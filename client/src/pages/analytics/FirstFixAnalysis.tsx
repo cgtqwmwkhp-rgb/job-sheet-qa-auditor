@@ -22,7 +22,7 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowDownRight, ArrowUpRight, Wrench, Users, Building2, ChevronRight, ArrowLeft, Sparkles, BrainCircuit, GraduationCap } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Wrench, Users, Building2, ChevronRight, ArrowLeft, Sparkles, BrainCircuit, GraduationCap, History, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CostCalculator } from "@/components/CostCalculator";
@@ -59,6 +59,14 @@ const customerData = [
   { name: "Weyland-Yutani", firstFix: 200, returnVisits: 10, rate: 95 },
   { name: "Stark Ind", firstFix: 150, returnVisits: 5, rate: 97 },
   { name: "Umbrella Corp", firstFix: 90, returnVisits: 30, rate: 75 },
+];
+
+const assetRepeatData = [
+  { assetId: "AST-8821", location: "Acme Corp - Plant Room B", returns15d: 2, returns30d: 3, returns45d: 3, returns60d: 4, status: "Critical" },
+  { assetId: "AST-9942", location: "Cyberdyne - Server Hall", returns15d: 1, returns30d: 1, returns45d: 2, returns60d: 2, status: "Warning" },
+  { assetId: "AST-7731", location: "Weyland - Med Bay", returns15d: 0, returns30d: 0, returns45d: 1, returns60d: 1, status: "Good" },
+  { assetId: "AST-1123", location: "Umbrella - Lab 4", returns15d: 3, returns30d: 4, returns45d: 5, returns60d: 6, status: "Critical" },
+  { assetId: "AST-5521", location: "Stark Ind - Workshop", returns15d: 0, returns30d: 1, returns45d: 1, returns60d: 1, status: "Good" },
 ];
 
 export default function FirstFixAnalysis() {
@@ -265,6 +273,10 @@ export default function FirstFixAnalysis() {
             <Building2 className="h-4 w-4 mr-2" />
             By Customer
           </TabsTrigger>
+          <TabsTrigger value="assets">
+            <History className="h-4 w-4 mr-2" />
+            Asset Health
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="engineer" className="space-y-4">
@@ -392,6 +404,67 @@ export default function FirstFixAnalysis() {
                         <Badge variant={customer.rate >= 90 ? "default" : customer.rate >= 80 ? "secondary" : "destructive"}>
                           {customer.rate}%
                         </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="assets" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Asset Repeat Visits</CardTitle>
+              <CardDescription>Identify assets with frequent return visits within specific time windows.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Asset ID</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead className="text-center">15 Days</TableHead>
+                    <TableHead className="text-center">30 Days</TableHead>
+                    <TableHead className="text-center">45 Days</TableHead>
+                    <TableHead className="text-center">60 Days</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {assetRepeatData.map((asset) => (
+                    <TableRow key={asset.assetId}>
+                      <TableCell className="font-mono font-medium">{asset.assetId}</TableCell>
+                      <TableCell>{asset.location}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={asset.returns15d > 0 ? "destructive" : "outline"} className={asset.returns15d === 0 ? "text-muted-foreground" : ""}>
+                          {asset.returns15d}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={asset.returns30d > 1 ? "destructive" : "outline"} className={asset.returns30d === 0 ? "text-muted-foreground" : ""}>
+                          {asset.returns30d}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center text-muted-foreground">{asset.returns45d}</TableCell>
+                      <TableCell className="text-center text-muted-foreground">{asset.returns60d}</TableCell>
+                      <TableCell className="text-right">
+                        {asset.status === "Critical" && (
+                          <Badge variant="destructive" className="gap-1">
+                            <AlertTriangle className="h-3 w-3" /> Critical
+                          </Badge>
+                        )}
+                        {asset.status === "Warning" && (
+                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
+                            Warning
+                          </Badge>
+                        )}
+                        {asset.status === "Good" && (
+                          <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                            Good
+                          </Badge>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
