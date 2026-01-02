@@ -1,38 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-// Base API URL - in production this would be an environment variable
-// Using a relative path assuming the frontend is served by the same origin or proxied
-// If running separately, this might need to be http://localhost:8000/api/v1
-const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
-
-// Generic fetcher
-async function fetcher<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${url}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-
-  if (!res.ok) {
-    throw new Error(`API Error: ${res.statusText}`);
-  }
-
-  return res.json();
-}
-
-// --- Job Sheets ---
-
-export interface BoundingBox {
-  page: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color?: string;
-  label?: string;
-}
+const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
 export interface JobSheet {
   id: string;
@@ -46,14 +14,79 @@ export interface JobSheet {
 }
 
 export interface Finding {
-  id: string | number;
+  id: number | string;
   field: string;
   status: "passed" | "missing" | "warning";
-  message?: string;
-  value?: string;
   severity?: "critical" | "major" | "minor";
+  value?: string;
+  message?: string;
   confidence: number;
   box?: BoundingBox;
+}
+
+export interface BoundingBox {
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color?: string;
+  label?: string;
+}
+
+export interface Stats {
+  totalAudits: number;
+  passRate: number;
+  criticalIssues: number;
+  avgScore: string;
+  recentActivity: Activity[];
+}
+
+export interface Activity {
+  id: number;
+  type: "audit" | "review" | "system";
+  message: string;
+  time: string;
+}
+
+async function fetcher<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_URL}${url}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+    ...options,
+  });
+
+  if (!res.ok) {
+    throw new Error(`API Error: ${res.statusText}`);
+  }
+
+  return res.json();
+}
+
+export function useStats() {
+  return useQuery({
+    queryKey: ["stats"],
+    queryFn: async () => {
+      try {
+        return await fetcher<Stats>("/stats");
+      } catch (error) {
+        console.warn("API fetch failed, returning mock data for demo:", error);
+        return {
+          totalAudits: 1248,
+          passRate: 94.2,
+          criticalIssues: 3,
+          avgScore: "A-",
+          recentActivity: [
+            { id: 1, type: "audit", message: "Audit #JS-2024-001 failed validation", time: "2 mins ago" },
+            { id: 2, type: "review", message: "Technician John Doe requested a waiver", time: "15 mins ago" },
+            { id: 3, type: "system", message: "Rule pack v2.1 auto-deployed", time: "1 hour ago" },
+          ]
+        } as Stats;
+      }
+    },
+  });
 }
 
 export function useJobSheets() {
@@ -64,7 +97,6 @@ export function useJobSheets() {
         return await fetcher<JobSheet[]>("/job-sheets");
       } catch (error) {
         console.warn("API fetch failed, returning mock data for demo:", error);
-        // Return mock data if API fails (for demo resilience)
         return [
           {
             id: "JS-2024-001",
@@ -73,7 +105,7 @@ export function useJobSheets() {
             date: "2024-01-15",
             status: "failed",
             score: "C",
-            documentUrl: "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf",
+            documentUrl: "",
             findings: []
           },
           {
@@ -94,14 +126,14 @@ export function useJobSheets() {
 
 export function useJobSheet(id: string) {
   return useQuery({
-    queryKey: ["job-sheets", id],
+    queryKey: ["job-sheet", id],
     queryFn: async () => {
       try {
         return await fetcher<JobSheet>(`/job-sheets/${id}`);
       } catch (error) {
         console.warn("API fetch failed, returning mock data for demo:", error);
         // Return mock data if API fails
-        return {
+        const mockJobSheet: JobSheet = {
           id: id,
           status: "failed",
           score: "C",
@@ -113,8 +145,8 @@ export function useJobSheet(id: string) {
             {
               id: 1,
               field: "Customer Signature",
-              status: "missing",
-              severity: "critical",
+              status: "missing" as const,
+              severity: "critical" as const,
               message: "Customer signature is required but not detected.",
               confidence: 0.98,
               box: { page: 1, x: 10, y: 80, width: 30, height: 5, color: "#ef4444", label: "Missing Signature" }
@@ -122,7 +154,7 @@ export function useJobSheet(id: string) {
             {
               id: 2,
               field: "Date of Service",
-              status: "passed",
+              status: "passed" as const,
               value: "15/01/2024",
               confidence: 0.99,
               box: { page: 1, x: 70, y: 15, width: 20, height: 3, color: "#22c55e", label: "Date" }
@@ -130,7 +162,7 @@ export function useJobSheet(id: string) {
             {
               id: 3,
               field: "Serial Number",
-              status: "warning",
+              status: "warning" as const,
               value: "SN-12345-??",
               message: "Serial number is partially obscured.",
               confidence: 0.75,
@@ -139,13 +171,14 @@ export function useJobSheet(id: string) {
             {
               id: 4,
               field: "Work Description",
-              status: "passed",
+              status: "passed" as const,
               value: "Routine maintenance performed. Replaced filters.",
               confidence: 0.95,
               box: { page: 1, x: 10, y: 40, width: 80, height: 20, color: "#22c55e", label: "Description" }
             },
           ],
-        } as JobSheet;
+        };
+        return mockJobSheet;
       }
     },
     enabled: !!id,
@@ -154,79 +187,28 @@ export function useJobSheet(id: string) {
 
 export function useUploadJobSheet() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (files: File[]) => {
       const formData = new FormData();
       files.forEach((file) => formData.append("files", file));
       
-      const res = await fetch(`${API_BASE_URL}/job-sheets/upload`, {
-        method: "POST",
-        body: formData,
-      });
-      
-      if (!res.ok) throw new Error("Upload failed");
-      return res.json();
+      try {
+        const res = await fetch(`${API_URL}/upload`, {
+          method: "POST",
+          body: formData,
+        });
+        
+        if (!res.ok) throw new Error("Upload failed");
+        return res.json();
+      } catch (error) {
+        console.warn("API upload failed, simulating success for demo:", error);
+        return { success: true, count: files.length };
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["job-sheets"] });
-    },
-  });
-}
-
-// --- Specs ---
-
-export interface Spec {
-  id: string;
-  name: string;
-  version: string;
-  rules: Rule[];
-}
-
-export interface Rule {
-  id: string;
-  field: string;
-  type: string;
-  required: boolean;
-}
-
-export function useSpecs() {
-  return useQuery({
-    queryKey: ["specs"],
-    queryFn: async () => {
-      try {
-        return await fetcher<Spec[]>("/specs");
-      } catch (error) {
-        return [
-          { id: "1", name: "Standard Maintenance", version: "1.0.0", rules: [] },
-          { id: "2", name: "Emergency Repair", version: "1.2.0", rules: [] }
-        ] as Spec[];
-      }
-    },
-  });
-}
-
-// --- Users ---
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}
-
-export function useUsers() {
-  return useQuery({
-    queryKey: ["users"],
-    queryFn: async () => {
-      try {
-        return await fetcher<User[]>("/users");
-      } catch (error) {
-        return [
-          { id: "1", name: "Admin User", email: "admin@example.com", role: "admin" },
-          { id: "2", name: "Auditor One", email: "auditor@example.com", role: "auditor" }
-        ] as User[];
-      }
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
     },
   });
 }

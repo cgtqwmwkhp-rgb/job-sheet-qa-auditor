@@ -1,19 +1,22 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, CheckCircle2, Download, Eye, Flag } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, Eye, Flag, MessageSquare } from "lucide-react";
 import { useState } from "react";
-import { DocumentViewer, BoundingBox } from "@/components/DocumentViewer";
-import { useJobSheet } from "@/lib/api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DocumentViewer, BoundingBox as ViewerBoundingBox } from "@/components/DocumentViewer";
+import { useJobSheet, Finding as ApiFinding, BoundingBox as ApiBoundingBox } from "@/lib/api";
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AuditResults() {
-  const [location] = useLocation();
+  const [_location] = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
   const id = searchParams.get("id") || "JS-2024-001"; // Default ID for demo
   
@@ -21,8 +24,6 @@ export default function AuditResults() {
   // For now we'll rely on the mock data inside the hook or fallback
   const { data: auditData, isLoading, error } = useJobSheet(id);
   
-  const [activeBoxId, setActiveBoxId] = useState<string | number | null>(null);
-
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -144,23 +145,35 @@ export default function AuditResults() {
     };
     
     // Use mock data if API fails (since we don't have a real backend yet)
-    return <AuditResultsContent auditData={mockData} />;
+    return <AuditResultsContent auditData={mockData as unknown as AuditData} />;
   }
 
   return <AuditResultsContent auditData={auditData} />;
 }
 
-function AuditResultsContent({ auditData }: { auditData: any }) {
-  const [activeBoxId, setActiveBoxId] = useState<string | number | null>(null);
+interface AuditData {
+  id: string;
+  status: string;
+  score: string;
+  date: string;
+  technician: string;
+  documentUrl: string;
+  findings: ApiFinding[];
+}
 
-  const boxes: BoundingBox[] = auditData.findings
-    .filter((f: any) => f.box)
-    .map((f: any) => ({
+function AuditResultsContent({ auditData }: { auditData: AuditData }) {
+  const [activeBoxId, setActiveBoxId] = useState<string | number | null>(null);
+  const [annotationOpen, setAnnotationOpen] = useState(false);
+  const [newBox, setNewBox] = useState<ViewerBoundingBox | null>(null);
+  const [annotationLabel, setAnnotationLabel] = useState("");
+  const [annotationComment, setAnnotationComment] = useState("");
+
+  const boxes: ViewerBoundingBox[] = auditData.findings
+    .filter((f: ApiFinding) => f.box)
+    .map((f: ApiFinding) => ({
       id: f.id,
       ...f.box
-    } as BoundingBox));
-
-
+    } as ViewerBoundingBox));
 
   const handleBoxClick = (id: string | number) => {
     setActiveBoxId(id);
@@ -170,11 +183,22 @@ function AuditResultsContent({ auditData }: { auditData: any }) {
     }
   };
 
-  const handleBoxCreate = (box: BoundingBox) => {
-    // In a real app, this would open a dialog to create a new finding
-    console.log("New box created:", box);
-    // For demo, we'll just log it
-    alert(`New annotation created at ${Math.round(box.x)}%, ${Math.round(box.y)}%`);
+  const handleBoxCreate = (box: ViewerBoundingBox) => {
+    setNewBox(box);
+    setAnnotationOpen(true);
+  };
+
+  const submitAnnotation = () => {
+    console.log("New annotation created:", {
+      box: newBox,
+      label: annotationLabel,
+      comment: annotationComment
+    });
+    setAnnotationOpen(false);
+    setAnnotationLabel("");
+    setAnnotationComment("");
+    setNewBox(null);
+    alert("Annotation added successfully!");
   };
 
   return (
@@ -230,14 +254,113 @@ function AuditResultsContent({ auditData }: { auditData: any }) {
                     <TabsTrigger value="all">All Findings</TabsTrigger>
                     <TabsTrigger value="critical" className="text-destructive">Critical Issues</TabsTrigger>
                     <TabsTrigger value="warnings" className="text-orange-500">Warnings</TabsTrigger>
+                    <TabsTrigger value="passed" className="text-green-600">Passed</TabsTrigger>
                   </TabsList>
                 </div>
                 
-                <ScrollArea className="flex-1 p-4">
-                  <div className="space-y-4">
-                    {auditData.findings.map((finding: any) => (
-                      <div 
-                        key={finding.id}
+                <TabsContent value="all" className="flex-1 p-0 m-0 min-h-0">
+                  <FindingsList findings={auditData.findings} activeBoxId={activeBoxId} setActiveBoxId={setActiveBoxId} />
+                </TabsContent>
+                <TabsContent value="critical" className="flex-1 p-0 m-0 min-h-0">
+                  <FindingsList 
+                    findings={auditData.findings.filter(f => f.severity === 'critical' || f.status === 'missing')} 
+                    activeBoxId={activeBoxId} 
+                    setActiveBoxId={setActiveBoxId} 
+                  />
+                </TabsContent>
+                <TabsContent value="warnings" className="flex-1 p-0 m-0 min-h-0">
+                  <FindingsList 
+                    findings={auditData.findings.filter(f => f.status === 'warning')} 
+                    activeBoxId={activeBoxId} 
+                    setActiveBoxId={setActiveBoxId} 
+                  />
+                </TabsContent>
+                <TabsContent value="passed" className="flex-1 p-0 m-0 min-h-0">
+                  <FindingsList 
+                    findings={auditData.findings.filter(f => f.status === 'passed')} 
+                    activeBoxId={activeBoxId} 
+                    setActiveBoxId={setActiveBoxId} 
+                  />
+                </TabsContent>
+              </Tabs>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      <Dialog open={annotationOpen} onOpenChange={setAnnotationOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Annotation</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Label</Label>
+              <Select value={annotationLabel} onValueChange={setAnnotationLabel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a label type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="missing_signature">Missing Signature</SelectItem>
+                  <SelectItem value="incorrect_date">Incorrect Date</SelectItem>
+                  <SelectItem value="illegible_text">Illegible Text</SelectItem>
+                  <SelectItem value="other">Other Issue</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Comments</Label>
+              <Textarea 
+                placeholder="Add details about this annotation..." 
+                value={annotationComment}
+                onChange={(e) => setAnnotationComment(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAnnotationOpen(false)}>Cancel</Button>
+            <Button onClick={submitAnnotation} disabled={!annotationLabel}>Save Annotation</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </DashboardLayout>
+  );
+}
+
+function FindingsList({ findings, activeBoxId, setActiveBoxId }: { 
+  findings: ApiFinding[], 
+  activeBoxId: string | number | null, 
+  setActiveBoxId: (id: string | number) => void 
+}) {
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [selectedFinding, setSelectedFinding] = useState<ApiFinding | null>(null);
+  const [feedbackType, setFeedbackType] = useState("incorrect");
+  const [feedbackComment, setFeedbackComment] = useState("");
+
+  const handleReportIssue = (finding: ApiFinding, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedFinding(finding);
+    setFeedbackOpen(true);
+  };
+
+  const submitFeedback = () => {
+    console.log("Feedback submitted:", {
+      findingId: selectedFinding?.id,
+      type: feedbackType,
+      comment: feedbackComment
+    });
+    setFeedbackOpen(false);
+    setFeedbackComment("");
+    alert("Thank you for your feedback. It has been logged for review.");
+  };
+
+  return (
+    <>
+      <ScrollArea className="h-full p-4">
+        <div className="space-y-4">
+          {findings.map((finding: ApiFinding) => (
+                        <div 
+                          key={finding.id}
                         id={`finding-${finding.id}`}
                         className={`p-4 rounded-lg border transition-all ${
                           activeBoxId === finding.id ? 'ring-2 ring-offset-2 ring-primary' : ''
@@ -283,16 +406,55 @@ function AuditResultsContent({ auditData }: { auditData: any }) {
                               Override
                             </Button>
                           )}
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 text-xs text-muted-foreground hover:text-primary ml-auto"
+                            onClick={(e) => handleReportIssue(finding, e)}
+                          >
+                            <MessageSquare className="w-3 h-3 mr-1" /> Report Issue
+                          </Button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </Tabs>
-            </div>
-          </Card>
+          ))}
         </div>
-      </div>
-    </DashboardLayout>
+      </ScrollArea>
+
+      <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report Issue with Finding</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Issue Type</Label>
+              <Select value={feedbackType} onValueChange={setFeedbackType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="incorrect">Incorrect Extraction</SelectItem>
+                  <SelectItem value="false_positive">False Positive</SelectItem>
+                  <SelectItem value="missed_context">Missed Context</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Comments</Label>
+              <Textarea 
+                placeholder="Describe the issue..." 
+                value={feedbackComment}
+                onChange={(e) => setFeedbackComment(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFeedbackOpen(false)}>Cancel</Button>
+            <Button onClick={submitFeedback}>Submit Report</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
