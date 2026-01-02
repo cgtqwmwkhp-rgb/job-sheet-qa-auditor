@@ -77,3 +77,11 @@
 - [x] Connect User Management to real API
 - [x] Connect Audit Log to real API
 - [x] Connect Settings to real configuration
+
+## Phase 5: OCR & AI Analysis Pipeline
+- [x] Implement Mistral OCR service for document text extraction
+- [x] Implement Gemini 2.5 analysis service for job sheet validation
+- [x] Connect OCR to upload workflow (process endpoint)
+- [x] Connect analysis to audit result generation
+- [x] Add processing status indicators in UI
+- [ ] Test end-to-end pipeline with sample documents

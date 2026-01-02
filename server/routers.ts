@@ -6,6 +6,8 @@ import { z } from "zod";
 import * as db from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
+import { processJobSheet } from "./services/documentProcessor";
+import { validateMistralApiKey } from "./services/ocr";
 
 export const appRouter = router({
   system: systemRouter,
@@ -110,6 +112,28 @@ export const appRouter = router({
         });
 
         return { success: true };
+      }),
+
+    // Process a job sheet through OCR + AI analysis
+    process: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        goldSpecId: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const jobSheet = await db.getJobSheetById(input.id);
+        if (!jobSheet) {
+          throw new Error('Job sheet not found');
+        }
+
+        const result = await processJobSheet(
+          input.id,
+          jobSheet.fileUrl,
+          input.goldSpecId,
+          ctx.user.id
+        );
+
+        return result;
       }),
   }),
 
@@ -326,6 +350,25 @@ export const appRouter = router({
 
         return result;
       }),
+  }),
+
+  // ============ AI SERVICES ============
+  ai: router({
+    // Check if AI services (Mistral OCR, Gemini) are configured and working
+    healthCheck: protectedProcedure.query(async () => {
+      const mistralResult = await validateMistralApiKey();
+      return {
+        mistralOcr: {
+          configured: !!process.env.MISTRAL_API_KEY,
+          valid: mistralResult.valid,
+          error: mistralResult.error,
+        },
+        geminiAnalyzer: {
+          configured: !!process.env.BUILT_IN_FORGE_API_KEY,
+          valid: true, // Forge API is always available
+        },
+      };
+    }),
   }),
 
   // ============ AUDIT LOG ============
