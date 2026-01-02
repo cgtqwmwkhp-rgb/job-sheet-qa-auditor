@@ -45,7 +45,6 @@ const PageLoader = () => (
     </div>
   </div>
 );
-
 function Router() {
   const { user, isLoading } = useAuth();
   const [location, setLocation] = useLocation();
