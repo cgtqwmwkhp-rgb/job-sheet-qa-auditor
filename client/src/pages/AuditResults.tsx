@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Download, Eye, Flag, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, Eye, Flag } from "lucide-react";
 import { useState } from "react";
+import { DocumentViewer, BoundingBox } from "@/components/DocumentViewer";
 
 // Mock Data for Audit Result
 const auditData = {
@@ -16,6 +17,7 @@ const auditData = {
   technician: "John Doe",
   date: "2024-01-15",
   site: "London HQ",
+  documentUrl: "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf", // Sample PDF
   findings: [
     {
       id: 1,
@@ -24,6 +26,7 @@ const auditData = {
       severity: "critical",
       message: "Customer signature is required but not detected.",
       confidence: 0.98,
+      box: { page: 1, x: 10, y: 80, width: 30, height: 5, color: "#ef4444", label: "Missing Signature" }
     },
     {
       id: 2,
@@ -31,6 +34,7 @@ const auditData = {
       status: "passed",
       value: "15/01/2024",
       confidence: 0.99,
+      box: { page: 1, x: 70, y: 15, width: 20, height: 3, color: "#22c55e", label: "Date" }
     },
     {
       id: 3,
@@ -39,6 +43,7 @@ const auditData = {
       value: "SN-12345-??",
       message: "Serial number is partially obscured.",
       confidence: 0.75,
+      box: { page: 1, x: 40, y: 30, width: 25, height: 4, color: "#f97316", label: "Serial #" }
     },
     {
       id: 4,
@@ -46,12 +51,29 @@ const auditData = {
       status: "passed",
       value: "Routine maintenance performed. Replaced filters.",
       confidence: 0.95,
+      box: { page: 1, x: 10, y: 40, width: 80, height: 20, color: "#22c55e", label: "Description" }
     },
   ],
 };
 
 export default function AuditResults() {
-  const [zoom, setZoom] = useState(100);
+  const [activeBoxId, setActiveBoxId] = useState<string | number | null>(null);
+
+  const boxes: BoundingBox[] = auditData.findings
+    .filter(f => f.box)
+    .map(f => ({
+      id: f.id,
+      ...f.box
+    } as BoundingBox));
+
+  const handleBoxClick = (id: string | number) => {
+    setActiveBoxId(id);
+    // Scroll to finding in the list
+    const element = document.getElementById(`finding-${id}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -85,39 +107,13 @@ export default function AuditResults() {
         {/* Split Screen Content */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
           {/* Left Panel: Document Viewer */}
-          <Card className="flex flex-col h-full overflow-hidden">
-            <CardHeader className="py-3 px-4 border-b flex flex-row items-center justify-between shrink-0 bg-muted/30">
-              <CardTitle className="text-sm font-medium">Document Viewer</CardTitle>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.max(50, z - 10))}>
-                  <ZoomOut className="w-4 h-4" />
-                </Button>
-                <span className="text-xs w-12 text-center">{zoom}%</span>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom(z => Math.min(200, z + 10))}>
-                  <ZoomIn className="w-4 h-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <div className="flex-1 bg-muted/50 overflow-auto p-4 flex items-center justify-center relative">
-              {/* Placeholder for PDF/Image Viewer */}
-              <div 
-                className="bg-white shadow-lg transition-transform duration-200 origin-center"
-                style={{ 
-                  width: `${zoom * 4}px`, 
-                  height: `${zoom * 6}px`,
-                  transform: `scale(${zoom / 100})` 
-                }}
-              >
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground border-2 border-dashed border-muted m-2">
-                  Document Preview
-                </div>
-                
-                {/* Overlay Bounding Boxes (Example) */}
-                <div className="absolute top-[80%] left-[10%] w-[30%] h-[5%] border-2 border-red-500 bg-red-500/10" title="Missing Signature" />
-                <div className="absolute top-[15%] right-[10%] w-[20%] h-[3%] border-2 border-green-500 bg-green-500/10" title="Date" />
-              </div>
-            </div>
-          </Card>
+          <div className="h-full overflow-hidden">
+            <DocumentViewer 
+              url={auditData.documentUrl} 
+              boxes={boxes}
+              onBoxClick={handleBoxClick}
+            />
+          </div>
 
           {/* Right Panel: Audit Findings */}
           <Card className="flex flex-col h-full overflow-hidden">
@@ -138,12 +134,16 @@ export default function AuditResults() {
                   <div className="space-y-4">
                     {auditData.findings.map((finding) => (
                       <div 
-                        key={finding.id} 
-                        className={`p-4 rounded-lg border ${
+                        key={finding.id}
+                        id={`finding-${finding.id}`}
+                        className={`p-4 rounded-lg border transition-all ${
+                          activeBoxId === finding.id ? 'ring-2 ring-offset-2 ring-primary' : ''
+                        } ${
                           finding.status === 'missing' ? 'border-red-200 bg-red-50' :
                           finding.status === 'warning' ? 'border-orange-200 bg-orange-50' :
                           'border-green-200 bg-green-50'
                         }`}
+                        onClick={() => setActiveBoxId(finding.id)}
                       >
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
