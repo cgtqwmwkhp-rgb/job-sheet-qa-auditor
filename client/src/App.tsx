@@ -1,65 +1,80 @@
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import Dashboard from "./pages/Dashboard";
-import UploadPage from "./pages/Upload";
-import AuditResults from "./pages/AuditResults";
-import HoldQueue from "./pages/HoldQueue";
-import SpecManagement from "./pages/SpecManagement";
-import SearchPage from "./pages/Search";
-import UserManagement from "./pages/UserManagement";
-import ExecutiveDashboard from "./pages/analytics/ExecutiveDashboard";
-import DefectAnalysis from "./pages/analytics/DefectAnalysis";
-import TechnicianPerformance from "./pages/analytics/TechnicianPerformance";
-import FirstFixAnalysis from "./pages/analytics/FirstFixAnalysis";
+import { Loader2 } from "lucide-react";
+import { OnboardingTour } from "@/components/OnboardingTour";
 
-import AIAnalyst from "./pages/analytics/AIAnalyst";
-import ReportStudio from "./pages/analytics/ReportStudio";
-import PortalLogin from "./pages/portal/PortalLogin";
-import TechnicianDashboard from "./pages/portal/TechnicianDashboard";
-import DisputeManagement from "./pages/DisputeManagement";
-import AuditLog from "./pages/AuditLog";
-import Settings from "./pages/Settings";
+// Lazy load pages for performance optimization
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const UploadPage = lazy(() => import("./pages/Upload"));
+const AuditResults = lazy(() => import("./pages/AuditResults"));
+const HoldQueue = lazy(() => import("./pages/HoldQueue"));
+const SpecManagement = lazy(() => import("./pages/SpecManagement"));
+const SearchPage = lazy(() => import("./pages/Search"));
+const UserManagement = lazy(() => import("./pages/UserManagement"));
+const ExecutiveDashboard = lazy(() => import("./pages/analytics/ExecutiveDashboard"));
+const DefectAnalysis = lazy(() => import("./pages/analytics/DefectAnalysis"));
+const TechnicianPerformance = lazy(() => import("./pages/analytics/TechnicianPerformance"));
+const FirstFixAnalysis = lazy(() => import("./pages/analytics/FirstFixAnalysis"));
+const AIAnalyst = lazy(() => import("./pages/analytics/AIAnalyst"));
+const ReportStudio = lazy(() => import("./pages/analytics/ReportStudio"));
+const PortalLogin = lazy(() => import("./pages/portal/PortalLogin"));
+const TechnicianDashboard = lazy(() => import("./pages/portal/TechnicianDashboard"));
+const DisputeManagement = lazy(() => import("./pages/DisputeManagement"));
+const AuditLog = lazy(() => import("./pages/AuditLog"));
+const Settings = lazy(() => import("./pages/Settings"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
+// Loading fallback component
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="flex flex-col items-center gap-4">
+      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <p className="text-muted-foreground text-sm animate-pulse">Loading application...</p>
+    </div>
+  </div>
+);
 
 function Router() {
   return (
-    <Switch>
-      <Route path={"/"} component={Dashboard} />
-      <Route path={"/upload"} component={UploadPage} />
-      <Route path={"/audits"} component={AuditResults} />
-      <Route path={"/hold-queue"} component={HoldQueue} />
-      <Route path={"/specs"} component={SpecManagement} />
-      <Route path={"/search"} component={SearchPage} />
-      <Route path={"/users"} component={UserManagement} />
-      <Route path={"/analytics"} component={ExecutiveDashboard} />
-      <Route path={"/analytics/defects"} component={DefectAnalysis} />
-      <Route path={"/analytics/technicians"} component={TechnicianPerformance} />
-      <Route path={"/analytics/first-fix"} component={FirstFixAnalysis} />
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path={"/"} component={Dashboard} />
+        <Route path={"/upload"} component={UploadPage} />
+        <Route path={"/audits"} component={AuditResults} />
+        <Route path={"/hold-queue"} component={HoldQueue} />
+        <Route path={"/specs"} component={SpecManagement} />
+        <Route path={"/search"} component={SearchPage} />
+        <Route path={"/users"} component={UserManagement} />
+        <Route path={"/analytics"} component={ExecutiveDashboard} />
+        <Route path={"/analytics/defects"} component={DefectAnalysis} />
+        <Route path={"/analytics/technicians"} component={TechnicianPerformance} />
+        <Route path={"/analytics/first-fix"} component={FirstFixAnalysis} />
 
-      <Route path={"/analytics/ai"} component={AIAnalyst} />
-      <Route path={"/analytics/reports"} component={ReportStudio} />
-      <Route path={"/portal/login"} component={PortalLogin} />
-      <Route path={"/portal/dashboard"} component={TechnicianDashboard} />
-      <Route path="/disputes">
-        <ProtectedRoute component={DisputeManagement} allowedRoles={['admin', 'qa_lead']} />
-      </Route>
-      <Route path="/audit-log">
-        <ProtectedRoute component={AuditLog} allowedRoles={['admin']} />
-      </Route>
-      <Route path="/settings">
-        <ProtectedRoute component={Settings} allowedRoles={['admin', 'qa_lead']} />
-      </Route>
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
-    </Switch>
+        <Route path={"/analytics/ai"} component={AIAnalyst} />
+        <Route path={"/analytics/reports"} component={ReportStudio} />
+        <Route path={"/portal/login"} component={PortalLogin} />
+        <Route path={"/portal/dashboard"} component={TechnicianDashboard} />
+        <Route path="/disputes">
+          <ProtectedRoute component={DisputeManagement} allowedRoles={['admin', 'qa_lead']} />
+        </Route>
+        <Route path="/audit-log">
+          <ProtectedRoute component={AuditLog} allowedRoles={['admin']} />
+        </Route>
+        <Route path="/settings">
+          <ProtectedRoute component={Settings} allowedRoles={['admin', 'qa_lead']} />
+        </Route>
+        <Route path={"/404"} component={NotFound} />
+        {/* Final fallback route */}
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
@@ -73,12 +88,13 @@ const queryClient = new QueryClient();
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="light">
+      <ThemeProvider defaultTheme="light" switchable={true}>
         <AuthProvider>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
               <Toaster />
               <Router />
+              <OnboardingTour />
             </TooltipProvider>
           </QueryClientProvider>
         </AuthProvider>

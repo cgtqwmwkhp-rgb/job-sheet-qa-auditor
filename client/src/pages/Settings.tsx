@@ -11,14 +11,19 @@ import {
   UserCog, 
   Palette, 
   Globe,
-  BrainCircuit
+  BrainCircuit,
+  Moon,
+  Sun
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function Settings() {
+  const { theme, toggleTheme } = useTheme();
+
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
       <div className="pb-6 border-b border-border/50">
@@ -54,10 +59,17 @@ export default function Settings() {
               </TabsTrigger>
               <TabsTrigger 
                 value="general" 
-                className="w-full justify-start px-4 py-2 data-[state=active]:bg-muted data-[state=active]:text-foreground"
+                className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
               >
-                <Globe className="w-4 h-4 mr-2" />
+                <Globe className="w-4 h-4 mr-3" />
                 General
+              </TabsTrigger>
+              <TabsTrigger 
+                value="appearance" 
+                className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
+              >
+                <Palette className="w-4 h-4 mr-3" />
+                Appearance
               </TabsTrigger>
               <TabsTrigger 
                 value="security" 
@@ -93,6 +105,33 @@ export default function Settings() {
                 <p className="text-sm text-muted-foreground">Configure the behavior, tone, and strictness of the AI analysis engine.</p>
               </div>
               <AIPersonaSettings />
+            </TabsContent>
+
+            <TabsContent value="appearance" className="mt-0 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Appearance Settings</CardTitle>
+                  <CardDescription>Customize the look and feel of the application.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex items-center justify-between py-2">
+                    <div className="space-y-0.5">
+                      <Label className="text-base">Dark Mode</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Switch between light and dark themes.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Sun className="h-4 w-4 text-muted-foreground" />
+                      <Switch 
+                        checked={theme === 'dark'} 
+                        onCheckedChange={toggleTheme}
+                      />
+                      <Moon className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="general" className="mt-0 space-y-6">
