@@ -5,6 +5,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Bell, User } from "lucide-react";
+import { CommandCenter } from "./CommandCenter";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -29,6 +30,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="w-px h-4 bg-border mx-2" />
           <div className="flex-1" />
           <div className="flex items-center gap-2">
+            <CommandCenter />
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="h-5 w-5" />
               <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive" />

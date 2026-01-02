@@ -6,6 +6,8 @@ export interface JobSheet {
   id: string;
   technician: string;
   site: string;
+  customer: string;
+  assetType: string;
   date: string;
   status: "passed" | "failed" | "review";
   score: string;
@@ -102,6 +104,8 @@ export function useJobSheets() {
             id: "JS-2024-001",
             technician: "John Doe",
             site: "London HQ",
+            customer: "Acme Corp",
+            assetType: "HVAC Unit",
             date: "2024-01-15",
             status: "failed",
             score: "C",
@@ -112,6 +116,8 @@ export function useJobSheets() {
             id: "JS-2024-002",
             technician: "Jane Smith",
             site: "Manchester Branch",
+            customer: "Global Tech",
+            assetType: "Generator",
             date: "2024-01-16",
             status: "passed",
             score: "A",
@@ -140,6 +146,8 @@ export function useJobSheet(id: string) {
           technician: "John Doe",
           date: "2024-01-15",
           site: "London HQ",
+          customer: "Acme Corp",
+          assetType: "HVAC Unit",
           documentUrl: "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf",
           findings: [
             {

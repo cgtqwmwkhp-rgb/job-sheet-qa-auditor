@@ -12,7 +12,12 @@ import HoldQueue from "./pages/HoldQueue";
 import SpecManagement from "./pages/SpecManagement";
 import SearchPage from "./pages/Search";
 import UserManagement from "./pages/UserManagement";
-import Analytics from "./pages/Analytics";
+import ExecutiveDashboard from "./pages/analytics/ExecutiveDashboard";
+import DefectAnalysis from "./pages/analytics/DefectAnalysis";
+import TechnicianPerformance from "./pages/analytics/TechnicianPerformance";
+import SiteIntelligence from "./pages/analytics/SiteIntelligence";
+import AIAnalyst from "./pages/analytics/AIAnalyst";
+import ReportStudio from "./pages/analytics/ReportStudio";
 
 
 function Router() {
@@ -25,7 +30,12 @@ function Router() {
       <Route path={"/specs"} component={SpecManagement} />
       <Route path={"/search"} component={SearchPage} />
       <Route path={"/users"} component={UserManagement} />
-      <Route path={"/analytics"} component={Analytics} />
+      <Route path={"/analytics"} component={ExecutiveDashboard} />
+      <Route path={"/analytics/defects"} component={DefectAnalysis} />
+      <Route path={"/analytics/technicians"} component={TechnicianPerformance} />
+      <Route path={"/analytics/sites"} component={SiteIntelligence} />
+      <Route path={"/analytics/ai"} component={AIAnalyst} />
+      <Route path={"/analytics/reports"} component={ReportStudio} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
