@@ -175,6 +175,22 @@ export const appRouter = router({
 
         return result;
       }),
+
+    activate: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await db.activateGoldSpec(input.id);
+
+        await db.logAction({
+          userId: ctx.user.id,
+          action: 'ACTIVATE_GOLD_SPEC',
+          entityType: 'gold_spec',
+          entityId: input.id,
+          details: { activated: true },
+        });
+
+        return result;
+      }),
   }),
 
   // ============ DISPUTES ============
@@ -290,6 +306,25 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         return db.getUserById(input.id);
+      }),
+
+    updateRole: adminProcedure
+      .input(z.object({
+        id: z.number(),
+        role: z.enum(['admin', 'qa_lead', 'technician', 'viewer']),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await db.updateUserRole(input.id, input.role);
+
+        await db.logAction({
+          userId: ctx.user.id,
+          action: 'UPDATE_USER_ROLE',
+          entityType: 'user',
+          entityId: input.id,
+          details: { newRole: input.role },
+        });
+
+        return result;
       }),
   }),
 

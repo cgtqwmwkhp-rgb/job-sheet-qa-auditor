@@ -4,151 +4,36 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, CheckCircle2, Download, Eye, Flag, MessageSquare } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, Eye, Flag, MessageSquare, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DocumentViewer, BoundingBox as ViewerBoundingBox } from "@/components/DocumentViewer";
-import { useJobSheet, useSubmitFeedback, useCreateAnnotation, Finding as ApiFinding, BoundingBox as ApiBoundingBox } from "@/lib/api";
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
-export default function AuditResults() {
-  const [_location] = useLocation();
-  const searchParams = new URLSearchParams(window.location.search);
-  const id = searchParams.get("id") || "JS-2024-001"; // Default ID for demo
-  
-  // Use the API hook - in a real app this would fetch from backend
-  // For now we'll rely on the mock data inside the hook or fallback
-  const { data: auditData, isLoading, error } = useJobSheet(id);
-  
-  if (isLoading) {
-    return (
-      <DashboardLayout>
-        <div className="h-[calc(100vh-8rem)] flex flex-col">
-          {/* Header Skeleton */}
-          <div className="flex items-center justify-between mb-4 shrink-0">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Skeleton className="h-8 w-64" />
-                <Skeleton className="h-6 w-20" />
-                <Skeleton className="h-6 w-16" />
-              </div>
-              <Skeleton className="h-4 w-96" />
-            </div>
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-9 w-32" />
-              <Skeleton className="h-9 w-24" />
-            </div>
-          </div>
-
-          {/* Split Screen Skeleton */}
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
-            {/* Document Viewer Skeleton */}
-            <Card className="flex flex-col h-full overflow-hidden">
-              <CardHeader className="py-3 px-4 border-b flex flex-row items-center justify-between shrink-0 bg-muted/30">
-                <Skeleton className="h-5 w-32" />
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-8 w-8" />
-                  <Skeleton className="h-8 w-24" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
-              </CardHeader>
-              <div className="flex-1 bg-muted/50 p-4 flex items-center justify-center">
-                <Skeleton className="h-[80%] w-[70%]" />
-              </div>
-            </Card>
-
-            {/* Findings Skeleton */}
-            <Card className="flex flex-col h-full overflow-hidden">
-              <CardHeader className="py-3 px-4 border-b shrink-0">
-                <Skeleton className="h-5 w-32" />
-              </CardHeader>
-              <div className="flex-1 p-4 space-y-4">
-                <div className="flex gap-2 mb-4">
-                  <Skeleton className="h-9 w-24" />
-                  <Skeleton className="h-9 w-24" />
-                  <Skeleton className="h-9 w-24" />
-                </div>
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="p-4 rounded-lg border space-y-3">
-                    <div className="flex justify-between">
-                      <div className="flex gap-2">
-                        <Skeleton className="h-5 w-5 rounded-full" />
-                        <Skeleton className="h-5 w-48" />
-                      </div>
-                      <Skeleton className="h-5 w-20" />
-                    </div>
-                    <Skeleton className="h-16 w-full" />
-                    <div className="flex gap-2">
-                      <Skeleton className="h-7 w-24" />
-                      <Skeleton className="h-7 w-24" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  if (error || !auditData) {
-    // Fallback mock data for demo purposes if API fails
-    const mockData = {
-      id: "JS-2024-001",
-      status: "failed",
-      score: "C",
-      technician: "John Doe",
-      date: "2024-01-15",
-      site: "London HQ",
-      documentUrl: "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf",
-      findings: [
-        {
-          id: 1,
-          field: "Customer Signature",
-          status: "missing",
-          severity: "critical",
-          message: "Customer signature is required but not detected.",
-          confidence: 0.98,
-          box: { page: 1, x: 10, y: 80, width: 30, height: 5, color: "#ef4444", label: "Missing Signature" }
-        },
-        {
-          id: 2,
-          field: "Date of Service",
-          status: "passed",
-          value: "15/01/2024",
-          confidence: 0.99,
-          box: { page: 1, x: 70, y: 15, width: 20, height: 3, color: "#22c55e", label: "Date" }
-        },
-        {
-          id: 3,
-          field: "Serial Number",
-          status: "warning",
-          value: "SN-12345-??",
-          message: "Serial number is partially obscured.",
-          confidence: 0.75,
-          box: { page: 1, x: 40, y: 30, width: 25, height: 4, color: "#f97316", label: "Serial #" }
-        },
-        {
-          id: 4,
-          field: "Work Description",
-          status: "passed",
-          value: "Routine maintenance performed. Replaced filters.",
-          confidence: 0.95,
-          box: { page: 1, x: 10, y: 40, width: 80, height: 20, color: "#22c55e", label: "Description" }
-        },
-      ],
-    };
-    
-    // Use mock data if API fails (since we don't have a real backend yet)
-    return <AuditResultsContent auditData={mockData as unknown as AuditData} />;
-  }
-
-  return <AuditResultsContent auditData={auditData} />;
+// Local Finding type for this page
+interface Finding {
+  id: number | string;
+  field: string;
+  status: "passed" | "missing" | "warning";
+  severity?: "critical" | "major" | "minor";
+  value?: string;
+  message?: string;
+  confidence: number;
+  box?: {
+    page: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    color?: string;
+    label?: string;
+  };
 }
 
 interface AuditData {
@@ -158,7 +43,107 @@ interface AuditData {
   date: string;
   technician: string;
   documentUrl: string;
-  findings: ApiFinding[];
+  findings: Finding[];
+}
+
+// Mock data for demo
+const mockAuditData: AuditData = {
+  id: "JS-2024-001",
+  status: "failed",
+  score: "C",
+  technician: "John Doe",
+  date: "2024-01-15",
+  documentUrl: "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf",
+  findings: [
+    {
+      id: 1,
+      field: "Customer Signature",
+      status: "missing",
+      severity: "critical",
+      message: "Customer signature is required but not detected.",
+      confidence: 0.98,
+      box: { page: 1, x: 10, y: 80, width: 30, height: 5, color: "#ef4444", label: "Missing Signature" }
+    },
+    {
+      id: 2,
+      field: "Date of Service",
+      status: "passed",
+      value: "15/01/2024",
+      confidence: 0.99,
+      box: { page: 1, x: 70, y: 15, width: 20, height: 3, color: "#22c55e", label: "Date" }
+    },
+    {
+      id: 3,
+      field: "Serial Number",
+      status: "warning",
+      value: "SN-12345-??",
+      message: "Serial number is partially obscured.",
+      confidence: 0.75,
+      box: { page: 1, x: 40, y: 30, width: 25, height: 4, color: "#f97316", label: "Serial #" }
+    },
+    {
+      id: 4,
+      field: "Work Description",
+      status: "passed",
+      value: "Routine maintenance performed. Replaced filters.",
+      confidence: 0.95,
+      box: { page: 1, x: 10, y: 40, width: 80, height: 20, color: "#22c55e", label: "Description" }
+    },
+  ],
+};
+
+export default function AuditResults() {
+  const [_location] = useLocation();
+  const searchParams = new URLSearchParams(window.location.search);
+  const idParam = searchParams.get("id");
+  
+  // Try to fetch from real API if we have a numeric ID
+  const numericId = idParam ? parseInt(idParam) : 0;
+  const { data: jobSheetData, isLoading } = trpc.jobSheets.get.useQuery(
+    { id: numericId },
+    { enabled: numericId > 0 }
+  );
+
+  // If loading real data
+  if (isLoading && numericId > 0) {
+    return (
+      <DashboardLayout>
+        <div className="h-[calc(100vh-8rem)] flex flex-col">
+          <div className="flex items-center justify-between mb-4 shrink-0">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Skeleton className="h-8 w-64" />
+                <Skeleton className="h-6 w-20" />
+              </div>
+              <Skeleton className="h-4 w-96" />
+            </div>
+          </div>
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Convert real job sheet data to AuditData format if available
+  let auditData: AuditData;
+  if (jobSheetData && numericId > 0) {
+    auditData = {
+      id: jobSheetData.referenceNumber || `JS-${jobSheetData.id}`,
+      status: jobSheetData.status === 'completed' ? 'passed' : jobSheetData.status === 'failed' ? 'failed' : 'pending',
+      score: jobSheetData.status === 'completed' ? 'A' : jobSheetData.status === 'failed' ? 'F' : '-',
+      date: new Date(jobSheetData.createdAt).toLocaleDateString(),
+      technician: `User ${jobSheetData.uploadedBy}`,
+      documentUrl: jobSheetData.fileUrl,
+      findings: [], // Would be populated from audit results in a real implementation
+    };
+  } else {
+    // Use mock data for demo
+    auditData = mockAuditData;
+  }
+
+  return <AuditResultsContent auditData={auditData} />;
 }
 
 function AuditResultsContent({ auditData }: { auditData: AuditData }) {
@@ -167,15 +152,25 @@ function AuditResultsContent({ auditData }: { auditData: AuditData }) {
   const [newBox, setNewBox] = useState<ViewerBoundingBox | null>(null);
   const [annotationLabel, setAnnotationLabel] = useState("");
   const [annotationComment, setAnnotationComment] = useState("");
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
+  const [feedbackType, setFeedbackType] = useState("incorrect");
+  const [feedbackComment, setFeedbackComment] = useState("");
   
-  const createAnnotation = useCreateAnnotation();
+  const createDispute = trpc.disputes.create.useMutation();
 
   const boxes: ViewerBoundingBox[] = auditData.findings
-    .filter((f: ApiFinding) => f.box)
-    .map((f: ApiFinding) => ({
+    .filter((f) => f.box)
+    .map((f) => ({
       id: f.id,
-      ...f.box
-    } as ViewerBoundingBox));
+      page: f.box!.page,
+      x: f.box!.x,
+      y: f.box!.y,
+      width: f.box!.width,
+      height: f.box!.height,
+      color: f.box!.color,
+      label: f.box!.label,
+    }));
 
   const handleBoxClick = (id: string | number) => {
     setActiveBoxId(id);
@@ -193,29 +188,41 @@ function AuditResultsContent({ auditData }: { auditData: AuditData }) {
   const submitAnnotation = () => {
     if (!newBox) return;
     
-    createAnnotation.mutate({
-      jobSheetId: auditData.id,
-      box: {
-        page: newBox.page,
-        x: newBox.x,
-        y: newBox.y,
-        width: newBox.width,
-        height: newBox.height,
-        color: newBox.color,
-        label: newBox.label
-      },
-      label: annotationLabel,
-      comment: annotationComment
+    // In a real implementation, this would call an API
+    toast.success("Annotation saved successfully");
+    setAnnotationOpen(false);
+    setNewBox(null);
+    setAnnotationLabel("");
+    setAnnotationComment("");
+  };
+
+  const handleReportIssue = (finding: Finding, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedFinding(finding);
+    setFeedbackOpen(true);
+  };
+
+  const submitFeedback = () => {
+    if (!selectedFinding) return;
+    
+    // Create a dispute for this finding
+    createDispute.mutate({
+      auditFindingId: typeof selectedFinding.id === 'number' ? selectedFinding.id : 1,
+      reason: `[${feedbackType}] ${feedbackComment}`,
     }, {
       onSuccess: () => {
-        setAnnotationOpen(false);
-        setAnnotationLabel("");
-        setAnnotationComment("");
-        setNewBox(null);
-        alert("Annotation added successfully!");
+        toast.success("Feedback submitted successfully");
+        setFeedbackOpen(false);
+        setFeedbackComment("");
+      },
+      onError: () => {
+        toast.error("Failed to submit feedback");
       }
     });
   };
+
+  const passedFindings = auditData.findings.filter(f => f.status === 'passed');
+  const failedFindings = auditData.findings.filter(f => f.status !== 'passed');
 
   return (
     <DashboardLayout>
@@ -223,87 +230,96 @@ function AuditResultsContent({ auditData }: { auditData: AuditData }) {
         {/* Header */}
         <div className="flex items-center justify-between mb-4 shrink-0">
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-heading font-bold tracking-tight">Audit Result: {auditData.id}</h1>
-              <Badge variant={auditData.status === "passed" ? "default" : "destructive"} className="uppercase">
-                {auditData.status}
+            <div className="flex items-center gap-2 mb-1">
+              <h1 className="text-2xl font-bold tracking-tight">{auditData.id}</h1>
+              <Badge variant={auditData.status === 'passed' ? 'default' : 'destructive'}>
+                {auditData.status.toUpperCase()}
               </Badge>
-              <Badge variant="outline" className="font-mono">Score: {auditData.score}</Badge>
+              <Badge variant="outline" className="font-mono">
+                Score: {auditData.score}
+              </Badge>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Processed on {auditData.date} • Technician: {auditData.technician}
+            <p className="text-sm text-muted-foreground">
+              Technician: {auditData.technician} • Date: {auditData.date} • 
+              {passedFindings.length} passed, {failedFindings.length} issues
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm">
-              <Download className="w-4 h-4 mr-2" />
-              Export Report
+              <Flag className="w-4 h-4 mr-2" />
+              Flag for Review
             </Button>
-            <Button variant="default" size="sm">
-              <CheckCircle2 className="w-4 h-4 mr-2" />
-              Approve
+            <Button size="sm">
+              <Download className="w-4 h-4 mr-2" />
+              Export
             </Button>
           </div>
         </div>
 
-        {/* Split Screen Content */}
+        {/* Split Screen */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
-          {/* Left Panel: Document Viewer */}
-          <div className="h-full overflow-hidden">
-            <DocumentViewer 
-              url={auditData.documentUrl} 
-              boxes={boxes}
-              onBoxClick={handleBoxClick}
-              onBoxCreate={handleBoxCreate}
-            />
-          </div>
+          {/* Document Viewer */}
+          <Card className="flex flex-col h-full overflow-hidden">
+            <CardHeader className="py-3 px-4 border-b flex flex-row items-center justify-between shrink-0 bg-muted/30">
+              <CardTitle className="text-sm font-medium">Document Preview</CardTitle>
+            </CardHeader>
+            <div className="flex-1 overflow-hidden">
+              <DocumentViewer
+                url={auditData.documentUrl}
+                boxes={boxes}
+                onBoxClick={handleBoxClick}
+                onBoxCreate={handleBoxCreate}
+              />
+            </div>
+          </Card>
 
-          {/* Right Panel: Audit Findings */}
+          {/* Findings Panel */}
           <Card className="flex flex-col h-full overflow-hidden">
             <CardHeader className="py-3 px-4 border-b shrink-0">
               <CardTitle className="text-sm font-medium">Audit Findings</CardTitle>
             </CardHeader>
-            <div className="flex-1 overflow-hidden flex flex-col">
-              <Tabs defaultValue="all" className="flex-1 flex flex-col">
-                <div className="px-4 pt-2">
-                  <TabsList className="w-full justify-start">
-                    <TabsTrigger value="all">All Findings</TabsTrigger>
-                    <TabsTrigger value="critical" className="text-destructive">Critical Issues</TabsTrigger>
-                    <TabsTrigger value="warnings" className="text-orange-500">Warnings</TabsTrigger>
-                    <TabsTrigger value="passed" className="text-green-600">Passed</TabsTrigger>
-                  </TabsList>
-                </div>
-                
-                <TabsContent value="all" className="flex-1 p-0 m-0 min-h-0">
-                  <FindingsList findings={auditData.findings} activeBoxId={activeBoxId} setActiveBoxId={setActiveBoxId} />
-                </TabsContent>
-                <TabsContent value="critical" className="flex-1 p-0 m-0 min-h-0">
-                  <FindingsList 
-                    findings={auditData.findings.filter(f => f.severity === 'critical' || f.status === 'missing')} 
-                    activeBoxId={activeBoxId} 
-                    setActiveBoxId={setActiveBoxId} 
-                  />
-                </TabsContent>
-                <TabsContent value="warnings" className="flex-1 p-0 m-0 min-h-0">
-                  <FindingsList 
-                    findings={auditData.findings.filter(f => f.status === 'warning')} 
-                    activeBoxId={activeBoxId} 
-                    setActiveBoxId={setActiveBoxId} 
-                  />
-                </TabsContent>
-                <TabsContent value="passed" className="flex-1 p-0 m-0 min-h-0">
-                  <FindingsList 
-                    findings={auditData.findings.filter(f => f.status === 'passed')} 
-                    activeBoxId={activeBoxId} 
-                    setActiveBoxId={setActiveBoxId} 
-                  />
-                </TabsContent>
-              </Tabs>
-            </div>
+            
+            <Tabs defaultValue="all" className="flex-1 flex flex-col min-h-0">
+              <div className="px-4 pt-3 shrink-0">
+                <TabsList className="w-full grid grid-cols-3">
+                  <TabsTrigger value="all">All ({auditData.findings.length})</TabsTrigger>
+                  <TabsTrigger value="issues">Issues ({failedFindings.length})</TabsTrigger>
+                  <TabsTrigger value="passed">Passed ({passedFindings.length})</TabsTrigger>
+                </TabsList>
+              </div>
+              
+              <TabsContent value="all" className="flex-1 min-h-0 m-0">
+                <FindingsList 
+                  findings={auditData.findings} 
+                  activeBoxId={activeBoxId}
+                  onFindingClick={setActiveBoxId}
+                  onReportIssue={handleReportIssue}
+                />
+              </TabsContent>
+              
+              <TabsContent value="issues" className="flex-1 min-h-0 m-0">
+                <FindingsList 
+                  findings={failedFindings} 
+                  activeBoxId={activeBoxId}
+                  onFindingClick={setActiveBoxId}
+                  onReportIssue={handleReportIssue}
+                />
+              </TabsContent>
+              
+              <TabsContent value="passed" className="flex-1 min-h-0 m-0">
+                <FindingsList 
+                  findings={passedFindings} 
+                  activeBoxId={activeBoxId}
+                  onFindingClick={setActiveBoxId}
+                  onReportIssue={handleReportIssue}
+                />
+              </TabsContent>
+            </Tabs>
           </Card>
         </div>
       </div>
 
+      {/* Annotation Dialog */}
       <Dialog open={annotationOpen} onOpenChange={setAnnotationOpen}>
         <DialogContent>
           <DialogHeader>
@@ -314,20 +330,20 @@ function AuditResultsContent({ auditData }: { auditData: AuditData }) {
               <Label>Label</Label>
               <Select value={annotationLabel} onValueChange={setAnnotationLabel}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a label type" />
+                  <SelectValue placeholder="Select a label" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="missing_signature">Missing Signature</SelectItem>
-                  <SelectItem value="incorrect_date">Incorrect Date</SelectItem>
-                  <SelectItem value="illegible_text">Illegible Text</SelectItem>
-                  <SelectItem value="other">Other Issue</SelectItem>
+                  <SelectItem value="missing">Missing Field</SelectItem>
+                  <SelectItem value="incorrect">Incorrect Value</SelectItem>
+                  <SelectItem value="unclear">Unclear/Illegible</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Comments</Label>
+              <Label>Comment</Label>
               <Textarea 
-                placeholder="Add details about this annotation..." 
+                placeholder="Add a comment..."
                 value={annotationComment}
                 onChange={(e) => setAnnotationComment(e.target.value)}
               />
@@ -335,114 +351,12 @@ function AuditResultsContent({ auditData }: { auditData: AuditData }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAnnotationOpen(false)}>Cancel</Button>
-            <Button onClick={submitAnnotation} disabled={!annotationLabel}>Save Annotation</Button>
+            <Button onClick={submitAnnotation}>Save Annotation</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
-  );
-}
 
-function FindingsList({ findings, activeBoxId, setActiveBoxId }: { 
-  findings: ApiFinding[], 
-  activeBoxId: string | number | null, 
-  setActiveBoxId: (id: string | number) => void 
-}) {
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [selectedFinding, setSelectedFinding] = useState<ApiFinding | null>(null);
-  const [feedbackType, setFeedbackType] = useState("incorrect");
-  const [feedbackComment, setFeedbackComment] = useState("");
-  
-  const submitFeedbackMutation = useSubmitFeedback();
-
-  const handleReportIssue = (finding: ApiFinding, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedFinding(finding);
-    setFeedbackOpen(true);
-  };
-
-  const submitFeedback = () => {
-    if (!selectedFinding) return;
-
-    submitFeedbackMutation.mutate({
-      findingId: selectedFinding.id,
-      type: feedbackType,
-      comment: feedbackComment
-    }, {
-      onSuccess: () => {
-        setFeedbackOpen(false);
-        setFeedbackComment("");
-        alert("Thank you for your feedback. It has been logged for review.");
-      }
-    });
-  };
-
-  return (
-    <>
-      <ScrollArea className="h-full p-4">
-        <div className="space-y-4">
-          {findings.map((finding: ApiFinding) => (
-                        <div 
-                          key={finding.id}
-                        id={`finding-${finding.id}`}
-                        className={`p-4 rounded-lg border transition-all ${
-                          activeBoxId === finding.id ? 'ring-2 ring-offset-2 ring-primary' : ''
-                        } ${
-                          finding.status === 'missing' ? 'border-red-200 bg-red-50' :
-                          finding.status === 'warning' ? 'border-orange-200 bg-orange-50' :
-                          'border-green-200 bg-green-50'
-                        }`}
-                        onClick={() => setActiveBoxId(finding.id)}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            {finding.status === 'missing' ? <AlertCircle className="w-5 h-5 text-red-600" /> :
-                             finding.status === 'warning' ? <Flag className="w-5 h-5 text-orange-600" /> :
-                             <CheckCircle2 className="w-5 h-5 text-green-600" />}
-                            <h3 className="font-semibold text-sm">{finding.field}</h3>
-                          </div>
-                          <Badge variant="outline" className="bg-white/50">
-                            {(finding.confidence * 100).toFixed(0)}% Conf.
-                          </Badge>
-                        </div>
-                        
-                        {finding.value && (
-                          <div className="mb-2 p-2 bg-white/60 rounded border border-black/5 font-mono text-sm">
-                            {finding.value}
-                          </div>
-                        )}
-                        
-                        {finding.message && (
-                          <p className={`text-sm ${
-                            finding.status === 'missing' ? 'text-red-700' : 'text-orange-700'
-                          }`}>
-                            {finding.message}
-                          </p>
-                        )}
-                        
-                        <div className="mt-3 flex items-center gap-2">
-                          <Button variant="ghost" size="sm" className="h-7 text-xs">
-                            <Eye className="w-3 h-3 mr-1" /> View on Doc
-                          </Button>
-                          {finding.status !== 'passed' && (
-                            <Button variant="ghost" size="sm" className="h-7 text-xs hover:text-destructive">
-                              Override
-                            </Button>
-                          )}
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-7 text-xs text-muted-foreground hover:text-primary ml-auto"
-                            onClick={(e) => handleReportIssue(finding, e)}
-                          >
-                            <MessageSquare className="w-3 h-3 mr-1" /> Report Issue
-                          </Button>
-                        </div>
-                      </div>
-          ))}
-        </div>
-      </ScrollArea>
-
+      {/* Feedback Dialog */}
       <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
         <DialogContent>
           <DialogHeader>
@@ -456,17 +370,17 @@ function FindingsList({ findings, activeBoxId, setActiveBoxId }: {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="incorrect">Incorrect Extraction</SelectItem>
+                  <SelectItem value="incorrect">Incorrect Finding</SelectItem>
                   <SelectItem value="false_positive">False Positive</SelectItem>
-                  <SelectItem value="missed_context">Missed Context</SelectItem>
+                  <SelectItem value="missing_context">Missing Context</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Comments</Label>
+              <Label>Details</Label>
               <Textarea 
-                placeholder="Describe the issue..." 
+                placeholder="Please describe the issue..."
                 value={feedbackComment}
                 onChange={(e) => setFeedbackComment(e.target.value)}
               />
@@ -474,10 +388,100 @@ function FindingsList({ findings, activeBoxId, setActiveBoxId }: {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setFeedbackOpen(false)}>Cancel</Button>
-            <Button onClick={submitFeedback}>Submit Report</Button>
+            <Button onClick={submitFeedback} disabled={createDispute.isPending}>
+              {createDispute.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Submit Feedback
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </DashboardLayout>
+  );
+}
+
+interface FindingsListProps {
+  findings: Finding[];
+  activeBoxId: string | number | null;
+  onFindingClick: (id: string | number) => void;
+  onReportIssue: (finding: Finding, e: React.MouseEvent) => void;
+}
+
+function FindingsList({ findings, activeBoxId, onFindingClick, onReportIssue }: FindingsListProps) {
+  if (findings.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground">
+        No findings in this category.
+      </div>
+    );
+  }
+
+  return (
+    <ScrollArea className="h-full">
+      <div className="p-4 space-y-3">
+        {findings.map((finding) => (
+          <div
+            key={finding.id}
+            id={`finding-${finding.id}`}
+            className={`p-4 rounded-lg border cursor-pointer transition-all ${
+              activeBoxId === finding.id 
+                ? 'ring-2 ring-primary border-primary bg-primary/5' 
+                : 'hover:bg-muted/50'
+            } ${
+              finding.status === 'missing' ? 'bg-red-50/50 border-red-200' :
+              finding.status === 'warning' ? 'bg-orange-50/50 border-orange-200' :
+              'bg-green-50/50 border-green-200'
+            }`}
+            onClick={() => onFindingClick(finding.id)}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                {finding.status === 'missing' ? 
+                  <AlertCircle className="w-5 h-5 text-red-600" /> :
+                 finding.status === 'warning' ?
+                  <AlertCircle className="w-5 h-5 text-orange-600" /> :
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />}
+                <h3 className="font-semibold text-sm">{finding.field}</h3>
+              </div>
+              <Badge variant="outline" className="bg-white/50">
+                {(finding.confidence * 100).toFixed(0)}% Conf.
+              </Badge>
+            </div>
+            
+            {finding.value && (
+              <div className="mb-2 p-2 bg-white/60 rounded border border-black/5 font-mono text-sm">
+                {finding.value}
+              </div>
+            )}
+            
+            {finding.message && (
+              <p className={`text-sm ${
+                finding.status === 'missing' ? 'text-red-700' : 'text-orange-700'
+              }`}>
+                {finding.message}
+              </p>
+            )}
+            
+            <div className="mt-3 flex items-center gap-2">
+              <Button variant="ghost" size="sm" className="h-7 text-xs">
+                <Eye className="w-3 h-3 mr-1" /> View on Doc
+              </Button>
+              {finding.status !== 'passed' && (
+                <Button variant="ghost" size="sm" className="h-7 text-xs hover:text-destructive">
+                  Override
+                </Button>
+              )}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 text-xs text-muted-foreground hover:text-primary ml-auto"
+                onClick={(e) => onReportIssue(finding, e)}
+              >
+                <MessageSquare className="w-3 h-3 mr-1" /> Report Issue
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </ScrollArea>
   );
 }

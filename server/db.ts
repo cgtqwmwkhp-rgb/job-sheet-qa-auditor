@@ -100,6 +100,17 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function updateUserRole(id: number, role: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(users)
+    .set({ role: role as any })
+    .where(eq(users.id, id));
+  
+  return { success: true };
+}
+
 export async function getAllUsers() {
   const db = await getDb();
   if (!db) return [];
@@ -269,6 +280,26 @@ export async function getAllGoldSpecs() {
   if (!db) return [];
   
   return db.select().from(goldSpecs).orderBy(desc(goldSpecs.createdAt));
+}
+
+export async function activateGoldSpec(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // First, deactivate all specs of the same type
+  const spec = await db.select().from(goldSpecs).where(eq(goldSpecs.id, id)).limit(1);
+  if (spec.length === 0) throw new Error("Spec not found");
+  
+  await db.update(goldSpecs)
+    .set({ isActive: false })
+    .where(eq(goldSpecs.specType, spec[0].specType));
+  
+  // Then activate the selected spec
+  await db.update(goldSpecs)
+    .set({ isActive: true })
+    .where(eq(goldSpecs.id, id));
+  
+  return { success: true };
 }
 
 // ============ DISPUTE QUERIES ============

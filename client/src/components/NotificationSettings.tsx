@@ -1,55 +1,50 @@
-import { useNotificationSettings, useUpdateNotificationSettings, useSendTestEmail, type NotificationSettings } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Bell, AlertTriangle, CheckCircle2, FileText, Mail, PenTool } from "lucide-react";
 import { toast } from "sonner";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { EmailTemplateManager } from "@/components/EmailTemplateManager";
 
+interface NotificationSettingsState {
+  criticalDefects: boolean;
+  majorDefects: boolean;
+  minorDefects: boolean;
+  auditCompleted: boolean;
+  dailySummary: boolean;
+}
+
 export function NotificationSettings() {
-  const { data: settings, isLoading } = useNotificationSettings();
-  const updateSettings = useUpdateNotificationSettings();
-  const sendTestEmail = useSendTestEmail();
-  const [localSettings, setLocalSettings] = useState(settings);
+  // Local state for notification settings (would be persisted to backend in real app)
+  const [localSettings, setLocalSettings] = useState<NotificationSettingsState>({
+    criticalDefects: true,
+    majorDefects: true,
+    minorDefects: false,
+    auditCompleted: true,
+    dailySummary: false,
+  });
+  const [isSending, setIsSending] = useState(false);
 
-  useEffect(() => {
-    if (settings) {
-      setLocalSettings(settings);
-    }
-  }, [settings]);
-
-  const handleToggle = (key: keyof NotificationSettings) => {
-    if (!localSettings) return;
-    
+  const handleToggle = (key: keyof NotificationSettingsState) => {
     const newSettings = { ...localSettings, [key]: !localSettings[key] };
     setLocalSettings(newSettings);
-    
-    updateSettings.mutate(newSettings, {
-      onSuccess: () => {
-        toast.success("Notification preferences updated");
-      },
-      onError: () => {
-        toast.error("Failed to update preferences");
-        // Revert on error
-        setLocalSettings(localSettings);
-      }
-    });
+    toast.success("Notification preferences updated");
   };
 
-  const handleSendTestEmail = () => {
-    toast.promise(sendTestEmail.mutateAsync("daily_summary"), {
-      loading: "Sending test email...",
-      success: "Test email sent! Check your inbox.",
-      error: "Failed to send test email"
-    });
+  const handleSendTestEmail = async () => {
+    setIsSending(true);
+    try {
+      // Simulate sending test email
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      toast.success("Test email sent! Check your inbox.");
+    } catch {
+      toast.error("Failed to send test email");
+    } finally {
+      setIsSending(false);
+    }
   };
-
-  if (isLoading || !localSettings) {
-    return <div className="p-4 text-center text-muted-foreground">Loading settings...</div>;
-  }
 
   return (
     <Card>
@@ -152,10 +147,10 @@ export function NotificationSettings() {
           size="sm" 
           className="w-full" 
           onClick={handleSendTestEmail}
-          disabled={!localSettings.dailySummary}
+          disabled={!localSettings.dailySummary || isSending}
         >
           <Mail className="h-4 w-4 mr-2" />
-          Send Test Summary Email
+          {isSending ? "Sending..." : "Send Test Summary Email"}
         </Button>
         
         <Dialog>

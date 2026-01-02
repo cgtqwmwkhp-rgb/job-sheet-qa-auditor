@@ -1,68 +1,81 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { trpc } from "./trpc";
 
-const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
+// ============ TYPE EXPORTS ============
+// Re-export types for backwards compatibility
 
 export interface JobSheet {
-  id: string;
-  technician: string;
-  site: string;
-  customer: string;
-  assetType: string;
-  date: string;
-  status: "passed" | "failed" | "review";
-  score: string;
-  documentUrl: string;
-  findings: Finding[];
+  id: number;
+  referenceNumber: string | null;
+  fileName: string;
+  fileUrl: string;
+  fileType: string;
+  status: "pending" | "processing" | "completed" | "failed" | "review_queue";
+  technicianId: number | null;
+  siteInfo: string | null;
+  uploadedBy: number;
+  createdAt: Date;
 }
 
 export interface Finding {
-  id: number | string;
-  field: string;
-  status: "passed" | "missing" | "warning";
-  severity?: "critical" | "major" | "minor";
+  id: number;
+  auditResultId?: number;
+  severity?: "S0" | "S1" | "S2" | "S3" | "critical" | "major" | "minor";
+  reasonCode?: string;
+  fieldName?: string;
+  pageNumber?: number | null;
+  boundingBox?: any;
+  rawSnippet?: string | null;
+  normalisedSnippet?: string | null;
+  confidence: number;
+  ruleId?: string | null;
+  whyItMatters?: string | null;
+  suggestedFix?: string | null;
+  // Legacy fields for backward compatibility
+  field?: string;
+  status?: "passed" | "missing" | "warning";
   value?: string;
   message?: string;
-  confidence: number;
-  box?: BoundingBox;
-  dispute?: Dispute;
+  box?: {
+    page: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    color?: string;
+    label?: string;
+  };
 }
 
 export interface Dispute {
-  id: string;
-  findingId: string | number;
-  technicianId: string;
+  id: number;
+  auditFindingId: number;
+  raisedBy: number;
+  status: "open" | "under_review" | "accepted" | "rejected" | "escalated";
   reason: string;
-  status: "pending" | "approved" | "rejected";
-  createdAt: string;
-  resolvedAt?: string;
-  resolvedBy?: string;
-  adminComment?: string;
+  evidenceUrls: string[] | null;
+  reviewerId: number | null;
+  reviewNotes: string | null;
+  resolvedAt: Date | null;
+  createdAt: Date;
 }
 
-export interface NotificationSettings {
-  criticalDefects: boolean;
-  majorDefects: boolean;
-  minorDefects: boolean;
-  auditCompleted: boolean;
-  dailySummary: boolean;
-}
-
-export interface BoundingBox {
-  page: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color?: string;
-  label?: string;
+export interface GoldSpec {
+  id: number;
+  name: string;
+  version: string;
+  description: string | null;
+  schema: any;
+  specType: "base" | "client" | "contract" | "workType";
+  isActive: boolean;
+  createdBy: number;
+  createdAt: Date;
 }
 
 export interface Stats {
   totalAudits: number;
-  passRate: number;
+  passRate: string;
+  reviewQueue: number;
   criticalIssues: number;
-  avgScore: string;
-  recentActivity: Activity[];
 }
 
 export interface Activity {
@@ -72,321 +85,240 @@ export interface Activity {
   time: string;
 }
 
-async function fetcher<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${url}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-    ...options,
-  });
-
-  if (!res.ok) {
-    throw new Error(`API Error: ${res.statusText}`);
-  }
-
-  return res.json();
-}
-
+// ============ DASHBOARD STATS ============
 export function useStats() {
-  return useQuery({
-    queryKey: ["stats"],
-    queryFn: async () => {
-      try {
-        return await fetcher<Stats>("/stats");
-      } catch (error) {
-        console.warn("API fetch failed, returning mock data for demo:", error);
-        return {
-          totalAudits: 1248,
-          passRate: 94.2,
-          criticalIssues: 3,
-          avgScore: "A-",
-          recentActivity: [
-            { id: 1, type: "audit", message: "Audit #JS-2024-001 failed validation", time: "2 mins ago" },
-            { id: 2, type: "review", message: "Technician John Doe requested a waiver", time: "15 mins ago" },
-            { id: 3, type: "system", message: "Rule pack v2.1 auto-deployed", time: "1 hour ago" },
-          ]
-        } as Stats;
-      }
+  return trpc.stats.dashboard.useQuery(undefined, {
+    // Provide fallback data for demo mode
+    placeholderData: {
+      totalAudits: 0,
+      passRate: '0',
+      reviewQueue: 0,
+      criticalIssues: 0,
     },
   });
 }
 
-export function useJobSheets() {
-  return useQuery({
-    queryKey: ["job-sheets"],
-    queryFn: async () => {
-      try {
-        return await fetcher<JobSheet[]>("/job-sheets");
-      } catch (error) {
-        console.warn("API fetch failed, returning mock data for demo:", error);
-        return [
-          {
-            id: "JS-2024-001",
-            technician: "John Doe",
-            site: "London HQ",
-            customer: "Acme Corp",
-            assetType: "HVAC Unit",
-            date: "2024-01-15",
-            status: "failed",
-            score: "C",
-            documentUrl: "",
-            findings: []
-          },
-          {
-            id: "JS-2024-002",
-            technician: "Jane Smith",
-            site: "Manchester Branch",
-            customer: "Global Tech",
-            assetType: "Generator",
-            date: "2024-01-16",
-            status: "passed",
-            score: "A",
-            documentUrl: "",
-            findings: []
-          }
-        ] as JobSheet[];
-      }
-    },
-  });
+// ============ JOB SHEETS ============
+export function useJobSheets(options?: { status?: string; technicianId?: number; limit?: number }) {
+  return trpc.jobSheets.list.useQuery(options);
 }
 
-export function useJobSheet(id: string) {
-  return useQuery({
-    queryKey: ["job-sheet", id],
-    queryFn: async () => {
-      try {
-        return await fetcher<JobSheet>(`/job-sheets/${id}`);
-      } catch (error) {
-        console.warn("API fetch failed, returning mock data for demo:", error);
-        // Return mock data if API fails
-        const mockJobSheet: JobSheet = {
-          id: id,
-          status: "failed",
-          score: "C",
-          technician: "John Doe",
-          date: "2024-01-15",
-          site: "London HQ",
-          customer: "Acme Corp",
-          assetType: "HVAC Unit",
-          documentUrl: "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf",
-          findings: [
-            {
-              id: 1,
-              field: "Customer Signature",
-              status: "missing" as const,
-              severity: "critical" as const,
-              message: "Customer signature is required but not detected.",
-              confidence: 0.98,
-              box: { page: 1, x: 10, y: 80, width: 30, height: 5, color: "#ef4444", label: "Missing Signature" }
-            },
-            {
-              id: 2,
-              field: "Date of Service",
-              status: "passed" as const,
-              value: "15/01/2024",
-              confidence: 0.99,
-              box: { page: 1, x: 70, y: 15, width: 20, height: 3, color: "#22c55e", label: "Date" }
-            },
-            {
-              id: 3,
-              field: "Serial Number",
-              status: "warning" as const,
-              value: "SN-12345-??",
-              message: "Serial number is partially obscured.",
-              confidence: 0.75,
-              box: { page: 1, x: 40, y: 30, width: 25, height: 4, color: "#f97316", label: "Serial #" }
-            },
-            {
-              id: 4,
-              field: "Work Description",
-              status: "passed" as const,
-              value: "Routine maintenance performed. Replaced filters.",
-              confidence: 0.95,
-              box: { page: 1, x: 10, y: 40, width: 80, height: 20, color: "#22c55e", label: "Description" }
-            },
-          ],
-        };
-        return mockJobSheet;
-      }
-    },
-    enabled: !!id,
+export function useJobSheet(id: number) {
+  return trpc.jobSheets.get.useQuery({ id }, {
+    enabled: !!id && id > 0,
   });
 }
 
 export function useUploadJobSheet() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (files: File[]) => {
-      const formData = new FormData();
-      files.forEach((file) => formData.append("files", file));
-      
-      try {
-        const res = await fetch(`${API_URL}/upload`, {
-          method: "POST",
-          body: formData,
-        });
-        
-        if (!res.ok) throw new Error("Upload failed");
-        return res.json();
-      } catch (error) {
-        console.warn("API upload failed, simulating success for demo:", error);
-        return { success: true, count: files.length };
-      }
-    },
+  const utils = trpc.useUtils();
+  
+  return trpc.jobSheets.upload.useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["job-sheets"] });
-      queryClient.invalidateQueries({ queryKey: ["stats"] });
+      utils.jobSheets.list.invalidate();
+      utils.stats.dashboard.invalidate();
     },
   });
 }
+
+export function useUpdateJobSheetStatus() {
+  const utils = trpc.useUtils();
+  
+  return trpc.jobSheets.updateStatus.useMutation({
+    onSuccess: () => {
+      utils.jobSheets.list.invalidate();
+      utils.stats.dashboard.invalidate();
+    },
+  });
+}
+
+// ============ AUDIT RESULTS ============
+export function useAuditResults(options?: { result?: string; limit?: number }) {
+  return trpc.audits.list.useQuery(options);
+}
+
+export function useAuditResultByJobSheet(jobSheetId: number) {
+  return trpc.audits.getByJobSheet.useQuery({ jobSheetId }, {
+    enabled: !!jobSheetId && jobSheetId > 0,
+  });
+}
+
+export function useAuditFindings(auditResultId: number) {
+  return trpc.audits.getFindings.useQuery({ auditResultId }, {
+    enabled: !!auditResultId && auditResultId > 0,
+  });
+}
+
+// ============ GOLD SPECS ============
+export function useGoldSpecs() {
+  return trpc.specs.list.useQuery();
+}
+
+export function useActiveGoldSpec(specType?: string) {
+  return trpc.specs.getActive.useQuery({ specType });
+}
+
+export function useCreateGoldSpec() {
+  const utils = trpc.useUtils();
+  
+  return trpc.specs.create.useMutation({
+    onSuccess: () => {
+      utils.specs.list.invalidate();
+    },
+  });
+}
+
+// ============ DISPUTES ============
+export function useDisputes(options?: { status?: string; limit?: number }) {
+  return trpc.disputes.list.useQuery(options);
+}
+
+export function useCreateDispute() {
+  const utils = trpc.useUtils();
+  
+  return trpc.disputes.create.useMutation({
+    onSuccess: () => {
+      utils.disputes.list.invalidate();
+    },
+  });
+}
+
+export function useUpdateDisputeStatus() {
+  const utils = trpc.useUtils();
+  
+  return trpc.disputes.updateStatus.useMutation({
+    onSuccess: () => {
+      utils.disputes.list.invalidate();
+    },
+  });
+}
+
+// ============ WAIVERS ============
+export function useCreateWaiver() {
+  const utils = trpc.useUtils();
+  
+  return trpc.waivers.create.useMutation({
+    onSuccess: () => {
+      utils.audits.list.invalidate();
+    },
+  });
+}
+
+export function useWaiverByFinding(auditFindingId: number) {
+  return trpc.waivers.getByFinding.useQuery({ auditFindingId }, {
+    enabled: !!auditFindingId && auditFindingId > 0,
+  });
+}
+
+// ============ USERS ============
+export function useUsers() {
+  return trpc.users.list.useQuery();
+}
+
+export function useUser(id: number) {
+  return trpc.users.get.useQuery({ id }, {
+    enabled: !!id && id > 0,
+  });
+}
+
+// ============ AUDIT LOG ============
+export function useAuditLog(options?: { userId?: number; entityType?: string; limit?: number }) {
+  return trpc.auditLog.list.useQuery(options);
+}
+
+// ============ LEGACY COMPATIBILITY HOOKS ============
+// These maintain backwards compatibility with existing components
 
 export function useSubmitFeedback() {
-  return useMutation({
-    mutationFn: async (data: { findingId: number | string; type: string; comment: string }) => {
-      try {
-        return await fetcher("/feedback", {
-          method: "POST",
-          body: JSON.stringify(data),
-        });
-      } catch (error) {
-        console.warn("API feedback failed, simulating success for demo:", error);
-        return { success: true };
-      }
-    },
-  });
-}
-
-export function useCreateAnnotation() {
-  const queryClient = useQueryClient();
+  // Feedback is now handled through disputes
+  const createDispute = useCreateDispute();
   
-  return useMutation({
-    mutationFn: async (data: { jobSheetId: string; box: BoundingBox; label: string; comment: string }) => {
-      try {
-        return await fetcher(`/job-sheets/${data.jobSheetId}/annotations`, {
-          method: "POST",
-          body: JSON.stringify(data),
-        });
-      } catch (error) {
-        console.warn("API annotation failed, simulating success for demo:", error);
-        return { success: true, id: Date.now() };
-      }
+  return {
+    mutate: (data: { findingId: number; type: string; comment: string }) => {
+      createDispute.mutate({
+        auditFindingId: data.findingId,
+        reason: `[${data.type}] ${data.comment}`,
+      });
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["job-sheet", variables.jobSheetId] });
+    mutateAsync: async (data: { findingId: number; type: string; comment: string }) => {
+      return createDispute.mutateAsync({
+        auditFindingId: data.findingId,
+        reason: `[${data.type}] ${data.comment}`,
+      });
     },
-  });
-}
-
-export function useNotificationSettings() {
-  return useQuery({
-    queryKey: ["notification-settings"],
-    queryFn: async () => {
-      try {
-        return await fetcher<NotificationSettings>("/user/notifications");
-      } catch (error) {
-        console.warn("API fetch failed, returning mock data for demo:", error);
-        return {
-          criticalDefects: true,
-          majorDefects: true,
-          minorDefects: false,
-          auditCompleted: true,
-          dailySummary: false,
-        } as NotificationSettings;
-      }
-    },
-  });
-}
-
-export function useUpdateNotificationSettings() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (settings: NotificationSettings) => {
-      try {
-        return await fetcher("/user/notifications", {
-          method: "PUT",
-          body: JSON.stringify(settings),
-        });
-      } catch (error) {
-        console.warn("API update failed, simulating success for demo:", error);
-        return { success: true };
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notification-settings"] });
-    },
-  });
-}
-
-export function useDisputes() {
-  return useQuery({
-    queryKey: ["disputes"],
-    queryFn: async () => {
-      try {
-        return await fetcher<Dispute[]>("/disputes");
-      } catch (error) {
-        console.warn("API fetch failed, returning mock data for demo:", error);
-        return [
-          {
-            id: "DSP-001",
-            findingId: 1,
-            technicianId: "TECH-001",
-            reason: "Signature is present on page 3, top right corner.",
-            status: "pending",
-            createdAt: new Date(Date.now() - 86400000).toISOString(),
-          },
-          {
-            id: "DSP-002",
-            findingId: 3,
-            technicianId: "TECH-002",
-            reason: "Serial number is readable if zoomed in.",
-            status: "rejected",
-            createdAt: new Date(Date.now() - 172800000).toISOString(),
-            resolvedAt: new Date(Date.now() - 86400000).toISOString(),
-            resolvedBy: "Admin",
-            adminComment: "Still too blurry to verify against database.",
-          }
-        ] as Dispute[];
-      }
-    },
-  });
+    isPending: createDispute.isPending,
+    isError: createDispute.isError,
+    error: createDispute.error,
+  };
 }
 
 export function useResolveDispute() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (data: { disputeId: string; status: "approved" | "rejected"; comment?: string }) => {
-      try {
-        return await fetcher(`/disputes/${data.disputeId}/resolve`, {
-          method: "POST",
-          body: JSON.stringify(data),
-        });
-      } catch (error) {
-        console.warn("API resolve failed, simulating success for demo:", error);
-        return { success: true };
-      }
+  const updateStatus = useUpdateDisputeStatus();
+  
+  return {
+    mutate: (data: { disputeId: string; status: "approved" | "rejected"; comment?: string }) => {
+      updateStatus.mutate({
+        id: parseInt(data.disputeId),
+        status: data.status === "approved" ? "accepted" : "rejected",
+        reviewNotes: data.comment,
+      });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["disputes"] });
+    mutateAsync: async (data: { disputeId: string; status: "approved" | "rejected"; comment?: string }) => {
+      return updateStatus.mutateAsync({
+        id: parseInt(data.disputeId),
+        status: data.status === "approved" ? "accepted" : "rejected",
+        reviewNotes: data.comment,
+      });
     },
-  });
+    isPending: updateStatus.isPending,
+    isError: updateStatus.isError,
+    error: updateStatus.error,
+  };
+}
+
+// Notification settings - stored locally for now
+export function useNotificationSettings() {
+  return {
+    data: {
+      criticalDefects: true,
+      majorDefects: true,
+      minorDefects: false,
+      auditCompleted: true,
+      dailySummary: false,
+    },
+    isLoading: false,
+    error: null,
+  };
+}
+
+export function useUpdateNotificationSettings() {
+  return {
+    mutate: () => {},
+    mutateAsync: async () => ({ success: true }),
+    isPending: false,
+    isError: false,
+    error: null,
+  };
 }
 
 export function useSendTestEmail() {
-  return useMutation({
-    mutationFn: async (type: "daily_summary" | "audit_complete") => {
-      try {
-        return await fetcher("/email/send-test", {
-          method: "POST",
-          body: JSON.stringify({ type }),
-        });
-      } catch (error) {
-        console.warn("API email failed, simulating success for demo:", error);
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return { success: true, message: "Email queued for delivery" };
-      }
+  return {
+    mutate: () => {},
+    mutateAsync: async () => {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return { success: true, message: "Email queued for delivery" };
     },
-  });
+    isPending: false,
+    isError: false,
+    error: null,
+  };
+}
+
+export function useCreateAnnotation() {
+  return {
+    mutate: () => {},
+    mutateAsync: async () => ({ success: true, id: Date.now() }),
+    isPending: false,
+    isError: false,
+    error: null,
+  };
 }

@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useDisputes, useResolveDispute, type Dispute } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,26 +17,44 @@ import {
   CheckCircle2, 
   XCircle, 
   Clock, 
-  MessageSquareWarning,
   Search,
   Filter,
   User,
-  FileText
+  FileText,
+  Loader2
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { trpc } from "@/lib/trpc";
+
+// Define dispute type based on tRPC return
+type DisputeData = {
+  id: number;
+  auditFindingId: number;
+  raisedBy: number;
+  status: "open" | "under_review" | "accepted" | "rejected" | "escalated";
+  reason: string;
+  evidenceUrls: unknown;
+  reviewerId: number | null;
+  reviewNotes: string | null;
+  resolvedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 export default function DisputeManagement() {
-  const { data: disputes, isLoading } = useDisputes();
-  const resolveDispute = useResolveDispute();
-  const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
+  const { data: disputes, isLoading } = trpc.disputes.list.useQuery();
+  const updateDisputeStatus = trpc.disputes.updateStatus.useMutation();
+  const utils = trpc.useUtils();
+  
+  const [selectedDispute, setSelectedDispute] = useState<DisputeData | null>(null);
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const [adminComment, setAdminComment] = useState("");
   const [actionType, setActionType] = useState<"approve" | "reject">("approve");
   const [searchTerm, setSearchTerm] = useState("");
 
-  const handleAction = (dispute: Dispute, type: "approve" | "reject") => {
+  const handleAction = (dispute: DisputeData, type: "approve" | "reject") => {
     setSelectedDispute(dispute);
     setActionType(type);
     setAdminComment("");
@@ -47,14 +64,15 @@ export default function DisputeManagement() {
   const submitResolution = () => {
     if (!selectedDispute) return;
 
-    resolveDispute.mutate({
-      disputeId: selectedDispute.id,
-      status: actionType === "approve" ? "approved" : "rejected",
-      comment: adminComment
+    updateDisputeStatus.mutate({
+      id: selectedDispute.id,
+      status: actionType === "approve" ? "accepted" : "rejected",
+      reviewNotes: adminComment || undefined
     }, {
       onSuccess: () => {
         toast.success(`Dispute ${actionType === "approve" ? "approved" : "rejected"} successfully`);
         setResolveDialogOpen(false);
+        utils.disputes.list.invalidate();
       },
       onError: () => {
         toast.error("Failed to resolve dispute");
@@ -63,16 +81,22 @@ export default function DisputeManagement() {
   };
 
   const filteredDisputes = disputes?.filter(d => 
-    d.technicianId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    d.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    d.reason.toLowerCase().includes(searchTerm.toLowerCase())
+    d.id.toString().includes(searchTerm.toLowerCase()) ||
+    d.reason.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    d.raisedBy.toString().includes(searchTerm)
   );
 
-  const pendingDisputes = filteredDisputes?.filter(d => d.status === "pending") || [];
-  const resolvedDisputes = filteredDisputes?.filter(d => d.status !== "pending") || [];
+  // Open and under_review are pending
+  const pendingDisputes = filteredDisputes?.filter(d => d.status === "open" || d.status === "under_review") || [];
+  // Accepted, rejected, escalated are resolved
+  const resolvedDisputes = filteredDisputes?.filter(d => d.status === "accepted" || d.status === "rejected" || d.status === "escalated") || [];
 
   if (isLoading) {
-    return <div className="p-8 text-center">Loading disputes...</div>;
+    return (
+      <div className="p-8 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   return (
@@ -109,13 +133,17 @@ export default function DisputeManagement() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Approved (This Month)</CardTitle>
-            <div className="text-2xl font-bold text-green-600">12</div>
+            <div className="text-2xl font-bold text-green-600">
+              {resolvedDisputes.filter(d => d.status === "accepted").length}
+            </div>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Rejected (This Month)</CardTitle>
-            <div className="text-2xl font-bold text-red-600">4</div>
+            <div className="text-2xl font-bold text-red-600">
+              {resolvedDisputes.filter(d => d.status === "rejected").length}
+            </div>
           </CardHeader>
         </Card>
       </div>
@@ -147,14 +175,14 @@ export default function DisputeManagement() {
                   <div className="p-6 flex-1 space-y-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="font-mono">{dispute.id}</Badge>
+                        <Badge variant="outline" className="font-mono">DSP-{dispute.id}</Badge>
                         <span className="text-sm text-muted-foreground flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {formatDistanceToNow(new Date(dispute.createdAt), { addSuffix: true })}
                         </span>
                       </div>
                       <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
-                        Pending Review
+                        {dispute.status === "open" ? "Pending Review" : "Under Review"}
                       </Badge>
                     </div>
 
@@ -166,7 +194,7 @@ export default function DisputeManagement() {
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
                           <User className="h-4 w-4" />
-                          <span>Technician ID: {dispute.technicianId}</span>
+                          <span>Raised by User ID: {dispute.raisedBy}</span>
                         </div>
                       </div>
 
@@ -174,7 +202,7 @@ export default function DisputeManagement() {
                         <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Original Finding</h4>
                         <div className="border rounded-md p-3">
                           <div className="flex justify-between items-center mb-2">
-                            <span className="font-medium text-sm">Finding #{dispute.findingId}</span>
+                            <span className="font-medium text-sm">Finding #{dispute.auditFindingId}</span>
                             <Button variant="ghost" size="sm" className="h-6 text-xs">
                               <FileText className="h-3 w-3 mr-1" />
                               View Evidence
@@ -212,42 +240,50 @@ export default function DisputeManagement() {
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4 mt-4">
-          {resolvedDisputes.map((dispute) => (
-            <Card key={dispute.id}>
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline" className="font-mono">{dispute.id}</Badge>
-                    <div>
-                      <div className="font-medium">Technician {dispute.technicianId}</div>
-                      <div className="text-sm text-muted-foreground">
-                        Resolved {dispute.resolvedAt ? formatDistanceToNow(new Date(dispute.resolvedAt), { addSuffix: true }) : 'Unknown'}
+          {resolvedDisputes.length === 0 ? (
+            <div className="text-center py-12 bg-muted/30 rounded-lg border border-dashed">
+              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+              <h3 className="text-lg font-medium">No Resolution History</h3>
+              <p className="text-muted-foreground">Resolved disputes will appear here.</p>
+            </div>
+          ) : (
+            resolvedDisputes.map((dispute) => (
+              <Card key={dispute.id}>
+                <CardContent className="p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline" className="font-mono">DSP-{dispute.id}</Badge>
+                      <div>
+                        <div className="font-medium">User ID: {dispute.raisedBy}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Resolved {dispute.resolvedAt ? formatDistanceToNow(new Date(dispute.resolvedAt), { addSuffix: true }) : 'Unknown'}
+                        </div>
                       </div>
                     </div>
+                    <Badge 
+                      variant={dispute.status === "accepted" ? "default" : "destructive"}
+                      className={dispute.status === "accepted" ? "bg-green-600 hover:bg-green-700" : ""}
+                    >
+                      {dispute.status === "accepted" ? "Approved" : dispute.status === "rejected" ? "Rejected" : "Escalated"}
+                    </Badge>
                   </div>
-                  <Badge 
-                    variant={dispute.status === "approved" ? "default" : "destructive"}
-                    className={dispute.status === "approved" ? "bg-green-600 hover:bg-green-700" : ""}
-                  >
-                    {dispute.status === "approved" ? "Approved" : "Rejected"}
-                  </Badge>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium text-muted-foreground">Reason:</span>
-                    <p className="mt-1">{dispute.reason}</p>
-                  </div>
-                  {dispute.adminComment && (
-                    <div className="bg-muted/50 p-3 rounded-md">
-                      <span className="font-medium text-muted-foreground">Admin Note:</span>
-                      <p className="mt-1 italic">{dispute.adminComment}</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium text-muted-foreground">Reason:</span>
+                      <p className="mt-1">{dispute.reason}</p>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    {dispute.reviewNotes && (
+                      <div className="bg-muted/50 p-3 rounded-md">
+                        <span className="font-medium text-muted-foreground">Admin Note:</span>
+                        <p className="mt-1 italic">{dispute.reviewNotes}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </TabsContent>
       </Tabs>
 
@@ -282,7 +318,11 @@ export default function DisputeManagement() {
               variant={actionType === "approve" ? "default" : "destructive"}
               className={actionType === "approve" ? "bg-green-600 hover:bg-green-700" : ""}
               onClick={submitResolution}
+              disabled={updateDisputeStatus.isPending}
             >
+              {updateDisputeStatus.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
               Confirm {actionType === "approve" ? "Approval" : "Rejection"}
             </Button>
           </DialogFooter>

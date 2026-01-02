@@ -36,47 +36,48 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { MoreHorizontal, Plus, Search, Shield, User, UserPlus } from "lucide-react";
+import { Loader2, MoreHorizontal, Search, Shield, User, UserPlus } from "lucide-react";
 import { useState } from "react";
-
-// Mock Data
-const users = [
-  {
-    id: "USR-001",
-    name: "Admin User",
-    email: "admin@example.com",
-    role: "Administrator",
-    status: "active",
-    lastActive: "Just now",
-  },
-  {
-    id: "USR-002",
-    name: "Jane Doe",
-    email: "jane.doe@example.com",
-    role: "Reviewer",
-    status: "active",
-    lastActive: "2 hours ago",
-  },
-  {
-    id: "USR-003",
-    name: "John Smith",
-    email: "john.smith@example.com",
-    role: "Operator",
-    status: "inactive",
-    lastActive: "3 days ago",
-  },
-  {
-    id: "USR-004",
-    name: "Sarah Connor",
-    email: "sarah.c@example.com",
-    role: "Reviewer",
-    status: "active",
-    lastActive: "5 mins ago",
-  },
-];
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
 
 export default function UserManagement() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  // Fetch users from API
+  const { data: users, isLoading } = trpc.users.list.useQuery();
+  const updateRole = trpc.users.updateRole.useMutation();
+  const utils = trpc.useUtils();
+
+  const handleRoleChange = (userId: number, newRole: string) => {
+    updateRole.mutate({ id: userId, role: newRole as any }, {
+      onSuccess: () => {
+        toast.success("User role updated successfully");
+        utils.users.list.invalidate();
+      },
+      onError: () => {
+        toast.error("Failed to update user role");
+      }
+    });
+  };
+
+  // Filter users by search term
+  const filteredUsers = users?.filter(user => 
+    user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+  // Calculate stats
+  const totalUsers = users?.length || 0;
+  const activeUsers = users?.filter(u => {
+    if (!u.lastSignedIn) return false;
+    const lastActive = new Date(u.lastSignedIn);
+    const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    return lastActive > hourAgo;
+  }).length || 0;
+  const adminCount = users?.filter(u => u.role === 'admin').length || 0;
 
   return (
     <DashboardLayout>
@@ -115,8 +116,7 @@ export default function UserManagement() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="admin">Administrator</SelectItem>
-                      <SelectItem value="reviewer">Reviewer</SelectItem>
-                      <SelectItem value="operator">Operator</SelectItem>
+                      <SelectItem value="qa_lead">QA Lead</SelectItem>
                       <SelectItem value="technician">Technician</SelectItem>
                       <SelectItem value="viewer">Viewer</SelectItem>
                     </SelectContent>
@@ -125,7 +125,10 @@ export default function UserManagement() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsInviteOpen(false)}>Cancel</Button>
-                <Button onClick={() => setIsInviteOpen(false)}>Send Invitation</Button>
+                <Button onClick={() => {
+                  toast.info("User invitation feature coming soon");
+                  setIsInviteOpen(false);
+                }}>Send Invitation</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -138,8 +141,8 @@ export default function UserManagement() {
               <User className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">12</div>
-              <p className="text-xs text-muted-foreground">+2 from last month</p>
+              <div className="text-2xl font-bold">{totalUsers}</div>
+              <p className="text-xs text-muted-foreground">Registered accounts</p>
             </CardContent>
           </Card>
           <Card>
@@ -148,8 +151,8 @@ export default function UserManagement() {
               <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">3</div>
-              <p className="text-xs text-muted-foreground">Currently online</p>
+              <div className="text-2xl font-bold">{activeUsers}</div>
+              <p className="text-xs text-muted-foreground">Active in last hour</p>
             </CardContent>
           </Card>
           <Card>
@@ -158,7 +161,7 @@ export default function UserManagement() {
               <UserPlus className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">1</div>
+              <div className="text-2xl font-bold">0</div>
               <p className="text-xs text-muted-foreground">Awaiting acceptance</p>
             </CardContent>
           </Card>
@@ -168,7 +171,7 @@ export default function UserManagement() {
               <Shield className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">2</div>
+              <div className="text-2xl font-bold">{adminCount}</div>
               <p className="text-xs text-muted-foreground">Full system access</p>
             </CardContent>
           </Card>
@@ -182,63 +185,91 @@ export default function UserManagement() {
             </div>
             <div className="relative w-64">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search users..." className="pl-8 h-9" />
+              <Input 
+                placeholder="Search users..." 
+                className="pl-8 h-9" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Active</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{user.name}</span>
-                        <span className="text-xs text-muted-foreground">{user.email}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {user.role === 'Administrator' && <Shield className="w-3 h-3 text-primary" />}
-                        {user.role}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={user.status === 'active' ? 'default' : 'secondary'}>
-                        {user.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {user.lastActive}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem>Edit Role</DropdownMenuItem>
-                          <DropdownMenuItem>Reset Password</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">Deactivate User</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredUsers.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Last Active</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{user.name || 'Unknown User'}</span>
+                          <span className="text-xs text-muted-foreground">{user.email || 'No email'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {user.role === 'admin' && <Shield className="w-3 h-3 text-primary" />}
+                          <span className="capitalize">{user.role?.replace('_', ' ') || 'User'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={user.lastSignedIn ? 'default' : 'secondary'}>
+                          {user.lastSignedIn ? 'active' : 'inactive'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {user.lastSignedIn 
+                          ? formatDistanceToNow(new Date(user.lastSignedIn), { addSuffix: true })
+                          : 'Never'
+                        }
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => handleRoleChange(user.id, 'admin')}>
+                              Make Admin
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleRoleChange(user.id, 'qa_lead')}>
+                              Make QA Lead
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleRoleChange(user.id, 'technician')}>
+                              Make Technician
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive">
+                              Deactivate User
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No users found.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

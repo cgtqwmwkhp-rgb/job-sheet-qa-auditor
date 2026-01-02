@@ -1,49 +1,14 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, CheckCircle2, Clock, FileText, TrendingUp } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, FileText, TrendingUp, Loader2 } from "lucide-react";
 import { SmartTip } from "@/components/SmartTip";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AuditTimeline } from "@/components/AuditTimeline";
-import { useStats } from "@/lib/api";
+import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Mock Data
-const stats = [
-  {
-    title: "Total Audits",
-    value: "1,284",
-    change: "+12.5%",
-    trend: "up",
-    icon: FileText,
-    color: "text-blue-500",
-  },
-  {
-    title: "Pass Rate",
-    value: "94.2%",
-    change: "+2.1%",
-    trend: "up",
-    icon: CheckCircle2,
-    color: "text-brand-lime",
-  },
-  {
-    title: "Hold Queue",
-    value: "23",
-    change: "-5",
-    trend: "down",
-    icon: Clock,
-    color: "text-orange-500",
-  },
-  {
-    title: "Critical Issues",
-    value: "7",
-    change: "+2",
-    trend: "up",
-    icon: AlertTriangle,
-    color: "text-destructive",
-  },
-];
-
+// Static chart data (will be replaced with real data in future)
 const activityData = [
   { name: "Mon", passed: 145, failed: 12 },
   { name: "Tue", passed: 132, failed: 8 },
@@ -63,7 +28,9 @@ const defectTypes = [
 ];
 
 export default function Dashboard() {
-  const { data: statsData } = useStats();
+  // Use real tRPC data
+  const { data: statsData, isLoading: statsLoading } = trpc.stats.dashboard.useQuery();
+  const { data: recentJobSheets, isLoading: jobSheetsLoading } = trpc.jobSheets.list.useQuery({ limit: 5 });
   const { user } = useAuth();
 
   const getGreeting = () => {
@@ -71,14 +38,61 @@ export default function Dashboard() {
     const hour = new Date().getHours();
     const timeGreeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
     
+    const criticalCount = statsData?.criticalIssues ?? 0;
+    const queueCount = statsData?.reviewQueue ?? 0;
+    const passRate = statsData?.passRate ?? '0';
+    
     if (user.role === 'admin') {
-      return `${timeGreeting}, ${user.name}. You have 7 critical issues requiring attention.`;
+      return `${timeGreeting}, ${user.name}. You have ${criticalCount} critical issue${criticalCount !== 1 ? 's' : ''} requiring attention.`;
     } else if (user.role === 'qa_lead') {
-      return `${timeGreeting}, ${user.name}. The hold queue has 23 items pending review.`;
+      return `${timeGreeting}, ${user.name}. The hold queue has ${queueCount} item${queueCount !== 1 ? 's' : ''} pending review.`;
     } else {
-      return `${timeGreeting}, ${user.name}. Your current first fix rate is 94.2%.`;
+      return `${timeGreeting}, ${user.name}. Your current pass rate is ${passRate}%.`;
     }
   };
+
+  // Build stats array from real data
+  const stats = [
+    {
+      title: "Total Audits",
+      value: statsLoading ? "..." : (statsData?.totalAudits ?? 0).toLocaleString(),
+      change: "+12.5%",
+      trend: "up" as const,
+      icon: FileText,
+      color: "text-blue-500",
+    },
+    {
+      title: "Pass Rate",
+      value: statsLoading ? "..." : `${statsData?.passRate ?? 0}%`,
+      change: "+2.1%",
+      trend: "up" as const,
+      icon: CheckCircle2,
+      color: "text-brand-lime",
+    },
+    {
+      title: "Hold Queue",
+      value: statsLoading ? "..." : (statsData?.reviewQueue ?? 0).toString(),
+      change: "-5",
+      trend: "down" as const,
+      icon: Clock,
+      color: "text-orange-500",
+    },
+    {
+      title: "Critical Issues",
+      value: statsLoading ? "..." : (statsData?.criticalIssues ?? 0).toString(),
+      change: "+2",
+      trend: "up" as const,
+      icon: AlertTriangle,
+      color: "text-destructive",
+    },
+  ];
+
+  // Mock recent activity for timeline
+  const recentActivity = [
+    { id: 1, type: "audit" as const, message: "New job sheet uploaded", time: "2 mins ago" },
+    { id: 2, type: "review" as const, message: "Dispute submitted for review", time: "15 mins ago" },
+    { id: 3, type: "system" as const, message: "System health check passed", time: "1 hour ago" },
+  ];
 
   return (
     <DashboardLayout>
@@ -118,7 +132,13 @@ export default function Dashboard() {
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />
               </CardHeader>
               <CardContent className="relative z-10">
-                <div className="text-3xl font-bold font-heading tracking-tight">{stat.value}</div>
+                <div className="text-3xl font-bold font-heading tracking-tight">
+                  {statsLoading ? (
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  ) : (
+                    stat.value
+                  )}
+                </div>
                 <p className="text-xs font-medium mt-2 flex items-center gap-1.5">
                   <span className={`flex items-center px-1.5 py-0.5 rounded ${stat.trend === "up" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                     {stat.trend === "up" ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingUp className="h-3 w-3 mr-1 rotate-180" />}
@@ -210,51 +230,110 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-3">
           <div className="col-span-2">
             {/* Recent Activity Tabs */}
-        <Tabs defaultValue="recent" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="recent">Recent Audits</TabsTrigger>
-            <TabsTrigger value="hold">Hold Queue</TabsTrigger>
-            <TabsTrigger value="alerts">System Alerts</TabsTrigger>
-          </TabsList>
-          <TabsContent value="recent" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Audits</CardTitle>
-                <CardDescription>
-                  Latest job sheets processed by the system.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${i % 3 === 0 ? 'bg-red-100 text-red-600' : 'bg-lime-100 text-lime-700'}`}>
-                          {i % 3 === 0 ? <AlertTriangle className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
-                        </div>
-                        <div>
-                          <p className="font-medium font-mono">JS-2024-00{i}</p>
-                          <p className="text-sm text-muted-foreground">Technician: John Doe • Site: London HQ</p>
-                        </div>
+            <Tabs defaultValue="recent" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="recent">Recent Audits</TabsTrigger>
+                <TabsTrigger value="hold">Hold Queue</TabsTrigger>
+                <TabsTrigger value="alerts">System Alerts</TabsTrigger>
+              </TabsList>
+              <TabsContent value="recent" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Recent Audits</CardTitle>
+                    <CardDescription>
+                      Latest job sheets processed by the system.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {jobSheetsLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                       </div>
-                      <div className="text-right">
-                        <p className="font-bold text-sm">{i % 3 === 0 ? 'FAILED' : 'PASSED'}</p>
-                        <p className="text-xs text-muted-foreground">2 mins ago</p>
+                    ) : recentJobSheets && recentJobSheets.length > 0 ? (
+                      <div className="space-y-4">
+                        {recentJobSheets.map((sheet) => (
+                          <div key={sheet.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                            <div className="flex items-center gap-4">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                sheet.status === 'failed' ? 'bg-red-100 text-red-600' : 
+                                sheet.status === 'review_queue' ? 'bg-orange-100 text-orange-600' :
+                                'bg-lime-100 text-lime-700'
+                              }`}>
+                                {sheet.status === 'failed' ? <AlertTriangle className="w-5 h-5" /> : 
+                                 sheet.status === 'review_queue' ? <Clock className="w-5 h-5" /> :
+                                 <CheckCircle2 className="w-5 h-5" />}
+                              </div>
+                              <div>
+                                <p className="font-medium font-mono">{sheet.referenceNumber || `JS-${sheet.id}`}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {sheet.fileName} • {sheet.siteInfo || 'No site info'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className={`font-bold text-sm ${
+                                sheet.status === 'failed' ? 'text-red-600' :
+                                sheet.status === 'review_queue' ? 'text-orange-600' :
+                                sheet.status === 'completed' ? 'text-green-600' :
+                                'text-muted-foreground'
+                              }`}>
+                                {sheet.status.toUpperCase().replace('_', ' ')}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(sheet.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No job sheets uploaded yet.</p>
+                        <p className="text-sm">Upload your first job sheet to get started.</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              <TabsContent value="hold" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Hold Queue</CardTitle>
+                    <CardDescription>
+                      Items requiring manual review.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No items in the hold queue.</p>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              <TabsContent value="alerts" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>System Alerts</CardTitle>
+                    <CardDescription>
+                      Important notifications and warnings.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-8 text-muted-foreground">
+                      <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No active alerts.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </Tabs>
           </div>
           
           {/* Audit Timeline */}
           <div className="col-span-1">
-            {statsData?.recentActivity && (
-              <AuditTimeline activities={statsData.recentActivity} />
-            )}
+            <AuditTimeline activities={recentActivity} />
           </div>
         </div>
       </div>
