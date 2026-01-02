@@ -23,6 +23,7 @@ import ReportStudio from "./pages/analytics/ReportStudio";
 import PortalLogin from "./pages/portal/PortalLogin";
 import TechnicianDashboard from "./pages/portal/TechnicianDashboard";
 import DisputeManagement from "./pages/DisputeManagement";
+import AuditLog from "./pages/AuditLog";
 
 
 function Router() {
@@ -45,6 +46,9 @@ function Router() {
       <Route path={"/portal/dashboard"} component={TechnicianDashboard} />
       <Route path="/disputes">
         <ProtectedRoute component={DisputeManagement} allowedRoles={['admin', 'qa_lead']} />
+      </Route>
+      <Route path="/audit-log">
+        <ProtectedRoute component={AuditLog} allowedRoles={['admin']} />
       </Route>
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}

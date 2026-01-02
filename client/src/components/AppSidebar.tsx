@@ -73,6 +73,11 @@ const items = [
     url: "/users",
     icon: Users,
   },
+  {
+    title: "Audit Log",
+    url: "/audit-log",
+    icon: ShieldAlert,
+  },
 ];
 
 export function AppSidebar() {
@@ -82,6 +87,9 @@ export function AppSidebar() {
   const filteredItems = items.filter(item => {
     if (item.title === "Disputes") {
       return hasRole(['admin', 'qa_lead']);
+    }
+    if (item.title === "Audit Log") {
+      return hasRole(['admin']);
     }
     return true;
   });

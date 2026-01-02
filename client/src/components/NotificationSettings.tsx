@@ -3,9 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Bell, AlertTriangle, CheckCircle2, FileText, Mail } from "lucide-react";
+import { Bell, AlertTriangle, CheckCircle2, FileText, Mail, PenTool } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { EmailTemplateManager } from "@/components/EmailTemplateManager";
 
 export function NotificationSettings() {
   const { data: settings, isLoading } = useNotificationSettings();
@@ -144,7 +146,7 @@ export function NotificationSettings() {
           </div>
         </div>
       </CardContent>
-      <CardFooter className="bg-muted/20 border-t p-4">
+      <CardFooter className="bg-muted/20 border-t p-4 flex flex-col gap-2">
         <Button 
           variant="outline" 
           size="sm" 
@@ -155,6 +157,20 @@ export function NotificationSettings() {
           <Mail className="h-4 w-4 mr-2" />
           Send Test Summary Email
         </Button>
+        
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground">
+              <PenTool className="h-3 w-3 mr-2" />
+              Customize Email Templates
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-6xl h-[90vh] p-0 overflow-hidden">
+            <div className="h-full overflow-auto p-6">
+              <EmailTemplateManager />
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardFooter>
     </Card>
   );
