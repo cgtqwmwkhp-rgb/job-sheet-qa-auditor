@@ -8,7 +8,8 @@ import {
   InsertGoldSpec, goldSpecs,
   InsertDispute, disputes,
   InsertWaiver, waivers,
-  InsertSystemAuditLog, systemAuditLog
+  InsertSystemAuditLog, systemAuditLog,
+  InsertProcessingSetting, processingSettings
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -458,4 +459,91 @@ export async function getDashboardStats() {
     reviewQueue: reviewQueue[0]?.count ?? 0,
     criticalIssues: criticalIssues[0]?.count ?? 0,
   };
+}
+
+// ============ PROCESSING SETTINGS QUERIES ============
+
+export interface ProcessingSettingsConfig {
+  llmFallbackEnabled: boolean;
+  llmConfidenceThreshold: number;
+  ocrEnabled: boolean;
+  ocrConfidenceThreshold: number;
+  fuzzyMatchingEnabled: boolean;
+  fuzzyMatchThreshold: number;
+  maxRetries: number;
+  processingTimeoutMs: number;
+}
+
+const DEFAULT_PROCESSING_SETTINGS: ProcessingSettingsConfig = {
+  llmFallbackEnabled: true,
+  llmConfidenceThreshold: 70,
+  ocrEnabled: true,
+  ocrConfidenceThreshold: 60,
+  fuzzyMatchingEnabled: true,
+  fuzzyMatchThreshold: 80,
+  maxRetries: 3,
+  processingTimeoutMs: 60000,
+};
+
+export async function getProcessingSettings(): Promise<ProcessingSettingsConfig> {
+  const db = await getDb();
+  if (!db) return DEFAULT_PROCESSING_SETTINGS;
+  
+  try {
+    const results = await db.select().from(processingSettings);
+    
+    const config = { ...DEFAULT_PROCESSING_SETTINGS };
+    
+    for (const setting of results) {
+      const key = setting.settingKey as keyof ProcessingSettingsConfig;
+      if (key in config && setting.settingValue !== null) {
+        (config as any)[key] = (setting.settingValue as any).value ?? setting.settingValue;
+      }
+    }
+    
+    return config;
+  } catch (error) {
+    console.error('[Database] Failed to get processing settings:', error);
+    return DEFAULT_PROCESSING_SETTINGS;
+  }
+}
+
+export async function updateProcessingSetting(
+  settingKey: string,
+  settingValue: any,
+  updatedBy: number,
+  description?: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  
+  const existingSetting = await db.select()
+    .from(processingSettings)
+    .where(eq(processingSettings.settingKey, settingKey))
+    .limit(1);
+  
+  if (existingSetting.length > 0) {
+    await db.update(processingSettings)
+      .set({
+        settingValue: { value: settingValue },
+        updatedBy,
+        ...(description && { description }),
+      })
+      .where(eq(processingSettings.settingKey, settingKey));
+  } else {
+    await db.insert(processingSettings).values({
+      settingKey,
+      settingValue: { value: settingValue },
+      description: description ?? `Setting for ${settingKey}`,
+      category: 'extraction',
+      updatedBy,
+    });
+  }
+}
+
+export async function getAllProcessingSettings() {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return db.select().from(processingSettings).orderBy(processingSettings.category);
 }

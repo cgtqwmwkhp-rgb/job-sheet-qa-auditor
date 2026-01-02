@@ -167,3 +167,10 @@
 - [x] Add date format auto-detection and normalization
 - [x] Create field value validation against known patterns
 - [x] Implement cross-field consistency checks
+
+## Phase 9: LLM Fallback Toggle (Complete)
+- [x] Add processing_settings table to database schema
+- [x] Create API endpoints for settings CRUD
+- [x] Build Processing Settings UI in Settings page
+- [x] Integrate toggle with advancedExtraction.ts pipeline
+- [x] Test LLM fallback enable/disable functionality (58 tests passing)

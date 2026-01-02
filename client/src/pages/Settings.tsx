@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { EmailTemplateManager } from "@/components/EmailTemplateManager";
 import { AIPersonaSettings } from "@/components/AIPersonaSettings";
+import { ProcessingSettings } from "@/components/ProcessingSettings";
 import { 
   Bell, 
   Mail, 
@@ -14,7 +15,8 @@ import {
   BrainCircuit,
   Moon,
   Sun,
-  Database
+  Database,
+  Cpu
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -71,6 +73,13 @@ export default function Settings() {
               >
                 <Palette className="w-4 h-4 mr-3" />
                 Appearance
+              </TabsTrigger>
+              <TabsTrigger 
+                value="processing" 
+                className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
+              >
+                <Cpu className="w-4 h-4 mr-3" />
+                Processing
               </TabsTrigger>
               <TabsTrigger 
                 value="security" 
@@ -191,6 +200,14 @@ export default function Settings() {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="processing" className="mt-0 space-y-6">
+              <div className="mb-4">
+                <h2 className="text-lg font-medium">Document Processing Settings</h2>
+                <p className="text-sm text-muted-foreground">Configure extraction strategies, AI fallback, and performance options.</p>
+              </div>
+              <ProcessingSettings />
             </TabsContent>
 
             <TabsContent value="security" className="mt-0 space-y-6">

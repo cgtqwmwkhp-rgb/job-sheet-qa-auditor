@@ -199,3 +199,26 @@ export const systemAuditLog = mysqlTable("system_audit_log", {
 
 export type SystemAuditLog = typeof systemAuditLog.$inferSelect;
 export type InsertSystemAuditLog = typeof systemAuditLog.$inferInsert;
+
+
+/**
+ * Processing Settings - configuration for document extraction pipeline
+ */
+export const processingSettings = mysqlTable("processing_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Setting key identifier */
+  settingKey: varchar("settingKey", { length: 64 }).notNull().unique(),
+  /** Setting value as JSON for flexibility */
+  settingValue: json("settingValue").notNull(),
+  /** Human-readable description */
+  description: text("description"),
+  /** Category for grouping in UI */
+  category: mysqlEnum("category", ["extraction", "validation", "performance", "notifications"]).default("extraction").notNull(),
+  /** Last modified by user */
+  updatedBy: int("updatedBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ProcessingSetting = typeof processingSettings.$inferSelect;
+export type InsertProcessingSetting = typeof processingSettings.$inferInsert;

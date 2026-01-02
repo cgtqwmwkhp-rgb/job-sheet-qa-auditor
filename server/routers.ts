@@ -384,6 +384,74 @@ export const appRouter = router({
         return db.getAuditLogs(input);
       }),
   }),
+
+  // ============ PROCESSING SETTINGS ============
+  processingSettings: router({
+    get: protectedProcedure.query(async () => {
+      return db.getProcessingSettings();
+    }),
+
+    getAll: adminProcedure.query(async () => {
+      return db.getAllProcessingSettings();
+    }),
+
+    update: adminProcedure
+      .input(z.object({
+        settingKey: z.string(),
+        settingValue: z.any(),
+        description: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await db.updateProcessingSetting(
+          input.settingKey,
+          input.settingValue,
+          ctx.user.id,
+          input.description
+        );
+
+        await db.logAction({
+          userId: ctx.user.id,
+          action: 'UPDATE_PROCESSING_SETTING',
+          entityType: 'processing_setting',
+          entityId: null,
+          details: { 
+            settingKey: input.settingKey, 
+            newValue: input.settingValue 
+          },
+        });
+
+        return { success: true };
+      }),
+
+    updateBatch: adminProcedure
+      .input(z.object({
+        settings: z.array(z.object({
+          settingKey: z.string(),
+          settingValue: z.any(),
+        })),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        for (const setting of input.settings) {
+          await db.updateProcessingSetting(
+            setting.settingKey,
+            setting.settingValue,
+            ctx.user.id
+          );
+        }
+
+        await db.logAction({
+          userId: ctx.user.id,
+          action: 'UPDATE_PROCESSING_SETTINGS_BATCH',
+          entityType: 'processing_setting',
+          entityId: null,
+          details: { 
+            updatedKeys: input.settings.map(s => s.settingKey) 
+          },
+        });
+
+        return { success: true };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

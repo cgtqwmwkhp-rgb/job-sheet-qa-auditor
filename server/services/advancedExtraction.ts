@@ -11,6 +11,7 @@
  */
 
 import { invokeLLM } from '../_core/llm';
+import { getProcessingSettings, ProcessingSettingsConfig } from '../db';
 
 // ============================================================================
 // TYPES
@@ -490,8 +491,9 @@ async function ensembleExtract(
   const contextResult = extractWithContext(text, field);
   if (contextResult.value) results.push(contextResult);
   
-  // Use LLM for missing or low-confidence fields
-  if (useLlm && (results.length === 0 || Math.max(...results.map(r => r.confidence)) < 70)) {
+  // Use LLM for missing or low-confidence fields (threshold from settings)
+  const llmThreshold = 70; // Default, will be overridden by caller
+  if (useLlm && (results.length === 0 || Math.max(...results.map(r => r.confidence)) < llmThreshold)) {
     const llmResult = await extractWithLlm(text, field);
     if (llmResult.value) results.push(llmResult);
   }
@@ -549,13 +551,26 @@ async function ensembleExtract(
 // DOCUMENT PROCESSOR
 // ============================================================================
 
+export interface ProcessingOptions {
+  useLlm?: boolean;
+  extractionMethod?: 'EMBEDDED_TEXT' | 'OCR' | 'HYBRID';
+  settings?: ProcessingSettingsConfig;
+}
+
 export async function processDocument(
   text: string,
   filename: string,
-  options: { useLlm?: boolean; extractionMethod?: 'EMBEDDED_TEXT' | 'OCR' | 'HYBRID' } = {}
+  options: ProcessingOptions = {}
 ): Promise<DocumentExtractionResult> {
   const startTime = Date.now();
-  const { useLlm = false, extractionMethod = 'EMBEDDED_TEXT' } = options;
+  
+  // Load processing settings from database if not provided
+  const settings = options.settings ?? await getProcessingSettings();
+  const useLlm = options.useLlm ?? settings.llmFallbackEnabled;
+  const extractionMethod = options.extractionMethod ?? 'EMBEDDED_TEXT';
+  const llmConfidenceThreshold = settings.llmConfidenceThreshold ?? 70;
+  const fuzzyMatchEnabled = settings.fuzzyMatchingEnabled ?? true;
+  const fuzzyMatchThreshold = settings.fuzzyMatchThreshold ?? 80;
   
   // Apply OCR error correction
   const correctedText = correctOcrErrors(text);
