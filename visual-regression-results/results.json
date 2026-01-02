@@ -1,0 +1,1433 @@
+{
+  "config": {
+    "configFile": "/home/ubuntu/job-sheet-qa-frontend/playwright.visual.config.ts",
+    "rootDir": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "html",
+        {
+          "outputFolder": "visual-regression-report"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "visual-regression-results/results.json"
+        }
+      ],
+      [
+        "list",
+        null
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "desktop-chrome",
+        "name": "desktop-chrome",
+        "testDir": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "desktop-firefox",
+        "name": "desktop-firefox",
+        "testDir": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "tablet",
+        "name": "tablet",
+        "testDir": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "mobile",
+        "name": "mobile",
+        "testDir": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "changed",
+    "updateSourceMethod": "patch",
+    "version": "1.57.0",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm dev",
+      "url": "http://localhost:3000",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "components.visual.spec.ts",
+      "file": "components.visual.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "UI Components Visual Regression",
+          "file": "components.visual.spec.ts",
+          "line": 12,
+          "column": 6,
+          "specs": [
+            {
+              "title": "button - primary style",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2407,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/button-primary-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:18:50.736Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "button-primary-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/button-primary-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "button-primary-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/components.visual-UI-Compo-a82d5-sion-button---primary-style-desktop-chrome/button-primary-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99b47709ad32662f2642-055deea2935353a03eaf",
+              "file": "components.visual.spec.ts",
+              "line": 21,
+              "column": 3
+            },
+            {
+              "title": "card - role selection card",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2318,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/card-role-selection-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:18:53.305Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "card-role-selection-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/card-role-selection-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "card-role-selection-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/components.visual-UI-Compo-054d0--card---role-selection-card-desktop-chrome/card-role-selection-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99b47709ad32662f2642-b1d84b16c1cafc8c0c06",
+              "file": "components.visual.spec.ts",
+              "line": 30,
+              "column": 3
+            },
+            {
+              "title": "typography - heading styles",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2302,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/typography-heading-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:18:55.642Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "typography-heading-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/typography-heading-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "typography-heading-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/components.visual-UI-Compo-bd8d5-typography---heading-styles-desktop-chrome/typography-heading-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99b47709ad32662f2642-c36795b644d6ece96b7a",
+              "file": "components.visual.spec.ts",
+              "line": 41,
+              "column": 3
+            },
+            {
+              "title": "icon - feature icons",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2286,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/icon-feature-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:18:57.958Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "icon-feature-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/icon-feature-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "icon-feature-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/components.visual-UI-Compo-222ea-ession-icon---feature-icons-desktop-chrome/icon-feature-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99b47709ad32662f2642-549c33c017e399a36cf4",
+              "file": "components.visual.spec.ts",
+              "line": 50,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Modal Components Visual Regression",
+          "file": "components.visual.spec.ts",
+          "line": 62,
+          "column": 6,
+          "specs": [
+            {
+              "title": "onboarding modal - step 1",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2117,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:00.261Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99b47709ad32662f2642-cfc1df2e1d61a38cef09",
+              "file": "components.visual.spec.ts",
+              "line": 63,
+              "column": 3
+            },
+            {
+              "title": "onboarding modal - navigation buttons",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2519,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/modal-navigation-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:02.391Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "modal-navigation-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/modal-navigation-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "modal-navigation-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/components.visual-Modal-Co-64500--modal---navigation-buttons-desktop-chrome/modal-navigation-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99b47709ad32662f2642-0ed32c91313b2c3763ec",
+              "file": "components.visual.spec.ts",
+              "line": 79,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Color Theme Visual Regression",
+          "file": "components.visual.spec.ts",
+          "line": 96,
+          "column": 6,
+          "specs": [
+            {
+              "title": "light theme - demo gateway",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2432,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/theme-light-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:04.922Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "theme-light-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/theme-light-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "theme-light-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/components.visual-Color-Th-a53ff--light-theme---demo-gateway-desktop-chrome/theme-light-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99b47709ad32662f2642-ab1c52a3bf0f92f25403",
+              "file": "components.visual.spec.ts",
+              "line": 97,
+              "column": 3
+            },
+            {
+              "title": "dark theme - demo gateway",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2534,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/theme-dark-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:07.367Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "theme-dark-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/theme-dark-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "theme-dark-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/components.visual-Color-Th-85686-n-dark-theme---demo-gateway-desktop-chrome/theme-dark-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "99b47709ad32662f2642-cf66dc0f8dfef124e06e",
+              "file": "components.visual.spec.ts",
+              "line": 117,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "dashboard.visual.spec.ts",
+      "file": "dashboard.visual.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Dashboard Visual Regression",
+          "file": "dashboard.visual.spec.ts",
+          "line": 14,
+          "column": 6,
+          "specs": [
+            {
+              "title": "dashboard - demo gateway view",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2557,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-demo-view-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:09.925Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "dashboard-demo-view-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-demo-view-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "dashboard-demo-view-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/dashboard.visual-Dashboard-e5e63-shboard---demo-gateway-view-desktop-chrome/dashboard-demo-view-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1aba1fdc35889bbb3a07-55b3bec8906861de1e9e",
+              "file": "dashboard.visual.spec.ts",
+              "line": 19,
+              "column": 3
+            },
+            {
+              "title": "dashboard - role selection cards",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2397,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-role-cards-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:12.497Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "dashboard-role-cards-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-role-cards-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "dashboard-role-cards-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/dashboard.visual-Dashboard-8cb01-oard---role-selection-cards-desktop-chrome/dashboard-role-cards-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1aba1fdc35889bbb3a07-37d000ed27f3b57f9289",
+              "file": "dashboard.visual.spec.ts",
+              "line": 32,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Dashboard Responsive Visual Regression",
+          "file": "dashboard.visual.spec.ts",
+          "line": 46,
+          "column": 6,
+          "specs": [
+            {
+              "title": "dashboard - tablet layout",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3115,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-tablet-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:14.908Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "dashboard-tablet-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-tablet-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "dashboard-tablet-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/dashboard.visual-Dashboard-c069a-n-dashboard---tablet-layout-desktop-chrome/dashboard-tablet-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1aba1fdc35889bbb3a07-8ddedde738755534e449",
+              "file": "dashboard.visual.spec.ts",
+              "line": 47,
+              "column": 3
+            },
+            {
+              "title": "dashboard - mobile layout",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2439,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-mobile-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:18.040Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "dashboard-mobile-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-mobile-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "dashboard-mobile-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/dashboard.visual-Dashboard-07634-n-dashboard---mobile-layout-desktop-chrome/dashboard-mobile-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1aba1fdc35889bbb3a07-97275e6452120184baff",
+              "file": "dashboard.visual.spec.ts",
+              "line": 62,
+              "column": 3
+            },
+            {
+              "title": "dashboard - wide desktop layout",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3729,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-wide-desktop-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:20.491Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "dashboard-wide-desktop-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-wide-desktop-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "dashboard-wide-desktop-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/dashboard.visual-Dashboard-393ce-board---wide-desktop-layout-desktop-chrome/dashboard-wide-desktop-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1aba1fdc35889bbb3a07-557be1f3acd68e914c93",
+              "file": "dashboard.visual.spec.ts",
+              "line": 77,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "demo-gateway.visual.spec.ts",
+      "file": "demo-gateway.visual.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Demo Gateway Visual Regression",
+          "file": "demo-gateway.visual.spec.ts",
+          "line": 10,
+          "column": 6,
+          "specs": [
+            {
+              "title": "demo gateway page - full view",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2535,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-full-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:24.244Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "demo-gateway-full-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-full-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "demo-gateway-full-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/demo-gateway.visual-Demo-G-00a89-mo-gateway-page---full-view-desktop-chrome/demo-gateway-full-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6faa3354b5d7ab59be69-f1c9960833a88b5338ca",
+              "file": "demo-gateway.visual.spec.ts",
+              "line": 18,
+              "column": 3
+            },
+            {
+              "title": "demo gateway page - with onboarding modal",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2519,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-onboarding-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:26.793Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "demo-gateway-onboarding-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-onboarding-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "demo-gateway-onboarding-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/demo-gateway.visual-Demo-G-3918a-age---with-onboarding-modal-desktop-chrome/demo-gateway-onboarding-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6faa3354b5d7ab59be69-84c78a58c6ec11bb627c",
+              "file": "demo-gateway.visual.spec.ts",
+              "line": 31,
+              "column": 3
+            },
+            {
+              "title": "demo gateway - admin card",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2289,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-admin-card-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:29.326Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "demo-gateway-admin-card-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-admin-card-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "demo-gateway-admin-card-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/demo-gateway.visual-Demo-G-f94f4-n-demo-gateway---admin-card-desktop-chrome/demo-gateway-admin-card-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6faa3354b5d7ab59be69-6e41931727e3a5d218dc",
+              "file": "demo-gateway.visual.spec.ts",
+              "line": 43,
+              "column": 3
+            },
+            {
+              "title": "demo gateway - technician card",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2279,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-technician-card-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:31.631Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "demo-gateway-technician-card-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-technician-card-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "demo-gateway-technician-card-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/demo-gateway.visual-Demo-G-a533f-o-gateway---technician-card-desktop-chrome/demo-gateway-technician-card-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6faa3354b5d7ab59be69-2a832ea03f88ec4f5fa1",
+              "file": "demo-gateway.visual.spec.ts",
+              "line": 54,
+              "column": 3
+            },
+            {
+              "title": "demo gateway - header section",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2279,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-header-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:33.924Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "demo-gateway-header-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-header-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "demo-gateway-header-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/demo-gateway.visual-Demo-G-96d0a-mo-gateway---header-section-desktop-chrome/demo-gateway-header-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6faa3354b5d7ab59be69-3cf9bad7be616a2c6dcc",
+              "file": "demo-gateway.visual.spec.ts",
+              "line": 65,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Demo Gateway Responsive Visual Regression",
+          "file": "demo-gateway.visual.spec.ts",
+          "line": 77,
+          "column": 6,
+          "specs": [
+            {
+              "title": "demo gateway - tablet view",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2789,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-tablet-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:36.217Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "demo-gateway-tablet-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-tablet-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "demo-gateway-tablet-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/demo-gateway.visual-Demo-G-de6cf--demo-gateway---tablet-view-desktop-chrome/demo-gateway-tablet-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6faa3354b5d7ab59be69-cb8ba670d7ca8be30dd2",
+              "file": "demo-gateway.visual.spec.ts",
+              "line": 78,
+              "column": 3
+            },
+            {
+              "title": "demo gateway - mobile view",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2246,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-mobile-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:39.018Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "demo-gateway-mobile-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-mobile-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "demo-gateway-mobile-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/demo-gateway.visual-Demo-G-1ff12--demo-gateway---mobile-view-desktop-chrome/demo-gateway-mobile-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6faa3354b5d7ab59be69-6a492daf411135c05e1d",
+              "file": "demo-gateway.visual.spec.ts",
+              "line": 92,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "help-center.visual.spec.ts",
+      "file": "help-center.visual.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Help Center Visual Regression",
+          "file": "help-center.visual.spec.ts",
+          "line": 11,
+          "column": 6,
+          "specs": [
+            {
+              "title": "help center - full page",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2541,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-full-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:41.283Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "help-center-full-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-full-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "help-center-full-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/help-center.visual-Help-Ce-df0a8-ion-help-center---full-page-desktop-chrome/help-center-full-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dcb7c9c69b94311ef224-7f7297dd63b670f1bf67",
+              "file": "help-center.visual.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "help center - header section",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2183,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-header-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:43.839Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "help-center-header-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-header-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "help-center-header-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/help-center.visual-Help-Ce-d0534-elp-center---header-section-desktop-chrome/help-center-header-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dcb7c9c69b94311ef224-3375f2fa6d22f759a228",
+              "file": "help-center.visual.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "help center - search area",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1984,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:46.037Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dcb7c9c69b94311ef224-f14dacd6aac6df0e4802",
+              "file": "help-center.visual.spec.ts",
+              "line": 36,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Help Center Responsive Visual Regression",
+          "file": "help-center.visual.spec.ts",
+          "line": 48,
+          "column": 6,
+          "specs": [
+            {
+              "title": "help center - tablet view",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2778,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-tablet-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:48.035Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "help-center-tablet-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-tablet-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "help-center-tablet-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/help-center.visual-Help-Ce-5bcaf-n-help-center---tablet-view-desktop-chrome/help-center-tablet-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dcb7c9c69b94311ef224-c6c71f669e250f47a3ca",
+              "file": "help-center.visual.spec.ts",
+              "line": 49,
+              "column": 3
+            },
+            {
+              "title": "help center - mobile view",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "desktop-chrome",
+                  "projectName": "desktop-chrome",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2218,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-mobile-desktop-chrome-linux.png, writing actual.\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-01-02T17:19:50.825Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "help-center-mobile-expected.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-mobile-desktop-chrome-linux.png"
+                        },
+                        {
+                          "name": "help-center-mobile-actual.png",
+                          "contentType": "image/png",
+                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/help-center.visual-Help-Ce-c6ce1-n-help-center---mobile-view-desktop-chrome/help-center-mobile-actual.png"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "dcb7c9c69b94311ef224-2264a97a1ba586841d81",
+              "file": "help-center.visual.spec.ts",
+              "line": 62,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-01-02T17:18:49.661Z",
+    "duration": 63444.753,
+    "expected": 25,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

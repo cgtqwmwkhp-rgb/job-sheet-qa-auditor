@@ -232,3 +232,25 @@
 - [ ] Load testing for concurrent users
 - [ ] Security penetration testing
 - [x] Final UAT sign-off checklist (UAT_TEST_SCENARIOS.md)
+
+## Phase 11: Load Testing & Visual Regression Testing
+
+### Load Testing (k6)
+- [x] Install and configure k6 load testing framework
+- [x] Create load test for concurrent user sessions
+- [x] Create load test for batch document uploads
+- [x] Create load test for API endpoint stress testing
+- [x] Add load test configuration for different scenarios (smoke, load, stress, spike)
+- [x] Generate load test reports with performance metrics
+
+### Visual Regression Testing (Playwright)
+- [x] Configure Playwright for visual regression testing
+- [x] Create baseline screenshots for key pages
+- [x] Add visual regression tests for Demo Gateway page
+- [x] Add visual regression tests for Dashboard page
+- [x] Add visual regression tests for Help Center page
+- [x] Add visual regression tests for UI Components
+- [x] Add visual regression tests for Color Themes (light/dark)
+- [x] Add visual regression tests for responsive layouts (mobile, tablet, wide desktop)
+- [x] Configure screenshot comparison thresholds
+- [x] Add CI-ready visual regression scripts
