@@ -22,6 +22,16 @@ async function fetcher<T>(url: string, options?: RequestInit): Promise<T> {
 
 // --- Job Sheets ---
 
+export interface BoundingBox {
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color?: string;
+  label?: string;
+}
+
 export interface JobSheet {
   id: string;
   technician: string;
@@ -29,15 +39,19 @@ export interface JobSheet {
   date: string;
   status: "passed" | "failed" | "review";
   score: string;
+  documentUrl: string;
   findings: Finding[];
 }
 
 export interface Finding {
-  id: string;
+  id: string | number;
   field: string;
   status: "passed" | "missing" | "warning";
   message?: string;
+  value?: string;
+  severity?: "critical" | "major" | "minor";
   confidence: number;
+  box?: BoundingBox;
 }
 
 export function useJobSheets() {

@@ -8,71 +8,110 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertCircle, CheckCircle2, Download, Eye, Flag } from "lucide-react";
 import { useState } from "react";
 import { DocumentViewer, BoundingBox } from "@/components/DocumentViewer";
-
-// Mock Data for Audit Result
-const auditData = {
-  id: "JS-2024-001",
-  status: "failed",
-  score: "C",
-  technician: "John Doe",
-  date: "2024-01-15",
-  site: "London HQ",
-  documentUrl: "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf", // Sample PDF
-  findings: [
-    {
-      id: 1,
-      field: "Customer Signature",
-      status: "missing",
-      severity: "critical",
-      message: "Customer signature is required but not detected.",
-      confidence: 0.98,
-      box: { page: 1, x: 10, y: 80, width: 30, height: 5, color: "#ef4444", label: "Missing Signature" }
-    },
-    {
-      id: 2,
-      field: "Date of Service",
-      status: "passed",
-      value: "15/01/2024",
-      confidence: 0.99,
-      box: { page: 1, x: 70, y: 15, width: 20, height: 3, color: "#22c55e", label: "Date" }
-    },
-    {
-      id: 3,
-      field: "Serial Number",
-      status: "warning",
-      value: "SN-12345-??",
-      message: "Serial number is partially obscured.",
-      confidence: 0.75,
-      box: { page: 1, x: 40, y: 30, width: 25, height: 4, color: "#f97316", label: "Serial #" }
-    },
-    {
-      id: 4,
-      field: "Work Description",
-      status: "passed",
-      value: "Routine maintenance performed. Replaced filters.",
-      confidence: 0.95,
-      box: { page: 1, x: 10, y: 40, width: 80, height: 20, color: "#22c55e", label: "Description" }
-    },
-  ],
-};
+import { useJobSheet } from "@/lib/api";
+import { useLocation } from "wouter";
 
 export default function AuditResults() {
+  const [location] = useLocation();
+  const searchParams = new URLSearchParams(window.location.search);
+  const id = searchParams.get("id") || "JS-2024-001"; // Default ID for demo
+  
+  // Use the API hook - in a real app this would fetch from backend
+  // For now we'll rely on the mock data inside the hook or fallback
+  const { data: auditData, isLoading, error } = useJobSheet(id);
+  
+  const [activeBoxId, setActiveBoxId] = useState<string | number | null>(null);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error || !auditData) {
+    // Fallback mock data for demo purposes if API fails
+    const mockData = {
+      id: "JS-2024-001",
+      status: "failed",
+      score: "C",
+      technician: "John Doe",
+      date: "2024-01-15",
+      site: "London HQ",
+      documentUrl: "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf",
+      findings: [
+        {
+          id: 1,
+          field: "Customer Signature",
+          status: "missing",
+          severity: "critical",
+          message: "Customer signature is required but not detected.",
+          confidence: 0.98,
+          box: { page: 1, x: 10, y: 80, width: 30, height: 5, color: "#ef4444", label: "Missing Signature" }
+        },
+        {
+          id: 2,
+          field: "Date of Service",
+          status: "passed",
+          value: "15/01/2024",
+          confidence: 0.99,
+          box: { page: 1, x: 70, y: 15, width: 20, height: 3, color: "#22c55e", label: "Date" }
+        },
+        {
+          id: 3,
+          field: "Serial Number",
+          status: "warning",
+          value: "SN-12345-??",
+          message: "Serial number is partially obscured.",
+          confidence: 0.75,
+          box: { page: 1, x: 40, y: 30, width: 25, height: 4, color: "#f97316", label: "Serial #" }
+        },
+        {
+          id: 4,
+          field: "Work Description",
+          status: "passed",
+          value: "Routine maintenance performed. Replaced filters.",
+          confidence: 0.95,
+          box: { page: 1, x: 10, y: 40, width: 80, height: 20, color: "#22c55e", label: "Description" }
+        },
+      ],
+    };
+    
+    // Use mock data if API fails (since we don't have a real backend yet)
+    return <AuditResultsContent auditData={mockData} />;
+  }
+
+  return <AuditResultsContent auditData={auditData} />;
+}
+
+function AuditResultsContent({ auditData }: { auditData: any }) {
   const [activeBoxId, setActiveBoxId] = useState<string | number | null>(null);
 
   const boxes: BoundingBox[] = auditData.findings
-    .filter(f => f.box)
-    .map(f => ({
+    .filter((f: any) => f.box)
+    .map((f: any) => ({
       id: f.id,
       ...f.box
     } as BoundingBox));
 
+
+
   const handleBoxClick = (id: string | number) => {
     setActiveBoxId(id);
-    // Scroll to finding in the list
     const element = document.getElementById(`finding-${id}`);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+  };
+
+  const handleBoxCreate = (box: BoundingBox) => {
+    // In a real app, this would open a dialog to create a new finding
+    console.log("New box created:", box);
+    // For demo, we'll just log it
+    alert(`New annotation created at ${Math.round(box.x)}%, ${Math.round(box.y)}%`);
   };
 
   return (
@@ -112,6 +151,7 @@ export default function AuditResults() {
               url={auditData.documentUrl} 
               boxes={boxes}
               onBoxClick={handleBoxClick}
+              onBoxCreate={handleBoxCreate}
             />
           </div>
 
@@ -132,7 +172,7 @@ export default function AuditResults() {
                 
                 <ScrollArea className="flex-1 p-4">
                   <div className="space-y-4">
-                    {auditData.findings.map((finding) => (
+                    {auditData.findings.map((finding: any) => (
                       <div 
                         key={finding.id}
                         id={`finding-${finding.id}`}

@@ -1,8 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, PenTool, MousePointer2 } from "lucide-react";
+import * as ReactWindow from 'react-window';
+import { AutoSizer } from 'react-virtualized-auto-sizer';
+
+const List = (ReactWindow as any).FixedSizeList;
+const Sizer = AutoSizer as any;
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -29,13 +34,69 @@ interface DocumentViewerProps {
   onPageChange?: (page: number) => void;
   boxes?: BoundingBox[];
   onBoxClick?: (boxId: string | number) => void;
+  onBoxCreate?: (box: BoundingBox) => void;
 }
 
-export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [], onBoxClick }: DocumentViewerProps) {
+export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [], onBoxClick, onBoxCreate }: DocumentViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(initialPage);
   const [scale, setScale] = useState<number>(1.0);
   const [rotation, setRotation] = useState<number>(0);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
+  const [currentBox, setCurrentBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (listRef.current) {
+      listRef.current.scrollToItem(pageNumber - 1, "start");
+    }
+  }, [pageNumber]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!isDrawing || !containerRef.current) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    setDrawStart({ x, y });
+    setCurrentBox({ x, y, width: 0, height: 0 });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDrawing || !drawStart || !containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const currentX = ((e.clientX - rect.left) / rect.width) * 100;
+    const currentY = ((e.clientY - rect.top) / rect.height) * 100;
+
+    const width = Math.abs(currentX - drawStart.x);
+    const height = Math.abs(currentY - drawStart.y);
+    const x = Math.min(currentX, drawStart.x);
+    const y = Math.min(currentY, drawStart.y);
+
+    setCurrentBox({ x, y, width, height });
+  };
+
+  const handleMouseUp = () => {
+    if (!isDrawing || !drawStart || !currentBox) return;
+
+    if (currentBox.width > 1 && currentBox.height > 1) {
+      onBoxCreate?.({
+        id: Date.now(),
+        page: pageNumber,
+        ...currentBox,
+        color: '#3b82f6',
+        label: 'New Finding'
+      });
+    }
+
+    setDrawStart(null);
+    setCurrentBox(null);
+    setIsDrawing(false);
+  };
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
@@ -88,6 +149,18 @@ export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [],
               <ZoomIn className="w-4 h-4" />
             </Button>
           </div>
+          
+          <div className="flex items-center gap-1 border-l pl-2 ml-2">
+            <Button 
+              variant={isDrawing ? "secondary" : "ghost"} 
+              size="icon" 
+              className="h-8 w-8" 
+              onClick={() => setIsDrawing(!isDrawing)}
+              title={isDrawing ? "Cancel Drawing" : "Draw Box"}
+            >
+              {isDrawing ? <MousePointer2 className="w-4 h-4" /> : <PenTool className="w-4 h-4" />}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       
@@ -108,47 +181,90 @@ export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [],
             </div>
           }
         >
-          <div className="relative">
-            <Page 
-              pageNumber={pageNumber} 
-              scale={scale} 
-              rotate={rotation}
-              renderTextLayer={true}
-              renderAnnotationLayer={true}
-              className="bg-white"
-            />
-            {/* Bounding Boxes Overlay */}
-            {boxes
-              .filter(box => box.page === pageNumber)
-              .map(box => (
-                <div
-                  key={box.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onBoxClick?.(box.id);
-                  }}
-                  className="absolute border-2 cursor-pointer transition-all hover:bg-opacity-20 hover:scale-[1.02] z-10"
-                  style={{
-                    left: `${box.x}%`,
-                    top: `${box.y}%`,
-                    width: `${box.width}%`,
-                    height: `${box.height}%`,
-                    borderColor: box.color || '#ef4444',
-                    backgroundColor: `${box.color || '#ef4444'}1A`, // 10% opacity
-                  }}
-                  title={box.label}
-                >
-                  {box.label && (
-                    <span 
-                      className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
-                      style={{ backgroundColor: box.color || '#ef4444' }}
+          <Sizer>
+            {({ height, width }: { height: number; width: number }) => (
+              <List
+                ref={listRef}
+                height={height}
+                itemCount={numPages}
+                itemSize={800 * scale} // Approximate height based on scale
+                width={width}
+                className="flex justify-center"
+              >
+                {({ index, style }: { index: number; style: React.CSSProperties }) => (
+                  <div style={style} className="flex justify-center py-4">
+                    <div 
+                      className={`relative inline-block ${isDrawing ? 'cursor-crosshair' : ''}`}
+                      ref={containerRef}
+                      onMouseDown={handleMouseDown}
+                      onMouseMove={handleMouseMove}
+                      onMouseUp={handleMouseUp}
+                      onMouseLeave={handleMouseUp}
                     >
-                      {box.label}
-                    </span>
-                  )}
-                </div>
-              ))}
-          </div>
+                      <Page 
+                        pageNumber={index + 1} 
+                        scale={scale} 
+                        rotate={rotation}
+                        renderTextLayer={true}
+                        renderAnnotationLayer={true}
+                        className="bg-white shadow-md"
+                        onRenderSuccess={() => {
+                          if (index + 1 === pageNumber) {
+                            // Optional: logic after render
+                          }
+                        }}
+                      />
+                      
+                      {/* Current Drawing Box (Only on active page for now) */}
+                      {currentBox && index + 1 === pageNumber && (
+                        <div
+                          className="absolute border-2 border-blue-500 bg-blue-500/20 z-20"
+                          style={{
+                            left: `${currentBox.x}%`,
+                            top: `${currentBox.y}%`,
+                            width: `${currentBox.width}%`,
+                            height: `${currentBox.height}%`,
+                          }}
+                        />
+                      )}
+
+                      {/* Bounding Boxes Overlay */}
+                      {boxes
+                        .filter(box => box.page === index + 1)
+                        .map(box => (
+                          <div
+                            key={box.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onBoxClick?.(box.id);
+                            }}
+                            className="absolute border-2 cursor-pointer transition-all hover:bg-opacity-20 hover:scale-[1.02] z-10"
+                            style={{
+                              left: `${box.x}%`,
+                              top: `${box.y}%`,
+                              width: `${box.width}%`,
+                              height: `${box.height}%`,
+                              borderColor: box.color || '#ef4444',
+                              backgroundColor: `${box.color || '#ef4444'}1A`, // 10% opacity
+                            }}
+                            title={box.label}
+                          >
+                            {box.label && (
+                              <span 
+                                className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
+                                style={{ backgroundColor: box.color || '#ef4444' }}
+                              >
+                                {box.label}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </List>
+            )}
+          </Sizer>
         </Document>
       </div>
     </Card>
