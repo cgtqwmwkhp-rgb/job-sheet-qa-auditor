@@ -2,7 +2,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { CalendarDateRangePicker } from "@/components/ui/date-range-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, LayoutDashboard, Map, Users, AlertTriangle, FileText } from "lucide-react";
+import { Download, LayoutDashboard, Map, Users, AlertTriangle, FileText, Wrench } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
 interface AnalyticsLayoutProps {
@@ -18,6 +18,7 @@ export function AnalyticsLayout({ children, title, description }: AnalyticsLayou
     { href: "/analytics", label: "Overview", icon: LayoutDashboard },
     { href: "/analytics/defects", label: "Defect Analysis", icon: AlertTriangle },
     { href: "/analytics/technicians", label: "Technician Performance", icon: Users },
+    { href: "/analytics/first-fix", label: "First Fix Rate", icon: Wrench },
     { href: "/analytics/sites", label: "Site Intelligence", icon: Map },
     { href: "/analytics/reports", label: "Custom Reports", icon: FileText },
   ];
