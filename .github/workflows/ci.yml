@@ -102,6 +102,12 @@ jobs:
         run: pnpm test:e2e --project=chromium
         env:
           CI: true
+          VITE_ANALYTICS_ENDPOINT: ""
+          VITE_ANALYTICS_WEBSITE_ID: ""
+          VITE_APP_TITLE: "Job Sheet QA Auditor"
+          VITE_APP_LOGO: ""
+          VITE_APP_ID: "test"
+          VITE_OAUTH_PORTAL_URL: ""
 
       - name: Upload E2E test results
         uses: actions/upload-artifact@v4
@@ -156,6 +162,12 @@ jobs:
         run: pnpm test:visual --project=desktop-chrome
         env:
           CI: true
+          VITE_ANALYTICS_ENDPOINT: ""
+          VITE_ANALYTICS_WEBSITE_ID: ""
+          VITE_APP_TITLE: "Job Sheet QA Auditor"
+          VITE_APP_LOGO: ""
+          VITE_APP_ID: "test"
+          VITE_OAUTH_PORTAL_URL: ""
 
       - name: Upload visual regression results
         uses: actions/upload-artifact@v4
