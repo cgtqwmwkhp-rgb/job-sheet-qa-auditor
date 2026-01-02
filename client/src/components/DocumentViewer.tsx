@@ -1,14 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, PenTool, MousePointer2 } from "lucide-react";
-import * as ReactWindow from 'react-window';
-import * as AutoSizerPkg from 'react-virtualized-auto-sizer';
-
-// Robust import for CJS/ESM interop
-const List = (ReactWindow as any).default?.FixedSizeList || (ReactWindow as any).FixedSizeList || ReactWindow;
-const Sizer = (AutoSizerPkg as any).default || AutoSizerPkg;
 
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -45,13 +39,6 @@ export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [],
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [currentBox, setCurrentBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<any>(null);
-
-  useEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollToItem(pageNumber - 1, "start");
-    }
-  }, [pageNumber]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!isDrawing || !containerRef.current) return;
@@ -105,6 +92,9 @@ export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [],
     setPageNumber(newPage);
     onPageChange?.(newPage);
   };
+
+  // Get boxes for current page
+  const currentPageBoxes = boxes.filter(box => box.page === pageNumber);
 
   return (
     <Card className="flex flex-col h-full overflow-hidden">
@@ -180,90 +170,66 @@ export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [],
             </div>
           }
         >
-          <Sizer>
-            {({ height, width }: { height: number; width: number }) => (
-              <List
-                ref={listRef}
-                height={height}
-                itemCount={numPages}
-                itemSize={800 * scale} // Approximate height based on scale
-                width={width}
-                className="flex justify-center"
-              >
-                {({ index, style }: { index: number; style: React.CSSProperties }) => (
-                  <div style={style} className="flex justify-center py-4">
-                    <div 
-                      className={`relative inline-block ${isDrawing ? 'cursor-crosshair' : ''}`}
-                      ref={containerRef}
-                      onMouseDown={handleMouseDown}
-                      onMouseMove={handleMouseMove}
-                      onMouseUp={handleMouseUp}
-                      onMouseLeave={handleMouseUp}
-                    >
-                      <Page 
-                        pageNumber={index + 1} 
-                        scale={scale} 
-                        rotate={rotation}
-                        renderTextLayer={true}
-                        renderAnnotationLayer={true}
-                        className="bg-white shadow-md"
-                        onRenderSuccess={() => {
-                          if (index + 1 === pageNumber) {
-                            // Optional: logic after render
-                          }
-                        }}
-                      />
-                      
-                      {/* Current Drawing Box (Only on active page for now) */}
-                      {currentBox && index + 1 === pageNumber && (
-                        <div
-                          className="absolute border-2 border-blue-500 bg-blue-500/20 z-20"
-                          style={{
-                            left: `${currentBox.x}%`,
-                            top: `${currentBox.y}%`,
-                            width: `${currentBox.width}%`,
-                            height: `${currentBox.height}%`,
-                          }}
-                        />
-                      )}
-
-                      {/* Bounding Boxes Overlay */}
-                      {boxes
-                        .filter(box => box.page === index + 1)
-                        .map(box => (
-                          <div
-                            key={box.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onBoxClick?.(box.id);
-                            }}
-                            className="absolute border-2 cursor-pointer transition-all hover:bg-opacity-20 hover:scale-[1.02] z-10"
-                            style={{
-                              left: `${box.x}%`,
-                              top: `${box.y}%`,
-                              width: `${box.width}%`,
-                              height: `${box.height}%`,
-                              borderColor: box.color || '#ef4444',
-                              backgroundColor: `${box.color || '#ef4444'}1A`, // 10% opacity
-                            }}
-                            title={box.label}
-                          >
-                            {box.label && (
-                              <span 
-                                className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
-                                style={{ backgroundColor: box.color || '#ef4444' }}
-                              >
-                                {box.label}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </List>
+          <div 
+            className={`relative inline-block ${isDrawing ? 'cursor-crosshair' : ''}`}
+            ref={containerRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+            <Page 
+              pageNumber={pageNumber} 
+              scale={scale} 
+              rotate={rotation}
+              renderTextLayer={true}
+              renderAnnotationLayer={true}
+              className="bg-white shadow-md"
+            />
+            
+            {/* Current Drawing Box */}
+            {currentBox && (
+              <div
+                className="absolute border-2 border-blue-500 bg-blue-500/20 z-20"
+                style={{
+                  left: `${currentBox.x}%`,
+                  top: `${currentBox.y}%`,
+                  width: `${currentBox.width}%`,
+                  height: `${currentBox.height}%`,
+                }}
+              />
             )}
-          </Sizer>
+
+            {/* Bounding Boxes Overlay */}
+            {currentPageBoxes.map(box => (
+              <div
+                key={box.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBoxClick?.(box.id);
+                }}
+                className="absolute border-2 cursor-pointer transition-all hover:bg-opacity-20 hover:scale-[1.02] z-10"
+                style={{
+                  left: `${box.x}%`,
+                  top: `${box.y}%`,
+                  width: `${box.width}%`,
+                  height: `${box.height}%`,
+                  borderColor: box.color || '#ef4444',
+                  backgroundColor: `${box.color || '#ef4444'}1A`, // 10% opacity
+                }}
+                title={box.label}
+              >
+                {box.label && (
+                  <span 
+                    className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
+                    style={{ backgroundColor: box.color || '#ef4444' }}
+                  >
+                    {box.label}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
         </Document>
       </div>
     </Card>
