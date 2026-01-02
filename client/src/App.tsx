@@ -24,6 +24,7 @@ import PortalLogin from "./pages/portal/PortalLogin";
 import TechnicianDashboard from "./pages/portal/TechnicianDashboard";
 import DisputeManagement from "./pages/DisputeManagement";
 import AuditLog from "./pages/AuditLog";
+import Settings from "./pages/Settings";
 
 
 function Router() {
@@ -49,6 +50,9 @@ function Router() {
       </Route>
       <Route path="/audit-log">
         <ProtectedRoute component={AuditLog} allowedRoles={['admin']} />
+      </Route>
+      <Route path="/settings">
+        <ProtectedRoute component={Settings} allowedRoles={['admin', 'qa_lead']} />
       </Route>
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
