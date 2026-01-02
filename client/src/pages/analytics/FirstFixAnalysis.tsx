@@ -10,9 +10,6 @@ import {
   Tooltip, 
   Legend, 
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
   LineChart,
   Line
 } from "recharts";
@@ -25,10 +22,12 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowDownRight, ArrowUpRight, Wrench, Users, Building2, ChevronRight, ArrowLeft, Sparkles, BrainCircuit } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Wrench, Users, Building2, ChevronRight, ArrowLeft, Sparkles, BrainCircuit, GraduationCap } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { CostCalculator } from "@/components/CostCalculator";
+import { CoachingCard } from "@/components/CoachingCard";
+import { DeepNoteAnalysis } from "@/components/DeepNoteAnalysis";
 
 // Mock Data
 const trendData = [
@@ -61,8 +60,6 @@ const customerData = [
   { name: "Stark Ind", firstFix: 150, returnVisits: 5, rate: 97 },
   { name: "Umbrella Corp", firstFix: 90, returnVisits: 30, rate: 75 },
 ];
-
-const COLORS = ['#22c55e', '#ef4444'];
 
 export default function FirstFixAnalysis() {
   const [selectedEntity, setSelectedEntity] = useState<{ type: 'engineer' | 'customer', name: string } | null>(null);
@@ -125,48 +122,57 @@ export default function FirstFixAnalysis() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Job History</CardTitle>
-              <CardDescription>List of recent jobs and their first-fix status.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Job ID</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Outcome</TableHead>
-                    <TableHead>Notes</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell className="font-mono">JB-9921</TableCell>
-                    <TableCell>Today</TableCell>
-                    <TableCell><Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Completed</Badge></TableCell>
-                    <TableCell>First Fix</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">Standard service, no issues.</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-mono">JB-9918</TableCell>
-                    <TableCell>Yesterday</TableCell>
-                    <TableCell><Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Return Required</Badge></TableCell>
-                    <TableCell>Return Visit</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">Parts not available on van.</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-mono">JB-9844</TableCell>
-                    <TableCell>3 days ago</TableCell>
-                    <TableCell><Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Completed</Badge></TableCell>
-                    <TableCell>First Fix</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">Customer signed off.</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="md:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Job History</CardTitle>
+                  <CardDescription>List of recent jobs and their first-fix status.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Job ID</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Outcome</TableHead>
+                        <TableHead>Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="font-mono">JB-9921</TableCell>
+                        <TableCell>Today</TableCell>
+                        <TableCell><Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Completed</Badge></TableCell>
+                        <TableCell>First Fix</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">Standard service, no issues.</TableCell>
+                      </TableRow>
+                      <TableRow className="bg-red-50/30">
+                        <TableCell className="font-mono">JB-9918</TableCell>
+                        <TableCell>Yesterday</TableCell>
+                        <TableCell><Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Return Required</Badge></TableCell>
+                        <TableCell>Return Visit</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">Parts not available on van.</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono">JB-9844</TableCell>
+                        <TableCell>3 days ago</TableCell>
+                        <TableCell><Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Completed</Badge></TableCell>
+                        <TableCell>First Fix</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">Customer signed off.</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Deep Note Analysis Sidebar */}
+            <div className="md:col-span-1">
+              <DeepNoteAnalysis />
+            </div>
+          </div>
         </div>
       </AnalyticsLayout>
     );
@@ -218,29 +224,36 @@ export default function FirstFixAnalysis() {
         </Card>
       </div>
 
-      {/* Trend Chart */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>12-Month Performance Trend</CardTitle>
-          <CardDescription>Global First Fix Rate over the last year.</CardDescription>
-        </CardHeader>
-        <CardContent className="pl-2">
-          <div className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="month" />
-                <YAxis domain={[80, 100]} />
-                <Tooltip 
-                  cursor={{ stroke: 'rgba(0,0,0,0.1)' }}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                />
-                <Line type="monotone" dataKey="rate" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 md:grid-cols-3 mb-6">
+        {/* Trend Chart - Spans 2 columns */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>12-Month Performance Trend</CardTitle>
+            <CardDescription>Global First Fix Rate over the last year.</CardDescription>
+          </CardHeader>
+          <CardContent className="pl-2">
+            <div className="h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="month" />
+                  <YAxis domain={[80, 100]} />
+                  <Tooltip 
+                    cursor={{ stroke: 'rgba(0,0,0,0.1)' }}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                  />
+                  <Line type="monotone" dataKey="rate" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Cost Calculator - Spans 1 column */}
+        <div className="md:col-span-1">
+          <CostCalculator />
+        </div>
+      </div>
 
       <Tabs defaultValue="engineer" className="space-y-4">
         <TabsList>
@@ -255,143 +268,137 @@ export default function FirstFixAnalysis() {
         </TabsList>
 
         <TabsContent value="engineer" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="col-span-2">
-              <CardHeader>
-                <CardTitle>Engineer Efficiency</CardTitle>
-                <CardDescription>Comparison of first-time fixes vs. return visits per engineer.</CardDescription>
-              </CardHeader>
-              <CardContent className="pl-2">
-                <div className="h-[350px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={engineerData} layout="vertical" margin={{ left: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                      <XAxis type="number" />
-                      <YAxis dataKey="name" type="category" width={100} />
-                      <Tooltip 
-                        cursor={{ fill: 'rgba(0,0,0,0.05)' }}
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                      />
-                      <Legend />
-                      <Bar dataKey="firstFix" name="First Fix" stackId="a" fill="#22c55e" radius={[0, 4, 4, 0]} />
-                      <Bar dataKey="returnVisits" name="Return Visit" stackId="a" fill="#ef4444" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="md:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Engineer Efficiency</CardTitle>
+                  <CardDescription>Comparison of first-time fixes vs. return visits per engineer.</CardDescription>
+                </CardHeader>
+                <CardContent className="pl-2">
+                  <div className="h-[350px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={engineerData} layout="vertical" margin={{ left: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                        <XAxis type="number" />
+                        <YAxis dataKey="name" type="category" width={100} />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="firstFix" name="First Fix" stackId="a" fill="#22c55e" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey="returnVisits" name="Return Visits" stackId="a" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
 
-            <Card className="col-span-2">
-              <CardHeader>
-                <CardTitle>Detailed Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Engineer</TableHead>
-                      <TableHead className="text-right">Total Jobs</TableHead>
-                      <TableHead className="text-right">First Fixes</TableHead>
-                      <TableHead className="text-right">Return Visits</TableHead>
-                      <TableHead className="text-right">Success Rate</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {engineerData.sort((a, b) => b.rate - a.rate).map((engineer) => (
-                      <TableRow 
-                        key={engineer.name} 
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => setSelectedEntity({ type: 'engineer', name: engineer.name })}
-                      >
-                        <TableCell className="font-medium flex items-center gap-2">
-                          {engineer.name}
-                          <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
-                        </TableCell>
-                        <TableCell className="text-right">{engineer.firstFix + engineer.returnVisits}</TableCell>
-                        <TableCell className="text-right text-green-600">{engineer.firstFix}</TableCell>
-                        <TableCell className="text-right text-red-600">{engineer.returnVisits}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant={engineer.rate >= 90 ? "default" : engineer.rate >= 80 ? "secondary" : "destructive"}>
-                            {engineer.rate}%
-                          </Badge>
-                        </TableCell>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Engineer Performance</CardTitle>
+                  <CardDescription>First fix rates by individual engineer.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Engineer</TableHead>
+                        <TableHead className="text-right">Total Jobs</TableHead>
+                        <TableHead className="text-right">First Fix</TableHead>
+                        <TableHead className="text-right">Returns</TableHead>
+                        <TableHead className="text-right">Rate</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {engineerData.map((engineer) => (
+                        <TableRow 
+                          key={engineer.name} 
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => setSelectedEntity({ type: 'engineer', name: engineer.name })}
+                        >
+                          <TableCell className="font-medium flex items-center gap-2">
+                            {engineer.name}
+                            <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
+                          </TableCell>
+                          <TableCell className="text-right">{engineer.firstFix + engineer.returnVisits}</TableCell>
+                          <TableCell className="text-right text-green-600">{engineer.firstFix}</TableCell>
+                          <TableCell className="text-right text-red-600">{engineer.returnVisits}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={engineer.rate >= 90 ? "default" : engineer.rate >= 80 ? "secondary" : "destructive"}>
+                              {engineer.rate}%
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Coaching Cards Sidebar */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <GraduationCap className="h-5 w-5 text-blue-600" />
+                <h3 className="font-semibold text-slate-800">Coaching Opportunities</h3>
+              </div>
+              <CoachingCard 
+                engineerName="John Rambo"
+                firstFixRate={76}
+                topIssues={["Inventory Management", "Incomplete Notes"]}
+                recommendation="Assign 'Van Stock Management' module. Review last 3 jobs where 'Parts Missing' was cited."
+              />
+              <CoachingCard 
+                engineerName="Alex Murphy"
+                firstFixRate={84}
+                topIssues={["Customer Access", "Scheduling"]}
+                recommendation="Suggest calling ahead 30 mins prior. Review access protocols for commercial sites."
+              />
+            </div>
           </div>
         </TabsContent>
 
         <TabsContent value="customer" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="col-span-2">
-              <CardHeader>
-                <CardTitle>Customer Site Reliability</CardTitle>
-                <CardDescription>Return visit volume by customer account.</CardDescription>
-              </CardHeader>
-              <CardContent className="pl-2">
-                <div className="h-[350px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={customerData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip 
-                        cursor={{ fill: 'rgba(0,0,0,0.05)' }}
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                      />
-                      <Legend />
-                      <Bar dataKey="firstFix" name="First Fix" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="returnVisits" name="Return Visit" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="col-span-2">
-              <CardHeader>
-                <CardTitle>Detailed Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Customer</TableHead>
-                      <TableHead className="text-right">Total Jobs</TableHead>
-                      <TableHead className="text-right">First Fixes</TableHead>
-                      <TableHead className="text-right">Return Visits</TableHead>
-                      <TableHead className="text-right">Success Rate</TableHead>
+          <Card>
+            <CardHeader>
+              <CardTitle>Customer Sites</CardTitle>
+              <CardDescription>First fix rates by customer site.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Customer</TableHead>
+                    <TableHead className="text-right">Total Jobs</TableHead>
+                    <TableHead className="text-right">First Fix</TableHead>
+                    <TableHead className="text-right">Returns</TableHead>
+                    <TableHead className="text-right">Rate</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {customerData.map((customer) => (
+                    <TableRow 
+                      key={customer.name} 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setSelectedEntity({ type: 'customer', name: customer.name })}
+                    >
+                      <TableCell className="font-medium flex items-center gap-2">
+                        {customer.name}
+                        <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
+                      </TableCell>
+                      <TableCell className="text-right">{customer.firstFix + customer.returnVisits}</TableCell>
+                      <TableCell className="text-right text-green-600">{customer.firstFix}</TableCell>
+                      <TableCell className="text-right text-red-600">{customer.returnVisits}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={customer.rate >= 90 ? "default" : customer.rate >= 80 ? "secondary" : "destructive"}>
+                          {customer.rate}%
+                        </Badge>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {customerData.sort((a, b) => a.rate - b.rate).map((customer) => (
-                      <TableRow 
-                        key={customer.name}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => setSelectedEntity({ type: 'customer', name: customer.name })}
-                      >
-                        <TableCell className="font-medium flex items-center gap-2">
-                          {customer.name}
-                          <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
-                        </TableCell>
-                        <TableCell className="text-right">{customer.firstFix + customer.returnVisits}</TableCell>
-                        <TableCell className="text-right text-green-600">{customer.firstFix}</TableCell>
-                        <TableCell className="text-right text-red-600">{customer.returnVisits}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant={customer.rate >= 90 ? "default" : customer.rate >= 80 ? "secondary" : "destructive"}>
-                            {customer.rate}%
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </div>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </AnalyticsLayout>

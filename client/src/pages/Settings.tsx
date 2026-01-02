@@ -3,13 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { EmailTemplateManager } from "@/components/EmailTemplateManager";
+import { AIPersonaSettings } from "@/components/AIPersonaSettings";
 import { 
   Bell, 
   Mail, 
   Shield, 
   UserCog, 
   Palette, 
-  Globe 
+  Globe,
+  BrainCircuit
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -44,6 +46,13 @@ export default function Settings() {
                 Email Templates
               </TabsTrigger>
               <TabsTrigger 
+                value="ai-persona" 
+                className="w-full justify-start px-4 py-2 data-[state=active]:bg-muted data-[state=active]:text-foreground"
+              >
+                <BrainCircuit className="w-4 h-4 mr-2" />
+                AI Auditor Persona
+              </TabsTrigger>
+              <TabsTrigger 
                 value="general" 
                 className="w-full justify-start px-4 py-2 data-[state=active]:bg-muted data-[state=active]:text-foreground"
               >
@@ -76,6 +85,14 @@ export default function Settings() {
                 <p className="text-sm text-muted-foreground">Customize automated email content and AI generation rules.</p>
               </div>
               <EmailTemplateManager />
+            </TabsContent>
+
+            <TabsContent value="ai-persona" className="mt-0 space-y-6">
+              <div className="mb-4">
+                <h2 className="text-lg font-medium">AI Auditor Configuration</h2>
+                <p className="text-sm text-muted-foreground">Configure the behavior, tone, and strictness of the AI analysis engine.</p>
+              </div>
+              <AIPersonaSettings />
             </TabsContent>
 
             <TabsContent value="general" className="mt-0 space-y-6">
