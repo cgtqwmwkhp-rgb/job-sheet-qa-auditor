@@ -6,6 +6,7 @@ import { Info } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
+import { GuidedTour } from "@/components/GuidedTour";
 
 export default function UploadPage() {
   const [, setLocation] = useLocation();
@@ -23,6 +24,29 @@ export default function UploadPage() {
 
   return (
     <DashboardLayout>
+      <GuidedTour 
+        tourId="upload-page-tour"
+        steps={[
+          {
+            element: "#upload-area",
+            popover: {
+              title: "Upload Zone",
+              description: "Drag and drop your PDF job sheets here. You can upload up to 50 files at once for batch processing.",
+              side: "bottom",
+              align: "start"
+            }
+          },
+          {
+            element: "#upload-guidelines",
+            popover: {
+              title: "Best Practices",
+              description: "Check these guidelines to ensure the highest OCR accuracy and avoid audit failures.",
+              side: "top",
+              align: "start"
+            }
+          }
+        ]}
+      />
       <div className="space-y-6 max-w-4xl mx-auto">
         <div>
           <h1 className="text-3xl font-heading font-bold tracking-tight">Upload Job Cards</h1>
@@ -40,7 +64,7 @@ export default function UploadPage() {
           </AlertDescription>
         </Alert>
 
-        <Card>
+        <Card id="upload-area">
           <CardHeader>
             <CardTitle>File Upload</CardTitle>
             <CardDescription>
@@ -53,7 +77,7 @@ export default function UploadPage() {
         </Card>
 
         <div className="grid gap-6 md:grid-cols-2">
-          <Card>
+          <Card id="upload-guidelines">
             <CardHeader>
               <CardTitle>Upload Guidelines</CardTitle>
             </CardHeader>

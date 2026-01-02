@@ -6,6 +6,7 @@ import { SmartTip } from "@/components/SmartTip";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AuditTimeline } from "@/components/AuditTimeline";
 import { useStats } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Mock Data
 const stats = [
@@ -63,6 +64,21 @@ const defectTypes = [
 
 export default function Dashboard() {
   const { data: statsData } = useStats();
+  const { user } = useAuth();
+
+  const getGreeting = () => {
+    if (!user) return "Welcome back";
+    const hour = new Date().getHours();
+    const timeGreeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+    
+    if (user.role === 'admin') {
+      return `${timeGreeting}, ${user.name}. You have 7 critical issues requiring attention.`;
+    } else if (user.role === 'qa_lead') {
+      return `${timeGreeting}, ${user.name}. The hold queue has 23 items pending review.`;
+    } else {
+      return `${timeGreeting}, ${user.name}. Your current first fix rate is 94.2%.`;
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -72,7 +88,7 @@ export default function Dashboard() {
           <div>
             <h1 className="text-3xl font-heading font-bold tracking-tight text-foreground">Dashboard</h1>
             <p className="text-muted-foreground mt-1 text-lg">
-              Overview of job sheet audit performance and status.
+              {getGreeting()}
             </p>
           </div>
           <div className="flex items-center gap-2 text-sm font-medium text-green-700 bg-green-50 px-4 py-1.5 rounded-full border border-green-200 shadow-sm">

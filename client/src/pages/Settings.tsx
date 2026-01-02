@@ -13,7 +13,8 @@ import {
   Globe,
   BrainCircuit,
   Moon,
-  Sun
+  Sun,
+  Database
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -155,6 +156,38 @@ export default function Settings() {
                       <p className="text-sm text-muted-foreground">Disable access for non-admin users.</p>
                     </div>
                     <Switch />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-destructive/50">
+                <CardHeader>
+                  <CardTitle className="text-destructive flex items-center gap-2">
+                    <Database className="h-5 w-5" />
+                    Demo Data Management
+                  </CardTitle>
+                  <CardDescription>Manage the sample data used in this demo environment.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Reset Demo Data</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Clear all local changes and restore the original "Gold Standard" dataset. 
+                        Useful if you want to restart the demo experience.
+                      </p>
+                    </div>
+                    <Button 
+                      variant="destructive" 
+                      onClick={() => {
+                        if (confirm("Are you sure? This will reload the page and reset all data.")) {
+                          localStorage.clear();
+                          window.location.reload();
+                        }
+                      }}
+                    >
+                      Reset Data
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
