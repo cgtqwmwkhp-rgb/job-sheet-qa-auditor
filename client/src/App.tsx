@@ -15,7 +15,7 @@ import UserManagement from "./pages/UserManagement";
 import ExecutiveDashboard from "./pages/analytics/ExecutiveDashboard";
 import DefectAnalysis from "./pages/analytics/DefectAnalysis";
 import TechnicianPerformance from "./pages/analytics/TechnicianPerformance";
-import SiteIntelligence from "./pages/analytics/SiteIntelligence";
+
 import AIAnalyst from "./pages/analytics/AIAnalyst";
 import ReportStudio from "./pages/analytics/ReportStudio";
 
@@ -33,7 +33,7 @@ function Router() {
       <Route path={"/analytics"} component={ExecutiveDashboard} />
       <Route path={"/analytics/defects"} component={DefectAnalysis} />
       <Route path={"/analytics/technicians"} component={TechnicianPerformance} />
-      <Route path={"/analytics/sites"} component={SiteIntelligence} />
+
       <Route path={"/analytics/ai"} component={AIAnalyst} />
       <Route path={"/analytics/reports"} component={ReportStudio} />
       <Route path={"/404"} component={NotFound} />

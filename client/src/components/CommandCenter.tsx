@@ -95,10 +95,7 @@ export function CommandCenter() {
               <User className="mr-2 h-4 w-4" />
               <span>Technician Performance</span>
             </CommandItem>
-            <CommandItem onSelect={() => runCommand(() => setLocation("/analytics/sites"))}>
-              <Map className="mr-2 h-4 w-4" />
-              <span>Site Intelligence</span>
-            </CommandItem>
+
             <CommandItem onSelect={() => runCommand(() => setLocation("/analytics/defects"))}>
               <AlertTriangle className="mr-2 h-4 w-4" />
               <span>Defect Analysis</span>

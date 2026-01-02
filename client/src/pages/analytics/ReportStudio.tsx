@@ -41,10 +41,7 @@ export default function ReportStudio() {
                   <Checkbox id="module-tech" />
                   <Label htmlFor="module-tech" className="cursor-pointer">Technician Leaderboard</Label>
                 </div>
-                <div className="flex items-center space-x-2 border p-3 rounded-md hover:bg-muted/50 cursor-pointer">
-                  <Checkbox id="module-site" />
-                  <Label htmlFor="module-site" className="cursor-pointer">Site Benchmarks</Label>
-                </div>
+
                 <div className="flex items-center space-x-2 border p-3 rounded-md hover:bg-muted/50 cursor-pointer">
                   <Checkbox id="module-ai" />
                   <Label htmlFor="module-ai" className="cursor-pointer">AI Insights</Label>
