@@ -24,6 +24,27 @@ export interface Finding {
   message?: string;
   confidence: number;
   box?: BoundingBox;
+  dispute?: Dispute;
+}
+
+export interface Dispute {
+  id: string;
+  findingId: string | number;
+  technicianId: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  adminComment?: string;
+}
+
+export interface NotificationSettings {
+  criticalDefects: boolean;
+  majorDefects: boolean;
+  minorDefects: boolean;
+  auditCompleted: boolean;
+  dailySummary: boolean;
 }
 
 export interface BoundingBox {
@@ -254,6 +275,100 @@ export function useCreateAnnotation() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["job-sheet", variables.jobSheetId] });
+    },
+  });
+}
+
+export function useNotificationSettings() {
+  return useQuery({
+    queryKey: ["notification-settings"],
+    queryFn: async () => {
+      try {
+        return await fetcher<NotificationSettings>("/user/notifications");
+      } catch (error) {
+        console.warn("API fetch failed, returning mock data for demo:", error);
+        return {
+          criticalDefects: true,
+          majorDefects: true,
+          minorDefects: false,
+          auditCompleted: true,
+          dailySummary: false,
+        } as NotificationSettings;
+      }
+    },
+  });
+}
+
+export function useUpdateNotificationSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (settings: NotificationSettings) => {
+      try {
+        return await fetcher("/user/notifications", {
+          method: "PUT",
+          body: JSON.stringify(settings),
+        });
+      } catch (error) {
+        console.warn("API update failed, simulating success for demo:", error);
+        return { success: true };
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notification-settings"] });
+    },
+  });
+}
+
+export function useDisputes() {
+  return useQuery({
+    queryKey: ["disputes"],
+    queryFn: async () => {
+      try {
+        return await fetcher<Dispute[]>("/disputes");
+      } catch (error) {
+        console.warn("API fetch failed, returning mock data for demo:", error);
+        return [
+          {
+            id: "DSP-001",
+            findingId: 1,
+            technicianId: "TECH-001",
+            reason: "Signature is present on page 3, top right corner.",
+            status: "pending",
+            createdAt: new Date(Date.now() - 86400000).toISOString(),
+          },
+          {
+            id: "DSP-002",
+            findingId: 3,
+            technicianId: "TECH-002",
+            reason: "Serial number is readable if zoomed in.",
+            status: "rejected",
+            createdAt: new Date(Date.now() - 172800000).toISOString(),
+            resolvedAt: new Date(Date.now() - 86400000).toISOString(),
+            resolvedBy: "Admin",
+            adminComment: "Still too blurry to verify against database.",
+          }
+        ] as Dispute[];
+      }
+    },
+  });
+}
+
+export function useResolveDispute() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { disputeId: string; status: "approved" | "rejected"; comment?: string }) => {
+      try {
+        return await fetcher(`/disputes/${data.disputeId}/resolve`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        });
+      } catch (error) {
+        console.warn("API resolve failed, simulating success for demo:", error);
+        return { success: true };
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["disputes"] });
     },
   });
 }

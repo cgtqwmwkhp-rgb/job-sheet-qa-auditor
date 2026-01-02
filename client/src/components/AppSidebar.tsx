@@ -21,6 +21,7 @@ import {
   ShieldAlert,
   Upload,
   Users,
+  MessageSquareWarning,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
@@ -45,6 +46,11 @@ const items = [
     title: "Hold Queue",
     url: "/hold-queue",
     icon: ShieldAlert,
+  },
+  {
+    title: "Disputes",
+    url: "/disputes",
+    icon: MessageSquareWarning,
   },
   {
     title: "Search",

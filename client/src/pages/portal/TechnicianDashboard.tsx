@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { 
   Dialog,
   DialogContent,
@@ -26,9 +27,11 @@ import {
   FileText,
   Calendar,
   Bell,
-  MessageSquareWarning
+  MessageSquareWarning,
+  Settings
 } from "lucide-react";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { NotificationSettings } from "@/components/NotificationSettings";
 
 export default function TechnicianDashboard() {
   const [, setLocation] = useLocation();
@@ -112,9 +115,10 @@ export default function TechnicianDashboard() {
 
         {/* Recent Activity Tabs */}
         <Tabs defaultValue="audits" className="w-full">
-          <TabsList className="w-full grid grid-cols-2 mb-4">
+          <TabsList className="w-full grid grid-cols-3 mb-4">
             <TabsTrigger value="audits">Recent Audits</TabsTrigger>
             <TabsTrigger value="defects">My Defects</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
           
           <TabsContent value="audits" className="space-y-3">
@@ -204,6 +208,41 @@ export default function TechnicianDashboard() {
                   View Evidence
                 </Button>
               </div>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-3">
+            <NotificationSettings />
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  App Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">Dark Mode</span>
+                    <span className="text-xs text-muted-foreground">Adjust app appearance</span>
+                  </div>
+                  <Switch disabled />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">Offline Mode</span>
+                    <span className="text-xs text-muted-foreground">Cache data for field use</span>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                <div className="pt-4 border-t">
+                  <Button variant="destructive" className="w-full" onClick={handleLogout}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </Button>
+                </div>
+              </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
