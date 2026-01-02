@@ -16,7 +16,8 @@ import {
   LayoutDashboard, 
   BarChart3, 
   BrainCircuit, 
-  Settings 
+  Settings,
+  Book
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -52,6 +53,12 @@ const TOUR_STEPS: TourStep[] = [
     description: "Empower your team with their own dashboard to view scores, dispute findings, and manage notification preferences.",
     icon: <Settings className="h-12 w-12 text-green-500" />,
     targetPath: "/portal/dashboard"
+  },
+  {
+    title: "Help & Resources",
+    description: "Access comprehensive guides, FAQs, and best practices in our new Knowledge Base. Master the platform at your own pace.",
+    icon: <Book className="h-12 w-12 text-orange-500" />,
+    targetPath: "/help"
   }
 ];
 

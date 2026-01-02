@@ -29,6 +29,7 @@ const TechnicianDashboard = lazy(() => import("./pages/portal/TechnicianDashboar
 const DisputeManagement = lazy(() => import("./pages/DisputeManagement"));
 const AuditLog = lazy(() => import("./pages/AuditLog"));
 const Settings = lazy(() => import("./pages/Settings"));
+const HelpCenter = lazy(() => import("./pages/HelpCenter"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Loading fallback component
@@ -70,6 +71,7 @@ function Router() {
         <Route path="/settings">
           <ProtectedRoute component={Settings} allowedRoles={['admin', 'qa_lead']} />
         </Route>
+        <Route path="/help" component={HelpCenter} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />
