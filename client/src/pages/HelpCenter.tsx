@@ -19,12 +19,13 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useLocation } from "wouter";
 
 export default function HelpCenter() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [, setLocation] = useLocation();
 
   return (
     <div className="space-y-8 p-8 max-w-7xl mx-auto animate-in fade-in duration-500">
@@ -145,14 +146,14 @@ export default function HelpCenter() {
         <TabsContent value="guides" className="mt-8">
           <div className="grid gap-4">
             {[
-              { title: "Uploading Job Sheets", desc: "Step-by-step guide to single and batch uploads.", time: "2 min read" },
-              { title: "Handling Disputes", desc: "How to review and resolve engineer disputes effectively.", time: "4 min read" },
-              { title: "Configuring AI Personas", desc: "Adjusting the strictness and tone of the AI auditor.", time: "3 min read" },
-              { title: "Understanding Analytics", desc: "Deep dive into First Fix Rates and Defect Analysis.", time: "5 min read" },
-              { title: "Managing Users & Roles", desc: "Adding technicians and assigning permissions.", time: "3 min read" },
+              { title: "Uploading Job Sheets", desc: "Step-by-step guide to single and batch uploads.", time: "2 min read", action: "/upload", actionLabel: "Go to Upload" },
+              { title: "Handling Disputes", desc: "How to review and resolve engineer disputes effectively.", time: "4 min read", action: "/disputes", actionLabel: "View Disputes" },
+              { title: "Configuring AI Personas", desc: "Adjusting the strictness and tone of the AI auditor.", time: "3 min read", action: "/settings", actionLabel: "Configure AI" },
+              { title: "Understanding Analytics", desc: "Deep dive into First Fix Rates and Defect Analysis.", time: "5 min read", action: "/analytics", actionLabel: "Open Analytics" },
+              { title: "Managing Users & Roles", desc: "Adding technicians and assigning permissions.", time: "3 min read", action: "/users", actionLabel: "Manage Users" },
             ].map((guide, i) => (
-              <div key={i} className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer group">
-                <div className="flex items-center gap-4">
+              <div key={i} className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors group">
+                <div className="flex items-center gap-4 cursor-pointer flex-1">
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                     <Book className="h-5 w-5 text-primary" />
                   </div>
@@ -163,6 +164,17 @@ export default function HelpCenter() {
                 </div>
                 <div className="flex items-center gap-4">
                   <Badge variant="secondary">{guide.time}</Badge>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="hidden group-hover:flex animate-in fade-in"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLocation(guide.action);
+                    }}
+                  >
+                    {guide.actionLabel}
+                  </Button>
                   <Button variant="ghost" size="icon">
                     <ChevronRight className="h-4 w-4" />
                   </Button>

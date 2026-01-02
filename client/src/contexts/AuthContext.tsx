@@ -62,8 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (storedRole && MOCK_USERS[storedRole]) {
       setUser(MOCK_USERS[storedRole]);
     } else {
-      // Default to admin for demo convenience, or null to force login
-      setUser(MOCK_USERS['admin']); 
+      // Default to null to force login via Demo Gateway
+      setUser(null); 
     }
     setIsLoading(false);
   }, []);

@@ -2,6 +2,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, CheckCircle2, Clock, FileText, TrendingUp } from "lucide-react";
+import { SmartTip } from "@/components/SmartTip";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AuditTimeline } from "@/components/AuditTimeline";
 import { useStats } from "@/lib/api";
@@ -91,8 +92,12 @@ export default function Dashboard() {
                 <stat.icon className={`h-16 w-16 ${stat.color}`} />
               </div>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                   {stat.title}
+                  {stat.title === "Total Audits" && <SmartTip content="Total number of job sheets processed by the system in the current period." />}
+                  {stat.title === "Pass Rate" && <SmartTip content="Percentage of job sheets that met all Gold Standard criteria without manual intervention." />}
+                  {stat.title === "Hold Queue" && <SmartTip content="Job sheets flagged for manual review due to low confidence or ambiguity." />}
+                  {stat.title === "Critical Issues" && <SmartTip content="Number of S0/S1 defects detected (e.g., missing safety signatures) requiring immediate attention." />}
                 </CardTitle>
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />
               </CardHeader>

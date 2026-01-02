@@ -9,6 +9,9 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Loader2 } from "lucide-react";
 import { OnboardingTour } from "@/components/OnboardingTour";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLocation } from "wouter";
+import { useEffect } from "react";
 
 // Lazy load pages for performance optimization
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -30,6 +33,7 @@ const DisputeManagement = lazy(() => import("./pages/DisputeManagement"));
 const AuditLog = lazy(() => import("./pages/AuditLog"));
 const Settings = lazy(() => import("./pages/Settings"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
+const DemoGateway = lazy(() => import("./pages/DemoGateway"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Loading fallback component
@@ -43,9 +47,21 @@ const PageLoader = () => (
 );
 
 function Router() {
+  const { user, isLoading } = useAuth();
+  const [location, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && !user && location !== "/demo" && !location.startsWith("/portal/login")) {
+      setLocation("/demo");
+    }
+  }, [user, isLoading, location, setLocation]);
+
+  if (isLoading) return <PageLoader />;
+
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>
+        <Route path="/demo" component={DemoGateway} />
         <Route path={"/"} component={Dashboard} />
         <Route path={"/upload"} component={UploadPage} />
         <Route path={"/audits"} component={AuditResults} />
