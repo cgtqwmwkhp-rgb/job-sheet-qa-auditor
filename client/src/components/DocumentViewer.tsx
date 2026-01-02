@@ -4,18 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, PenTool, MousePointer2 } from "lucide-react";
 import * as ReactWindow from 'react-window';
-import { AutoSizer } from 'react-virtualized-auto-sizer';
+import * as AutoSizerPkg from 'react-virtualized-auto-sizer';
 
-const List = (ReactWindow as any).FixedSizeList;
-const Sizer = AutoSizer as any;
+// Robust import for CJS/ESM interop
+const List = (ReactWindow as any).default?.FixedSizeList || (ReactWindow as any).FixedSizeList || ReactWindow;
+const Sizer = (AutoSizerPkg as any).default || AutoSizerPkg;
+
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
-// Set worker source
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString();
+// Set worker source to CDN to avoid build-time resolution issues
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 export interface BoundingBox {
   id: string | number;

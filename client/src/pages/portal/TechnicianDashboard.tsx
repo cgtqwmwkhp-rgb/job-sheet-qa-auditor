@@ -6,6 +6,17 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { 
   CheckCircle2, 
   AlertTriangle, 
   Clock, 
@@ -13,12 +24,18 @@ import {
   ChevronRight, 
   TrendingUp,
   FileText,
-  Calendar
+  Calendar,
+  Bell,
+  MessageSquareWarning
 } from "lucide-react";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 export default function TechnicianDashboard() {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("overview");
+  const { fcmToken } = usePushNotifications();
+  const [disputeOpen, setDisputeOpen] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
 
   const handleLogout = () => {
     setLocation("/portal/login");
@@ -37,9 +54,15 @@ export default function TechnicianDashboard() {
             <p className="text-[10px] text-muted-foreground">Logged in as Alex M.</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={handleLogout}>
-          <LogOut className="h-5 w-5 text-muted-foreground" />
-        </Button>
+        <div className="flex gap-1">
+          <Button variant="ghost" size="icon" className="relative">
+            <Bell className="h-5 w-5 text-muted-foreground" />
+            {fcmToken && <span className="absolute top-2 right-2 h-2 w-2 bg-green-500 rounded-full" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handleLogout}>
+            <LogOut className="h-5 w-5 text-muted-foreground" />
+          </Button>
+        </div>
       </header>
 
       <div className="p-4 space-y-4">
@@ -127,9 +150,46 @@ export default function TechnicianDashboard() {
                 </div>
                 <h4 className="font-semibold text-sm mb-1">Missing Safety Signature</h4>
                 <p className="text-xs text-muted-foreground">Job #4821-9 • Reviewer: Sarah C.</p>
-                <Button size="sm" variant="outline" className="w-full mt-3 h-8 text-xs">
-                  View Evidence
-                </Button>
+                <div className="flex gap-2 mt-3">
+                  <Button size="sm" variant="outline" className="flex-1 h-8 text-xs">
+                    View Evidence
+                  </Button>
+                  <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="destructive" className="flex-1 h-8 text-xs">
+                        <MessageSquareWarning className="w-3 h-3 mr-1" />
+                        Dispute
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Dispute Finding</DialogTitle>
+                        <DialogDescription>
+                          Provide a reason why this finding is incorrect. This will be sent to the QA Lead for review.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="reason">Reason for Dispute</Label>
+                          <Textarea 
+                            id="reason" 
+                            placeholder="e.g., The signature is present on page 3, top right corner." 
+                            value={disputeReason}
+                            onChange={(e) => setDisputeReason(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setDisputeOpen(false)}>Cancel</Button>
+                        <Button onClick={() => {
+                          setDisputeOpen(false);
+                          setDisputeReason("");
+                          // TODO: Submit dispute API call
+                        }}>Submit Dispute</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </div>
             </Card>
             <Card className="border-l-4 border-l-amber-500">
