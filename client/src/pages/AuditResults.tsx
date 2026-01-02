@@ -10,6 +10,7 @@ import { useState } from "react";
 import { DocumentViewer, BoundingBox } from "@/components/DocumentViewer";
 import { useJobSheet } from "@/lib/api";
 import { useLocation } from "wouter";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AuditResults() {
   const [location] = useLocation();
@@ -25,8 +26,70 @@ export default function AuditResults() {
   if (isLoading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="h-[calc(100vh-8rem)] flex flex-col">
+          {/* Header Skeleton */}
+          <div className="flex items-center justify-between mb-4 shrink-0">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Skeleton className="h-8 w-64" />
+                <Skeleton className="h-6 w-20" />
+                <Skeleton className="h-6 w-16" />
+              </div>
+              <Skeleton className="h-4 w-96" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-9 w-32" />
+              <Skeleton className="h-9 w-24" />
+            </div>
+          </div>
+
+          {/* Split Screen Skeleton */}
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
+            {/* Document Viewer Skeleton */}
+            <Card className="flex flex-col h-full overflow-hidden">
+              <CardHeader className="py-3 px-4 border-b flex flex-row items-center justify-between shrink-0 bg-muted/30">
+                <Skeleton className="h-5 w-32" />
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-8 w-8" />
+                  <Skeleton className="h-8 w-24" />
+                  <Skeleton className="h-8 w-8" />
+                </div>
+              </CardHeader>
+              <div className="flex-1 bg-muted/50 p-4 flex items-center justify-center">
+                <Skeleton className="h-[80%] w-[70%]" />
+              </div>
+            </Card>
+
+            {/* Findings Skeleton */}
+            <Card className="flex flex-col h-full overflow-hidden">
+              <CardHeader className="py-3 px-4 border-b shrink-0">
+                <Skeleton className="h-5 w-32" />
+              </CardHeader>
+              <div className="flex-1 p-4 space-y-4">
+                <div className="flex gap-2 mb-4">
+                  <Skeleton className="h-9 w-24" />
+                  <Skeleton className="h-9 w-24" />
+                  <Skeleton className="h-9 w-24" />
+                </div>
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="p-4 rounded-lg border space-y-3">
+                    <div className="flex justify-between">
+                      <div className="flex gap-2">
+                        <Skeleton className="h-5 w-5 rounded-full" />
+                        <Skeleton className="h-5 w-48" />
+                      </div>
+                      <Skeleton className="h-5 w-20" />
+                    </div>
+                    <Skeleton className="h-16 w-full" />
+                    <div className="flex gap-2">
+                      <Skeleton className="h-7 w-24" />
+                      <Skeleton className="h-7 w-24" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
         </div>
       </DashboardLayout>
     );
