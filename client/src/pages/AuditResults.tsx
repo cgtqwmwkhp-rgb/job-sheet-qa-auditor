@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DocumentViewer, BoundingBox as ViewerBoundingBox } from "@/components/DocumentViewer";
-import { useJobSheet, Finding as ApiFinding, BoundingBox as ApiBoundingBox } from "@/lib/api";
+import { useJobSheet, useSubmitFeedback, useCreateAnnotation, Finding as ApiFinding, BoundingBox as ApiBoundingBox } from "@/lib/api";
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -167,6 +167,8 @@ function AuditResultsContent({ auditData }: { auditData: AuditData }) {
   const [newBox, setNewBox] = useState<ViewerBoundingBox | null>(null);
   const [annotationLabel, setAnnotationLabel] = useState("");
   const [annotationComment, setAnnotationComment] = useState("");
+  
+  const createAnnotation = useCreateAnnotation();
 
   const boxes: ViewerBoundingBox[] = auditData.findings
     .filter((f: ApiFinding) => f.box)
@@ -189,16 +191,30 @@ function AuditResultsContent({ auditData }: { auditData: AuditData }) {
   };
 
   const submitAnnotation = () => {
-    console.log("New annotation created:", {
-      box: newBox,
+    if (!newBox) return;
+    
+    createAnnotation.mutate({
+      jobSheetId: auditData.id,
+      box: {
+        page: newBox.page,
+        x: newBox.x,
+        y: newBox.y,
+        width: newBox.width,
+        height: newBox.height,
+        color: newBox.color,
+        label: newBox.label
+      },
       label: annotationLabel,
       comment: annotationComment
+    }, {
+      onSuccess: () => {
+        setAnnotationOpen(false);
+        setAnnotationLabel("");
+        setAnnotationComment("");
+        setNewBox(null);
+        alert("Annotation added successfully!");
+      }
     });
-    setAnnotationOpen(false);
-    setAnnotationLabel("");
-    setAnnotationComment("");
-    setNewBox(null);
-    alert("Annotation added successfully!");
   };
 
   return (
@@ -336,6 +352,8 @@ function FindingsList({ findings, activeBoxId, setActiveBoxId }: {
   const [selectedFinding, setSelectedFinding] = useState<ApiFinding | null>(null);
   const [feedbackType, setFeedbackType] = useState("incorrect");
   const [feedbackComment, setFeedbackComment] = useState("");
+  
+  const submitFeedbackMutation = useSubmitFeedback();
 
   const handleReportIssue = (finding: ApiFinding, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -344,14 +362,19 @@ function FindingsList({ findings, activeBoxId, setActiveBoxId }: {
   };
 
   const submitFeedback = () => {
-    console.log("Feedback submitted:", {
-      findingId: selectedFinding?.id,
+    if (!selectedFinding) return;
+
+    submitFeedbackMutation.mutate({
+      findingId: selectedFinding.id,
       type: feedbackType,
       comment: feedbackComment
+    }, {
+      onSuccess: () => {
+        setFeedbackOpen(false);
+        setFeedbackComment("");
+        alert("Thank you for your feedback. It has been logged for review.");
+      }
     });
-    setFeedbackOpen(false);
-    setFeedbackComment("");
-    alert("Thank you for your feedback. It has been logged for review.");
   };
 
   return (

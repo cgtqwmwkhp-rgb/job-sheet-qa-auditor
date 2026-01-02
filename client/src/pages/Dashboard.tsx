@@ -3,6 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, CheckCircle2, Clock, FileText, TrendingUp } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { AuditTimeline } from "@/components/AuditTimeline";
+import { useStats } from "@/lib/api";
 
 // Mock Data
 const stats = [
@@ -59,6 +61,8 @@ const defectTypes = [
 ];
 
 export default function Dashboard() {
+  const { data: statsData } = useStats();
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -175,7 +179,9 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Recent Activity Tabs */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="col-span-2">
+            {/* Recent Activity Tabs */}
         <Tabs defaultValue="recent" className="space-y-4">
           <TabsList>
             <TabsTrigger value="recent">Recent Audits</TabsTrigger>
@@ -213,7 +219,16 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
+            </Tabs>
+          </div>
+          
+          {/* Audit Timeline */}
+          <div className="col-span-1">
+            {statsData?.recentActivity && (
+              <AuditTimeline activities={statsData.recentActivity} />
+            )}
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );
