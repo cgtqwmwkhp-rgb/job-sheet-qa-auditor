@@ -254,3 +254,50 @@
 - [x] Add visual regression tests for responsive layouts (mobile, tablet, wide desktop)
 - [x] Configure screenshot comparison thresholds
 - [x] Add CI-ready visual regression scripts
+
+
+## Phase 12: Performance Testing & CI/CD Integration
+
+### Load/Stress Testing
+- [x] Run full stress test with k6
+- [x] Create performance baseline report (JSON output)
+- [x] Document performance metrics and thresholds
+
+### CI/CD Integration
+- [x] Create GitHub Actions workflow for E2E tests
+- [x] Add visual regression tests to CI pipeline
+- [x] Add load test smoke test to CI pipeline
+- [x] Configure test result artifacts and reporting
+
+## Phase 13: UI Style Guide Implementation (Plantexpand)
+
+### Color System Update
+- [x] Update CSS variables with Plantexpand color palette
+- [x] Implement Lime Green (#BEDA41) as primary accent
+- [x] Update Charcoal (#333030) as primary text color
+- [x] Configure semantic colors (success, warning, error, info)
+- [x] Update neutral palette (gray scale)
+
+### Typography Update
+- [x] Configure Inter font as primary
+- [x] Update font weights (400, 500, 600, 700)
+- [x] Implement type scale (page title, section heading, body, small)
+- [x] Update letter spacing and line heights
+
+### Component Updates
+- [x] Update button styles (primary, secondary, outline, ghost)
+- [x] Update card styles (no shadows, border-based)
+- [x] Update input/form styles
+- [x] Update badge and pill styles
+- [x] Update navigation styles
+
+### Layout Updates
+- [x] Update spacing scale (4px base unit)
+- [x] Update page margins and padding
+- [x] Update responsive breakpoints
+- [x] Ensure white backgrounds throughout
+
+### Dark Mode
+- [x] Update dark mode color palette
+- [x] Ensure proper contrast ratios
+- [x] Test dark mode across all pages

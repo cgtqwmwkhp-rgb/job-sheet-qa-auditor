@@ -4,19 +4,50 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * Badge Component - Plantexpand Style Guide
+ * 
+ * - 4px vertical padding, 8px horizontal
+ * - 11px font size, 500 weight
+ * - 4px border radius
+ * - Uppercase text
+ * - Semantic color variants
+ */
 const badgeVariants = cva(
-  "inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden",
+  "inline-flex items-center justify-center rounded px-2 py-1 text-[11px] font-medium uppercase tracking-wide w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none transition-colors overflow-hidden",
   {
     variants: {
       variant: {
+        // Default - Lime Green
         default:
-          "border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
+          "bg-primary text-primary-foreground",
+        // Secondary - Gray background
         secondary:
-          "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
+          "bg-[#F5F4F4] text-[#706D6D] dark:bg-[#334155] dark:text-[#94A3B8]",
+        // Destructive - Red
         destructive:
-          "border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "bg-[#FEE2E2] text-[#BA3737] dark:bg-[#7F1D1D] dark:text-[#FCA5A5]",
+        // Outline - Border only
         outline:
-          "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+          "border border-[#EBE8E8] bg-transparent text-foreground dark:border-[#334155]",
+        // Success - Emerald
+        success:
+          "bg-[#D1FAE5] text-[#065F46] dark:bg-[#064E3B] dark:text-[#6EE7B7]",
+        // Warning - Amber
+        warning:
+          "bg-[#FEF3C7] text-[#92400E] dark:bg-[#78350F] dark:text-[#FCD34D]",
+        // Info - Blue
+        info:
+          "bg-[#DBEAFE] text-[#1E40AF] dark:bg-[#1E3A8A] dark:text-[#93C5FD]",
+        // Purple - For PAMS/People stream
+        purple:
+          "bg-[rgba(139,92,246,0.15)] text-[#8B5CF6]",
+        // Emerald - For Parts/Assets stream
+        emerald:
+          "bg-[rgba(16,185,129,0.15)] text-[#10B981]",
+        // Blue - For Contracts/Docs stream
+        blue:
+          "bg-[rgba(59,130,246,0.15)] text-[#3B82F6]",
       },
     },
     defaultVariants: {

@@ -146,29 +146,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2407,
+                      "duration": 2699,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/button-primary-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/button-primary-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:18:50.736Z",
+                      "startTime": "2026-01-02T17:53:39.575Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "button-primary-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/button-primary-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "button-primary-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/components.visual-UI-Compo-a82d5-sion-button---primary-style-desktop-chrome/button-primary-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -195,29 +184,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2318,
+                      "duration": 2180,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/card-role-selection-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/card-role-selection-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:18:53.305Z",
+                      "startTime": "2026-01-02T17:53:42.618Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "card-role-selection-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/card-role-selection-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "card-role-selection-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/components.visual-UI-Compo-054d0--card---role-selection-card-desktop-chrome/card-role-selection-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -244,29 +222,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2302,
+                      "duration": 1945,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/typography-heading-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/typography-heading-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:18:55.642Z",
+                      "startTime": "2026-01-02T17:53:44.819Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "typography-heading-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/typography-heading-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "typography-heading-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/components.visual-UI-Compo-bd8d5-typography---heading-styles-desktop-chrome/typography-heading-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -293,29 +260,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2286,
+                      "duration": 1914,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/icon-feature-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/icon-feature-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:18:57.958Z",
+                      "startTime": "2026-01-02T17:53:46.783Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "icon-feature-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/icon-feature-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "icon-feature-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/components.visual-UI-Compo-222ea-ession-icon---feature-icons-desktop-chrome/icon-feature-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -350,12 +306,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2117,
+                      "duration": 1683,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:00.261Z",
+                      "startTime": "2026-01-02T17:53:48.711Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -384,29 +340,14 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2519,
+                      "duration": 1679,
                       "errors": [],
-                      "stdout": [
-                        {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/modal-navigation-desktop-chrome-linux.png, writing actual.\n"
-                        }
-                      ],
+                      "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:02.391Z",
+                      "startTime": "2026-01-02T17:53:50.406Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "modal-navigation-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/modal-navigation-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "modal-navigation-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/components.visual-Modal-Co-64500--modal---navigation-buttons-desktop-chrome/modal-navigation-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -441,29 +382,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2432,
+                      "duration": 3216,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/theme-light-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/theme-light-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:04.922Z",
+                      "startTime": "2026-01-02T17:53:52.099Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "theme-light-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/theme-light-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "theme-light-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/components.visual-Color-Th-a53ff--light-theme---demo-gateway-desktop-chrome/theme-light-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -490,29 +420,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2534,
+                      "duration": 3289,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/theme-dark-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/theme-dark-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:07.367Z",
+                      "startTime": "2026-01-02T17:53:55.328Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "theme-dark-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/components.visual.spec.ts-snapshots/theme-dark-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "theme-dark-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/components.visual-Color-Th-85686-n-dark-theme---demo-gateway-desktop-chrome/theme-dark-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -556,29 +475,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2557,
+                      "duration": 3290,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-demo-view-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-demo-view-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:09.925Z",
+                      "startTime": "2026-01-02T17:53:58.642Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "dashboard-demo-view-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-demo-view-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "dashboard-demo-view-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/dashboard.visual-Dashboard-e5e63-shboard---demo-gateway-view-desktop-chrome/dashboard-demo-view-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -605,29 +513,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2397,
+                      "duration": 2684,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-role-cards-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-role-cards-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:12.497Z",
+                      "startTime": "2026-01-02T17:54:01.947Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "dashboard-role-cards-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-role-cards-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "dashboard-role-cards-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/dashboard.visual-Dashboard-8cb01-oard---role-selection-cards-desktop-chrome/dashboard-role-cards-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -662,29 +559,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3115,
+                      "duration": 3133,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-tablet-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-tablet-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:14.908Z",
+                      "startTime": "2026-01-02T17:54:04.646Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "dashboard-tablet-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-tablet-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "dashboard-tablet-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/dashboard.visual-Dashboard-c069a-n-dashboard---tablet-layout-desktop-chrome/dashboard-tablet-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -711,29 +597,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2439,
+                      "duration": 2279,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-mobile-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-mobile-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:18.040Z",
+                      "startTime": "2026-01-02T17:54:07.792Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "dashboard-mobile-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-mobile-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "dashboard-mobile-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/dashboard.visual-Dashboard-07634-n-dashboard---mobile-layout-desktop-chrome/dashboard-mobile-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -760,29 +635,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3729,
+                      "duration": 5119,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-wide-desktop-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-wide-desktop-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:20.491Z",
+                      "startTime": "2026-01-02T17:54:10.083Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "dashboard-wide-desktop-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/dashboard.visual.spec.ts-snapshots/dashboard-wide-desktop-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "dashboard-wide-desktop-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/dashboard.visual-Dashboard-393ce-board---wide-desktop-layout-desktop-chrome/dashboard-wide-desktop-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -826,29 +690,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2535,
+                      "duration": 3340,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-full-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-full-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:24.244Z",
+                      "startTime": "2026-01-02T17:54:15.228Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "demo-gateway-full-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-full-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "demo-gateway-full-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/demo-gateway.visual-Demo-G-00a89-mo-gateway-page---full-view-desktop-chrome/demo-gateway-full-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -875,29 +728,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2519,
+                      "duration": 3247,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-onboarding-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-onboarding-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:26.793Z",
+                      "startTime": "2026-01-02T17:54:18.586Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "demo-gateway-onboarding-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-onboarding-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "demo-gateway-onboarding-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/demo-gateway.visual-Demo-G-3918a-age---with-onboarding-modal-desktop-chrome/demo-gateway-onboarding-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -924,29 +766,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2289,
+                      "duration": 1987,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-admin-card-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-admin-card-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:29.326Z",
+                      "startTime": "2026-01-02T17:54:21.847Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "demo-gateway-admin-card-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-admin-card-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "demo-gateway-admin-card-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/demo-gateway.visual-Demo-G-f94f4-n-demo-gateway---admin-card-desktop-chrome/demo-gateway-admin-card-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -973,29 +804,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2279,
+                      "duration": 2000,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-technician-card-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-technician-card-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:31.631Z",
+                      "startTime": "2026-01-02T17:54:23.848Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "demo-gateway-technician-card-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-technician-card-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "demo-gateway-technician-card-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/demo-gateway.visual-Demo-G-a533f-o-gateway---technician-card-desktop-chrome/demo-gateway-technician-card-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -1022,29 +842,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2279,
+                      "duration": 1962,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-header-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-header-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:33.924Z",
+                      "startTime": "2026-01-02T17:54:25.862Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "demo-gateway-header-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-header-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "demo-gateway-header-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/demo-gateway.visual-Demo-G-96d0a-mo-gateway---header-section-desktop-chrome/demo-gateway-header-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -1079,29 +888,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2789,
+                      "duration": 2990,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-tablet-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-tablet-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:36.217Z",
+                      "startTime": "2026-01-02T17:54:27.842Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "demo-gateway-tablet-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-tablet-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "demo-gateway-tablet-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/demo-gateway.visual-Demo-G-de6cf--demo-gateway---tablet-view-desktop-chrome/demo-gateway-tablet-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -1128,29 +926,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2246,
+                      "duration": 2626,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-mobile-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-mobile-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:39.018Z",
+                      "startTime": "2026-01-02T17:54:30.845Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "demo-gateway-mobile-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/demo-gateway.visual.spec.ts-snapshots/demo-gateway-mobile-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "demo-gateway-mobile-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/demo-gateway.visual-Demo-G-1ff12--demo-gateway---mobile-view-desktop-chrome/demo-gateway-mobile-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -1194,29 +981,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2541,
+                      "duration": 3453,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-full-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-full-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:41.283Z",
+                      "startTime": "2026-01-02T17:54:33.492Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "help-center-full-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-full-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "help-center-full-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/help-center.visual-Help-Ce-df0a8-ion-help-center---full-page-desktop-chrome/help-center-full-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -1243,29 +1019,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2183,
+                      "duration": 2167,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-header-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-header-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:43.839Z",
+                      "startTime": "2026-01-02T17:54:36.960Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "help-center-header-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-header-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "help-center-header-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/help-center.visual-Help-Ce-d0534-elp-center---header-section-desktop-chrome/help-center-header-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -1292,12 +1057,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1984,
+                      "duration": 1867,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:46.037Z",
+                      "startTime": "2026-01-02T17:54:39.141Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -1334,29 +1099,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2778,
+                      "duration": 2689,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-tablet-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-tablet-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:48.035Z",
+                      "startTime": "2026-01-02T17:54:41.026Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "help-center-tablet-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-tablet-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "help-center-tablet-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/help-center.visual-Help-Ce-5bcaf-n-help-center---tablet-view-desktop-chrome/help-center-tablet-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -1383,29 +1137,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2218,
+                      "duration": 2525,
                       "errors": [],
                       "stdout": [
                         {
-                          "text": "A snapshot doesn't exist at /home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-mobile-desktop-chrome-linux.png, writing actual.\n"
+                          "text": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-mobile-desktop-chrome-linux.png is re-generated, writing actual.\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-01-02T17:19:50.825Z",
+                      "startTime": "2026-01-02T17:54:43.729Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "help-center-mobile-expected.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/e2e/visual-regression/snapshots/help-center.visual.spec.ts-snapshots/help-center-mobile-desktop-chrome-linux.png"
-                        },
-                        {
-                          "name": "help-center-mobile-actual.png",
-                          "contentType": "image/png",
-                          "path": "/home/ubuntu/job-sheet-qa-frontend/visual-regression-results/help-center.visual-Help-Ce-c6ce1-n-help-center---mobile-view-desktop-chrome/help-center-mobile-actual.png"
-                        }
-                      ]
+                      "attachments": []
                     }
                   ],
                   "status": "expected"
@@ -1423,8 +1166,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-01-02T17:18:49.661Z",
-    "duration": 63444.753,
+    "startTime": "2026-01-02T17:53:38.679Z",
+    "duration": 67636.152,
     "expected": 25,
     "skipped": 0,
     "unexpected": 0,

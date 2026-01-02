@@ -4,15 +4,20 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: "Inter", "sans-serif";
-  --font-heading: "Inter Tight", "sans-serif";
-  --font-mono: "JetBrains Mono", "monospace";
+  /* Typography - Inter font family */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-heading: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* Border Radius Scale */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
   
+  /* Color System Mapping */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   
@@ -50,111 +55,159 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
   
-  --color-brand-lime: #BEDA41;
-  --color-brand-charcoal: #333030;
+  /* Plantexpand Brand Colors */
+  --color-brand-lime: oklch(0.84 0.18 110);
+  --color-brand-lime-dark: oklch(0.78 0.17 110);
+  --color-brand-lime-light: oklch(0.88 0.15 110);
+  --color-brand-charcoal: oklch(0.28 0.01 30);
+  --color-brand-charcoal-dark: oklch(0.18 0.01 30);
+  --color-brand-charcoal-light: oklch(0.35 0.01 30);
+  --color-brand-blue: oklch(0.55 0.18 250);
+  --color-brand-blue-dark: oklch(0.48 0.16 250);
+  
+  /* Semantic Colors */
+  --color-success: oklch(0.65 0.17 160);
+  --color-success-light: oklch(0.92 0.05 160);
+  --color-warning: oklch(0.75 0.16 70);
+  --color-warning-light: oklch(0.95 0.05 70);
+  --color-error: oklch(0.55 0.22 25);
+  --color-error-light: oklch(0.93 0.05 25);
+  --color-info: oklch(0.60 0.18 250);
+  --color-info-light: oklch(0.93 0.05 250);
 }
 
 :root {
-  /* Precision Industrial Theme - Light Mode */
+  /* Plantexpand Theme - Light Mode */
   --radius: 0.5rem;
   
-  /* Base - Clean White & Deep Charcoal */
+  /* Base - Clean White & Charcoal */
   --background: #FFFFFF;
-  --foreground: #0F172A; /* Slate 900 */
+  --foreground: #333030; /* Charcoal - Primary text */
 
-  /* Card - White with subtle depth */
+  /* Card - White with border (no shadows) */
   --card: #FFFFFF;
-  --card-foreground: #0F172A;
+  --card-foreground: #333030;
 
   /* Popover */
   --popover: #FFFFFF;
-  --popover-foreground: #0F172A;
+  --popover-foreground: #333030;
 
-  /* Primary - Professional Blue */
-  --primary: #2563EB; /* Blue 600 */
-  --primary-foreground: #FFFFFF;
+  /* Primary - Lime Green (Plantexpand brand) */
+  --primary: #BEDA41;
+  --primary-foreground: #333030; /* Dark text on lime */
 
-  /* Secondary - Slate 100 */
-  --secondary: #F1F5F9;
-  --secondary-foreground: #0F172A;
+  /* Secondary - White with border */
+  --secondary: #FFFFFF;
+  --secondary-foreground: #333030;
 
-  /* Muted - Slate 50 */
-  --muted: #F8FAFC;
-  --muted-foreground: #64748B;
+  /* Muted - Gray 50 */
+  --muted: #F9F9F9;
+  --muted-foreground: #706D6D; /* Gray 600 */
 
-  /* Accent - Slate 100 */
-  --accent: #F1F5F9;
-  --accent-foreground: #0F172A;
+  /* Accent - Light lime highlight */
+  --accent: #BEDA411A; /* 10% lime */
+  --accent-foreground: #333030;
 
-  /* Destructive - Red 600 */
-  --destructive: #DC2626;
+  /* Destructive - Crimson Red */
+  --destructive: #BA3737;
   --destructive-foreground: #FFFFFF;
 
-  /* Borders - Slate 200 */
-  --border: #E2E8F0;
-  --input: #E2E8F0;
-  --ring: #2563EB;
+  /* Borders - Platinum */
+  --border: #EBE8E8;
+  --input: #EBE8E8;
+  --ring: #BEDA41;
 
-  /* Sidebar - Dark Slate */
-  --sidebar: #0F172A;
-  --sidebar-foreground: #F8FAFC;
-  --sidebar-primary: #3B82F6;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #1E293B;
+  /* Sidebar - Charcoal Dark */
+  --sidebar: #1A1818;
+  --sidebar-foreground: #F9F9F9;
+  --sidebar-primary: #BEDA41;
+  --sidebar-primary-foreground: #333030;
+  --sidebar-accent: #333030;
   --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: #1E293B;
-  --sidebar-ring: #3B82F6;
+  --sidebar-border: #333030;
+  --sidebar-ring: #BEDA41;
+  
+  /* Neutral Palette */
+  --gray-50: #F9F9F9;
+  --gray-100: #F5F4F4;
+  --gray-200: #EBE8E8;
+  --gray-300: #D9D7D7;
+  --gray-400: #B5B2B2;
+  --gray-500: #8A8787;
+  --gray-600: #706D6D;
+  --gray-700: #4A4646;
+  --gray-800: #333030;
+  --gray-900: #1A1818;
+  
+  /* Supporting Colors */
+  --blue: #2868CE;
+  --blue-dark: #1E52A3;
+  --blue-light: #4A85E0;
+  --orange: #D4A337;
+  --orange-dark: #B08A2D;
 }
 
 .dark {
-  /* Precision Industrial Theme - Dark Mode */
+  /* Plantexpand Theme - Dark Mode */
   
   /* Base - Deep Slate */
-  --background: #020617; /* Slate 950 */
-  --foreground: #F8FAFC;
+  --background: #0F172A;
+  --foreground: #F1F5F9;
 
-  /* Card - Slate 900 */
-  --card: #0F172A;
-  --card-foreground: #F8FAFC;
+  /* Card - Slate 800 */
+  --card: #1E293B;
+  --card-foreground: #F1F5F9;
 
   /* Popover */
-  --popover: #0F172A;
-  --popover-foreground: #F8FAFC;
+  --popover: #1E293B;
+  --popover-foreground: #F1F5F9;
 
-  /* Primary - Blue 500 */
-  --primary: #3B82F6;
-  --primary-foreground: #FFFFFF;
+  /* Primary - Lime Green (slightly brighter for dark mode) */
+  --primary: #BEDA41;
+  --primary-foreground: #1A1818;
 
-  /* Secondary - Slate 800 */
-  --secondary: #1E293B;
-  --secondary-foreground: #F8FAFC;
+  /* Secondary - Slate 700 */
+  --secondary: #334155;
+  --secondary-foreground: #F1F5F9;
 
   /* Muted */
-  --muted: #0F172A;
+  --muted: #1E293B;
   --muted-foreground: #94A3B8;
 
   /* Accent */
-  --accent: #1E293B;
-  --accent-foreground: #F8FAFC;
+  --accent: #334155;
+  --accent-foreground: #F1F5F9;
 
   /* Destructive */
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
 
   /* Borders */
-  --border: #1E293B;
-  --input: #1E293B;
-  --ring: #3B82F6;
+  --border: #334155;
+  --input: #334155;
+  --ring: #BEDA41;
 
   /* Sidebar */
   --sidebar: #020617;
-  --sidebar-foreground: #F8FAFC;
-  --sidebar-primary: #3B82F6;
-  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-foreground: #F1F5F9;
+  --sidebar-primary: #BEDA41;
+  --sidebar-primary-foreground: #1A1818;
   --sidebar-accent: #1E293B;
   --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: #1E293B;
-  --sidebar-ring: #3B82F6;
+  --sidebar-border: #334155;
+  --sidebar-ring: #BEDA41;
+  
+  /* Dark mode neutral palette */
+  --gray-50: #0F172A;
+  --gray-100: #1E293B;
+  --gray-200: #334155;
+  --gray-300: #475569;
+  --gray-400: #64748B;
+  --gray-500: #94A3B8;
+  --gray-600: #CBD5E1;
+  --gray-700: #E2E8F0;
+  --gray-800: #F1F5F9;
+  --gray-900: #F8FAFC;
 }
 
 @layer base {
@@ -163,12 +216,54 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    font-size: 14px;
+    line-height: 1.5;
   }
-  h1, h2, h3, h4, h5, h6 {
+  
+  /* Typography Scale - Plantexpand */
+  h1 {
+    @apply font-heading;
+    font-size: 1.5rem; /* 24px */
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+  h2 {
+    @apply font-heading;
+    font-size: 1.25rem; /* 20px */
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    @apply font-heading;
+    font-size: 1rem; /* 16px */
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  h4, h5, h6 {
     @apply font-heading font-semibold tracking-tight;
   }
+  
   code, pre, kbd {
     @apply font-mono;
+  }
+  
+  /* Links - Blue */
+  a {
+    color: #2868CE;
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+  a:hover {
+    color: #1E52A3;
+  }
+  
+  .dark a {
+    color: #4A85E0;
+  }
+  .dark a:hover {
+    color: #2868CE;
   }
 }
 
@@ -195,13 +290,31 @@
 
   @media (min-width: 1024px) {
     .container {
-      padding-left: 2rem;
-      padding-right: 2rem;
-      max-width: 1400px; /* Wider for data density */
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+      max-width: 1400px;
     }
   }
   
-  /* Custom Scrollbar for Industrial Look */
+  /* Section Label - Uppercase small text */
+  .section-label {
+    font-size: 0.625rem; /* 10px */
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--gray-500);
+  }
+  
+  /* Helper Text */
+  .helper-text {
+    font-size: 0.75rem; /* 12px */
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--gray-600);
+  }
+  
+  /* Custom Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -214,5 +327,47 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-muted-foreground/40;
+  }
+  
+  /* Stream/Feature Pills */
+  .stream-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  
+  .stream-pill-pams {
+    background-color: rgba(139, 92, 246, 0.15);
+    color: #8B5CF6;
+  }
+  
+  .stream-pill-parts {
+    background-color: rgba(16, 185, 129, 0.15);
+    color: #10B981;
+  }
+  
+  .stream-pill-contracts {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: #3B82F6;
+  }
+}
+
+@layer utilities {
+  /* Opacity variants for brand colors */
+  .bg-lime-hover {
+    background-color: rgba(51, 48, 48, 0.03);
+  }
+  .bg-lime-active {
+    background-color: rgba(51, 48, 48, 0.06);
+  }
+  .bg-lime-light {
+    background-color: rgba(190, 218, 65, 0.1);
+  }
+  .bg-lime-medium {
+    background-color: rgba(190, 218, 65, 0.2);
   }
 }

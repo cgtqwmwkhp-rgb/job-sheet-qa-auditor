@@ -1,0 +1,6 @@
+# Ignore large load test output files
+*.json
+*.txt
+
+# Keep the performance baseline report
+!PERFORMANCE_BASELINE_REPORT.md
