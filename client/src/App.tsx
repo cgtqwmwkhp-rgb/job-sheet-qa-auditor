@@ -5,6 +5,8 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import UploadPage from "./pages/Upload";
 import AuditResults from "./pages/AuditResults";
@@ -41,7 +43,9 @@ function Router() {
       <Route path={"/analytics/reports"} component={ReportStudio} />
       <Route path={"/portal/login"} component={PortalLogin} />
       <Route path={"/portal/dashboard"} component={TechnicianDashboard} />
-      <Route path={"/disputes"} component={DisputeManagement} />
+      <Route path="/disputes">
+        <ProtectedRoute component={DisputeManagement} allowedRoles={['admin', 'qa_lead']} />
+      </Route>
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
@@ -60,12 +64,14 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
-        </QueryClientProvider>
+        <AuthProvider>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </QueryClientProvider>
+        </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

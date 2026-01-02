@@ -1,15 +1,16 @@
-import { useNotificationSettings, useUpdateNotificationSettings, type NotificationSettings } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useNotificationSettings, useUpdateNotificationSettings, useSendTestEmail, type NotificationSettings } from "@/lib/api";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Bell, AlertTriangle, CheckCircle2, FileText } from "lucide-react";
+import { Bell, AlertTriangle, CheckCircle2, FileText, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 
 export function NotificationSettings() {
   const { data: settings, isLoading } = useNotificationSettings();
   const updateSettings = useUpdateNotificationSettings();
+  const sendTestEmail = useSendTestEmail();
   const [localSettings, setLocalSettings] = useState(settings);
 
   useEffect(() => {
@@ -33,6 +34,14 @@ export function NotificationSettings() {
         // Revert on error
         setLocalSettings(localSettings);
       }
+    });
+  };
+
+  const handleSendTestEmail = () => {
+    toast.promise(sendTestEmail.mutateAsync("daily_summary"), {
+      loading: "Sending test email...",
+      success: "Test email sent! Check your inbox.",
+      error: "Failed to send test email"
     });
   };
 
@@ -135,6 +144,18 @@ export function NotificationSettings() {
           </div>
         </div>
       </CardContent>
+      <CardFooter className="bg-muted/20 border-t p-4">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="w-full" 
+          onClick={handleSendTestEmail}
+          disabled={!localSettings.dailySummary}
+        >
+          <Mail className="h-4 w-4 mr-2" />
+          Send Test Summary Email
+        </Button>
+      </CardFooter>
     </Card>
   );
 }

@@ -24,6 +24,7 @@ import {
   MessageSquareWarning,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Menu items
 const items = [
@@ -76,6 +77,14 @@ const items = [
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { hasRole } = useAuth();
+
+  const filteredItems = items.filter(item => {
+    if (item.title === "Disputes") {
+      return hasRole(['admin', 'qa_lead']);
+    }
+    return true;
+  });
 
   return (
     <Sidebar collapsible="icon">
@@ -94,7 +103,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Platform</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
+              {filteredItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
                     asChild 
