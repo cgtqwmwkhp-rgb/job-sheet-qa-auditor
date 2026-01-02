@@ -12,6 +12,7 @@ import HoldQueue from "./pages/HoldQueue";
 import SpecManagement from "./pages/SpecManagement";
 import SearchPage from "./pages/Search";
 import UserManagement from "./pages/UserManagement";
+import Analytics from "./pages/Analytics";
 
 
 function Router() {
@@ -24,6 +25,7 @@ function Router() {
       <Route path={"/specs"} component={SpecManagement} />
       <Route path={"/search"} component={SearchPage} />
       <Route path={"/users"} component={UserManagement} />
+      <Route path={"/analytics"} component={Analytics} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
