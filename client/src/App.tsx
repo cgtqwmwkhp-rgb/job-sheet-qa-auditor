@@ -18,6 +18,8 @@ import TechnicianPerformance from "./pages/analytics/TechnicianPerformance";
 
 import AIAnalyst from "./pages/analytics/AIAnalyst";
 import ReportStudio from "./pages/analytics/ReportStudio";
+import PortalLogin from "./pages/portal/PortalLogin";
+import TechnicianDashboard from "./pages/portal/TechnicianDashboard";
 
 
 function Router() {
@@ -36,6 +38,8 @@ function Router() {
 
       <Route path={"/analytics/ai"} component={AIAnalyst} />
       <Route path={"/analytics/reports"} component={ReportStudio} />
+      <Route path={"/portal/login"} component={PortalLogin} />
+      <Route path={"/portal/dashboard"} component={TechnicianDashboard} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
