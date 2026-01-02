@@ -1,9 +1,14 @@
 /**
  * Gemini 2.5 Job Sheet Analyzer Service
  * Analyzes extracted OCR text against Gold Standard specifications
+ * Includes enterprise-grade resilience: retry logic, circuit breaker, correlation tracking
  */
 
 import { invokeLLM } from '../_core/llm';
+import { withResiliency, geminiCircuitBreaker, CircuitBreakerOpenError } from '../utils/resilience';
+import { getCorrelationId, addContextMetadata } from '../utils/context';
+import { redactFindings } from '../utils/piiRedaction';
+import { addToDeadLetterQueue } from '../utils/deadLetterQueue';
 
 export interface GoldSpecRule {
   id: string;
@@ -56,7 +61,17 @@ export interface AnalysisResult {
   summary: string;
   processingTimeMs: number;
   model: string;
+  correlationId?: string;
+  retryAttempts?: number;
   error?: string;
+  errorCode?: string;
+}
+
+export interface AnalysisOptions {
+  jobSheetId?: number;
+  skipRetry?: boolean;
+  redactPII?: boolean;
+  confidenceThreshold?: number;
 }
 
 const ANALYSIS_SYSTEM_PROMPT = `You are an expert Job Sheet QA Auditor. Your task is to analyze extracted text from job sheets and validate them against a Gold Standard specification.
@@ -85,17 +100,14 @@ Reason Codes:
 Always respond with valid JSON matching the specified schema.`;
 
 /**
- * Analyze job sheet text against a Gold Standard specification
+ * Internal LLM call for analysis
  */
-export async function analyzeJobSheet(
+async function callAnalysisLLM(
   extractedText: string,
   goldSpec: GoldSpec,
-  pageCount: number = 1
-): Promise<AnalysisResult> {
-  const startTime = Date.now();
-
-  try {
-    const userPrompt = `Analyze the following job sheet text against the Gold Standard specification.
+  pageCount: number
+): Promise<any> {
+  const userPrompt = `Analyze the following job sheet text against the Gold Standard specification.
 
 ## Gold Standard Specification
 Name: ${goldSpec.name}
@@ -128,103 +140,261 @@ Respond with a JSON object containing:
 - extractedFields: object mapping field names to extracted values
 - summary: brief summary of the analysis`;
 
-    const response = await invokeLLM({
-      messages: [
-        { role: 'system', content: ANALYSIS_SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-      responseFormat: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'job_sheet_analysis',
-          schema: {
-            type: 'object',
-            properties: {
-              overallResult: { type: 'string', enum: ['PASS', 'FAIL', 'REVIEW_QUEUE'] },
-              score: { type: 'number' },
-              findings: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    ruleId: { type: 'string' },
-                    fieldName: { type: 'string' },
-                    severity: { type: 'string', enum: ['S0', 'S1', 'S2', 'S3'] },
-                    reasonCode: { type: 'string' },
-                    rawSnippet: { type: 'string' },
-                    normalisedSnippet: { type: 'string' },
-                    confidence: { type: 'number' },
-                    pageNumber: { type: 'number' },
-                    whyItMatters: { type: 'string' },
-                    suggestedFix: { type: 'string' },
-                  },
-                  required: ['ruleId', 'fieldName', 'severity', 'reasonCode', 'confidence', 'pageNumber', 'whyItMatters', 'suggestedFix'],
-                },
-              },
-              extractedFields: {
+  const response = await invokeLLM({
+    messages: [
+      { role: 'system', content: ANALYSIS_SYSTEM_PROMPT },
+      { role: 'user', content: userPrompt },
+    ],
+    responseFormat: {
+      type: 'json_schema',
+      json_schema: {
+        name: 'job_sheet_analysis',
+        schema: {
+          type: 'object',
+          properties: {
+            overallResult: { type: 'string', enum: ['PASS', 'FAIL', 'REVIEW_QUEUE'] },
+            score: { type: 'number' },
+            findings: {
+              type: 'array',
+              items: {
                 type: 'object',
-                additionalProperties: {
-                  type: 'object',
-                  properties: {
-                    value: { type: 'string' },
-                    confidence: { type: 'number' },
-                    pageNumber: { type: 'number' },
-                  },
-                  required: ['value', 'confidence', 'pageNumber'],
+                properties: {
+                  ruleId: { type: 'string' },
+                  fieldName: { type: 'string' },
+                  severity: { type: 'string', enum: ['S0', 'S1', 'S2', 'S3'] },
+                  reasonCode: { type: 'string' },
+                  rawSnippet: { type: 'string' },
+                  normalisedSnippet: { type: 'string' },
+                  confidence: { type: 'number' },
+                  pageNumber: { type: 'number' },
+                  whyItMatters: { type: 'string' },
+                  suggestedFix: { type: 'string' },
                 },
+                required: ['ruleId', 'fieldName', 'severity', 'reasonCode', 'confidence', 'pageNumber', 'whyItMatters', 'suggestedFix'],
               },
-              summary: { type: 'string' },
             },
-            required: ['overallResult', 'score', 'findings', 'extractedFields', 'summary'],
+            extractedFields: {
+              type: 'object',
+              additionalProperties: {
+                type: 'object',
+                properties: {
+                  value: { type: 'string' },
+                  confidence: { type: 'number' },
+                  pageNumber: { type: 'number' },
+                },
+                required: ['value', 'confidence', 'pageNumber'],
+              },
+            },
+            summary: { type: 'string' },
           },
-          strict: true,
+          required: ['overallResult', 'score', 'findings', 'extractedFields', 'summary'],
         },
+        strict: true,
       },
+    },
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content || typeof content !== 'string') {
+    throw new Error('Empty response from LLM');
+  }
+
+  return { data: JSON.parse(content), model: response.model };
+}
+
+/**
+ * Analyze job sheet text against a Gold Standard specification with resilience
+ */
+export async function analyzeJobSheet(
+  extractedText: string,
+  goldSpec: GoldSpec,
+  pageCount: number = 1,
+  options: AnalysisOptions = {}
+): Promise<AnalysisResult> {
+  const startTime = Date.now();
+  const correlationId = getCorrelationId();
+  let retryAttempts = 0;
+
+  console.log(`[Analyzer] Starting analysis`, {
+    correlationId,
+    specName: goldSpec.name,
+    specVersion: goldSpec.version,
+    rulesCount: goldSpec.rules.length,
+    pageCount,
+    textLength: extractedText.length,
+  });
+
+  try {
+    const result = await withResiliency(
+      () => callAnalysisLLM(extractedText, goldSpec, pageCount),
+      geminiCircuitBreaker,
+      {
+        maxRetries: options.skipRetry ? 0 : 3,
+        baseDelayMs: 2000,
+        maxDelayMs: 30000,
+        backoffMultiplier: 2,
+        onRetry: (attempt, error, delayMs) => {
+          retryAttempts = attempt;
+          console.warn(`[Analyzer] Retry attempt ${attempt}`, {
+            correlationId,
+            error: error.message,
+            nextRetryMs: delayMs,
+          });
+        },
+      }
+    );
+
+    const processingTimeMs = Date.now() - startTime;
+    const { data: analysisData, model } = result;
+
+    // Sort findings by severity and reason code for determinism
+    const sortedFindings = sortFindings(analysisData.findings || []);
+
+    // Optionally redact PII from findings
+    const finalFindings = options.redactPII 
+      ? redactFindings(sortedFindings) as Finding[]
+      : sortedFindings;
+
+    console.log(`[Analyzer] Analysis complete`, {
+      correlationId,
+      result: analysisData.overallResult,
+      score: analysisData.score,
+      findingsCount: finalFindings.length,
+      processingTimeMs,
     });
 
-    const content = response.choices[0]?.message?.content;
-    if (!content || typeof content !== 'string') {
-      throw new Error('Empty response from LLM');
-    }
-
-    const analysisData = JSON.parse(content);
-    const processingTimeMs = Date.now() - startTime;
+    addContextMetadata('analysisResult', analysisData.overallResult);
+    addContextMetadata('analysisScore', analysisData.score);
+    addContextMetadata('analysisProcessingMs', processingTimeMs);
 
     return {
       success: true,
       overallResult: analysisData.overallResult,
       score: analysisData.score,
-      findings: analysisData.findings || [],
+      findings: finalFindings,
       extractedFields: analysisData.extractedFields || {},
       summary: analysisData.summary,
       processingTimeMs,
-      model: response.model || 'gemini-2.5-flash',
+      model: model || 'gemini-2.5-flash',
+      correlationId,
+      retryAttempts,
     };
+
   } catch (error) {
-    console.error('[Analyzer] Analysis error:', error);
-    return {
-      success: false,
-      overallResult: 'REVIEW_QUEUE',
-      score: 0,
-      findings: [{
-        ruleId: 'SYSTEM',
-        fieldName: 'Analysis Pipeline',
-        severity: 'S1',
-        reasonCode: 'PIPELINE_ERROR',
-        rawSnippet: '',
-        normalisedSnippet: '',
-        confidence: 0,
-        pageNumber: 1,
-        whyItMatters: 'The analysis pipeline encountered an error and could not complete validation.',
-        suggestedFix: 'Review the document manually or retry the analysis.',
-      }],
-      extractedFields: {},
-      summary: 'Analysis failed due to pipeline error.',
-      processingTimeMs: Date.now() - startTime,
-      model: 'gemini-2.5-flash',
-      error: error instanceof Error ? error.message : 'Unknown analysis error',
-    };
+    const processingTimeMs = Date.now() - startTime;
+
+    // Handle circuit breaker open
+    if (error instanceof CircuitBreakerOpenError) {
+      console.error('[Analyzer] Circuit breaker open', {
+        correlationId,
+        retryAfterMs: error.retryAfterMs,
+      });
+
+      if (options.jobSheetId) {
+        addToDeadLetterQueue(options.jobSheetId, 'analysis', error, {
+          correlationId,
+          recoverable: true,
+          metadata: { specName: goldSpec.name, circuitBreakerOpen: true },
+        });
+      }
+
+      return createErrorResult(
+        'Analysis service temporarily unavailable. Please try again later.',
+        'CIRCUIT_BREAKER_OPEN',
+        processingTimeMs,
+        correlationId,
+        retryAttempts
+      );
+    }
+
+    console.error('[Analyzer] Analysis failed after retries', {
+      correlationId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      retryAttempts,
+      processingTimeMs,
+    });
+
+    // Add to DLQ if job sheet ID provided
+    if (options.jobSheetId) {
+      addToDeadLetterQueue(
+        options.jobSheetId,
+        'analysis',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          correlationId,
+          attempts: retryAttempts + 1,
+          maxAttempts: 3,
+          metadata: { specName: goldSpec.name },
+        }
+      );
+    }
+
+    return createErrorResult(
+      error instanceof Error ? error.message : 'Unknown analysis error',
+      'PROCESSING_ERROR',
+      processingTimeMs,
+      correlationId,
+      retryAttempts
+    );
   }
+}
+
+/**
+ * Sort findings for deterministic output
+ * Order: severity (S0 > S1 > S2 > S3) → reasonCode → fieldName
+ */
+function sortFindings(findings: Finding[]): Finding[] {
+  const severityOrder: Record<string, number> = { S0: 0, S1: 1, S2: 2, S3: 3 };
+  
+  return [...findings].sort((a, b) => {
+    // First by severity
+    const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
+    if (severityDiff !== 0) return severityDiff;
+    
+    // Then by reason code
+    const reasonDiff = a.reasonCode.localeCompare(b.reasonCode);
+    if (reasonDiff !== 0) return reasonDiff;
+    
+    // Finally by field name
+    return a.fieldName.localeCompare(b.fieldName);
+  });
+}
+
+/**
+ * Create an error result
+ */
+function createErrorResult(
+  errorMessage: string,
+  errorCode: string,
+  processingTimeMs: number,
+  correlationId?: string,
+  retryAttempts?: number
+): AnalysisResult {
+  return {
+    success: false,
+    overallResult: 'REVIEW_QUEUE',
+    score: 0,
+    findings: [{
+      ruleId: 'SYSTEM',
+      fieldName: 'Analysis Pipeline',
+      severity: 'S1',
+      reasonCode: 'PIPELINE_ERROR',
+      rawSnippet: '',
+      normalisedSnippet: '',
+      confidence: 0,
+      pageNumber: 1,
+      whyItMatters: 'The analysis pipeline encountered an error and could not complete validation.',
+      suggestedFix: 'Review the document manually or retry the analysis.',
+    }],
+    extractedFields: {},
+    summary: 'Analysis failed due to pipeline error.',
+    processingTimeMs,
+    model: 'gemini-2.5-flash',
+    correlationId,
+    retryAttempts,
+    error: errorMessage,
+    errorCode,
+  };
 }
 
 /**
@@ -312,4 +482,19 @@ export function getDefaultGoldSpec(): GoldSpec {
       },
     ],
   };
+}
+
+/**
+ * Get circuit breaker status for monitoring
+ */
+export function getAnalyzerCircuitBreakerStatus() {
+  return geminiCircuitBreaker.getStats();
+}
+
+/**
+ * Reset circuit breaker (admin function)
+ */
+export function resetAnalyzerCircuitBreaker() {
+  geminiCircuitBreaker.reset();
+  console.log('[Analyzer] Circuit breaker manually reset');
 }

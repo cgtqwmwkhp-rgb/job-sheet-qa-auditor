@@ -1,7 +1,13 @@
 /**
  * Mistral OCR Service
  * Extracts text from PDF documents and images using Mistral's OCR API
+ * Includes enterprise-grade resilience: retry logic, circuit breaker, correlation tracking
  */
+
+import { withResiliency, mistralCircuitBreaker, CircuitBreakerOpenError } from '../utils/resilience';
+import { getCorrelationId, addContextMetadata } from '../utils/context';
+import { redactExtractedText } from '../utils/piiRedaction';
+import { addToDeadLetterQueue } from '../utils/deadLetterQueue';
 
 const MISTRAL_OCR_ENDPOINT = 'https://api.mistral.ai/v1/ocr';
 
@@ -27,27 +33,156 @@ export interface OCRResult {
   pages: OCRPage[];
   totalPages: number;
   model: string;
+  correlationId?: string;
+  processingTimeMs?: number;
   usageInfo?: {
     pagesProcessed: number;
     tokensGenerated: number;
   };
   error?: string;
+  errorCode?: string;
+  retryAttempts?: number;
 }
 
 export interface OCROptions {
   includeImageLocations?: boolean;
   imageLimit?: number;
   pageLimit?: number;
+  jobSheetId?: number; // For DLQ tracking
+  skipRetry?: boolean;
+  redactPII?: boolean;
 }
 
 /**
- * Process a document URL through Mistral OCR
+ * Internal OCR call (without resilience wrapper)
+ */
+async function callMistralOCR(
+  documentUrl: string,
+  apiKey: string,
+  options: OCROptions
+): Promise<OCRResult> {
+  const startTime = Date.now();
+  const correlationId = getCorrelationId();
+
+  const payload: Record<string, unknown> = {
+    model: 'mistral-ocr-latest',
+    document: {
+      type: 'document_url',
+      document_url: documentUrl,
+    },
+  };
+
+  if (options.includeImageLocations) {
+    payload.include_image_base64 = false;
+  }
+
+  if (options.pageLimit) {
+    payload.page_limit = options.pageLimit;
+  }
+
+  if (options.imageLimit) {
+    payload.image_limit = options.imageLimit;
+  }
+
+  console.log(`[Mistral OCR] Starting extraction`, {
+    correlationId,
+    documentUrl: documentUrl.substring(0, 50) + '...',
+  });
+
+  const response = await fetch(MISTRAL_OCR_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      ...(correlationId && { 'X-Correlation-ID': correlationId }),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const processingTimeMs = Date.now() - startTime;
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    const errorCode = `HTTP_${response.status}`;
+    
+    console.error('[Mistral OCR] API error:', {
+      correlationId,
+      status: response.status,
+      error: errorText,
+      processingTimeMs,
+    });
+
+    // Throw to trigger retry for transient errors
+    if (response.status >= 500 || response.status === 429) {
+      const error = new Error(`OCR API error: ${response.status} - ${errorText}`);
+      (error as any).code = errorCode;
+      (error as any).retryable = true;
+      throw error;
+    }
+
+    return {
+      success: false,
+      pages: [],
+      totalPages: 0,
+      model: 'mistral-ocr-latest',
+      correlationId,
+      processingTimeMs,
+      error: `OCR API error: ${response.status} - ${errorText}`,
+      errorCode,
+    };
+  }
+
+  const result = await response.json();
+  
+  // Parse the OCR response
+  let pages: OCRPage[] = (result.pages || []).map((page: any, index: number) => ({
+    pageNumber: page.index ?? index + 1,
+    markdown: page.markdown || '',
+    images: page.images,
+    dimensions: page.dimensions,
+  }));
+
+  // Optionally redact PII from extracted text
+  if (options.redactPII) {
+    pages = pages.map(page => ({
+      ...page,
+      markdown: redactExtractedText(page.markdown),
+    }));
+  }
+
+  console.log(`[Mistral OCR] Extraction complete`, {
+    correlationId,
+    totalPages: pages.length,
+    processingTimeMs,
+  });
+
+  addContextMetadata('ocrPages', pages.length);
+  addContextMetadata('ocrProcessingMs', processingTimeMs);
+
+  return {
+    success: true,
+    pages,
+    totalPages: pages.length,
+    model: result.model || 'mistral-ocr-latest',
+    correlationId,
+    processingTimeMs,
+    usageInfo: result.usage_info ? {
+      pagesProcessed: result.usage_info.pages_processed,
+      tokensGenerated: result.usage_info.doc_size_tokens,
+    } : undefined,
+  };
+}
+
+/**
+ * Process a document URL through Mistral OCR with resilience
  */
 export async function extractTextFromDocument(
   documentUrl: string,
   options: OCROptions = {}
 ): Promise<OCRResult> {
   const apiKey = process.env.MISTRAL_API_KEY;
+  const correlationId = getCorrelationId();
+  const startTime = Date.now();
   
   if (!apiKey) {
     return {
@@ -55,86 +190,106 @@ export async function extractTextFromDocument(
       pages: [],
       totalPages: 0,
       model: 'mistral-ocr-latest',
+      correlationId,
       error: 'MISTRAL_API_KEY not configured',
+      errorCode: 'CONFIG_ERROR',
     };
   }
 
+  let retryAttempts = 0;
+
   try {
-    const payload: Record<string, unknown> = {
-      model: 'mistral-ocr-latest',
-      document: {
-        type: 'document_url',
-        document_url: documentUrl,
-      },
-    };
+    const result = await withResiliency(
+      () => callMistralOCR(documentUrl, apiKey, options),
+      mistralCircuitBreaker,
+      {
+        maxRetries: options.skipRetry ? 0 : 3,
+        baseDelayMs: 2000,
+        maxDelayMs: 30000,
+        backoffMultiplier: 2,
+        onRetry: (attempt, error, delayMs) => {
+          retryAttempts = attempt;
+          console.warn(`[Mistral OCR] Retry attempt ${attempt}`, {
+            correlationId,
+            error: error.message,
+            nextRetryMs: delayMs,
+          });
+        },
+      }
+    );
 
-    if (options.includeImageLocations) {
-      payload.include_image_base64 = false;
-    }
+    return { ...result, retryAttempts };
 
-    if (options.pageLimit) {
-      payload.page_limit = options.pageLimit;
-    }
+  } catch (error) {
+    const processingTimeMs = Date.now() - startTime;
+    
+    // Handle circuit breaker open
+    if (error instanceof CircuitBreakerOpenError) {
+      console.error('[Mistral OCR] Circuit breaker open', {
+        correlationId,
+        retryAfterMs: error.retryAfterMs,
+      });
 
-    if (options.imageLimit) {
-      payload.image_limit = options.imageLimit;
-    }
+      // Add to DLQ if job sheet ID provided
+      if (options.jobSheetId) {
+        addToDeadLetterQueue(options.jobSheetId, 'ocr', error, {
+          correlationId,
+          recoverable: true,
+          metadata: { documentUrl, circuitBreakerOpen: true },
+        });
+      }
 
-    const response = await fetch(MISTRAL_OCR_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Mistral OCR] API error:', response.status, errorText);
       return {
         success: false,
         pages: [],
         totalPages: 0,
         model: 'mistral-ocr-latest',
-        error: `OCR API error: ${response.status} - ${errorText}`,
+        correlationId,
+        processingTimeMs,
+        error: 'OCR service temporarily unavailable. Please try again later.',
+        errorCode: 'CIRCUIT_BREAKER_OPEN',
+        retryAttempts,
       };
     }
 
-    const result = await response.json();
-    
-    // Parse the OCR response
-    const pages: OCRPage[] = (result.pages || []).map((page: any, index: number) => ({
-      pageNumber: page.index ?? index + 1,
-      markdown: page.markdown || '',
-      images: page.images,
-      dimensions: page.dimensions,
-    }));
+    console.error('[Mistral OCR] Processing failed after retries', {
+      correlationId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      retryAttempts,
+      processingTimeMs,
+    });
 
-    return {
-      success: true,
-      pages,
-      totalPages: pages.length,
-      model: result.model || 'mistral-ocr-latest',
-      usageInfo: result.usage_info ? {
-        pagesProcessed: result.usage_info.pages_processed,
-        tokensGenerated: result.usage_info.doc_size_tokens,
-      } : undefined,
-    };
-  } catch (error) {
-    console.error('[Mistral OCR] Processing error:', error);
+    // Add to DLQ if job sheet ID provided
+    if (options.jobSheetId) {
+      addToDeadLetterQueue(
+        options.jobSheetId, 
+        'ocr', 
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          correlationId,
+          attempts: retryAttempts + 1,
+          maxAttempts: 3,
+          metadata: { documentUrl },
+        }
+      );
+    }
+
     return {
       success: false,
       pages: [],
       totalPages: 0,
       model: 'mistral-ocr-latest',
+      correlationId,
+      processingTimeMs,
       error: error instanceof Error ? error.message : 'Unknown OCR error',
+      errorCode: 'PROCESSING_ERROR',
+      retryAttempts,
     };
   }
 }
 
 /**
- * Extract text from a base64 encoded document
+ * Extract text from a base64 encoded document with resilience
  */
 export async function extractTextFromBase64(
   base64Data: string,
@@ -142,6 +297,8 @@ export async function extractTextFromBase64(
   options: OCROptions = {}
 ): Promise<OCRResult> {
   const apiKey = process.env.MISTRAL_API_KEY;
+  const correlationId = getCorrelationId();
+  const startTime = Date.now();
   
   if (!apiKey) {
     return {
@@ -149,11 +306,15 @@ export async function extractTextFromBase64(
       pages: [],
       totalPages: 0,
       model: 'mistral-ocr-latest',
+      correlationId,
       error: 'MISTRAL_API_KEY not configured',
+      errorCode: 'CONFIG_ERROR',
     };
   }
 
-  try {
+  let retryAttempts = 0;
+
+  const callOCR = async (): Promise<OCRResult> => {
     const payload: Record<string, unknown> = {
       model: 'mistral-ocr-latest',
       document: {
@@ -172,49 +333,95 @@ export async function extractTextFromBase64(
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
+        ...(correlationId && { 'X-Correlation-ID': correlationId }),
       },
       body: JSON.stringify(payload),
     });
 
+    const processingTimeMs = Date.now() - startTime;
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[Mistral OCR] API error:', response.status, errorText);
+      
+      if (response.status >= 500 || response.status === 429) {
+        const error = new Error(`OCR API error: ${response.status}`);
+        (error as any).code = `HTTP_${response.status}`;
+        throw error;
+      }
+
       return {
         success: false,
         pages: [],
         totalPages: 0,
         model: 'mistral-ocr-latest',
+        correlationId,
+        processingTimeMs,
         error: `OCR API error: ${response.status} - ${errorText}`,
+        errorCode: `HTTP_${response.status}`,
       };
     }
 
     const result = await response.json();
     
-    const pages: OCRPage[] = (result.pages || []).map((page: any, index: number) => ({
+    let pages: OCRPage[] = (result.pages || []).map((page: any, index: number) => ({
       pageNumber: page.index ?? index + 1,
       markdown: page.markdown || '',
       images: page.images,
       dimensions: page.dimensions,
     }));
 
+    if (options.redactPII) {
+      pages = pages.map(page => ({
+        ...page,
+        markdown: redactExtractedText(page.markdown),
+      }));
+    }
+
     return {
       success: true,
       pages,
       totalPages: pages.length,
       model: result.model || 'mistral-ocr-latest',
+      correlationId,
+      processingTimeMs,
       usageInfo: result.usage_info ? {
         pagesProcessed: result.usage_info.pages_processed,
         tokensGenerated: result.usage_info.doc_size_tokens,
       } : undefined,
     };
+  };
+
+  try {
+    const result = await withResiliency(callOCR, mistralCircuitBreaker, {
+      maxRetries: options.skipRetry ? 0 : 3,
+      baseDelayMs: 2000,
+      onRetry: (attempt) => { retryAttempts = attempt; },
+    });
+
+    return { ...result, retryAttempts };
+
   } catch (error) {
-    console.error('[Mistral OCR] Processing error:', error);
+    const processingTimeMs = Date.now() - startTime;
+
+    if (options.jobSheetId) {
+      addToDeadLetterQueue(
+        options.jobSheetId,
+        'ocr',
+        error instanceof Error ? error : new Error(String(error)),
+        { correlationId, attempts: retryAttempts + 1 }
+      );
+    }
+
     return {
       success: false,
       pages: [],
       totalPages: 0,
       model: 'mistral-ocr-latest',
+      correlationId,
+      processingTimeMs,
       error: error instanceof Error ? error.message : 'Unknown OCR error',
+      errorCode: 'PROCESSING_ERROR',
+      retryAttempts,
     };
   }
 }
@@ -230,7 +437,6 @@ export async function validateMistralApiKey(): Promise<{ valid: boolean; error?:
   }
 
   try {
-    // Use the models endpoint to validate the key
     const response = await fetch('https://api.mistral.ai/v1/models', {
       method: 'GET',
       headers: {
@@ -250,4 +456,19 @@ export async function validateMistralApiKey(): Promise<{ valid: boolean; error?:
       error: error instanceof Error ? error.message : 'Connection error' 
     };
   }
+}
+
+/**
+ * Get circuit breaker status for monitoring
+ */
+export function getOCRCircuitBreakerStatus() {
+  return mistralCircuitBreaker.getStats();
+}
+
+/**
+ * Reset circuit breaker (admin function)
+ */
+export function resetOCRCircuitBreaker() {
+  mistralCircuitBreaker.reset();
+  console.log('[Mistral OCR] Circuit breaker manually reset');
 }
