@@ -25,19 +25,20 @@ export function AnalyticsLayout({ children, title, description }: AnalyticsLayou
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Header & Controls */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/50">
           <div>
-            <h1 className="text-3xl font-heading font-bold tracking-tight">{title}</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-3xl font-heading font-bold tracking-tight text-foreground">{title}</h1>
+            <p className="text-muted-foreground mt-2 text-lg max-w-2xl">
               {description}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 bg-card p-1.5 rounded-lg border shadow-sm">
             <CalendarDateRangePicker />
+            <div className="h-6 w-px bg-border" />
             <Select defaultValue="all">
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[180px] border-0 bg-transparent shadow-none focus:ring-0">
                 <SelectValue placeholder="Select Site" />
               </SelectTrigger>
               <SelectContent>
@@ -47,7 +48,8 @@ export function AnalyticsLayout({ children, title, description }: AnalyticsLayou
                 <SelectItem value="leeds">Leeds Hub</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline">
+            <div className="h-6 w-px bg-border" />
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
               <Download className="w-4 h-4 mr-2" />
               Export
             </Button>
@@ -55,24 +57,22 @@ export function AnalyticsLayout({ children, title, description }: AnalyticsLayou
         </div>
 
         {/* Sub-navigation */}
-        <div className="border-b">
-          <div className="flex h-10 items-center gap-4">
-            {navItems.map((item) => {
-              const isActive = location === item.href;
-              return (
-                <Link key={item.href} href={item.href}>
-                  <a className={`flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary ${
-                    isActive 
-                      ? "text-primary border-b-2 border-primary h-10" 
-                      : "text-muted-foreground"
-                  }`}>
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                  </a>
-                </Link>
-              );
-            })}
-          </div>
+        <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit">
+          {navItems.map((item) => {
+            const isActive = location === item.href;
+            return (
+              <Link key={item.href} href={item.href}>
+                <a className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+                  isActive 
+                    ? "bg-white text-primary shadow-sm" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/50"
+                }`}>
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </a>
+              </Link>
+            );
+          })}
         </div>
 
         {/* Main Content */}

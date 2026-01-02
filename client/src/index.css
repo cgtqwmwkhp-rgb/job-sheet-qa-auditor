@@ -58,103 +58,103 @@
   /* Precision Industrial Theme - Light Mode */
   --radius: 0.5rem;
   
-  /* Base - White & Cool Gray */
+  /* Base - Clean White & Deep Charcoal */
   --background: #FFFFFF;
-  --foreground: #333030; /* Charcoal */
+  --foreground: #0F172A; /* Slate 900 */
 
-  /* Card - White with subtle border */
+  /* Card - White with subtle depth */
   --card: #FFFFFF;
-  --card-foreground: #333030;
+  --card-foreground: #0F172A;
 
   /* Popover */
   --popover: #FFFFFF;
-  --popover-foreground: #333030;
+  --popover-foreground: #0F172A;
 
-  /* Primary - Lime Green #BEDA41 */
-  --primary: #BEDA41;
-  --primary-foreground: #1A1818; /* Dark Charcoal for contrast */
+  /* Primary - Professional Blue */
+  --primary: #2563EB; /* Blue 600 */
+  --primary-foreground: #FFFFFF;
 
-  /* Secondary - Charcoal #333030 */
-  --secondary: #333030;
-  --secondary-foreground: #FFFFFF;
+  /* Secondary - Slate 100 */
+  --secondary: #F1F5F9;
+  --secondary-foreground: #0F172A;
 
-  /* Muted - Platinum #EBE8E8 */
-  --muted: #F5F4F4;
+  /* Muted - Slate 50 */
+  --muted: #F8FAFC;
   --muted-foreground: #64748B;
 
-  /* Accent - Light Lime or Gray Hover */
-  --accent: #F5F4F4;
-  --accent-foreground: #333030;
+  /* Accent - Slate 100 */
+  --accent: #F1F5F9;
+  --accent-foreground: #0F172A;
 
-  /* Destructive - Red */
-  --destructive: #EF4444;
+  /* Destructive - Red 600 */
+  --destructive: #DC2626;
   --destructive-foreground: #FFFFFF;
 
-  /* Borders - Platinum */
+  /* Borders - Slate 200 */
   --border: #E2E8F0;
   --input: #E2E8F0;
-  --ring: #BEDA41; /* Lime ring */
+  --ring: #2563EB;
 
-  /* Sidebar - Dark Charcoal for contrast in split layout */
-  --sidebar: #1A1818;
-  --sidebar-foreground: #F1F5F9;
-  --sidebar-primary: #BEDA41;
-  --sidebar-primary-foreground: #1A1818;
-  --sidebar-accent: #333030;
+  /* Sidebar - Dark Slate */
+  --sidebar: #0F172A;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-primary: #3B82F6;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #1E293B;
   --sidebar-accent-foreground: #FFFFFF;
-  --sidebar-border: #333030;
-  --sidebar-ring: #BEDA41;
+  --sidebar-border: #1E293B;
+  --sidebar-ring: #3B82F6;
 }
 
 .dark {
   /* Precision Industrial Theme - Dark Mode */
   
-  /* Base - Dark Charcoal */
-  --background: #0F172A; /* Slate 900 */
-  --foreground: #F1F5F9;
+  /* Base - Deep Slate */
+  --background: #020617; /* Slate 950 */
+  --foreground: #F8FAFC;
 
-  /* Card - Darker Slate */
-  --card: #1E293B; /* Slate 800 */
-  --card-foreground: #F1F5F9;
+  /* Card - Slate 900 */
+  --card: #0F172A;
+  --card-foreground: #F8FAFC;
 
   /* Popover */
-  --popover: #1E293B;
-  --popover-foreground: #F1F5F9;
+  --popover: #0F172A;
+  --popover-foreground: #F8FAFC;
 
-  /* Primary - Lime Green */
-  --primary: #BEDA41;
-  --primary-foreground: #1A1818;
+  /* Primary - Blue 500 */
+  --primary: #3B82F6;
+  --primary-foreground: #FFFFFF;
 
-  /* Secondary - Slate 700 */
-  --secondary: #334155;
-  --secondary-foreground: #F1F5F9;
+  /* Secondary - Slate 800 */
+  --secondary: #1E293B;
+  --secondary-foreground: #F8FAFC;
 
   /* Muted */
-  --muted: #1E293B;
+  --muted: #0F172A;
   --muted-foreground: #94A3B8;
 
   /* Accent */
   --accent: #1E293B;
-  --accent-foreground: #F1F5F9;
+  --accent-foreground: #F8FAFC;
 
   /* Destructive */
-  --destructive: #7F1D1D;
-  --destructive-foreground: #F1F5F9;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
 
   /* Borders */
-  --border: #334155;
-  --input: #334155;
-  --ring: #BEDA41;
+  --border: #1E293B;
+  --input: #1E293B;
+  --ring: #3B82F6;
 
   /* Sidebar */
-  --sidebar: #020617; /* Slate 950 */
-  --sidebar-foreground: #F1F5F9;
-  --sidebar-primary: #BEDA41;
-  --sidebar-primary-foreground: #1A1818;
+  --sidebar: #020617;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-primary: #3B82F6;
+  --sidebar-primary-foreground: #FFFFFF;
   --sidebar-accent: #1E293B;
-  --sidebar-accent-foreground: #F1F5F9;
+  --sidebar-accent-foreground: #FFFFFF;
   --sidebar-border: #1E293B;
-  --sidebar-ring: #BEDA41;
+  --sidebar-ring: #3B82F6;
 }
 
 @layer base {

@@ -65,38 +65,45 @@ export default function Dashboard() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-heading font-bold tracking-tight">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-3xl font-heading font-bold tracking-tight text-foreground">Dashboard</h1>
+            <p className="text-muted-foreground mt-1 text-lg">
               Overview of job sheet audit performance and status.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-1 rounded-full border">
-            <span className="w-2 h-2 rounded-full bg-brand-lime animate-pulse" />
+          <div className="flex items-center gap-2 text-sm font-medium text-green-700 bg-green-50 px-4 py-1.5 rounded-full border border-green-200 shadow-sm">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+            </span>
             System Operational
           </div>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat) => (
-            <Card key={stat.title} className="border-l-4 border-l-transparent hover:border-l-brand-lime transition-all">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
+            <Card key={stat.title} className="group hover:shadow-lg transition-all duration-300 border-l-4 border-l-transparent hover:border-l-primary overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <stat.icon className={`h-16 w-16 ${stat.color}`} />
+              </div>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
                   {stat.title}
                 </CardTitle>
-                <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                <stat.icon className={`h-5 w-5 ${stat.color}`} />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold font-mono">{stat.value}</div>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  <span className={stat.trend === "up" ? "text-green-600" : "text-red-600"}>
+              <CardContent className="relative z-10">
+                <div className="text-3xl font-bold font-heading tracking-tight">{stat.value}</div>
+                <p className="text-xs font-medium mt-2 flex items-center gap-1.5">
+                  <span className={`flex items-center px-1.5 py-0.5 rounded ${stat.trend === "up" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                    {stat.trend === "up" ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingUp className="h-3 w-3 mr-1 rotate-180" />}
                     {stat.change}
                   </span>
-                  from last month
+                  <span className="text-muted-foreground">vs last month</span>
                 </p>
               </CardContent>
             </Card>

@@ -20,22 +20,22 @@ import { Input } from "@/components/ui/input";
 
 export default function Settings() {
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">System Settings</h1>
-        <p className="text-muted-foreground mt-1">Manage platform configuration, notifications, and templates.</p>
+    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+      <div className="pb-6 border-b border-border/50">
+        <h1 className="text-3xl font-heading font-bold tracking-tight text-foreground">System Settings</h1>
+        <p className="text-muted-foreground mt-2 text-lg">Manage platform configuration, notifications, and templates.</p>
       </div>
 
       <Tabs defaultValue="notifications" className="w-full">
-        <div className="flex flex-col md:flex-row gap-6">
+        <div className="flex flex-col md:flex-row gap-8">
           {/* Sidebar Navigation for Settings */}
           <aside className="w-full md:w-64 shrink-0">
-            <TabsList className="flex flex-col h-auto w-full bg-transparent p-0 gap-1">
+            <TabsList className="flex flex-col h-auto w-full bg-transparent p-0 gap-1.5">
               <TabsTrigger 
                 value="notifications" 
-                className="w-full justify-start px-4 py-2 data-[state=active]:bg-muted data-[state=active]:text-foreground"
+                className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
               >
-                <Bell className="w-4 h-4 mr-2" />
+                <Bell className="w-4 h-4 mr-3" />
                 Notifications
               </TabsTrigger>
               <TabsTrigger 

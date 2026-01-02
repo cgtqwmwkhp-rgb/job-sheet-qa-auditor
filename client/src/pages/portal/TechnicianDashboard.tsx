@@ -47,68 +47,71 @@ export default function TechnicianDashboard() {
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       {/* Mobile Header */}
-      <header className="bg-white border-b sticky top-0 z-10 px-4 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center">
+      <header className="bg-card border-b sticky top-0 z-10 px-4 py-3 flex items-center justify-between shadow-sm backdrop-blur-sm bg-opacity-95">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 bg-primary rounded-xl flex items-center justify-center shadow-sm">
             <CheckCircle2 className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="font-bold text-sm leading-tight">Technician Portal</h1>
-            <p className="text-[10px] text-muted-foreground">Logged in as Alex M.</p>
+            <h1 className="font-bold text-sm leading-tight text-foreground">Technician Portal</h1>
+            <p className="text-[11px] text-muted-foreground font-medium">Logged in as Alex M.</p>
           </div>
         </div>
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="relative">
+          <Button variant="ghost" size="icon" className="relative hover:bg-muted/50 rounded-full">
             <Bell className="h-5 w-5 text-muted-foreground" />
-            {fcmToken && <span className="absolute top-2 right-2 h-2 w-2 bg-green-500 rounded-full" />}
+            {fcmToken && <span className="absolute top-2.5 right-2.5 h-2 w-2 bg-red-500 rounded-full ring-2 ring-white" />}
           </Button>
-          <Button variant="ghost" size="icon" onClick={handleLogout}>
+          <Button variant="ghost" size="icon" onClick={handleLogout} className="hover:bg-muted/50 rounded-full">
             <LogOut className="h-5 w-5 text-muted-foreground" />
           </Button>
         </div>
       </header>
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-5">
         {/* Scorecard */}
-        <Card className="bg-primary text-primary-foreground border-none shadow-md">
-          <CardContent className="p-5">
-            <div className="flex justify-between items-start mb-4">
+        <Card className="bg-gradient-to-br from-primary to-blue-700 text-primary-foreground border-none shadow-lg relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <TrendingUp className="h-32 w-32 text-white" />
+          </div>
+          <CardContent className="p-6 relative z-10">
+            <div className="flex justify-between items-start mb-6">
               <div>
-                <p className="text-primary-foreground/80 text-sm font-medium">Current Quality Score</p>
-                <h2 className="text-4xl font-bold mt-1">94.2%</h2>
+                <p className="text-blue-100 text-sm font-medium mb-1">Current Quality Score</p>
+                <h2 className="text-5xl font-bold tracking-tight">94.2%</h2>
               </div>
-              <Badge className="bg-white/20 hover:bg-white/30 text-white border-none">
+              <Badge className="bg-white/20 hover:bg-white/30 text-white border-none backdrop-blur-sm px-3 py-1">
                 Top 10%
               </Badge>
             </div>
             <div className="space-y-2">
-              <div className="flex justify-between text-xs opacity-90">
+              <div className="flex justify-between text-xs font-medium text-blue-100">
                 <span>Monthly Target: 95%</span>
-                <span>-0.8%</span>
+                <span className="text-white">-0.8%</span>
               </div>
-              <Progress value={94.2} className="h-2 bg-black/20 [&>div]:bg-white" />
+              <Progress value={94.2} className="h-2.5 bg-black/20 [&>div]:bg-white" />
             </div>
           </CardContent>
         </Card>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 gap-3">
-          <Card>
+        <div className="grid grid-cols-2 gap-4">
+          <Card className="shadow-sm hover:shadow-md transition-shadow border-l-4 border-l-green-500">
             <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-              <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mb-2">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
+              <div className="h-12 w-12 bg-green-50 rounded-full flex items-center justify-center mb-3">
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
               </div>
-              <span className="text-2xl font-bold">128</span>
-              <span className="text-xs text-muted-foreground">Passed Audits</span>
+              <span className="text-3xl font-bold text-foreground">128</span>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-1">Passed Audits</span>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="shadow-sm hover:shadow-md transition-shadow border-l-4 border-l-amber-500">
             <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-              <div className="h-10 w-10 bg-amber-100 rounded-full flex items-center justify-center mb-2">
-                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <div className="h-12 w-12 bg-amber-50 rounded-full flex items-center justify-center mb-3">
+                <AlertTriangle className="h-6 w-6 text-amber-600" />
               </div>
-              <span className="text-2xl font-bold">7</span>
-              <span className="text-xs text-muted-foreground">Defects Found</span>
+              <span className="text-3xl font-bold text-foreground">7</span>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-1">Defects Found</span>
             </CardContent>
           </Card>
         </div>
