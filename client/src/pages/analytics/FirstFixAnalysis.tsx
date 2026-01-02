@@ -28,6 +28,8 @@ import { Button } from "@/components/ui/button";
 import { CostCalculator } from "@/components/CostCalculator";
 import { CoachingCard } from "@/components/CoachingCard";
 import { DeepNoteAnalysis } from "@/components/DeepNoteAnalysis";
+import { AssetTimeline } from "@/components/AssetTimeline";
+import { PredictiveAlerts } from "@/components/PredictiveAlerts";
 
 // Mock Data
 const trendData = [
@@ -69,14 +71,93 @@ const assetRepeatData = [
   { assetId: "AST-5521", location: "Stark Ind - Workshop", returns15d: 0, returns30d: 1, returns45d: 1, returns60d: 1, status: "Good" },
 ];
 
+// Mock Timeline Data
+const mockTimelineEvents = [
+  { id: "1", date: "Today, 09:30 AM", type: "visit" as const, title: "Emergency Call-out", description: "Boiler lockout code F22. System pressure low.", engineer: "John Rambo", status: "failed" as const },
+  { id: "2", date: "Yesterday, 02:15 PM", type: "alert" as const, title: "Predictive Failure Alert", description: "Vibration sensor threshold exceeded (Level 2).", status: "pending" as const },
+  { id: "3", date: "Oct 12, 11:00 AM", type: "visit" as const, title: "Scheduled Maintenance", description: "Annual service completed. Flue gas analysis passed.", engineer: "Sarah Connor", status: "completed" as const, parts: ["Filter Kit A", "Ignition Electrode"] },
+  { id: "4", date: "Sep 28, 04:45 PM", type: "part" as const, title: "Part Replacement", description: "Expansion vessel replaced due to pressure loss.", engineer: "Alex Murphy", status: "completed" as const, parts: ["12L Expansion Vessel"] },
+];
+
+// Mock Predictions
+const mockPredictions = [
+  { assetId: "AST-8821", riskScore: 92, predictedFailureDate: "Oct 24", reason: "3 returns in 15 days + Pressure sensor variance.", confidence: 88 },
+  { assetId: "AST-1123", riskScore: 78, predictedFailureDate: "Nov 02", reason: "Intermittent ignition faults reported.", confidence: 75 },
+];
+
 export default function FirstFixAnalysis() {
-  const [selectedEntity, setSelectedEntity] = useState<{ type: 'engineer' | 'customer', name: string } | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<{ type: 'engineer' | 'customer' | 'asset', name: string } | null>(null);
 
   const totalJobs = engineerData.reduce((acc, curr) => acc + curr.firstFix + curr.returnVisits, 0);
   const totalReturns = engineerData.reduce((acc, curr) => acc + curr.returnVisits, 0);
   const globalRate = Math.round(((totalJobs - totalReturns) / totalJobs) * 100);
 
   if (selectedEntity) {
+    // Asset Timeline View
+    if (selectedEntity.type === 'asset') {
+      return (
+        <AnalyticsLayout 
+          title={`${selectedEntity.name} - Asset Lifecycle`}
+          description="Complete history of visits, alerts, and part replacements."
+        >
+          <Button variant="ghost" onClick={() => setSelectedEntity(null)} className="mb-4 pl-0 hover:pl-2 transition-all">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Overview
+          </Button>
+
+          <div className="grid gap-6 md:grid-cols-3 h-[600px]">
+            <div className="md:col-span-2 h-full">
+              <AssetTimeline 
+                assetId={selectedEntity.name} 
+                assetName="Acme Corp - Plant Room B" 
+                events={mockTimelineEvents} 
+              />
+            </div>
+            <div className="md:col-span-1 space-y-6">
+              <PredictiveAlerts predictions={mockPredictions.filter(p => p.assetId === selectedEntity.name)} />
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Return Reason Analysis</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Intermittent Fault</span>
+                        <span className="font-medium">45%</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-amber-500 w-[45%]" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Wrong Part</span>
+                        <span className="font-medium">30%</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-500 w-[30%]" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Access Issue</span>
+                        <span className="font-medium">25%</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-slate-400 w-[25%]" />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </AnalyticsLayout>
+      );
+    }
+
     return (
       <AnalyticsLayout 
         title={`${selectedEntity.name} - Performance Detail`}
@@ -414,64 +495,80 @@ export default function FirstFixAnalysis() {
         </TabsContent>
 
         <TabsContent value="assets" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Asset Repeat Visits</CardTitle>
-              <CardDescription>Identify assets with frequent return visits within specific time windows.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Asset ID</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead className="text-center">15 Days</TableHead>
-                    <TableHead className="text-center">30 Days</TableHead>
-                    <TableHead className="text-center">45 Days</TableHead>
-                    <TableHead className="text-center">60 Days</TableHead>
-                    <TableHead className="text-right">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {assetRepeatData.map((asset) => (
-                    <TableRow key={asset.assetId}>
-                      <TableCell className="font-mono font-medium">{asset.assetId}</TableCell>
-                      <TableCell>{asset.location}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={asset.returns15d > 0 ? "destructive" : "outline"} className={asset.returns15d === 0 ? "text-muted-foreground" : ""}>
-                          {asset.returns15d}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={asset.returns30d > 1 ? "destructive" : "outline"} className={asset.returns30d === 0 ? "text-muted-foreground" : ""}>
-                          {asset.returns30d}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center text-muted-foreground">{asset.returns45d}</TableCell>
-                      <TableCell className="text-center text-muted-foreground">{asset.returns60d}</TableCell>
-                      <TableCell className="text-right">
-                        {asset.status === "Critical" && (
-                          <Badge variant="destructive" className="gap-1">
-                            <AlertTriangle className="h-3 w-3" /> Critical
-                          </Badge>
-                        )}
-                        {asset.status === "Warning" && (
-                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
-                            Warning
-                          </Badge>
-                        )}
-                        {asset.status === "Good" && (
-                          <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
-                            Good
-                          </Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="md:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Asset Repeat Visits</CardTitle>
+                  <CardDescription>Identify assets with frequent return visits within specific time windows.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Asset ID</TableHead>
+                        <TableHead>Location</TableHead>
+                        <TableHead className="text-center">15 Days</TableHead>
+                        <TableHead className="text-center">30 Days</TableHead>
+                        <TableHead className="text-center">45 Days</TableHead>
+                        <TableHead className="text-center">60 Days</TableHead>
+                        <TableHead className="text-right">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {assetRepeatData.map((asset) => (
+                        <TableRow 
+                          key={asset.assetId}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => setSelectedEntity({ type: 'asset', name: asset.assetId })}
+                        >
+                          <TableCell className="font-mono font-medium flex items-center gap-2">
+                            {asset.assetId}
+                            <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
+                          </TableCell>
+                          <TableCell>{asset.location}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={asset.returns15d > 0 ? "destructive" : "outline"} className={asset.returns15d === 0 ? "text-muted-foreground" : ""}>
+                              {asset.returns15d}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={asset.returns30d > 1 ? "destructive" : "outline"} className={asset.returns30d === 0 ? "text-muted-foreground" : ""}>
+                              {asset.returns30d}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center text-muted-foreground">{asset.returns45d}</TableCell>
+                          <TableCell className="text-center text-muted-foreground">{asset.returns60d}</TableCell>
+                          <TableCell className="text-right">
+                            {asset.status === "Critical" && (
+                              <Badge variant="destructive" className="gap-1">
+                                <AlertTriangle className="h-3 w-3" /> Critical
+                              </Badge>
+                            )}
+                            {asset.status === "Warning" && (
+                              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
+                                Warning
+                              </Badge>
+                            )}
+                            {asset.status === "Good" && (
+                              <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                                Good
+                              </Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Predictive Alerts Sidebar */}
+            <div className="space-y-4">
+              <PredictiveAlerts predictions={mockPredictions} />
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </AnalyticsLayout>
