@@ -20,7 +20,10 @@
     "test:load:stress": "k6 run --env BASE_URL=http://localhost:3000 --env SCENARIO=stress load-tests/api-stress.js",
     "test:all": "pnpm test && pnpm test:e2e && pnpm test:visual",
     "test:parity:subset": "npx tsx parity/runner/cli.ts --mode subset",
-    "test:parity:full": "npx tsx parity/runner/cli.ts --mode full"
+    "test:parity:full": "npx tsx parity/runner/cli.ts --mode full",
+    "validate:dataset": "npx tsx scripts/validate-golden-dataset.ts",
+    "validate:pii": "npx tsx scripts/pii-safety-check.ts",
+    "validate:all": "pnpm validate:dataset && pnpm validate:pii"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
@@ -114,6 +117,8 @@
     "@typescript-eslint/parser": "^8.51.0",
     "@vitejs/plugin-react": "^5.0.4",
     "add": "^2.0.6",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.31.4",
     "esbuild": "^0.25.0",
