@@ -1,5 +1,11 @@
 # Parity and Integrity Alert Rules
 # Vendor-neutral format compatible with Prometheus Alertmanager
+# 
+# CANONICAL SEVERITY LABELS: S0, S1, S2, S3
+# - S0: Critical (must be 100%)
+# - S1: High (must be >= 95%)
+# - S2: Medium (must be >= 90%)
+# - S3: Low (must be >= 80%)
 
 groups:
   - name: parity_alerts
@@ -40,7 +46,7 @@ groups:
           description: "Current pass rate: {{ $value }}%. This is below the acceptable threshold."
           runbook_url: "https://docs.example.com/runbooks/pass-rate-drop"
 
-      # Alert on critical severity failures
+      # Alert on S0 (critical) severity failures - MUST be 100%
       - alert: CriticalSeverityFailures
         expr: parity_pass_rate_by_severity{severity="S0"} < 100
         for: 0m
@@ -49,8 +55,44 @@ groups:
           team: qa
         annotations:
           summary: "Critical (S0) severity fields failing"
-          description: "S0 severity fields are not at 100% pass rate. Immediate attention required."
+          description: "S0 severity fields are not at 100% pass rate (current: {{ $value }}%). Immediate attention required."
           runbook_url: "https://docs.example.com/runbooks/critical-failures"
+
+      # Alert on S1 (high) severity failures - MUST be >= 95%
+      - alert: HighSeverityFailures
+        expr: parity_pass_rate_by_severity{severity="S1"} < 95
+        for: 0m
+        labels:
+          severity: critical
+          team: qa
+        annotations:
+          summary: "High (S1) severity fields below threshold"
+          description: "S1 severity fields are below 95% pass rate (current: {{ $value }}%). Review required."
+          runbook_url: "https://docs.example.com/runbooks/high-severity-failures"
+
+      # Alert on S2 (medium) severity failures - MUST be >= 90%
+      - alert: MediumSeverityFailures
+        expr: parity_pass_rate_by_severity{severity="S2"} < 90
+        for: 5m
+        labels:
+          severity: warning
+          team: qa
+        annotations:
+          summary: "Medium (S2) severity fields below threshold"
+          description: "S2 severity fields are below 90% pass rate (current: {{ $value }}%)."
+          runbook_url: "https://docs.example.com/runbooks/medium-severity-failures"
+
+      # Alert on S3 (low) severity failures - MUST be >= 80%
+      - alert: LowSeverityFailures
+        expr: parity_pass_rate_by_severity{severity="S3"} < 80
+        for: 10m
+        labels:
+          severity: warning
+          team: qa
+        annotations:
+          summary: "Low (S3) severity fields below threshold"
+          description: "S3 severity fields are below 80% pass rate (current: {{ $value }}%)."
+          runbook_url: "https://docs.example.com/runbooks/low-severity-failures"
 
   - name: integrity_alerts
     rules:
@@ -78,6 +120,18 @@ groups:
           description: "The golden dataset hash has changed. Verify this was intentional."
           runbook_url: "https://docs.example.com/runbooks/dataset-change"
 
+      # Alert when integrity check is stale (no check in 24h)
+      - alert: IntegrityCheckStale
+        expr: (time() - integrity_last_check_epoch_seconds) > 86400
+        for: 1h
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "Integrity check is stale"
+          description: "No integrity check has run in the last 24 hours. Check CI/CD pipeline."
+          runbook_url: "https://docs.example.com/runbooks/integrity-stale"
+
   - name: operational_alerts
     rules:
       # Alert when no parity runs for extended period
@@ -91,3 +145,15 @@ groups:
           summary: "No parity runs in 24 hours"
           description: "Parity checks have not run in the last 24 hours. Check CI/CD pipeline."
           runbook_url: "https://docs.example.com/runbooks/parity-stalled"
+
+      # Alert when metrics endpoint is unavailable
+      - alert: MetricsEndpointDown
+        expr: up{job="parity-metrics"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "Parity metrics endpoint is down"
+          description: "The parity metrics endpoint has been unavailable for 5 minutes."
+          runbook_url: "https://docs.example.com/runbooks/metrics-down"
