@@ -134,7 +134,7 @@ export const JOB_SHEET_FIELDS: FieldDefinition[] = [
     required: true,
     severity: 'S1',
     patterns: [
-      /Make\s*[\/&]\s*Model[:\s]*([^\n]+)/i,
+      /Make\s*[/&]\s*Model[:\s]*([^\n]+)/i,
       /(?:Make|Manufacturer)[:\s]*([^\n]+)/i,
     ],
     labelPatterns: ['Make/Model', 'Make & Model', 'Make', 'Model', 'Equipment Type'],
@@ -160,7 +160,7 @@ export const JOB_SHEET_FIELDS: FieldDefinition[] = [
     required: false,
     severity: 'S3',
     patterns: [
-      /(?:Asset\s*)?(?:Mileage|Hours)[\/\s]*(?:Hours)?[:\s]*(\d+(?:\.\d+)?)/i,
+      /(?:Asset\s*)?(?:Mileage|Hours)[/\s]*(?:Hours)?[:\s]*(\d+(?:\.\d+)?)/i,
       /(?:Odometer|Hour\s*Meter)[:\s]*(\d+(?:\.\d+)?)/i,
     ],
     labelPatterns: ['Mileage/Hours', 'Asset Mileage/Hours', 'Hours', 'Mileage'],
@@ -230,8 +230,8 @@ export const JOB_SHEET_FIELDS: FieldDefinition[] = [
     required: true,
     severity: 'S0',
     patterns: [
-      /Date[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
-      /(?:Job|Work)\s*Date[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+      /Date[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
+      /(?:Job|Work)\s*Date[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
     ],
     labelPatterns: ['Date', 'Job Date', 'Work Date', 'Service Date'],
     normalizer: normalizeDate,
@@ -315,8 +315,8 @@ export const JOB_SHEET_FIELDS: FieldDefinition[] = [
     required: true,
     severity: 'S1',
     patterns: [
-      /(?:Were\s*)?(?:all\s*)?works?\s*(?:fully\s*)?completed[:\?]?\s*(Yes|No|Y|N|True|False)/i,
-      /Job\s*Completed[:\?]?\s*(Yes|No|Y|N|True|False)/i,
+      /(?:Were\s*)?(?:all\s*)?works?\s*(?:fully\s*)?completed[:?]?\s*(Yes|No|Y|N|True|False)/i,
+      /Job\s*Completed[:?]?\s*(Yes|No|Y|N|True|False)/i,
     ],
     labelPatterns: ['Were all works fully completed', 'Works Completed', 'Job Completed'],
     normalizer: normalizeBoolean,
@@ -329,8 +329,8 @@ export const JOB_SHEET_FIELDS: FieldDefinition[] = [
     required: true,
     severity: 'S1',
     patterns: [
-      /(?:Is\s*a\s*)?return\s*visit\s*required[:\?]?\s*(Yes|No|Y|N|True|False)/i,
-      /Follow[\s\-]*up\s*Required[:\?]?\s*(Yes|No|Y|N|True|False)/i,
+      /(?:Is\s*a\s*)?return\s*visit\s*required[:?]?\s*(Yes|No|Y|N|True|False)/i,
+      /Follow[\s-]*up\s*Required[:?]?\s*(Yes|No|Y|N|True|False)/i,
     ],
     labelPatterns: ['Is a return visit required', 'Return Visit Required', 'Follow-up Required'],
     normalizer: normalizeBoolean,
@@ -343,8 +343,8 @@ export const JOB_SHEET_FIELDS: FieldDefinition[] = [
     required: true,
     severity: 'S0',
     patterns: [
-      /(?:Is\s*the\s*)?asset\s*safe\s*to\s*use[:\?]?\s*(Yes|No|Y|N|True|False)/i,
-      /Safe\s*(?:to\s*)?(?:Use|Operate)[:\?]?\s*(Yes|No|Y|N|True|False)/i,
+      /(?:Is\s*the\s*)?asset\s*safe\s*to\s*use[:?]?\s*(Yes|No|Y|N|True|False)/i,
+      /Safe\s*(?:to\s*)?(?:Use|Operate)[:?]?\s*(Yes|No|Y|N|True|False)/i,
     ],
     labelPatterns: ['Is the asset safe to use', 'Safe to Use', 'Safe to Operate'],
     normalizer: normalizeBoolean,
@@ -467,11 +467,11 @@ function normalizeDate(value: string): string | null {
   // Try various date formats
   const patterns = [
     // DD/MM/YYYY or DD-MM-YYYY
-    { regex: /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/, format: 'DMY' },
+    { regex: /(\d{1,2})[/-](\d{1,2})[/-](\d{4})/, format: 'DMY' },
     // DD/MM/YY or DD-MM-YY
-    { regex: /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})/, format: 'DMY-short' },
+    { regex: /(\d{1,2})[/-](\d{1,2})[/-](\d{2})/, format: 'DMY-short' },
     // YYYY-MM-DD (ISO)
-    { regex: /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/, format: 'YMD' },
+    { regex: /(\d{4})[/-](\d{1,2})[/-](\d{1,2})/, format: 'YMD' },
   ];
   
   for (const { regex, format } of patterns) {

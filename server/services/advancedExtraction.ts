@@ -174,8 +174,8 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     required: true,
     severity: 'S0',
     regexPatterns: [
-      /Date[:\s]*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})/i,
-      /Date[:\s]*(\d{4}[/\-\.]\d{1,2}[/\-\.]\d{1,2})/i,
+      /Date[:\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
+      /Date[:\s]*(\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2})/i,
       /(\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})/i,
     ],
     fuzzyLabels: ['Date', 'Job Date', 'Completed Date', 'Service Date'],
@@ -188,10 +188,10 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     required: true,
     severity: 'S0',
     regexPatterns: [
-      /Engineer(?:\s*Name)?[:\s]*([A-Za-z][A-Za-z\s\.]+?)(?=\n|Date|$)/i,
-      /Technician(?:\s*Name)?[:\s]*([A-Za-z][A-Za-z\s\.]+?)(?=\n|$)/i,
-      /Completed\s*By[:\s]*([A-Za-z][A-Za-z\s\.]+?)(?=\n|$)/i,
-      /Print\s*name[:\s]*([A-Za-z][A-Za-z\s\.]+?)(?=\n|$)/i,
+      /Engineer(?:\s*Name)?[:\s]*([A-Za-z][A-Za-z\s.]+?)(?=\n|Date|$)/i,
+      /Technician(?:\s*Name)?[:\s]*([A-Za-z][A-Za-z\s.]+?)(?=\n|$)/i,
+      /Completed\s*By[:\s]*([A-Za-z][A-Za-z\s.]+?)(?=\n|$)/i,
+      /Print\s*name[:\s]*([A-Za-z][A-Za-z\s.]+?)(?=\n|$)/i,
       /Name[:\s]*([a-z]+\.[a-z]+)/i,
     ],
     fuzzyLabels: ['Engineer', 'Engineer Name', 'Technician', 'Completed By', 'Service By'],
@@ -249,14 +249,14 @@ function normalizeDate(value: string): string {
   const trimmed = value.trim();
   
   // Try DD/MM/YYYY format
-  const ddmmyyyy = trimmed.match(/(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{4})/);
+  const ddmmyyyy = trimmed.match(/(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})/);
   if (ddmmyyyy) {
     const [, day, month, year] = ddmmyyyy;
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   }
   
   // Try YYYY-MM-DD format
-  const yyyymmdd = trimmed.match(/(\d{4})[/\-\.](\d{1,2})[/\-\.](\d{1,2})/);
+  const yyyymmdd = trimmed.match(/(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})/);
   if (yyyymmdd) {
     const [, year, month, day] = yyyymmdd;
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
@@ -568,9 +568,9 @@ export async function processDocument(
   const settings = options.settings ?? await getProcessingSettings();
   const useLlm = options.useLlm ?? settings.llmFallbackEnabled;
   const extractionMethod = options.extractionMethod ?? 'EMBEDDED_TEXT';
-  const llmConfidenceThreshold = settings.llmConfidenceThreshold ?? 70;
-  const fuzzyMatchEnabled = settings.fuzzyMatchingEnabled ?? true;
-  const fuzzyMatchThreshold = settings.fuzzyMatchThreshold ?? 80;
+  const _llmConfidenceThreshold = settings.llmConfidenceThreshold ?? 70;
+  const _fuzzyMatchEnabled = settings.fuzzyMatchingEnabled ?? true;
+  const _fuzzyMatchThreshold = settings.fuzzyMatchThreshold ?? 80;
   
   // Apply OCR error correction
   const correctedText = correctOcrErrors(text);

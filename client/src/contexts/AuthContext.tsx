@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 
 export type UserRole = 'admin' | 'qa_lead' | 'technician' | 'viewer';
 
@@ -52,21 +52,25 @@ const MOCK_USERS: Record<UserRole, User> = {
   }
 };
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+/**
+ * Helper to read initial user from localStorage.
+ * Pure function called once during useState initialization.
+ */
+function getInitialUser(): User | null {
+  // Safe to call during initialization - runs once on mount
+  if (typeof window === 'undefined') return null;
+  const storedRole = localStorage.getItem('demo_user_role') as UserRole;
+  if (storedRole && MOCK_USERS[storedRole]) {
+    return MOCK_USERS[storedRole];
+  }
+  return null;
+}
 
-  useEffect(() => {
-    // Simulate checking local storage or session
-    const storedRole = localStorage.getItem('demo_user_role') as UserRole;
-    if (storedRole && MOCK_USERS[storedRole]) {
-      setUser(MOCK_USERS[storedRole]);
-    } else {
-      // Default to null to force login via Demo Gateway
-      setUser(null); 
-    }
-    setIsLoading(false);
-  }, []);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  // Use lazy initializer to avoid useEffect setState pattern
+  const [user, setUser] = useState<User | null>(getInitialUser);
+  // Loading is false immediately since we read synchronously from localStorage
+  const [isLoading] = useState(false);
 
   const login = (role: UserRole) => {
     const newUser = MOCK_USERS[role];

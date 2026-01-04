@@ -2,19 +2,27 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches:
+      - main
+      - develop
+      - "stage-*"
+      - "pr-*"
   pull_request:
-    branches: [main, develop]
+    branches:
+      - main
+      - develop
+      - "stage-*"
+      - "pr-*"
 
 env:
-  NODE_VERSION: '22'
+  NODE_VERSION: "22"
 
 jobs:
-  # Unit and Integration Tests
+  # Unit and Integration Tests (BLOCKING)
   unit-tests:
     name: Unit & Integration Tests
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,9 +55,8 @@ jobs:
 
       - name: Run unit tests
         run: pnpm test
-        env:
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        # Note: Unit tests run without external API secrets by design
+        # Live integration tests are in ci-live-integration.yml
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -58,13 +65,16 @@ jobs:
           name: unit-test-results
           path: coverage/
           retention-days: 30
+          if-no-files-found: ignore
 
-  # E2E Tests
+  # E2E Tests - Functional Only (BLOCKING)
+  # Note: Visual regression tests moved to ci-nightly.yml (quarantined)
+  # See docs/ci/VISUAL_REGRESSION_QUARANTINE.md for details
   e2e-tests:
-    name: E2E Tests
+    name: E2E Tests (Functional)
     runs-on: ubuntu-latest
     needs: unit-tests
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -98,16 +108,19 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Run E2E tests
-        run: pnpm test:e2e --project=chromium
+      - name: Run E2E tests (functional only)
+        run: pnpm test:e2e --project=chromium --ignore-snapshots
         env:
           CI: true
+          # CI defaults for optional env vars (non-blocking warnings suppressed)
           VITE_ANALYTICS_ENDPOINT: ""
           VITE_ANALYTICS_WEBSITE_ID: ""
           VITE_APP_TITLE: "Job Sheet QA Auditor"
           VITE_APP_LOGO: ""
-          VITE_APP_ID: "test"
-          VITE_OAUTH_PORTAL_URL: ""
+          VITE_APP_ID: "ci-test"
+          # OAuth: use test default to suppress warning (no secrets required)
+          VITE_OAUTH_PORTAL_URL: "http://localhost:3000/oauth-disabled"
+          OAUTH_SERVER_URL: "http://localhost:3000/oauth-disabled"
 
       - name: Upload E2E test results
         uses: actions/upload-artifact@v4
@@ -118,74 +131,16 @@ jobs:
             test-results/
             playwright-report/
           retention-days: 30
+          if-no-files-found: ignore
 
-  # Visual Regression Tests
-  visual-regression:
-    name: Visual Regression Tests
-    runs-on: ubuntu-latest
-    needs: unit-tests
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 10
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: Run visual regression tests
-        run: pnpm test:visual --project=desktop-chrome
-        env:
-          CI: true
-          VITE_ANALYTICS_ENDPOINT: ""
-          VITE_ANALYTICS_WEBSITE_ID: ""
-          VITE_APP_TITLE: "Job Sheet QA Auditor"
-          VITE_APP_LOGO: ""
-          VITE_APP_ID: "test"
-          VITE_OAUTH_PORTAL_URL: ""
-
-      - name: Upload visual regression results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: visual-regression-results
-          path: |
-            visual-regression-results/
-            visual-regression-report/
-            e2e/visual-regression/snapshots/
-          retention-days: 30
-
-  # Load Test (Smoke)
+  # Load Test (Smoke) - Non-blocking informational
   load-test-smoke:
     name: Load Test (Smoke)
     runs-on: ubuntu-latest
     needs: unit-tests
-    
+    # Non-blocking: informational only
+    continue-on-error: true
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -230,14 +185,14 @@ jobs:
           sleep 10
         env:
           NODE_ENV: development
+          OAUTH_SERVER_URL: "http://localhost:3000/oauth-disabled"
 
       - name: Run load test (smoke)
         run: |
           mkdir -p load-tests/results
           k6 run --env BASE_URL=http://localhost:3000 --env SCENARIO=smoke \
             --summary-export=load-tests/results/smoke-summary.json \
-            load-tests/concurrent-users.js
-        continue-on-error: true
+            load-tests/concurrent-users.js || true
 
       - name: Upload load test results
         uses: actions/upload-artifact@v4
@@ -246,12 +201,13 @@ jobs:
           name: load-test-results
           path: load-tests/results/
           retention-days: 30
+          if-no-files-found: ignore
 
-  # TypeScript Check
+  # TypeScript Check (BLOCKING)
   type-check:
     name: TypeScript Check
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -285,11 +241,11 @@ jobs:
       - name: Run type check
         run: pnpm check
 
-  # Lint Check
+  # Lint Check (BLOCKING)
   lint:
     name: Lint Check
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -321,9 +277,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run ESLint
-        run: npx eslint . --ext .ts,.tsx --max-warnings 0
-        continue-on-error: true
+        run: npx eslint . --ext .ts,.tsx
+        # Note: Lint is blocking for errors only; warnings are allowed
+        # This catches errors but allows incremental cleanup of warnings
 
       - name: Check formatting
         run: pnpm format --check
-        continue-on-error: true
