@@ -1,0 +1,93 @@
+# Parity and Integrity Alert Rules
+# Vendor-neutral format compatible with Prometheus Alertmanager
+
+groups:
+  - name: parity_alerts
+    rules:
+      # Alert when parity fails on main branch
+      - alert: ParityFailureOnMain
+        expr: parity_failures_total > 0 AND on() (github_branch == "main")
+        for: 0m
+        labels:
+          severity: critical
+          team: qa
+        annotations:
+          summary: "Parity check failed on main branch"
+          description: "Parity validation has failed on the main branch. This may indicate a regression."
+          runbook_url: "https://docs.example.com/runbooks/parity-failure"
+
+      # Alert on repeated threshold violations
+      - alert: RepeatedThresholdViolations
+        expr: increase(parity_threshold_violations_total[1h]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          team: qa
+        annotations:
+          summary: "Multiple parity threshold violations detected"
+          description: "More than 3 threshold violations in the last hour. Review validation rules and thresholds."
+          runbook_url: "https://docs.example.com/runbooks/threshold-violations"
+
+      # Alert when pass rate drops significantly
+      - alert: ParityPassRateDrop
+        expr: parity_pass_rate < 80
+        for: 0m
+        labels:
+          severity: warning
+          team: qa
+        annotations:
+          summary: "Parity pass rate below 80%"
+          description: "Current pass rate: {{ $value }}%. This is below the acceptable threshold."
+          runbook_url: "https://docs.example.com/runbooks/pass-rate-drop"
+
+      # Alert on critical severity failures
+      - alert: CriticalSeverityFailures
+        expr: parity_pass_rate_by_severity{severity="S0"} < 100
+        for: 0m
+        labels:
+          severity: critical
+          team: qa
+        annotations:
+          summary: "Critical (S0) severity fields failing"
+          description: "S0 severity fields are not at 100% pass rate. Immediate attention required."
+          runbook_url: "https://docs.example.com/runbooks/critical-failures"
+
+  - name: integrity_alerts
+    rules:
+      # Alert on integrity mismatches
+      - alert: IntegrityMismatchSpike
+        expr: increase(integrity_mismatch_total[1h]) > 5
+        for: 5m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "Integrity mismatch spike detected"
+          description: "More than 5 integrity mismatches in the last hour. Possible data corruption or tampering."
+          runbook_url: "https://docs.example.com/runbooks/integrity-mismatch"
+
+      # Alert when dataset hash changes unexpectedly
+      - alert: DatasetHashChanged
+        expr: changes(parity_dataset_info[1h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          team: qa
+        annotations:
+          summary: "Dataset hash changed"
+          description: "The golden dataset hash has changed. Verify this was intentional."
+          runbook_url: "https://docs.example.com/runbooks/dataset-change"
+
+  - name: operational_alerts
+    rules:
+      # Alert when no parity runs for extended period
+      - alert: ParityRunsStalled
+        expr: increase(parity_runs_total[24h]) == 0
+        for: 1h
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "No parity runs in 24 hours"
+          description: "Parity checks have not run in the last 24 hours. Check CI/CD pipeline."
+          runbook_url: "https://docs.example.com/runbooks/parity-stalled"
