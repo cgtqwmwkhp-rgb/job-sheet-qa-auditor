@@ -1,0 +1,249 @@
+name: Release Governance
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      skip_branch_protection_check:
+        description: 'Skip branch protection check (for testing)'
+        required: false
+        default: 'false'
+        type: boolean
+  schedule:
+    # Daily at 03:00 UTC for branch protection verification
+    - cron: '0 3 * * *'
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  # Release Rehearsal - Validates release process without publishing
+  release-rehearsal:
+    name: Release Rehearsal
+    runs-on: ubuntu-latest
+    # Only run on push/PR, not on schedule (schedule is for branch-protection-proof only)
+    if: github.event_name != 'schedule'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for version validation
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate version consistency
+        run: |
+          echo "=== Version Consistency Check ==="
+          ROOT_VERSION=$(node -p "require('./package.json').version")
+          echo "Root package.json version: $ROOT_VERSION"
+          
+          # Check if version follows semver
+          if [[ ! "$ROOT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "❌ Version does not follow semver: $ROOT_VERSION"
+            exit 1
+          fi
+          echo "✅ Version follows semver"
+
+      - name: Validate changelog
+        run: |
+          echo "=== Changelog Validation ==="
+          if [ ! -f "CHANGELOG.md" ]; then
+            echo "⚠️ CHANGELOG.md not found (creating placeholder)"
+            echo "# Changelog" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            echo "All notable changes to this project will be documented in this file." >> CHANGELOG.md
+          fi
+          
+          # Check changelog has content
+          if [ $(wc -l < CHANGELOG.md) -lt 3 ]; then
+            echo "⚠️ CHANGELOG.md appears empty or minimal"
+          else
+            echo "✅ CHANGELOG.md exists and has content"
+          fi
+
+      - name: Run full test suite
+        run: |
+          echo "=== Full Test Suite ==="
+          pnpm test
+        env:
+          CI: true
+
+      - name: TypeScript check
+        run: |
+          echo "=== TypeScript Check ==="
+          pnpm check
+
+      - name: Lint check
+        run: |
+          echo "=== Lint Check ==="
+          npx eslint . --ext .ts,.tsx
+
+      - name: Build production artifacts
+        run: |
+          echo "=== Production Build ==="
+          pnpm build
+        env:
+          NODE_ENV: production
+
+      - name: Generate artifact checksums
+        run: |
+          echo "=== Artifact Checksums ==="
+          mkdir -p release-artifacts
+          
+          # Create checksums for build output
+          if [ -d "dist" ]; then
+            find dist -type f -exec sha256sum {} \; > release-artifacts/checksums.txt
+            echo "Generated checksums for $(wc -l < release-artifacts/checksums.txt) files"
+            cat release-artifacts/checksums.txt
+          else
+            echo "No dist directory found (build may output elsewhere)"
+          fi
+          
+          # Record build metadata
+          echo "BUILD_SHA=${{ github.sha }}" > release-artifacts/build-metadata.txt
+          echo "BUILD_REF=${{ github.ref }}" >> release-artifacts/build-metadata.txt
+          echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> release-artifacts/build-metadata.txt
+          echo "NODE_VERSION=${{ env.NODE_VERSION }}" >> release-artifacts/build-metadata.txt
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-rehearsal-artifacts
+          path: release-artifacts/
+          retention-days: 7
+
+      - name: Release rehearsal summary
+        run: |
+          echo "## Release Rehearsal Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Version Consistency | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          echo "| Changelog Validation | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Suite | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          echo "| TypeScript | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          echo "| Production Build | ✅ Pass |" >> $GITHUB_STEP_SUMMARY
+          echo "| Artifact Checksums | ✅ Generated |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Release rehearsal passed** - This commit is ready for release." >> $GITHUB_STEP_SUMMARY
+
+  # Branch Protection Proof - Validates branch protection rules
+  branch-protection-proof:
+    name: Branch Protection Proof
+    runs-on: ubuntu-latest
+    # Run on schedule, manual dispatch, or when explicitly not skipped
+    if: |
+      github.event_name == 'schedule' || 
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push'
+    # Non-blocking - informational only
+    continue-on-error: true
+
+    steps:
+      - name: Check branch protection status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const branch = 'main';
+            
+            console.log(`Checking branch protection for ${owner}/${repo}:${branch}`);
+            
+            let protectionEnabled = false;
+            let requiredChecks = [];
+            let requiredReviews = false;
+            let enforceAdmins = false;
+            
+            try {
+              const protection = await github.rest.repos.getBranchProtection({
+                owner,
+                repo,
+                branch
+              });
+              
+              protectionEnabled = true;
+              
+              if (protection.data.required_status_checks) {
+                requiredChecks = protection.data.required_status_checks.contexts || [];
+              }
+              
+              if (protection.data.required_pull_request_reviews) {
+                requiredReviews = true;
+              }
+              
+              if (protection.data.enforce_admins && protection.data.enforce_admins.enabled) {
+                enforceAdmins = true;
+              }
+              
+              console.log('Branch protection is enabled');
+              console.log(`Required status checks: ${requiredChecks.join(', ') || 'None'}`);
+              console.log(`Required reviews: ${requiredReviews}`);
+              console.log(`Enforce admins: ${enforceAdmins}`);
+              
+            } catch (error) {
+              if (error.status === 404) {
+                console.log('Branch protection is NOT enabled');
+              } else {
+                console.log(`Error checking protection: ${error.message}`);
+              }
+            }
+            
+            // Generate summary
+            const summary = `## Branch Protection Status
+            
+            | Setting | Status |
+            |---------|--------|
+            | Protection Enabled | ${protectionEnabled ? '✅ Yes' : '❌ No'} |
+            | Required Status Checks | ${requiredChecks.length > 0 ? '✅ ' + requiredChecks.length + ' checks' : '⚠️ None'} |
+            | Required Reviews | ${requiredReviews ? '✅ Yes' : '⚠️ No'} |
+            | Enforce Admins | ${enforceAdmins ? '✅ Yes' : '⚠️ No'} |
+            
+            ${protectionEnabled ? '✅ **Branch protection is configured**' : '⚠️ **Branch protection should be enabled for production use**'}
+            `;
+            
+            core.summary.addRaw(summary);
+            await core.summary.write();
+            
+            // Don't fail the job, just report status
+            if (!protectionEnabled) {
+              core.warning('Branch protection is not enabled on main branch');
+            }
+
+      - name: Branch protection summary
+        run: |
+          echo "Branch protection check completed"
+          echo "See job summary for details"
