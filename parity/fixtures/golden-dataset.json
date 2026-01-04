@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "description": "Golden dataset for parity testing - Stage 8",
+  "createdAt": "2025-01-04T00:00:00.000Z",
+  "documents": [
+    {
+      "id": "doc-001",
+      "name": "Standard Job Sheet - Complete",
+      "description": "Fully compliant job sheet with all required fields",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2025-001",
+        "customerName": "Acme Corporation",
+        "serviceDate": "2025-01-15",
+        "technicianId": "TECH-042",
+        "workDescription": "Quarterly maintenance inspection",
+        "partsUsed": ["Filter-A100", "Oil-5W30"],
+        "laborHours": 2.5,
+        "totalCost": 450.00,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "RULE-001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2025-001",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "critical"
+        },
+        {
+          "ruleId": "RULE-002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "Acme Corporation",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "critical"
+        },
+        {
+          "ruleId": "RULE-003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2025-01-15",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "major"
+        },
+        {
+          "ruleId": "RULE-004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-042",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "major"
+        },
+        {
+          "ruleId": "RULE-005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Quarterly maintenance inspection",
+          "confidence": 0.92,
+          "pageNumber": 1,
+          "severity": "minor"
+        },
+        {
+          "ruleId": "RULE-006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "critical"
+        },
+        {
+          "ruleId": "RULE-007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "critical"
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-002",
+      "name": "Job Sheet - Missing Signature",
+      "description": "Job sheet with missing customer signature",
+      "expectedResult": "fail",
+      "extractedFields": {
+        "jobNumber": "JS-2025-002",
+        "customerName": "Beta Industries",
+        "serviceDate": "2025-01-16",
+        "technicianId": "TECH-015",
+        "workDescription": "Emergency repair",
+        "partsUsed": ["Pump-B200"],
+        "laborHours": 4.0,
+        "totalCost": 750.00,
+        "customerSignature": false,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "RULE-001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2025-002",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "critical"
+        },
+        {
+          "ruleId": "RULE-002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "Beta Industries",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "critical"
+        },
+        {
+          "ruleId": "RULE-003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2025-01-16",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "major"
+        },
+        {
+          "ruleId": "RULE-004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-015",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "major"
+        },
+        {
+          "ruleId": "RULE-005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Emergency repair",
+          "confidence": 0.94,
+          "pageNumber": 1,
+          "severity": "minor"
+        },
+        {
+          "ruleId": "RULE-006",
+          "field": "customerSignature",
+          "status": "failed",
+          "value": false,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "critical",
+          "message": "Customer signature is required"
+        },
+        {
+          "ruleId": "RULE-007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "critical"
+        }
+      ],
+      "findings": [
+        {
+          "id": 1,
+          "ruleId": "RULE-006",
+          "field": "customerSignature",
+          "severity": "critical",
+          "message": "Customer signature is required but was not found",
+          "extractedValue": "false",
+          "expectedPattern": "true",
+          "pageNumber": 2
+        }
+      ]
+    },
+    {
+      "id": "doc-003",
+      "name": "Job Sheet - Low Confidence OCR",
+      "description": "Job sheet with low confidence extraction requiring review",
+      "expectedResult": "pass",
+      "reviewQueueReasons": ["LOW_CONFIDENCE"],
+      "extractedFields": {
+        "jobNumber": "JS-2025-003",
+        "customerName": "Gamma LLC",
+        "serviceDate": "2025-01-17",
+        "technicianId": "TECH-008",
+        "workDescription": "Installation",
+        "partsUsed": [],
+        "laborHours": 6.0,
+        "totalCost": 900.00,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "RULE-001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2025-003",
+          "confidence": 0.65,
+          "pageNumber": 1,
+          "severity": "critical",
+          "message": "Low confidence extraction - requires review"
+        },
+        {
+          "ruleId": "RULE-002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "Gamma LLC",
+          "confidence": 0.70,
+          "pageNumber": 1,
+          "severity": "critical"
+        },
+        {
+          "ruleId": "RULE-003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2025-01-17",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "major"
+        },
+        {
+          "ruleId": "RULE-004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-008",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "major"
+        },
+        {
+          "ruleId": "RULE-005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Installation",
+          "confidence": 0.60,
+          "pageNumber": 1,
+          "severity": "minor",
+          "message": "Low confidence extraction - requires review"
+        },
+        {
+          "ruleId": "RULE-006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "critical"
+        },
+        {
+          "ruleId": "RULE-007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "critical"
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "rules": [
+    {
+      "ruleId": "RULE-001",
+      "field": "jobNumber",
+      "description": "Job number must be present and match format JS-YYYY-NNN",
+      "severity": "critical",
+      "pattern": "^JS-\\d{4}-\\d{3}$"
+    },
+    {
+      "ruleId": "RULE-002",
+      "field": "customerName",
+      "description": "Customer name must be present",
+      "severity": "critical"
+    },
+    {
+      "ruleId": "RULE-003",
+      "field": "serviceDate",
+      "description": "Service date must be present and valid",
+      "severity": "major",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    {
+      "ruleId": "RULE-004",
+      "field": "technicianId",
+      "description": "Technician ID must be present and match format TECH-NNN",
+      "severity": "major",
+      "pattern": "^TECH-\\d{3}$"
+    },
+    {
+      "ruleId": "RULE-005",
+      "field": "workDescription",
+      "description": "Work description must be present",
+      "severity": "minor"
+    },
+    {
+      "ruleId": "RULE-006",
+      "field": "customerSignature",
+      "description": "Customer signature must be present",
+      "severity": "critical"
+    },
+    {
+      "ruleId": "RULE-007",
+      "field": "technicianSignature",
+      "description": "Technician signature must be present",
+      "severity": "critical"
+    }
+  ]
+}
