@@ -1,0 +1,260 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://job-sheet-qa-auditor/parity/golden-dataset.schema.json",
+  "title": "Golden Dataset Schema",
+  "description": "Schema for parity testing golden dataset with canonical contracts",
+  "type": "object",
+  "required": ["version", "schemaVersion", "documents", "rules", "reasonCodes", "severityLevels"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Dataset version (semver)"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Schema version for compatibility"
+    },
+    "description": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]+$|^sha256:placeholder$"
+    },
+    "documents": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/document"
+      },
+      "minItems": 1
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/rule"
+      },
+      "minItems": 1
+    },
+    "reasonCodes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "required": ["VALID", "MISSING_FIELD", "INVALID_FORMAT", "OUT_OF_RANGE", "OUT_OF_POLICY", "CONFLICT", "LOW_CONFIDENCE"]
+    },
+    "severityLevels": {
+      "type": "object",
+      "required": ["S0", "S1", "S2", "S3"],
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "severity": {
+      "type": "string",
+      "enum": ["S0", "S1", "S2", "S3"],
+      "description": "Canonical severity levels: S0=Critical, S1=Major, S2=Minor, S3=Info"
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": ["VALID", "MISSING_FIELD", "INVALID_FORMAT", "OUT_OF_RANGE", "OUT_OF_POLICY", "CONFLICT", "LOW_CONFIDENCE"],
+      "description": "Canonical reason codes"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed", "skipped", "error"],
+      "description": "Validation status"
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["snippet", "boundingBox"],
+      "properties": {
+        "snippet": {
+          "type": "string",
+          "description": "Text snippet from document (may be empty string)"
+        },
+        "boundingBox": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["x", "y", "width", "height"],
+              "properties": {
+                "x": { "type": "number" },
+                "y": { "type": "number" },
+                "width": { "type": "number" },
+                "height": { "type": "number" }
+              }
+            }
+          ],
+          "description": "Bounding box coordinates (nullable)"
+        }
+      }
+    },
+    "validatedField": {
+      "type": "object",
+      "required": ["ruleId", "field", "status", "severity", "reasonCode", "evidence"],
+      "properties": {
+        "ruleId": {
+          "type": "string",
+          "pattern": "^R\\d{3}$"
+        },
+        "field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "value": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "boolean" },
+            { "type": "null" }
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "pageNumber": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "reasonCode": {
+          "$ref": "#/$defs/reasonCode"
+        },
+        "message": {
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": ["id", "ruleId", "field", "severity", "reasonCode", "message", "evidence"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^F\\d{3}$"
+        },
+        "ruleId": {
+          "type": "string",
+          "pattern": "^R\\d{3}$"
+        },
+        "field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "reasonCode": {
+          "$ref": "#/$defs/reasonCode"
+        },
+        "message": {
+          "type": "string"
+        },
+        "extractedValue": {
+          "type": "string"
+        },
+        "expectedPattern": {
+          "type": "string"
+        },
+        "pageNumber": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        }
+      }
+    },
+    "document": {
+      "type": "object",
+      "required": ["id", "name", "description", "expectedResult", "extractedFields", "validatedFields", "findings"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^doc-\\d{3}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "expectedResult": {
+          "type": "string",
+          "enum": ["pass", "fail"]
+        },
+        "reviewQueueReasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/reasonCode"
+          }
+        },
+        "extractedFields": {
+          "type": "object"
+        },
+        "validatedFields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/validatedField"
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/finding"
+          }
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "required": ["ruleId", "field", "description", "severity", "type", "enabled"],
+      "properties": {
+        "ruleId": {
+          "type": "string",
+          "pattern": "^R\\d{3}$"
+        },
+        "field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["required", "format", "range", "pattern", "custom"]
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
