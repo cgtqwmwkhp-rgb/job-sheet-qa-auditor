@@ -1,4 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,7 +38,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Loader2, MoreHorizontal, Search, Shield, User, UserPlus } from "lucide-react";
-import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -69,14 +69,17 @@ export default function UserManagement() {
     user.email?.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
-  // Calculate stats
+  // Calculate stats. Store timestamp in state (initialized once on mount).
+  const [mountTime] = useState(() => Date.now());
   const totalUsers = users?.length || 0;
-  const activeUsers = users?.filter(u => {
-    if (!u.lastSignedIn) return false;
-    const lastActive = new Date(u.lastSignedIn);
-    const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    return lastActive > hourAgo;
-  }).length || 0;
+  const activeUsers = useMemo(() => {
+    return users?.filter(u => {
+      if (!u.lastSignedIn) return false;
+      const lastActive = new Date(u.lastSignedIn);
+      const hourAgo = new Date(mountTime - 60 * 60 * 1000);
+      return lastActive > hourAgo;
+    }).length || 0;
+  }, [users, mountTime]);
   const adminCount = users?.filter(u => u.role === 'admin').length || 0;
 
   return (
