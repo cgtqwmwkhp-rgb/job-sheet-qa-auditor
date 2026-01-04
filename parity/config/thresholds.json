@@ -1,0 +1,62 @@
+{
+  "$schema": "./thresholds.schema.json",
+  "version": "1.0.0",
+  "description": "Parity threshold governance configuration",
+  "thresholds": {
+    "overall": {
+      "minPassRate": 0.95,
+      "maxWorseCount": 0,
+      "maxNewFailures": 0,
+      "description": "Overall parity must maintain 95% pass rate with no regressions"
+    },
+    "bySeverity": {
+      "S0": {
+        "minPassRate": 1.0,
+        "maxWorseCount": 0,
+        "description": "Critical fields must have 100% pass rate"
+      },
+      "S1": {
+        "minPassRate": 0.95,
+        "maxWorseCount": 1,
+        "description": "Major fields must have 95% pass rate, max 1 regression"
+      },
+      "S2": {
+        "minPassRate": 0.90,
+        "maxWorseCount": 2,
+        "description": "Minor fields must have 90% pass rate, max 2 regressions"
+      },
+      "S3": {
+        "minPassRate": 0.80,
+        "maxWorseCount": 5,
+        "description": "Info fields must have 80% pass rate, max 5 regressions"
+      }
+    },
+    "byDocumentType": {
+      "standard": {
+        "minPassRate": 0.98,
+        "description": "Standard documents must have 98% pass rate"
+      },
+      "edge-case": {
+        "minPassRate": 0.90,
+        "description": "Edge case documents must have 90% pass rate"
+      }
+    }
+  },
+  "alerts": {
+    "warnOnImprovement": true,
+    "warnOnNewFields": true,
+    "failOnRegression": true,
+    "failOnMissingBaseline": false
+  },
+  "ci": {
+    "prSubsetDocIds": ["doc-001", "doc-002", "doc-004"],
+    "nightlyFullSuite": true,
+    "artifactRetentionDays": 30,
+    "summaryFormat": "markdown"
+  },
+  "governance": {
+    "requireApprovalForThresholdChange": true,
+    "approvers": ["@qa-team", "@tech-lead"],
+    "changeLogRequired": true
+  }
+}

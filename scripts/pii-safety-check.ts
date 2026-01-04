@@ -41,7 +41,7 @@ const PII_PATTERNS = {
   
   // Common first + last name patterns (but allow synthetic like TECH-XXX, CUSTOMER_X)
   // Also allow document naming patterns like "Job Sheet", "Standard Job", etc.
-  realName: /\b(?!TECH-|CUSTOMER_|VENDOR_|PART-|JS-|Standard|Job|Sheet|Missing|Signature|Low|Confidence|OCR|Table|Heavy|Conflicting|Invalid|Format|Out|Policy)(?:[A-Z][a-z]{2,})\s+(?:[A-Z][a-z]{2,})\b/g,
+  realName: /\b(?!TECH-|CUSTOMER_|VENDOR_|PART-|JS-|Standard|Job|Sheet|Missing|Signature|Low|Confidence|OCR|Table|Heavy|Conflicting|Invalid|Format|Out|Policy|Multiple|Failures|Full|Major|Complex|Scheduled)(?:[A-Z][a-z]{2,})\s+(?:[A-Z][a-z]{2,})\b/g,
 };
 
 // Allowlist for known safe patterns
@@ -54,6 +54,12 @@ const ALLOWLIST = [
   'Quarterly maintenance inspection',
   'Installation',
   'Preventive maintenance',
+  'Multiple Failures',
+  'Full system replacement',
+  'Repair and calibration',
+  'Complex repair',
+  'Scheduled inspection',
+  'Major overhaul',
 ];
 
 interface PIIViolation {

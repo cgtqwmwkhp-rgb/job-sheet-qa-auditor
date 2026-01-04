@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "thresholds.schema.json",
+  "title": "Parity Threshold Configuration",
+  "description": "Schema for parity testing threshold governance configuration",
+  "type": "object",
+  "required": ["version", "thresholds", "alerts", "ci"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Configuration version"
+    },
+    "description": {
+      "type": "string"
+    },
+    "thresholds": {
+      "type": "object",
+      "required": ["overall"],
+      "properties": {
+        "overall": {
+          "$ref": "#/definitions/thresholdConfig"
+        },
+        "bySeverity": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/thresholdConfig"
+          }
+        },
+        "byDocumentType": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/thresholdConfig"
+          }
+        }
+      }
+    },
+    "alerts": {
+      "type": "object",
+      "properties": {
+        "warnOnImprovement": {
+          "type": "boolean",
+          "description": "Warn when parity improves (to track intentional changes)"
+        },
+        "warnOnNewFields": {
+          "type": "boolean",
+          "description": "Warn when new fields are detected"
+        },
+        "failOnRegression": {
+          "type": "boolean",
+          "description": "Fail CI on any regression"
+        },
+        "failOnMissingBaseline": {
+          "type": "boolean",
+          "description": "Fail if baseline document is missing"
+        }
+      }
+    },
+    "ci": {
+      "type": "object",
+      "properties": {
+        "prSubsetDocIds": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Document IDs to run on PR checks (subset)"
+        },
+        "nightlyFullSuite": {
+          "type": "boolean",
+          "description": "Run full suite on nightly"
+        },
+        "artifactRetentionDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 90
+        },
+        "summaryFormat": {
+          "type": "string",
+          "enum": ["markdown", "json", "text"]
+        }
+      }
+    },
+    "governance": {
+      "type": "object",
+      "properties": {
+        "requireApprovalForThresholdChange": {
+          "type": "boolean"
+        },
+        "approvers": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "changeLogRequired": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "thresholdConfig": {
+      "type": "object",
+      "properties": {
+        "minPassRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum pass rate (0-1)"
+        },
+        "maxWorseCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum number of regressions allowed"
+        },
+        "maxNewFailures": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum number of new failures allowed"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
