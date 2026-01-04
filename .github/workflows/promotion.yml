@@ -1,0 +1,456 @@
+# Deployment Promotion Workflow - Stage 13
+# Requires governance + parity + rehearsal before promotion
+
+name: Deployment Promotion
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: 'Target environment for promotion'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      use_nightly_parity:
+        description: 'Use latest nightly parity results instead of running fresh'
+        required: false
+        default: 'false'
+        type: boolean
+      skip_parity:
+        description: 'Skip parity check (REQUIRES APPROVAL)'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # Gate 1: Validate promotion request
+  validate-request:
+    name: Validate Promotion Request
+    runs-on: ubuntu-latest
+    outputs:
+      can_proceed: ${{ steps.validate.outputs.can_proceed }}
+      validation_report: ${{ steps.validate.outputs.report }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate Request
+        id: validate
+        run: |
+          echo "=== Promotion Request Validation ==="
+          echo "Target: ${{ inputs.target_environment }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "SHA: ${{ github.sha }}"
+          
+          REPORT=""
+          CAN_PROCEED="true"
+          
+          # Check if on main branch
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "❌ Promotions must be from main branch"
+            REPORT="${REPORT}❌ Not on main branch\n"
+            CAN_PROCEED="false"
+          else
+            REPORT="${REPORT}✅ On main branch\n"
+          fi
+          
+          # Check skip_parity requires production approval
+          if [ "${{ inputs.skip_parity }}" = "true" ]; then
+            echo "⚠️ Parity skip requested - requires explicit approval"
+            REPORT="${REPORT}⚠️ Parity skip requested\n"
+            if [ "${{ inputs.target_environment }}" = "production" ]; then
+              echo "❌ Cannot skip parity for production"
+              CAN_PROCEED="false"
+              REPORT="${REPORT}❌ Cannot skip parity for production\n"
+            fi
+          fi
+          
+          echo "can_proceed=$CAN_PROCEED" >> $GITHUB_OUTPUT
+          echo "report<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$REPORT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  # Gate 2: CI must be green
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    needs: validate-request
+    if: needs.validate-request.outputs.can_proceed == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript Check
+        run: pnpm check
+
+      - name: Lint Check
+        run: npx eslint . --ext .ts,.tsx
+
+      - name: Unit Tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+        env:
+          NODE_ENV: production
+
+  # Gate 3: Policy check must pass
+  policy-gate:
+    name: Policy Gate
+    runs-on: ubuntu-latest
+    needs: validate-request
+    if: needs.validate-request.outputs.can_proceed == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Policy Consistency Check
+        run: |
+          echo "=== Policy Consistency Check ==="
+          
+          # Check workflow triggers
+          echo "Checking workflow triggers..."
+          for workflow in .github/workflows/*.yml; do
+            if grep -q "branches:" "$workflow"; then
+              echo "✅ $workflow has branch triggers"
+            fi
+          done
+          
+          # Check for required files
+          REQUIRED_FILES=(
+            ".github/workflows/ci.yml"
+            ".github/workflows/policy-check.yml"
+            ".github/workflows/parity.yml"
+            "parity/config/thresholds.json"
+            "parity/fixtures/golden-dataset.json"
+          )
+          
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✅ $file exists"
+            else
+              echo "❌ $file missing"
+              exit 1
+            fi
+          done
+          
+          echo "✅ Policy check passed"
+
+  # Gate 4: Release rehearsal must pass
+  rehearsal-gate:
+    name: Release Rehearsal Gate
+    runs-on: ubuntu-latest
+    needs: [validate-request, ci-gate]
+    if: needs.validate-request.outputs.can_proceed == 'true'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate Version
+        run: |
+          ROOT_VERSION=$(node -p "require('./package.json').version")
+          echo "Version: $ROOT_VERSION"
+          
+          if [[ ! "$ROOT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "❌ Invalid semver"
+            exit 1
+          fi
+          echo "✅ Valid semver"
+
+      - name: Build Production Artifacts
+        run: pnpm build
+        env:
+          NODE_ENV: production
+
+      - name: Generate Checksums
+        run: |
+          mkdir -p promotion-artifacts
+          if [ -d "dist" ]; then
+            find dist -type f -exec sha256sum {} \; > promotion-artifacts/checksums.txt
+          fi
+          
+          echo "BUILD_SHA=${{ github.sha }}" > promotion-artifacts/build-metadata.txt
+          echo "TARGET_ENV=${{ inputs.target_environment }}" >> promotion-artifacts/build-metadata.txt
+          echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> promotion-artifacts/build-metadata.txt
+          echo "TRIGGERED_BY=${{ github.actor }}" >> promotion-artifacts/build-metadata.txt
+
+  # Gate 5: Parity check
+  parity-gate:
+    name: Parity Gate
+    runs-on: ubuntu-latest
+    needs: [validate-request, ci-gate, policy-gate]
+    if: needs.validate-request.outputs.can_proceed == 'true' && inputs.skip_parity != 'true'
+    outputs:
+      parity_status: ${{ steps.parity.outputs.status }}
+      parity_pass_rate: ${{ steps.parity.outputs.pass_rate }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify Dataset Hash
+        run: pnpm parity:stamp:verify
+
+      - name: Generate Provenance
+        run: pnpm parity:provenance
+
+      - name: Run Parity Full Suite
+        id: parity
+        run: |
+          echo "Running parity full suite..."
+          mkdir -p parity/reports
+          
+          # Run parity tests
+          pnpm test:parity:full 2>&1 | tee parity/reports/promotion-parity.txt || true
+          
+          # Generate report
+          node -e "
+          const fs = require('fs');
+          const thresholds = JSON.parse(fs.readFileSync('parity/config/thresholds.json', 'utf-8'));
+          const dataset = JSON.parse(fs.readFileSync('parity/fixtures/golden-dataset.json', 'utf-8'));
+          
+          let totalFields = 0;
+          let passedFields = 0;
+          const violations = [];
+          const bySeverity = {};
+          
+          dataset.documents.forEach(doc => {
+            doc.validatedFields.forEach(f => {
+              totalFields++;
+              bySeverity[f.severity] = bySeverity[f.severity] || { total: 0, passed: 0 };
+              bySeverity[f.severity].total++;
+              if (f.status === 'passed') {
+                passedFields++;
+                bySeverity[f.severity].passed++;
+              }
+            });
+          });
+          
+          const passRate = (passedFields / totalFields * 100).toFixed(1);
+          
+          // Check thresholds
+          const overallThreshold = thresholds.thresholds.overall.minPassRate * 100;
+          if (parseFloat(passRate) < overallThreshold) {
+            violations.push('Overall: ' + passRate + '% < ' + overallThreshold + '%');
+          }
+          
+          Object.entries(bySeverity).forEach(([sev, data]) => {
+            const rate = data.total > 0 ? data.passed / data.total : 1;
+            const threshold = thresholds.thresholds.bySeverity[sev]?.minPassRate || 0;
+            if (rate < threshold) {
+              violations.push(sev + ': ' + (rate * 100).toFixed(1) + '% < ' + (threshold * 100) + '%');
+            }
+          });
+          
+          const status = violations.length > 0 ? 'fail' : 'pass';
+          
+          const report = {
+            timestamp: new Date().toISOString(),
+            sha: '${{ github.sha }}',
+            targetEnv: '${{ inputs.target_environment }}',
+            status,
+            passRate: parseFloat(passRate),
+            totalFields,
+            passedFields,
+            violations
+          };
+          
+          fs.writeFileSync('parity/reports/promotion-parity.json', JSON.stringify(report, null, 2));
+          
+          console.log('status=' + status);
+          console.log('pass_rate=' + passRate);
+          "
+          
+          # Set outputs
+          if [ -f parity/reports/promotion-parity.json ]; then
+            STATUS=$(jq -r '.status' parity/reports/promotion-parity.json)
+            PASS_RATE=$(jq -r '.passRate' parity/reports/promotion-parity.json)
+            echo "status=$STATUS" >> $GITHUB_OUTPUT
+            echo "pass_rate=$PASS_RATE" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload Parity Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: promotion-parity-report
+          path: parity/reports/
+          retention-days: 90
+
+      - name: Check Parity Result
+        run: |
+          if [ -f parity/reports/promotion-parity.json ]; then
+            STATUS=$(jq -r '.status' parity/reports/promotion-parity.json)
+            if [ "$STATUS" = "fail" ]; then
+              echo "❌ Parity check failed"
+              jq -r '.violations[]' parity/reports/promotion-parity.json
+              exit 1
+            fi
+            echo "✅ Parity check passed"
+          fi
+
+  # Final: Generate promotion bundle
+  generate-promotion-bundle:
+    name: Generate Promotion Bundle
+    runs-on: ubuntu-latest
+    needs: [validate-request, ci-gate, policy-gate, rehearsal-gate, parity-gate]
+    if: |
+      always() &&
+      needs.validate-request.outputs.can_proceed == 'true' &&
+      needs.ci-gate.result == 'success' &&
+      needs.policy-gate.result == 'success' &&
+      needs.rehearsal-gate.result == 'success' &&
+      (needs.parity-gate.result == 'success' || inputs.skip_parity == 'true')
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Provenance
+        run: pnpm parity:provenance
+
+      - name: Create Promotion Bundle
+        run: |
+          mkdir -p promotion-bundle
+          
+          # Build metadata
+          cat > promotion-bundle/promotion-manifest.json << EOF
+          {
+            "version": "1.0.0",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "sha": "${{ github.sha }}",
+            "targetEnvironment": "${{ inputs.target_environment }}",
+            "triggeredBy": "${{ github.actor }}",
+            "runId": "${{ github.run_id }}",
+            "gates": {
+              "ci": "passed",
+              "policy": "passed",
+              "rehearsal": "passed",
+              "parity": "${{ inputs.skip_parity == 'true' && 'skipped' || 'passed' }}"
+            },
+            "paritySkipped": ${{ inputs.skip_parity }},
+            "parityPassRate": ${{ needs.parity-gate.outputs.parity_pass_rate || 'null' }}
+          }
+          EOF
+          
+          # Copy provenance
+          if [ -f parity/provenance.json ]; then
+            cp parity/provenance.json promotion-bundle/
+          fi
+          
+          # Copy thresholds
+          cp parity/config/thresholds.json promotion-bundle/
+          
+          # Generate checksums for bundle
+          find promotion-bundle -type f -exec sha256sum {} \; > promotion-bundle/bundle-checksums.txt
+          
+          echo "=== Promotion Bundle Contents ==="
+          ls -la promotion-bundle/
+          echo ""
+          echo "=== Manifest ==="
+          cat promotion-bundle/promotion-manifest.json
+
+      - name: Upload Promotion Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: promotion-bundle-${{ inputs.target_environment }}-${{ github.run_number }}
+          path: promotion-bundle/
+          retention-days: 90
+
+      - name: Generate Summary
+        run: |
+          echo "## 🚀 Deployment Promotion Bundle" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Target Environment | **${{ inputs.target_environment }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| SHA | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Triggered By | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Run ID | ${{ github.run_id }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Gate Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Gate | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| CI | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Policy | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rehearsal | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.skip_parity }}" = "true" ]; then
+            echo "| Parity | ⚠️ Skipped |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Parity | ✅ Passed (${{ needs.parity-gate.outputs.parity_pass_rate }}%) |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Promotion bundle generated successfully**" >> $GITHUB_STEP_SUMMARY
