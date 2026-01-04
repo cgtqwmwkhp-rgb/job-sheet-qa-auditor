@@ -1,0 +1,65 @@
+# =============================================================================
+# CODEOWNERS - Code Ownership and Review Requirements
+# =============================================================================
+# This file defines code ownership for the Job Sheet QA Auditor project.
+# Changes to files matching these patterns require approval from the
+# designated owners before merging.
+#
+# Format: <pattern> <owner1> <owner2> ...
+# Owners can be @username, @org/team-name, or email addresses.
+#
+# For more information:
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Default Owners (fallback for all files)
+# -----------------------------------------------------------------------------
+*                                   @cgtqwmwkhp-rgb
+
+# -----------------------------------------------------------------------------
+# CI/CD and Workflow Configuration (Critical Infrastructure)
+# -----------------------------------------------------------------------------
+# Changes to CI workflows require careful review to maintain stability
+.github/workflows/                  @cgtqwmwkhp-rgb
+.github/CODEOWNERS                  @cgtqwmwkhp-rgb
+
+# -----------------------------------------------------------------------------
+# Server-Side Code (Core Application Logic)
+# -----------------------------------------------------------------------------
+server/                             @cgtqwmwkhp-rgb
+
+# -----------------------------------------------------------------------------
+# Client-Side Code (UI and Frontend)
+# -----------------------------------------------------------------------------
+client/                             @cgtqwmwkhp-rgb
+
+# -----------------------------------------------------------------------------
+# Database Schema and Migrations
+# -----------------------------------------------------------------------------
+drizzle/                            @cgtqwmwkhp-rgb
+
+# -----------------------------------------------------------------------------
+# Evidence and Audit Documentation (Compliance Critical)
+# -----------------------------------------------------------------------------
+# Evidence packs and acceptance documentation require governance review
+docs/evidence/                      @cgtqwmwkhp-rgb
+
+# -----------------------------------------------------------------------------
+# Governance Documentation
+# -----------------------------------------------------------------------------
+docs/governance/                    @cgtqwmwkhp-rgb
+docs/adr/                           @cgtqwmwkhp-rgb
+
+# -----------------------------------------------------------------------------
+# Security-Sensitive Files
+# -----------------------------------------------------------------------------
+SECURITY.md                         @cgtqwmwkhp-rgb
+.env.example                        @cgtqwmwkhp-rgb
+
+# -----------------------------------------------------------------------------
+# Project Configuration
+# -----------------------------------------------------------------------------
+package.json                        @cgtqwmwkhp-rgb
+pnpm-lock.yaml                      @cgtqwmwkhp-rgb
+tsconfig.json                       @cgtqwmwkhp-rgb
