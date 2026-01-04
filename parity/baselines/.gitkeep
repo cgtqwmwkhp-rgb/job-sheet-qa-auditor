@@ -1,0 +1,2 @@
+# Baselines directory
+# Baseline files are created via: npx tsx scripts/parity/create-baseline.ts --version <semver>
