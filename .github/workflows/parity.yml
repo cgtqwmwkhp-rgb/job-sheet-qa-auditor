@@ -44,6 +44,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify Dataset Hash
+        run: pnpm parity:stamp:verify
+
       - name: Run Parity Subset Tests
         id: parity
         run: |
@@ -207,6 +210,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Verify Dataset Hash
+        run: pnpm parity:stamp:verify
+
+      - name: Generate Provenance
+        run: pnpm parity:provenance
 
       - name: Run Full Parity Tests
         id: parity_full
@@ -372,6 +381,7 @@ jobs:
             parity/reports/
             parity/fixtures/golden-dataset.json
             parity/config/thresholds.json
+            parity/provenance.json
           retention-days: 90
 
       - name: Check Parity Thresholds

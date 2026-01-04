@@ -23,7 +23,11 @@
     "test:parity:full": "npx tsx parity/runner/cli.ts --mode full",
     "validate:dataset": "npx tsx scripts/validate-golden-dataset.ts",
     "validate:pii": "npx tsx scripts/pii-safety-check.ts",
-    "validate:all": "pnpm validate:dataset && pnpm validate:pii"
+    "validate:all": "pnpm validate:dataset && pnpm validate:pii",
+    "parity:stamp": "npx tsx scripts/parity/stamp-content-hash.ts",
+    "parity:stamp:verify": "npx tsx scripts/parity/stamp-content-hash.ts --verify",
+    "parity:stamp:update": "npx tsx scripts/parity/stamp-content-hash.ts --update",
+    "parity:provenance": "npx tsx scripts/parity/generate-provenance.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
