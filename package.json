@@ -18,7 +18,9 @@
     "test:load": "./load-tests/run-tests.sh",
     "test:load:smoke": "k6 run --env BASE_URL=http://localhost:3000 --env SCENARIO=smoke load-tests/concurrent-users.js",
     "test:load:stress": "k6 run --env BASE_URL=http://localhost:3000 --env SCENARIO=stress load-tests/api-stress.js",
-    "test:all": "pnpm test && pnpm test:e2e && pnpm test:visual"
+    "test:all": "pnpm test && pnpm test:e2e && pnpm test:visual",
+    "test:parity:subset": "npx tsx parity/runner/cli.ts --mode subset",
+    "test:parity:full": "npx tsx parity/runner/cli.ts --mode full"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
