@@ -2,6 +2,17 @@
 
 This document tracks all parity baselines and their associated changes.
 
+## Severity Tier Reference
+
+The system uses canonical severity tiers:
+
+| Tier | Name | Description | Threshold |
+|------|------|-------------|-----------|
+| S0 | Critical | Must pass 100% - blocking issues | 100% |
+| S1 | Major | Must pass 95% - significant issues | 95% |
+| S2 | Minor | Must pass 90% - moderate issues | 90% |
+| S3 | Info | Must pass 80% - informational | 80% |
+
 ## Baseline History
 
 ### v1.0.0 (Initial Baseline)
@@ -13,10 +24,16 @@ This document tracks all parity baselines and their associated changes.
 - Total Fields: TBD
 - Dataset Version: TBD
 
+**Severity Distribution:**
+- S0 (Critical): TBD
+- S1 (Major): TBD
+- S2 (Minor): TBD
+- S3 (Info): TBD
+
 **Changes:**
 - Initial baseline establishment
 - 9-document golden dataset coverage
-- Full severity tier coverage (critical, high, medium, low)
+- Full severity tier coverage (S0, S1, S2, S3)
 
 ---
 
@@ -46,6 +63,16 @@ Baselines follow semantic versioning:
 ## Threshold Governance
 
 Thresholds are defined in `parity/config/thresholds.json` and enforced during comparison:
-- Overall pass rate minimum
-- Per-severity pass rate minimums
+- Overall pass rate minimum (95%)
+- Per-severity pass rate minimums (S0: 100%, S1: 95%, S2: 90%, S3: 80%)
 - Maximum regression count per PR
+
+## Canonical Severity Codes
+
+All baseline files and reports MUST use canonical severity codes:
+- `S0` (not "critical")
+- `S1` (not "high" or "major")
+- `S2` (not "medium" or "minor")
+- `S3` (not "low" or "info")
+
+Any legacy references to non-canonical severity names should be migrated.

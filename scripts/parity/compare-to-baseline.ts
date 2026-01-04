@@ -6,6 +6,11 @@
  * 
  * Usage:
  *   npx tsx scripts/parity/compare-to-baseline.ts --baseline <version>
+ *   npx tsx scripts/parity/compare-to-baseline.ts --baseline <version> --strict
+ * 
+ * Options:
+ *   --baseline <version>  Required. The baseline version to compare against.
+ *   --strict              Fail on dataset/threshold version mismatch (default: warn)
  * 
  * Example:
  *   npx tsx scripts/parity/compare-to-baseline.ts --baseline 1.0.0
@@ -67,6 +72,11 @@ interface ComparisonResult {
     timestamp: string;
     passRate: number;
   };
+  versionMatch: {
+    datasetMatch: boolean;
+    thresholdMatch: boolean;
+    warnings: string[];
+  };
   delta: {
     passRateChange: number;
     direction: 'improved' | 'same' | 'regressed';
@@ -95,21 +105,43 @@ interface ComparisonResult {
   overallStatus: 'pass' | 'fail';
 }
 
+/**
+ * Canonical severity order for deterministic sorting
+ */
+const CANONICAL_SEVERITY_ORDER = ['S0', 'S1', 'S2', 'S3'];
+
+function sortSeverities(severities: string[]): string[] {
+  return [...severities].sort((a, b) => {
+    const aIndex = CANONICAL_SEVERITY_ORDER.indexOf(a);
+    const bIndex = CANONICAL_SEVERITY_ORDER.indexOf(b);
+    
+    if (aIndex !== -1 && bIndex !== -1) {
+      return aIndex - bIndex;
+    }
+    if (aIndex !== -1) return -1;
+    if (bIndex !== -1) return 1;
+    return a.localeCompare(b);
+  });
+}
+
 function main(): void {
   const args = process.argv.slice(2);
   let baselineVersion: string | undefined;
+  let strictMode = false;
   
   // Parse arguments
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--baseline' && args[i + 1]) {
       baselineVersion = args[i + 1];
       i++;
+    } else if (args[i] === '--strict') {
+      strictMode = true;
     }
   }
   
   if (!baselineVersion) {
     console.error('❌ Error: --baseline is required');
-    console.error('Usage: npx tsx scripts/parity/compare-to-baseline.ts --baseline <version>');
+    console.error('Usage: npx tsx scripts/parity/compare-to-baseline.ts --baseline <version> [--strict]');
     process.exit(1);
   }
   
@@ -136,12 +168,47 @@ function main(): void {
     process.exit(1);
   }
   
+  // STRICT: Thresholds file is REQUIRED - no fallback defaults
+  if (!fs.existsSync(thresholdsPath)) {
+    console.error('❌ Error: Thresholds file not found at', thresholdsPath);
+    console.error('   Thresholds configuration is required for baseline comparison.');
+    console.error('   Create parity/config/thresholds.json with threshold definitions.');
+    process.exit(1);
+  }
+  
   // Read files
   const baseline: Baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf-8'));
   const report: ParityReport = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
-  const thresholds: ThresholdConfig = fs.existsSync(thresholdsPath)
-    ? JSON.parse(fs.readFileSync(thresholdsPath, 'utf-8'))
-    : { version: 'unknown', thresholds: { overall: { minPassRate: 0.85, maxWorseCount: 5 }, bySeverity: {} } };
+  const thresholds: ThresholdConfig = JSON.parse(fs.readFileSync(thresholdsPath, 'utf-8'));
+  
+  // Check version compatibility
+  const versionWarnings: string[] = [];
+  const datasetMatch = baseline.sourceReport.datasetVersion === report.datasetVersion;
+  const thresholdMatch = baseline.sourceReport.thresholdVersion === report.thresholdVersion;
+  
+  if (!datasetMatch) {
+    const msg = `Dataset version mismatch: baseline=${baseline.sourceReport.datasetVersion}, current=${report.datasetVersion}`;
+    versionWarnings.push(msg);
+    if (strictMode) {
+      console.error('❌ Error:', msg);
+      console.error('   Use matching dataset versions or remove --strict flag.');
+      process.exit(1);
+    } else {
+      console.warn('⚠️  Warning:', msg);
+    }
+  }
+  
+  if (!thresholdMatch) {
+    const msg = `Threshold version mismatch: baseline=${baseline.sourceReport.thresholdVersion}, current=${report.thresholdVersion}`;
+    versionWarnings.push(msg);
+    if (strictMode) {
+      console.error('❌ Error:', msg);
+      console.error('   Use matching threshold versions or remove --strict flag.');
+      process.exit(1);
+    } else {
+      console.warn('⚠️  Warning:', msg);
+    }
+  }
   
   // Compare
   const passRateChange = report.passRate - baseline.metrics.passRate;
@@ -149,13 +216,13 @@ function main(): void {
     passRateChange > 0.1 ? 'improved' :
     passRateChange < -0.1 ? 'regressed' : 'same';
   
-  // Compare by severity
-  const severities = new Set([
+  // Compare by severity (deterministic ordering)
+  const severities = sortSeverities(Array.from(new Set([
     ...Object.keys(baseline.metrics.bySeverity),
     ...Object.keys(report.bySeverity)
-  ]);
+  ])));
   
-  const bySeverity = Array.from(severities).sort().map(sev => {
+  const bySeverity = severities.map(sev => {
     const baselineData = baseline.metrics.bySeverity[sev] || { passed: 0, total: 0 };
     const currentData = report.bySeverity[sev] || { passed: 0, total: 0 };
     const baselineRate = baselineData.total > 0 ? baselineData.passed / baselineData.total * 100 : 0;
@@ -171,12 +238,12 @@ function main(): void {
     };
   });
   
-  // Compare documents
+  // Compare documents (deterministic ordering by id)
   const baselineDocs = new Map(baseline.docResults.map(d => [d.id, d]));
   const currentDocs = new Map(report.docResults.map(d => [d.id, d]));
-  const allDocIds = new Set([...baselineDocs.keys(), ...currentDocs.keys()]);
+  const allDocIds = Array.from(new Set([...baselineDocs.keys(), ...currentDocs.keys()])).sort();
   
-  const docComparison = Array.from(allDocIds).sort().map(id => {
+  const docComparison = allDocIds.map(id => {
     const baselineDoc = baselineDocs.get(id);
     const currentDoc = currentDocs.get(id);
     
@@ -248,6 +315,11 @@ function main(): void {
       timestamp: report.timestamp,
       passRate: report.passRate
     },
+    versionMatch: {
+      datasetMatch,
+      thresholdMatch,
+      warnings: versionWarnings
+    },
     delta: {
       passRateChange,
       direction,
@@ -262,6 +334,12 @@ function main(): void {
     overallStatus: violations.length > 0 ? 'fail' : 'pass'
   };
   
+  // Ensure output directory exists
+  const outputDir = path.dirname(outputPath);
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+  
   // Write result
   fs.writeFileSync(outputPath, JSON.stringify(result, null, 2) + '\n', 'utf-8');
   
@@ -272,6 +350,12 @@ function main(): void {
   console.log(`Current:      ${report.passRate}%`);
   console.log(`Delta:        ${passRateChange >= 0 ? '+' : ''}${passRateChange.toFixed(1)}% (${direction})`);
   console.log('');
+  
+  if (versionWarnings.length > 0) {
+    console.log('Version Warnings:');
+    versionWarnings.forEach(w => console.log(`  ⚠️  ${w}`));
+    console.log('');
+  }
   
   console.log('By Severity:');
   bySeverity.forEach(sev => {
