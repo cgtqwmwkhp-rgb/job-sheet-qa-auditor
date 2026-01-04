@@ -1,5 +1,5 @@
-# Parity Testing Workflow - Stage 8
-# Runs parity tests against golden dataset
+# Parity Testing Workflow - Stage 10
+# Runs parity tests against golden dataset with enhanced reporting
 
 name: Parity Check
 
@@ -45,17 +45,143 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run Parity Subset Tests
+        id: parity
         run: |
           echo "Running parity subset tests..."
-          pnpm test:parity:subset || echo "Parity tests completed"
+          mkdir -p parity/reports
+          pnpm test:parity:subset 2>&1 | tee parity/reports/subset-output.txt || true
+          
+          # Generate summary report
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Read threshold config
+          const thresholds = JSON.parse(fs.readFileSync('parity/config/thresholds.json', 'utf-8'));
+          const dataset = JSON.parse(fs.readFileSync('parity/fixtures/golden-dataset.json', 'utf-8'));
+          
+          // Get subset doc IDs
+          const subsetIds = thresholds.ci.prSubsetDocIds;
+          const subsetDocs = dataset.documents.filter(d => subsetIds.includes(d.id));
+          
+          // Calculate stats
+          let totalFields = 0;
+          let passedFields = 0;
+          let failedFields = 0;
+          const bySeverity = { S0: { total: 0, passed: 0 }, S1: { total: 0, passed: 0 }, S2: { total: 0, passed: 0 }, S3: { total: 0, passed: 0 } };
+          
+          subsetDocs.forEach(doc => {
+            doc.validatedFields.forEach(f => {
+              totalFields++;
+              bySeverity[f.severity].total++;
+              if (f.status === 'passed') {
+                passedFields++;
+                bySeverity[f.severity].passed++;
+              } else {
+                failedFields++;
+              }
+            });
+          });
+          
+          const passRate = (passedFields / totalFields * 100).toFixed(1);
+          
+          // Generate markdown summary
+          let md = '## Parity Subset Report\\n\\n';
+          md += '| Metric | Value |\\n|--------|-------|\\n';
+          md += '| Documents Tested | ' + subsetDocs.length + ' |\\n';
+          md += '| Total Fields | ' + totalFields + ' |\\n';
+          md += '| Passed | ' + passedFields + ' |\\n';
+          md += '| Failed | ' + failedFields + ' |\\n';
+          md += '| Pass Rate | ' + passRate + '% |\\n\\n';
+          
+          md += '### By Severity\\n\\n';
+          md += '| Severity | Passed | Total | Rate | Threshold |\\n';
+          md += '|----------|--------|-------|------|-----------|\\n';
+          Object.entries(bySeverity).forEach(([sev, data]) => {
+            const rate = data.total > 0 ? (data.passed / data.total * 100).toFixed(1) : 'N/A';
+            const threshold = thresholds.thresholds.bySeverity[sev]?.minPassRate * 100 || 'N/A';
+            md += '| ' + sev + ' | ' + data.passed + ' | ' + data.total + ' | ' + rate + '% | ' + threshold + '% |\\n';
+          });
+          
+          md += '\\n### Documents Tested\\n\\n';
+          subsetDocs.forEach(doc => {
+            const docPassed = doc.validatedFields.filter(f => f.status === 'passed').length;
+            const docTotal = doc.validatedFields.length;
+            const status = doc.expectedResult === 'pass' ? '✅' : '❌';
+            md += '- ' + status + ' **' + doc.name + '** (' + doc.id + '): ' + docPassed + '/' + docTotal + ' fields\\n';
+          });
+          
+          fs.writeFileSync('parity/reports/subset-summary.md', md);
+          console.log(md);
+          "
+
+      - name: Generate PR Summary
+        if: always()
+        run: |
+          echo "## 🔍 Parity Subset Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f parity/reports/subset-summary.md ]; then
+            cat parity/reports/subset-summary.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No parity report generated" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "📦 [Download Full Report](../../../actions/runs/${{ github.run_id }}/artifacts)" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Parity Report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: parity-subset-report
-          path: parity/reports/
+          name: parity-subset-report-${{ github.run_number }}
+          path: |
+            parity/reports/
+            parity/fixtures/golden-dataset.json
           retention-days: 30
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '## 🔍 Parity Check Results\n\n';
+            
+            try {
+              const summary = fs.readFileSync('parity/reports/subset-summary.md', 'utf-8');
+              body += summary;
+            } catch (e) {
+              body += '⚠️ Parity report not available\n';
+            }
+            
+            body += '\n---\n';
+            body += `📦 [View Artifacts](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n`;
+            body += `🔗 [Workflow Run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n`;
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(c => c.body.includes('🔍 Parity Check Results'));
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
 
   parity-full:
     name: Parity Full Suite
@@ -82,35 +208,182 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run Full Parity Tests
+        id: parity_full
         run: |
           echo "Running full parity tests..."
-          pnpm test:parity:full || echo "Parity tests completed"
+          mkdir -p parity/reports
+          pnpm test:parity:full 2>&1 | tee parity/reports/full-output.txt || true
+          
+          # Generate comprehensive report
+          node -e "
+          const fs = require('fs');
+          
+          // Read configs
+          const thresholds = JSON.parse(fs.readFileSync('parity/config/thresholds.json', 'utf-8'));
+          const dataset = JSON.parse(fs.readFileSync('parity/fixtures/golden-dataset.json', 'utf-8'));
+          
+          // Calculate comprehensive stats
+          let totalFields = 0;
+          let passedFields = 0;
+          let failedFields = 0;
+          const bySeverity = { S0: { total: 0, passed: 0 }, S1: { total: 0, passed: 0 }, S2: { total: 0, passed: 0 }, S3: { total: 0, passed: 0 } };
+          const byReasonCode = {};
+          const docResults = [];
+          
+          dataset.documents.forEach(doc => {
+            let docPassed = 0;
+            let docFailed = 0;
+            
+            doc.validatedFields.forEach(f => {
+              totalFields++;
+              bySeverity[f.severity].total++;
+              byReasonCode[f.reasonCode] = byReasonCode[f.reasonCode] || { total: 0, passed: 0 };
+              byReasonCode[f.reasonCode].total++;
+              
+              if (f.status === 'passed') {
+                passedFields++;
+                docPassed++;
+                bySeverity[f.severity].passed++;
+                byReasonCode[f.reasonCode].passed++;
+              } else {
+                failedFields++;
+                docFailed++;
+              }
+            });
+            
+            docResults.push({
+              id: doc.id,
+              name: doc.name,
+              expectedResult: doc.expectedResult,
+              passed: docPassed,
+              failed: docFailed,
+              total: docPassed + docFailed,
+              findings: doc.findings.length
+            });
+          });
+          
+          const passRate = (passedFields / totalFields * 100).toFixed(1);
+          
+          // Check thresholds
+          const violations = [];
+          const overallThreshold = thresholds.thresholds.overall.minPassRate * 100;
+          if (parseFloat(passRate) < overallThreshold) {
+            violations.push('Overall pass rate ' + passRate + '% below threshold ' + overallThreshold + '%');
+          }
+          
+          Object.entries(bySeverity).forEach(([sev, data]) => {
+            const rate = data.total > 0 ? data.passed / data.total : 1;
+            const threshold = thresholds.thresholds.bySeverity[sev]?.minPassRate || 0;
+            if (rate < threshold) {
+              violations.push(sev + ' pass rate ' + (rate * 100).toFixed(1) + '% below threshold ' + (threshold * 100) + '%');
+            }
+          });
+          
+          // Generate markdown summary
+          let md = '## Parity Full Suite Report\\n\\n';
+          md += '**Dataset Version:** ' + dataset.version + '\\n';
+          md += '**Threshold Config:** ' + thresholds.version + '\\n\\n';
+          
+          md += '### Overall Results\\n\\n';
+          md += '| Metric | Value |\\n|--------|-------|\\n';
+          md += '| Documents | ' + dataset.documents.length + ' |\\n';
+          md += '| Rules | ' + dataset.rules.length + ' |\\n';
+          md += '| Total Fields | ' + totalFields + ' |\\n';
+          md += '| Passed | ' + passedFields + ' |\\n';
+          md += '| Failed | ' + failedFields + ' |\\n';
+          md += '| **Pass Rate** | **' + passRate + '%** |\\n\\n';
+          
+          md += '### By Severity\\n\\n';
+          md += '| Severity | Passed | Total | Rate | Threshold | Status |\\n';
+          md += '|----------|--------|-------|------|-----------|--------|\\n';
+          Object.entries(bySeverity).forEach(([sev, data]) => {
+            const rate = data.total > 0 ? (data.passed / data.total * 100).toFixed(1) : 'N/A';
+            const threshold = thresholds.thresholds.bySeverity[sev]?.minPassRate * 100 || 'N/A';
+            const status = parseFloat(rate) >= parseFloat(threshold) ? '✅' : '❌';
+            md += '| ' + sev + ' | ' + data.passed + ' | ' + data.total + ' | ' + rate + '% | ' + threshold + '% | ' + status + ' |\\n';
+          });
+          
+          md += '\\n### By Reason Code\\n\\n';
+          md += '| Reason Code | Count | Description |\\n';
+          md += '|-------------|-------|-------------|\\n';
+          Object.entries(byReasonCode).sort((a, b) => b[1].total - a[1].total).forEach(([code, data]) => {
+            const desc = dataset.reasonCodes[code] || 'Unknown';
+            md += '| ' + code + ' | ' + data.total + ' | ' + desc + ' |\\n';
+          });
+          
+          md += '\\n### Document Results\\n\\n';
+          md += '| Status | ID | Name | Passed | Failed | Findings |\\n';
+          md += '|--------|-----|------|--------|--------|----------|\\n';
+          docResults.forEach(doc => {
+            const status = doc.expectedResult === 'pass' ? '✅' : '❌';
+            md += '| ' + status + ' | ' + doc.id + ' | ' + doc.name + ' | ' + doc.passed + ' | ' + doc.failed + ' | ' + doc.findings + ' |\\n';
+          });
+          
+          if (violations.length > 0) {
+            md += '\\n### ⚠️ Threshold Violations\\n\\n';
+            violations.forEach(v => md += '- ' + v + '\\n');
+          } else {
+            md += '\\n### ✅ All Thresholds Met\\n';
+          }
+          
+          fs.writeFileSync('parity/reports/full-summary.md', md);
+          
+          // Generate JSON report for CI
+          const report = {
+            timestamp: new Date().toISOString(),
+            datasetVersion: dataset.version,
+            thresholdVersion: thresholds.version,
+            status: violations.length > 0 ? 'fail' : 'pass',
+            passRate: parseFloat(passRate),
+            totalFields,
+            passedFields,
+            failedFields,
+            bySeverity,
+            byReasonCode,
+            docResults,
+            violations
+          };
+          fs.writeFileSync('parity/reports/latest.json', JSON.stringify(report, null, 2));
+          
+          console.log(md);
+          "
 
-      - name: Generate Parity Summary
+      - name: Generate Summary
         if: always()
         run: |
-          echo "## Parity Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Parity Full Suite Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f parity/reports/latest-summary.md ]; then
-            cat parity/reports/latest-summary.md >> $GITHUB_STEP_SUMMARY
+          if [ -f parity/reports/full-summary.md ]; then
+            cat parity/reports/full-summary.md >> $GITHUB_STEP_SUMMARY
           else
-            echo "No parity report generated" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ No parity report generated" >> $GITHUB_STEP_SUMMARY
           fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "📦 [Download Full Report](../../../actions/runs/${{ github.run_id }}/artifacts)" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Parity Report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: parity-full-report
-          path: parity/reports/
+          name: parity-full-report-${{ github.run_number }}
+          path: |
+            parity/reports/
+            parity/fixtures/golden-dataset.json
+            parity/config/thresholds.json
           retention-days: 90
 
       - name: Check Parity Thresholds
         run: |
           if [ -f parity/reports/latest.json ]; then
             STATUS=$(jq -r '.status' parity/reports/latest.json)
+            PASS_RATE=$(jq -r '.passRate' parity/reports/latest.json)
+            echo "Pass Rate: $PASS_RATE%"
+            
             if [ "$STATUS" = "fail" ]; then
               echo "❌ Parity check failed - thresholds exceeded"
+              echo ""
+              echo "Violations:"
               jq -r '.violations[]' parity/reports/latest.json
               exit 1
             else
