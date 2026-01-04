@@ -277,9 +277,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run ESLint
-        run: npx eslint . --ext .ts,.tsx --max-warnings 0
-        # Note: Lint is blocking but warnings are allowed via --max-warnings 0
-        # This catches errors but allows incremental cleanup
+        run: npx eslint . --ext .ts,.tsx
+        # Note: Lint is blocking for errors only; warnings are allowed
+        # This catches errors but allows incremental cleanup of warnings
 
       - name: Check formatting
         run: pnpm format --check
