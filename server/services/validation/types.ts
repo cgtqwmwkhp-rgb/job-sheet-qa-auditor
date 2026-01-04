@@ -4,8 +4,7 @@
  * Defines the validation pipeline interface and types.
  */
 
-import type { ValidationRule, RuleStatus, RuleSeverity } from '../specResolver/types';
-import type { ExtractedField } from '../extraction/types';
+import type { RuleStatus, RuleSeverity } from '../specResolver/types';
 
 /**
  * Single validated field result

@@ -8,11 +8,10 @@
  * - Review queue management
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   createSpecResolver,
   resetSpecResolver,
-  getBaseSpec,
   baseSpecPack,
   type SpecPack,
   type ValidationRule,

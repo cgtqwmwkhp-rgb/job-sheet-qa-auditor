@@ -4,7 +4,7 @@
  * Defines the extraction pipeline interface and types.
  */
 
-import type { FieldDefinition, FieldType } from '../specResolver/types';
+import type { FieldDefinition } from '../specResolver/types';
 
 /**
  * Extraction confidence level

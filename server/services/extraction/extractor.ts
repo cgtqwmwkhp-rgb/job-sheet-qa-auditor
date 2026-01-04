@@ -208,21 +208,23 @@ function normalizeValue(
   const trimmed = rawValue.trim();
   
   switch (type) {
-    case 'number':
+    case 'number': {
       const num = parseFloat(trimmed.replace(/[,\s]/g, ''));
       if (!isNaN(num)) {
         return { value: num, normalized: true };
       }
       return { value: trimmed, normalized: false };
+    }
       
-    case 'currency':
+    case 'currency': {
       const currency = parseFloat(trimmed.replace(/[$,\s]/g, ''));
       if (!isNaN(currency)) {
         return { value: currency, normalized: true };
       }
       return { value: trimmed, normalized: false };
+    }
       
-    case 'boolean':
+    case 'boolean': {
       const lower = trimmed.toLowerCase();
       if (['yes', 'true', '1', 'checked', 'signed'].includes(lower)) {
         return { value: true, normalized: true };
@@ -231,14 +233,16 @@ function normalizeValue(
         return { value: false, normalized: true };
       }
       return { value: trimmed, normalized: false };
+    }
       
-    case 'date':
+    case 'date': {
       // Try to normalize to ISO format
       const date = new Date(trimmed);
       if (!isNaN(date.getTime())) {
         return { value: date.toISOString().split('T')[0], normalized: true };
       }
       return { value: trimmed, normalized: false };
+    }
       
     case 'string':
     case 'list':
@@ -253,7 +257,7 @@ function normalizeValue(
 function calculateConfidence(
   rawValue: string,
   type: FieldType,
-  keyword: string
+  _keyword: string
 ): number {
   let confidence = 0.7; // Base confidence for keyword match
   

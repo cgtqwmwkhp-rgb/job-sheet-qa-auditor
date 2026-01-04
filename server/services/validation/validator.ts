@@ -5,7 +5,7 @@
  * Produces deterministic validatedFields and findings.
  */
 
-import type { ValidationRule, RuleStatus, RuleSeverity } from '../specResolver/types';
+import type { ValidationRule, RuleStatus } from '../specResolver/types';
 import type { ExtractedField } from '../extraction/types';
 import type {
   ValidatedField,
