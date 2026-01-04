@@ -1,0 +1,243 @@
+name: Policy Check
+
+# =============================================================================
+# Policy Consistency Gate (BLOCKING)
+# =============================================================================
+# This workflow validates repository governance policies are in place and
+# consistent. It is designed to be a required status check.
+#
+# Checks performed:
+# 1. CODEOWNERS exists and covers critical paths
+# 2. BRANCH_PROTECTION_ASSUMPTIONS.md exists and lists required checks
+# 3. SECURITY.md exists
+# 4. CONTRIBUTING.md exists
+#
+# This workflow requires NO secrets and performs pure repo inspection.
+# =============================================================================
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - "feature/*"
+      - "fix/*"
+      - "hotfix/*"
+      - "release/*"
+      - "stage-*"
+      - "pr-*"
+  pull_request:
+    branches:
+      - main
+      - develop
+      - "feature/*"
+      - "fix/*"
+      - "hotfix/*"
+      - "release/*"
+      - "stage-*"
+      - "pr-*"
+  workflow_dispatch:
+
+jobs:
+  policy-check:
+    name: Policy Consistency Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run policy checks
+        id: policy
+        run: |
+          set +e  # Don't exit on first error, collect all failures
+          
+          REPORT_FILE="policy-check-report.json"
+          FAILURES=0
+          CHECKS_PASSED=0
+          CHECKS_TOTAL=0
+          
+          # Initialize JSON report
+          echo '{"timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'", "sha": "'$GITHUB_SHA'", "checks": []}' > $REPORT_FILE
+          
+          add_check() {
+            local name="$1"
+            local status="$2"
+            local message="$3"
+            local tmp=$(mktemp)
+            jq --arg name "$name" --arg status "$status" --arg message "$message" \
+              '.checks += [{"name": $name, "status": $status, "message": $message}]' \
+              $REPORT_FILE > $tmp && mv $tmp $REPORT_FILE
+          }
+          
+          echo "=== Policy Consistency Check ==="
+          echo ""
+          
+          # ---------------------------------------------------------------------
+          # Check 1: CODEOWNERS exists and covers critical paths
+          # ---------------------------------------------------------------------
+          ((CHECKS_TOTAL++))
+          echo "📋 Check 1: CODEOWNERS"
+          
+          if [ ! -f ".github/CODEOWNERS" ]; then
+            echo "  ❌ FAIL: .github/CODEOWNERS not found"
+            add_check "CODEOWNERS exists" "FAIL" ".github/CODEOWNERS not found"
+            ((FAILURES++))
+          else
+            echo "  ✓ .github/CODEOWNERS exists"
+            
+            # Check critical path coverage
+            CODEOWNERS_CONTENT=$(cat .github/CODEOWNERS)
+            MISSING_PATHS=""
+            
+            for path in ".github/workflows/" "server/" "client/" "docs/evidence/"; do
+              if ! echo "$CODEOWNERS_CONTENT" | grep -q "$path"; then
+                MISSING_PATHS="$MISSING_PATHS $path"
+              fi
+            done
+            
+            # drizzle/ is optional
+            if [ -d "drizzle" ] && ! echo "$CODEOWNERS_CONTENT" | grep -q "drizzle/"; then
+              MISSING_PATHS="$MISSING_PATHS drizzle/"
+            fi
+            
+            if [ -n "$MISSING_PATHS" ]; then
+              echo "  ❌ FAIL: CODEOWNERS missing coverage for:$MISSING_PATHS"
+              add_check "CODEOWNERS coverage" "FAIL" "Missing coverage for:$MISSING_PATHS"
+              ((FAILURES++))
+            else
+              echo "  ✓ CODEOWNERS covers all critical paths"
+              add_check "CODEOWNERS" "PASS" "Exists and covers critical paths"
+              ((CHECKS_PASSED++))
+            fi
+          fi
+          echo ""
+          
+          # ---------------------------------------------------------------------
+          # Check 2: BRANCH_PROTECTION_ASSUMPTIONS.md exists with required checks
+          # ---------------------------------------------------------------------
+          ((CHECKS_TOTAL++))
+          echo "📋 Check 2: BRANCH_PROTECTION_ASSUMPTIONS.md"
+          
+          BRANCH_PROTECTION_FILE="docs/governance/BRANCH_PROTECTION_ASSUMPTIONS.md"
+          
+          if [ ! -f "$BRANCH_PROTECTION_FILE" ]; then
+            echo "  ❌ FAIL: $BRANCH_PROTECTION_FILE not found"
+            add_check "BRANCH_PROTECTION_ASSUMPTIONS.md exists" "FAIL" "File not found"
+            ((FAILURES++))
+          else
+            echo "  ✓ $BRANCH_PROTECTION_FILE exists"
+            
+            # Check for required job names in the file
+            BRANCH_CONTENT=$(cat "$BRANCH_PROTECTION_FILE")
+            MISSING_JOBS=""
+            
+            # CI workflow required jobs
+            for job in "Lint Check" "TypeScript Check" "Unit & Integration Tests" "E2E Tests (Functional)"; do
+              if ! echo "$BRANCH_CONTENT" | grep -q "$job"; then
+                MISSING_JOBS="$MISSING_JOBS '$job'"
+              fi
+            done
+            
+            # Release governance required job
+            if ! echo "$BRANCH_CONTENT" | grep -q "Release Rehearsal"; then
+              MISSING_JOBS="$MISSING_JOBS 'Release Rehearsal'"
+            fi
+            
+            if [ -n "$MISSING_JOBS" ]; then
+              echo "  ❌ FAIL: Missing required check documentation:$MISSING_JOBS"
+              add_check "BRANCH_PROTECTION_ASSUMPTIONS.md content" "FAIL" "Missing jobs:$MISSING_JOBS"
+              ((FAILURES++))
+            else
+              echo "  ✓ All required checks documented"
+              add_check "BRANCH_PROTECTION_ASSUMPTIONS.md" "PASS" "Exists and documents required checks"
+              ((CHECKS_PASSED++))
+            fi
+          fi
+          echo ""
+          
+          # ---------------------------------------------------------------------
+          # Check 3: SECURITY.md exists
+          # ---------------------------------------------------------------------
+          ((CHECKS_TOTAL++))
+          echo "📋 Check 3: SECURITY.md"
+          
+          if [ ! -f "SECURITY.md" ]; then
+            echo "  ❌ FAIL: SECURITY.md not found"
+            add_check "SECURITY.md" "FAIL" "File not found"
+            ((FAILURES++))
+          else
+            echo "  ✓ SECURITY.md exists"
+            add_check "SECURITY.md" "PASS" "Exists"
+            ((CHECKS_PASSED++))
+          fi
+          echo ""
+          
+          # ---------------------------------------------------------------------
+          # Check 4: CONTRIBUTING.md exists
+          # ---------------------------------------------------------------------
+          ((CHECKS_TOTAL++))
+          echo "📋 Check 4: CONTRIBUTING.md"
+          
+          if [ ! -f "CONTRIBUTING.md" ]; then
+            echo "  ❌ FAIL: CONTRIBUTING.md not found"
+            add_check "CONTRIBUTING.md" "FAIL" "File not found"
+            ((FAILURES++))
+          else
+            echo "  ✓ CONTRIBUTING.md exists"
+            add_check "CONTRIBUTING.md" "PASS" "Exists"
+            ((CHECKS_PASSED++))
+          fi
+          echo ""
+          
+          # ---------------------------------------------------------------------
+          # Finalize report
+          # ---------------------------------------------------------------------
+          tmp=$(mktemp)
+          jq --argjson passed "$CHECKS_PASSED" --argjson total "$CHECKS_TOTAL" --argjson failures "$FAILURES" \
+            '. + {"summary": {"passed": $passed, "total": $total, "failures": $failures, "status": (if $failures > 0 then "FAIL" else "PASS" end)}}' \
+            $REPORT_FILE > $tmp && mv $tmp $REPORT_FILE
+          
+          echo "=== Summary ==="
+          echo "Checks passed: $CHECKS_PASSED / $CHECKS_TOTAL"
+          echo "Failures: $FAILURES"
+          echo ""
+          
+          # Output for GitHub Actions
+          echo "failures=$FAILURES" >> $GITHUB_OUTPUT
+          echo "passed=$CHECKS_PASSED" >> $GITHUB_OUTPUT
+          echo "total=$CHECKS_TOTAL" >> $GITHUB_OUTPUT
+          
+          # Generate step summary
+          echo "## Policy Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          jq -r '.checks[] | "| \(.name) | \(if .status == "PASS" then "✅ PASS" else "❌ FAIL: \(.message)" end) |"' $REPORT_FILE >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total:** $CHECKS_PASSED / $CHECKS_TOTAL passed" >> $GITHUB_STEP_SUMMARY
+          
+          if [ $FAILURES -gt 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Policy check failed** - Please fix the issues above." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **All policy checks passed**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload policy check report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: policy-check-report
+          path: policy-check-report.json
+          retention-days: 30
+
+      - name: Fail if policy checks failed
+        if: steps.policy.outputs.failures != '0'
+        run: |
+          echo "❌ Policy check failed with ${{ steps.policy.outputs.failures }} failure(s)"
+          echo "Please review the policy check report and fix the issues."
+          exit 1

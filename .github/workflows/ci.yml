@@ -1,16 +1,45 @@
 name: CI
 
+# =============================================================================
+# CI Trigger Coverage
+# =============================================================================
+# This workflow runs on the following branch patterns:
+#
+# PROTECTED BRANCHES (always CI):
+#   - main: Production branch, all checks required
+#   - develop: Integration branch, all checks required
+#
+# FEATURE BRANCHES (CI on push + PR):
+#   - feature/*: New feature development
+#   - fix/*: Bug fixes
+#   - hotfix/*: Urgent production fixes
+#   - release/*: Release preparation branches
+#   - stage-*: Staged milestone branches
+#   - pr-*: Pull request branches
+#
+# This ensures comprehensive coverage while avoiding CI spam on personal
+# branches. Use the patterns above for branches that need CI validation.
+# =============================================================================
+
 on:
   push:
     branches:
       - main
       - develop
+      - "feature/*"
+      - "fix/*"
+      - "hotfix/*"
+      - "release/*"
       - "stage-*"
       - "pr-*"
   pull_request:
     branches:
       - main
       - develop
+      - "feature/*"
+      - "fix/*"
+      - "hotfix/*"
+      - "release/*"
       - "stage-*"
       - "pr-*"
 
