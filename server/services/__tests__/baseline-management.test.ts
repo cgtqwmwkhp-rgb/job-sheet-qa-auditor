@@ -2,12 +2,18 @@
  * Baseline Management Tests
  * 
  * Tests for baseline creation, comparison, and listing functionality.
+ * Uses canonical severity tiers: S0, S1, S2, S3
  */
 
 import { describe, it, expect } from 'vitest';
 import * as crypto from 'crypto';
 
-// Test fixtures
+/**
+ * Canonical severity order for deterministic sorting
+ */
+const CANONICAL_SEVERITY_ORDER = ['S0', 'S1', 'S2', 'S3'];
+
+// Test fixtures with canonical severity tiers
 const mockParityReport = {
   timestamp: '2025-01-04T10:00:00.000Z',
   datasetVersion: '1.0.0',
@@ -18,10 +24,10 @@ const mockParityReport = {
   passedFields: 85,
   failedFields: 15,
   bySeverity: {
-    critical: { passed: 20, total: 20 },
-    high: { passed: 30, total: 35 },
-    medium: { passed: 25, total: 30 },
-    low: { passed: 10, total: 15 }
+    S0: { passed: 20, total: 20 },
+    S1: { passed: 30, total: 35 },
+    S2: { passed: 25, total: 30 },
+    S3: { passed: 10, total: 15 }
   },
   byReasonCode: {
     FIELD_MISSING: { total: 5 },
@@ -50,10 +56,10 @@ const mockBaseline = {
     passedFields: 80,
     failedFields: 20,
     bySeverity: {
-      critical: { passed: 18, total: 20 },
-      high: { passed: 28, total: 35 },
-      medium: { passed: 24, total: 30 },
-      low: { passed: 10, total: 15 }
+      S0: { passed: 18, total: 20 },
+      S1: { passed: 28, total: 35 },
+      S2: { passed: 24, total: 30 },
+      S3: { passed: 10, total: 15 }
     }
   },
   docResults: [
@@ -109,6 +115,42 @@ describe('Baseline Management', () => {
     });
   });
   
+  describe('Canonical Severity Tiers', () => {
+    it('should use canonical severity codes (S0-S3)', () => {
+      const severities = Object.keys(mockBaseline.metrics.bySeverity);
+      
+      severities.forEach(sev => {
+        expect(CANONICAL_SEVERITY_ORDER).toContain(sev);
+      });
+    });
+    
+    it('should not use legacy severity names', () => {
+      const legacyNames = ['critical', 'high', 'medium', 'low', 'major', 'minor', 'info'];
+      const severities = Object.keys(mockBaseline.metrics.bySeverity);
+      
+      severities.forEach(sev => {
+        expect(legacyNames).not.toContain(sev.toLowerCase());
+      });
+    });
+    
+    it('should sort severities in canonical order', () => {
+      const unsorted = ['S2', 'S0', 'S3', 'S1'];
+      const sorted = sortSeverities(unsorted);
+      
+      expect(sorted).toEqual(['S0', 'S1', 'S2', 'S3']);
+    });
+    
+    it('should handle non-canonical severities after canonical ones', () => {
+      const mixed = ['S2', 'custom', 'S0', 'other'];
+      const sorted = sortSeverities(mixed);
+      
+      expect(sorted[0]).toBe('S0');
+      expect(sorted[1]).toBe('S2');
+      // Non-canonical sorted alphabetically after
+      expect(sorted.slice(2).sort()).toEqual(['custom', 'other'].sort());
+    });
+  });
+  
   describe('Content Hash Computation', () => {
     it('should produce deterministic hash for same input', () => {
       const input = JSON.stringify({
@@ -132,6 +174,77 @@ describe('Baseline Management', () => {
       const hash2 = computeHash(input2);
       
       expect(hash1).not.toBe(hash2);
+    });
+    
+    it('should exclude createdAt from hash computation', () => {
+      const baseInput = {
+        version: '1.0.0',
+        sourceReport: mockBaseline.sourceReport,
+        metrics: mockBaseline.metrics,
+        docResults: mockBaseline.docResults
+      };
+      
+      // createdAt is NOT included in hash input
+      const hash1 = computeHash(JSON.stringify(baseInput));
+      const hash2 = computeHash(JSON.stringify(baseInput));
+      
+      expect(hash1).toBe(hash2);
+    });
+    
+    it('should exclude createdBy from hash computation', () => {
+      const baseInput = {
+        version: '1.0.0',
+        sourceReport: mockBaseline.sourceReport,
+        metrics: mockBaseline.metrics,
+        docResults: mockBaseline.docResults
+      };
+      
+      // createdBy is NOT included in hash input
+      const hash1 = computeHash(JSON.stringify(baseInput));
+      const hash2 = computeHash(JSON.stringify(baseInput));
+      
+      expect(hash1).toBe(hash2);
+    });
+    
+    it('should produce same hash regardless of bySeverity key order', () => {
+      const input1 = {
+        version: '1.0.0',
+        metrics: {
+          bySeverity: canonicaliseBySeverity({ S2: { passed: 1, total: 1 }, S0: { passed: 1, total: 1 } })
+        }
+      };
+      
+      const input2 = {
+        version: '1.0.0',
+        metrics: {
+          bySeverity: canonicaliseBySeverity({ S0: { passed: 1, total: 1 }, S2: { passed: 1, total: 1 } })
+        }
+      };
+      
+      const hash1 = computeHash(JSON.stringify(input1));
+      const hash2 = computeHash(JSON.stringify(input2));
+      
+      expect(hash1).toBe(hash2);
+    });
+    
+    it('should produce same hash regardless of docResults order', () => {
+      const docs1 = [
+        { id: 'doc-2', name: 'B', status: 'pass', passRate: 80 },
+        { id: 'doc-1', name: 'A', status: 'pass', passRate: 90 }
+      ];
+      
+      const docs2 = [
+        { id: 'doc-1', name: 'A', status: 'pass', passRate: 90 },
+        { id: 'doc-2', name: 'B', status: 'pass', passRate: 80 }
+      ];
+      
+      const input1 = { docResults: canonicaliseDocResults(docs1) };
+      const input2 = { docResults: canonicaliseDocResults(docs2) };
+      
+      const hash1 = computeHash(JSON.stringify(input1));
+      const hash2 = computeHash(JSON.stringify(input2));
+      
+      expect(hash1).toBe(hash2);
     });
   });
   
@@ -215,11 +328,11 @@ describe('Baseline Management', () => {
       
       expect(comparison).toHaveLength(4);
       
-      const critical = comparison.find(s => s.severity === 'critical');
-      expect(critical?.status).toBe('improved'); // 18/20 -> 20/20
+      const s0 = comparison.find(s => s.severity === 'S0');
+      expect(s0?.status).toBe('improved'); // 18/20 -> 20/20
       
-      const high = comparison.find(s => s.severity === 'high');
-      expect(high?.status).toBe('improved'); // 28/35 -> 30/35
+      const s1 = comparison.find(s => s.severity === 'S1');
+      expect(s1?.status).toBe('improved'); // 28/35 -> 30/35
     });
     
     it('should calculate severity rates correctly', () => {
@@ -230,6 +343,17 @@ describe('Baseline Management', () => {
     it('should handle zero total gracefully', () => {
       const rate = calculateSeverityRate({ passed: 0, total: 0 });
       expect(rate).toBe(0);
+    });
+    
+    it('should sort severity comparison in canonical order', () => {
+      const comparison = compareSeverities(
+        { S3: { passed: 1, total: 1 }, S0: { passed: 1, total: 1 }, S2: { passed: 1, total: 1 } },
+        { S3: { passed: 1, total: 1 }, S0: { passed: 1, total: 1 }, S2: { passed: 1, total: 1 } }
+      );
+      
+      expect(comparison[0].severity).toBe('S0');
+      expect(comparison[1].severity).toBe('S2');
+      expect(comparison[2].severity).toBe('S3');
     });
   });
   
@@ -247,26 +371,26 @@ describe('Baseline Management', () => {
       const violations = checkViolations(
         { 
           passRate: 90, 
-          bySeverity: { critical: { passed: 15, total: 20 } } 
+          bySeverity: { S0: { passed: 15, total: 20 } } 
         },
         { 
           overall: { minPassRate: 0.85, maxWorseCount: 5 },
-          bySeverity: { critical: { minPassRate: 0.90, maxWorseCount: 0 } }
+          bySeverity: { S0: { minPassRate: 0.90, maxWorseCount: 0 } }
         }
       );
       
-      expect(violations.some(v => v.includes('critical pass rate'))).toBe(true);
+      expect(violations.some(v => v.includes('S0 pass rate'))).toBe(true);
     });
     
     it('should pass when all thresholds met', () => {
       const violations = checkViolations(
         { 
           passRate: 90, 
-          bySeverity: { critical: { passed: 19, total: 20 } } 
+          bySeverity: { S0: { passed: 19, total: 20 } } 
         },
         { 
           overall: { minPassRate: 0.85, maxWorseCount: 5 },
-          bySeverity: { critical: { minPassRate: 0.90, maxWorseCount: 0 } }
+          bySeverity: { S0: { minPassRate: 0.90, maxWorseCount: 0 } }
         }
       );
       
@@ -282,18 +406,34 @@ describe('Baseline Management', () => {
         { id: 'doc-2', name: 'B', status: 'pass', passRate: 80 }
       ];
       
-      const sorted = [...unsorted].sort((a, b) => a.id.localeCompare(b.id));
+      const sorted = canonicaliseDocResults(unsorted);
       
       expect(sorted[0].id).toBe('doc-1');
       expect(sorted[1].id).toBe('doc-2');
       expect(sorted[2].id).toBe('doc-3');
     });
     
-    it('should sort severities alphabetically', () => {
-      const severities = ['medium', 'critical', 'low', 'high'];
-      const sorted = [...severities].sort();
+    it('should sort severities in canonical order (S0, S1, S2, S3)', () => {
+      const severities = ['S2', 'S0', 'S3', 'S1'];
+      const sorted = sortSeverities(severities);
       
-      expect(sorted).toEqual(['critical', 'high', 'low', 'medium']);
+      expect(sorted).toEqual(['S0', 'S1', 'S2', 'S3']);
+    });
+  });
+  
+  describe('Version Mismatch Handling', () => {
+    it('should detect dataset version mismatch', () => {
+      const baseline = { datasetVersion: '1.0.0' };
+      const current = { datasetVersion: '2.0.0' };
+      
+      expect(baseline.datasetVersion).not.toBe(current.datasetVersion);
+    });
+    
+    it('should detect threshold version mismatch', () => {
+      const baseline = { thresholdVersion: '1.0.0' };
+      const current = { thresholdVersion: '1.1.0' };
+      
+      expect(baseline.thresholdVersion).not.toBe(current.thresholdVersion);
     });
   });
 });
@@ -312,15 +452,46 @@ function classifyDelta(delta: number): 'improved' | 'same' | 'regressed' {
   return 'same';
 }
 
+function sortSeverities(severities: string[]): string[] {
+  return [...severities].sort((a, b) => {
+    const aIndex = CANONICAL_SEVERITY_ORDER.indexOf(a);
+    const bIndex = CANONICAL_SEVERITY_ORDER.indexOf(b);
+    
+    if (aIndex !== -1 && bIndex !== -1) {
+      return aIndex - bIndex;
+    }
+    if (aIndex !== -1) return -1;
+    if (bIndex !== -1) return 1;
+    return a.localeCompare(b);
+  });
+}
+
+function canonicaliseBySeverity(
+  bySeverity: Record<string, { passed: number; total: number }>
+): Record<string, { passed: number; total: number }> {
+  const keys = sortSeverities(Object.keys(bySeverity));
+  const result: Record<string, { passed: number; total: number }> = {};
+  for (const key of keys) {
+    result[key] = bySeverity[key];
+  }
+  return result;
+}
+
+function canonicaliseDocResults(
+  docResults: Array<{ id: string; name: string; status: string; passRate: number }>
+): Array<{ id: string; name: string; status: string; passRate: number }> {
+  return [...docResults].sort((a, b) => a.id.localeCompare(b.id));
+}
+
 function compareDocResults(
   baseline: Array<{ id: string; name: string; status: string; passRate: number }>,
   current: Array<{ id: string; name: string; status: string; passRate: number }>
 ): Array<{ id: string; name: string; status: 'improved' | 'same' | 'regressed' | 'new' }> {
   const baselineMap = new Map(baseline.map(d => [d.id, d]));
   const currentMap = new Map(current.map(d => [d.id, d]));
-  const allIds = new Set([...baselineMap.keys(), ...currentMap.keys()]);
+  const allIds = Array.from(new Set([...baselineMap.keys(), ...currentMap.keys()])).sort();
   
-  return Array.from(allIds).sort().map(id => {
+  return allIds.map(id => {
     const baselineDoc = baselineMap.get(id);
     const currentDoc = currentMap.get(id);
     
@@ -345,9 +516,9 @@ function compareSeverities(
   baseline: Record<string, { passed: number; total: number }>,
   current: Record<string, { passed: number; total: number }>
 ): Array<{ severity: string; status: 'improved' | 'same' | 'regressed' }> {
-  const severities = new Set([...Object.keys(baseline), ...Object.keys(current)]);
+  const severities = sortSeverities(Array.from(new Set([...Object.keys(baseline), ...Object.keys(current)])));
   
-  return Array.from(severities).sort().map(sev => {
+  return severities.map(sev => {
     const baselineData = baseline[sev] || { passed: 0, total: 0 };
     const currentData = current[sev] || { passed: 0, total: 0 };
     
