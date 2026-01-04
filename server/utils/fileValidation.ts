@@ -219,7 +219,7 @@ export function verifyIntegrity(buffer: Buffer, expectedHash: string): boolean {
  */
 export function sanitizeFilename(filename: string): string {
   // Remove path components
-  let sanitized = filename.replace(/^.*[\\\/]/, '');
+  let sanitized = filename.replace(/^.*[\\/]/, '');
   
   // Remove null bytes
   sanitized = sanitized.replace(/\0/g, '');

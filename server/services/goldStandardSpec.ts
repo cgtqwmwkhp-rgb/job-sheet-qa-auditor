@@ -198,7 +198,7 @@ export const GOLD_STANDARD_SPEC_V1: GoldStandardSpec = {
       whyItMatters: 'Critical for warranty calculations, SLA compliance, and billing accuracy.',
       validationRules: [
         createPresenceRule('Service Date'),
-        createFormatRule('Service Date', /^\d{4}-\d{2}-\d{2}$|^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/, 'YYYY-MM-DD or DD/MM/YYYY'),
+        createFormatRule('Service Date', /^\d{4}-\d{2}-\d{2}$|^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/, 'YYYY-MM-DD or DD/MM/YYYY'),
       ],
     },
     {
