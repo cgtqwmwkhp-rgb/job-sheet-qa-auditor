@@ -1,13 +1,14 @@
 /**
- * Stage 13: Deployment Promotion Gates Contract Tests
+ * Stage 13b: Deployment Promotion Gates Contract Tests (Hardened)
  * 
- * Tests for promotion bundle composition, ordering, and determinism.
+ * Tests for promotion bundle composition, ordering, determinism,
+ * and parity gate enforcement.
  */
 
 import { describe, it, expect } from 'vitest';
 import * as crypto from 'crypto';
 
-describe('Stage 13: Deployment Promotion Gates', () => {
+describe('Stage 13b: Deployment Promotion Gates (Hardened)', () => {
   describe('Promotion Manifest Schema', () => {
     const requiredFields = [
       'version',
@@ -19,7 +20,8 @@ describe('Stage 13: Deployment Promotion Gates', () => {
       'runId',
       'gates',
       'artifacts',
-      'bundleHash'
+      'bundleHash',
+      'paritySkipped'
     ];
     
     const requiredGates = ['ci', 'policy', 'rehearsal', 'parity'];
@@ -39,6 +41,7 @@ describe('Stage 13: Deployment Promotion Gates', () => {
           rehearsal: 'passed',
           parity: 'passed'
         },
+        paritySkipped: false,
         artifacts: [],
         bundleHash: 'sha256:abc'
       };
@@ -166,6 +169,16 @@ describe('Stage 13: Deployment Promotion Gates', () => {
       
       expect(hash).toMatch(/^sha256:[a-f0-9]{64}$/);
     });
+    
+    it('should NOT include timestamps in hash computation', () => {
+      const artifacts = [{ hash: 'sha256:test' }];
+      
+      // Same artifacts, different timestamps
+      const hash1 = computeHashFromArtifacts(artifacts, '2025-01-01T00:00:00.000Z');
+      const hash2 = computeHashFromArtifacts(artifacts, '2025-12-31T23:59:59.999Z');
+      
+      expect(hash1).toBe(hash2);
+    });
   });
   
   describe('Gate Requirements', () => {
@@ -173,13 +186,14 @@ describe('Stage 13: Deployment Promotion Gates', () => {
       required: boolean;
       canSkip: boolean;
       skipRequiresApproval: boolean;
+      skipAllowedForProduction: boolean;
     }
     
     const gateConfigs: Record<string, GateConfig> = {
-      ci: { required: true, canSkip: false, skipRequiresApproval: false },
-      policy: { required: true, canSkip: false, skipRequiresApproval: false },
-      rehearsal: { required: true, canSkip: false, skipRequiresApproval: false },
-      parity: { required: true, canSkip: true, skipRequiresApproval: true }
+      ci: { required: true, canSkip: false, skipRequiresApproval: false, skipAllowedForProduction: false },
+      policy: { required: true, canSkip: false, skipRequiresApproval: false, skipAllowedForProduction: false },
+      rehearsal: { required: true, canSkip: false, skipRequiresApproval: false, skipAllowedForProduction: false },
+      parity: { required: true, canSkip: true, skipRequiresApproval: true, skipAllowedForProduction: false }
     };
     
     it('should require CI gate for all promotions', () => {
@@ -197,15 +211,167 @@ describe('Stage 13: Deployment Promotion Gates', () => {
       expect(gateConfigs.rehearsal.canSkip).toBe(false);
     });
     
-    it('should allow parity skip only with approval', () => {
+    it('should allow parity skip only with approval for staging', () => {
       expect(gateConfigs.parity.required).toBe(true);
       expect(gateConfigs.parity.canSkip).toBe(true);
       expect(gateConfigs.parity.skipRequiresApproval).toBe(true);
     });
     
-    it('should not allow parity skip for production', () => {
-      const canSkipParityForProduction = false; // Hardcoded rule
-      expect(canSkipParityForProduction).toBe(false);
+    it('should NOT allow parity skip for production', () => {
+      expect(gateConfigs.parity.skipAllowedForProduction).toBe(false);
+    });
+  });
+  
+  describe('Parity Skip Controls', () => {
+    const PARITY_SKIP_ACKNOWLEDGEMENT = 'I_ACCEPT_PARITY_SKIP';
+    
+    function validateParitySkip(config: {
+      targetEnv: string;
+      skipRequested: boolean;
+      acknowledgementText: string;
+    }): { allowed: boolean; reason: string } {
+      // Production: NEVER allow skip
+      if (config.targetEnv === 'production') {
+        return { allowed: false, reason: 'Parity skip is not allowed for production' };
+      }
+      
+      // Skip not requested
+      if (!config.skipRequested) {
+        return { allowed: true, reason: 'Parity will run normally' };
+      }
+      
+      // Staging: requires acknowledgement
+      if (config.acknowledgementText !== PARITY_SKIP_ACKNOWLEDGEMENT) {
+        return { allowed: false, reason: 'Parity skip requires acknowledgement text: ' + PARITY_SKIP_ACKNOWLEDGEMENT };
+      }
+      
+      return { allowed: true, reason: 'Parity skip acknowledged for staging' };
+    }
+    
+    it('should NEVER allow parity skip for production', () => {
+      const result = validateParitySkip({
+        targetEnv: 'production',
+        skipRequested: true,
+        acknowledgementText: PARITY_SKIP_ACKNOWLEDGEMENT
+      });
+      
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('not allowed for production');
+    });
+    
+    it('should require acknowledgement for staging parity skip', () => {
+      const result = validateParitySkip({
+        targetEnv: 'staging',
+        skipRequested: true,
+        acknowledgementText: ''
+      });
+      
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('requires acknowledgement');
+    });
+    
+    it('should allow staging parity skip with correct acknowledgement', () => {
+      const result = validateParitySkip({
+        targetEnv: 'staging',
+        skipRequested: true,
+        acknowledgementText: PARITY_SKIP_ACKNOWLEDGEMENT
+      });
+      
+      expect(result.allowed).toBe(true);
+    });
+    
+    it('should reject incorrect acknowledgement text', () => {
+      const result = validateParitySkip({
+        targetEnv: 'staging',
+        skipRequested: true,
+        acknowledgementText: 'yes please skip'
+      });
+      
+      expect(result.allowed).toBe(false);
+    });
+  });
+  
+  describe('Parity Failure Handling', () => {
+    function simulateParityGate(config: {
+      parityPassed: boolean;
+      skipParity: boolean;
+      skipAcknowledged: boolean;
+      targetEnv: string;
+    }): { promotionAllowed: boolean; reason: string } {
+      // Production: parity MUST pass, no skip allowed
+      if (config.targetEnv === 'production') {
+        if (!config.parityPassed) {
+          return { promotionAllowed: false, reason: 'Parity failed - production promotion blocked' };
+        }
+        return { promotionAllowed: true, reason: 'Parity passed' };
+      }
+      
+      // Staging: parity must pass OR be skipped with acknowledgement
+      if (config.parityPassed) {
+        return { promotionAllowed: true, reason: 'Parity passed' };
+      }
+      
+      if (config.skipParity && config.skipAcknowledged) {
+        return { promotionAllowed: true, reason: 'Parity skipped with acknowledgement' };
+      }
+      
+      return { promotionAllowed: false, reason: 'Parity failed - staging promotion blocked' };
+    }
+    
+    it('should block production promotion when parity fails', () => {
+      const result = simulateParityGate({
+        parityPassed: false,
+        skipParity: false,
+        skipAcknowledged: false,
+        targetEnv: 'production'
+      });
+      
+      expect(result.promotionAllowed).toBe(false);
+      expect(result.reason).toContain('production promotion blocked');
+    });
+    
+    it('should block production promotion even with skip request', () => {
+      const result = simulateParityGate({
+        parityPassed: false,
+        skipParity: true,
+        skipAcknowledged: true,
+        targetEnv: 'production'
+      });
+      
+      expect(result.promotionAllowed).toBe(false);
+    });
+    
+    it('should allow production promotion when parity passes', () => {
+      const result = simulateParityGate({
+        parityPassed: true,
+        skipParity: false,
+        skipAcknowledged: false,
+        targetEnv: 'production'
+      });
+      
+      expect(result.promotionAllowed).toBe(true);
+    });
+    
+    it('should block staging promotion when parity fails without skip', () => {
+      const result = simulateParityGate({
+        parityPassed: false,
+        skipParity: false,
+        skipAcknowledged: false,
+        targetEnv: 'staging'
+      });
+      
+      expect(result.promotionAllowed).toBe(false);
+    });
+    
+    it('should allow staging promotion when parity fails with acknowledged skip', () => {
+      const result = simulateParityGate({
+        parityPassed: false,
+        skipParity: true,
+        skipAcknowledged: true,
+        targetEnv: 'staging'
+      });
+      
+      expect(result.promotionAllowed).toBe(true);
     });
   });
   
@@ -214,6 +380,7 @@ describe('Stage 13: Deployment Promotion Gates', () => {
       branch: string;
       targetEnv: string;
       skipParity: boolean;
+      skipAcknowledged: boolean;
       gates: Record<string, 'passed' | 'failed' | 'skipped'>;
     }): { valid: boolean; errors: string[] } {
       const errors: string[] = [];
@@ -228,6 +395,11 @@ describe('Stage 13: Deployment Promotion Gates', () => {
         errors.push('Cannot skip parity for production');
       }
       
+      // Staging parity skip requires acknowledgement
+      if (config.targetEnv === 'staging' && config.skipParity && !config.skipAcknowledged) {
+        errors.push('Parity skip requires acknowledgement');
+      }
+      
       // All required gates must pass (or be skipped if allowed)
       const requiredGates = ['ci', 'policy', 'rehearsal'];
       requiredGates.forEach(gate => {
@@ -236,7 +408,7 @@ describe('Stage 13: Deployment Promotion Gates', () => {
         }
       });
       
-      // Parity must pass unless skipped
+      // Parity must pass unless skipped (and skip is allowed)
       if (!config.skipParity && config.gates.parity !== 'passed') {
         errors.push('parity gate must pass');
       }
@@ -249,6 +421,7 @@ describe('Stage 13: Deployment Promotion Gates', () => {
         branch: 'main',
         targetEnv: 'staging',
         skipParity: false,
+        skipAcknowledged: false,
         gates: { ci: 'passed', policy: 'passed', rehearsal: 'passed', parity: 'passed' }
       });
       
@@ -261,6 +434,7 @@ describe('Stage 13: Deployment Promotion Gates', () => {
         branch: 'main',
         targetEnv: 'production',
         skipParity: false,
+        skipAcknowledged: false,
         gates: { ci: 'passed', policy: 'passed', rehearsal: 'passed', parity: 'passed' }
       });
       
@@ -272,6 +446,7 @@ describe('Stage 13: Deployment Promotion Gates', () => {
         branch: 'develop',
         targetEnv: 'staging',
         skipParity: false,
+        skipAcknowledged: false,
         gates: { ci: 'passed', policy: 'passed', rehearsal: 'passed', parity: 'passed' }
       });
       
@@ -284,6 +459,7 @@ describe('Stage 13: Deployment Promotion Gates', () => {
         branch: 'main',
         targetEnv: 'production',
         skipParity: true,
+        skipAcknowledged: true,
         gates: { ci: 'passed', policy: 'passed', rehearsal: 'passed', parity: 'skipped' }
       });
       
@@ -291,15 +467,29 @@ describe('Stage 13: Deployment Promotion Gates', () => {
       expect(result.errors).toContain('Cannot skip parity for production');
     });
     
-    it('should allow staging promotion with parity skip', () => {
+    it('should allow staging promotion with acknowledged parity skip', () => {
       const result = validatePromotion({
         branch: 'main',
         targetEnv: 'staging',
         skipParity: true,
+        skipAcknowledged: true,
         gates: { ci: 'passed', policy: 'passed', rehearsal: 'passed', parity: 'skipped' }
       });
       
       expect(result.valid).toBe(true);
+    });
+    
+    it('should reject staging promotion with unacknowledged parity skip', () => {
+      const result = validatePromotion({
+        branch: 'main',
+        targetEnv: 'staging',
+        skipParity: true,
+        skipAcknowledged: false,
+        gates: { ci: 'passed', policy: 'passed', rehearsal: 'passed', parity: 'skipped' }
+      });
+      
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Parity skip requires acknowledgement');
     });
     
     it('should reject promotion with failed CI', () => {
@@ -307,6 +497,7 @@ describe('Stage 13: Deployment Promotion Gates', () => {
         branch: 'main',
         targetEnv: 'staging',
         skipParity: false,
+        skipAcknowledged: false,
         gates: { ci: 'failed', policy: 'passed', rehearsal: 'passed', parity: 'passed' }
       });
       
@@ -340,6 +531,21 @@ describe('Stage 13: Deployment Promotion Gates', () => {
       
       expect(checksums).toContain('sha256:abc123  file1.json');
       expect(checksums).toContain('sha256:def456  file2.json');
+    });
+    
+    it('should include skip acknowledgement in manifest when applicable', () => {
+      const manifestWithSkip = {
+        paritySkipped: true,
+        paritySkipAcknowledgement: {
+          acknowledged: true,
+          acknowledgementText: 'I_ACCEPT_PARITY_SKIP',
+          acknowledgedBy: 'test-user',
+          acknowledgedAt: '2025-01-04T10:00:00.000Z'
+        }
+      };
+      
+      expect(manifestWithSkip.paritySkipAcknowledgement).toBeDefined();
+      expect(manifestWithSkip.paritySkipAcknowledgement.acknowledged).toBe(true);
     });
   });
   

@@ -4,6 +4,11 @@
  * Generates a deterministic promotion bundle with all required artifacts.
  * Used by the promotion workflow to create deployment artifacts.
  * 
+ * DETERMINISM RULES:
+ * - Bundle hash is computed from artifact hashes ONLY (not timestamps)
+ * - Artifacts are sorted alphabetically by name
+ * - Manifest includes timestamp but it does NOT affect bundleHash
+ * 
  * Usage:
  *   npx tsx scripts/release/generate-promotion-bundle.ts --env <staging|production>
  */
@@ -26,6 +31,13 @@ interface PromotionManifest {
     rehearsal: 'passed' | 'failed' | 'skipped';
     parity: 'passed' | 'failed' | 'skipped';
   };
+  paritySkipped: boolean;
+  paritySkipAcknowledgement?: {
+    acknowledged: boolean;
+    acknowledgementText: string;
+    acknowledgedBy: string;
+    acknowledgedAt: string;
+  };
   artifacts: Array<{
     name: string;
     path: string;
@@ -41,6 +53,14 @@ function computeFileHash(filePath: string): string {
   return 'sha256:' + hash.digest('hex');
 }
 
+/**
+ * Compute bundle hash from artifact hashes ONLY.
+ * This ensures the hash is deterministic and does NOT depend on:
+ * - Timestamps
+ * - Actor/user who triggered
+ * - Run ID
+ * - Any other non-content metadata
+ */
 function computeBundleHash(artifacts: Array<{ hash: string }>): string {
   // Deterministic: sort by hash and concatenate
   const sortedHashes = artifacts.map(a => a.hash).sort();
@@ -132,14 +152,30 @@ function main(): void {
     });
   }
   
-  // Sort artifacts deterministically
+  // Add baseline comparison if exists
+  const baselineComparisonPath = path.join(process.cwd(), 'parity/reports/baseline-comparison.json');
+  if (fs.existsSync(baselineComparisonPath)) {
+    const destPath = path.join(bundleDir, 'baseline-comparison.json');
+    fs.copyFileSync(baselineComparisonPath, destPath);
+    artifacts.push({
+      name: 'baseline-comparison',
+      path: 'baseline-comparison.json',
+      hash: computeFileHash(destPath)
+    });
+  }
+  
+  // Sort artifacts deterministically by name
   artifacts.sort((a, b) => a.name.localeCompare(b.name));
   
-  // Create manifest
+  // Compute bundle hash BEFORE adding timestamp to manifest
+  // This ensures bundleHash is deterministic based on content only
+  const bundleHash = computeBundleHash(artifacts);
+  
+  // Create manifest (timestamp is for audit trail, NOT for hash)
   const manifest: PromotionManifest = {
     version: '1.0.0',
     schemaVersion: '1',
-    timestamp: new Date().toISOString(),
+    timestamp: new Date().toISOString(), // Audit trail only, not in bundleHash
     sha: process.env.GITHUB_SHA || 'local',
     targetEnvironment: targetEnv,
     triggeredBy: process.env.GITHUB_ACTOR || process.env.USER || 'unknown',
@@ -150,12 +186,10 @@ function main(): void {
       rehearsal: 'passed',
       parity: 'passed'
     },
+    paritySkipped: false,
     artifacts,
-    bundleHash: '' // Will be computed
+    bundleHash // Computed from artifact hashes only
   };
-  
-  // Compute bundle hash
-  manifest.bundleHash = computeBundleHash(artifacts);
   
   // Write manifest
   const manifestPath = path.join(bundleDir, 'promotion-manifest.json');
@@ -168,13 +202,16 @@ function main(): void {
   console.log('Promotion Bundle Generated');
   console.log('==========================');
   console.log(`Target:      ${targetEnv}`);
-  console.log(`Bundle Hash: ${manifest.bundleHash}`);
+  console.log(`Bundle Hash: ${bundleHash}`);
   console.log(`Artifacts:   ${artifacts.length}`);
   console.log('');
   console.log('Contents:');
   artifacts.forEach(a => {
     console.log(`  - ${a.name}: ${a.hash.substring(0, 20)}...`);
   });
+  console.log('');
+  console.log('Note: bundleHash is computed from artifact hashes only.');
+  console.log('      Timestamp and metadata do NOT affect the hash.');
   console.log('');
   console.log(`✅ Written to: ${bundleDir}`);
 }
