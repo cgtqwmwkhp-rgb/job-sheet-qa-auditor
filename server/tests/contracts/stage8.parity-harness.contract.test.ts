@@ -10,6 +10,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { join } from 'path';
+import { readFileSync } from 'fs';
 import {
   ParityRunner,
   createParityRunner,
@@ -38,25 +39,7 @@ describe('Stage 8: Parity Harness', () => {
   });
 
   describe('Parity Comparison', () => {
-    const goldenDoc: GoldenDocument = {
-      id: 'test-001',
-      name: 'Test Document',
-      description: 'Test',
-      expectedResult: 'pass',
-      extractedFields: {},
-      validatedFields: [
-        {
-          ruleId: 'RULE-001',
-          field: 'testField',
-          status: 'passed',
-          value: 'test',
-          confidence: 0.95,
-          pageNumber: 1,
-          severity: 'critical',
-        },
-      ],
-      findings: [],
-    };
+    // Test fixtures are loaded from golden-dataset.json
 
     beforeEach(() => {
       const fixturesPath = join(__dirname, '../../../parity/fixtures/golden-dataset.json');
@@ -65,7 +48,7 @@ describe('Stage 8: Parity Harness', () => {
 
     it('should detect same results', () => {
       const fixturesPath = join(__dirname, '../../../parity/fixtures/golden-dataset.json');
-      const goldenDataset = JSON.parse(require('fs').readFileSync(fixturesPath, 'utf-8'));
+      const goldenDataset = JSON.parse(readFileSync(fixturesPath, 'utf-8'));
       
       // Pass identical results
       const report = runner.runParity(goldenDataset.documents);
@@ -85,7 +68,7 @@ describe('Stage 8: Parity Harness', () => {
 
     it('should detect improved fields', () => {
       const fixturesPath = join(__dirname, '../../../parity/fixtures/golden-dataset.json');
-      const goldenDataset = JSON.parse(require('fs').readFileSync(fixturesPath, 'utf-8'));
+      const goldenDataset = JSON.parse(readFileSync(fixturesPath, 'utf-8'));
       
       // Improve confidence on all fields
       const improved = goldenDataset.documents.map((doc: GoldenDocument) => ({
@@ -103,7 +86,7 @@ describe('Stage 8: Parity Harness', () => {
 
     it('should detect worse fields', () => {
       const fixturesPath = join(__dirname, '../../../parity/fixtures/golden-dataset.json');
-      const goldenDataset = JSON.parse(require('fs').readFileSync(fixturesPath, 'utf-8'));
+      const goldenDataset = JSON.parse(readFileSync(fixturesPath, 'utf-8'));
       
       // Decrease confidence on all fields
       const worse = goldenDataset.documents.map((doc: GoldenDocument) => ({
@@ -128,7 +111,7 @@ describe('Stage 8: Parity Harness', () => {
 
     it('should generate report with all required fields', () => {
       const fixturesPath = join(__dirname, '../../../parity/fixtures/golden-dataset.json');
-      const goldenDataset = JSON.parse(require('fs').readFileSync(fixturesPath, 'utf-8'));
+      const goldenDataset = JSON.parse(readFileSync(fixturesPath, 'utf-8'));
       
       const report = runner.runParity(goldenDataset.documents);
       
@@ -145,7 +128,7 @@ describe('Stage 8: Parity Harness', () => {
 
     it('should generate deterministic runId format', () => {
       const fixturesPath = join(__dirname, '../../../parity/fixtures/golden-dataset.json');
-      const goldenDataset = JSON.parse(require('fs').readFileSync(fixturesPath, 'utf-8'));
+      const goldenDataset = JSON.parse(readFileSync(fixturesPath, 'utf-8'));
       
       const report = runner.runParity(goldenDataset.documents);
       
@@ -154,7 +137,7 @@ describe('Stage 8: Parity Harness', () => {
 
     it('should generate markdown summary', () => {
       const fixturesPath = join(__dirname, '../../../parity/fixtures/golden-dataset.json');
-      const goldenDataset = JSON.parse(require('fs').readFileSync(fixturesPath, 'utf-8'));
+      const goldenDataset = JSON.parse(readFileSync(fixturesPath, 'utf-8'));
       
       const report = runner.runParity(goldenDataset.documents);
       const markdown = runner.generateSummaryMarkdown(report);
@@ -215,7 +198,7 @@ describe('Stage 8: Parity Harness', () => {
 
     it('should sort field comparisons by ruleId', () => {
       const fixturesPath = join(__dirname, '../../../parity/fixtures/golden-dataset.json');
-      const goldenDataset = JSON.parse(require('fs').readFileSync(fixturesPath, 'utf-8'));
+      const goldenDataset = JSON.parse(readFileSync(fixturesPath, 'utf-8'));
       
       const report = runner.runParity(goldenDataset.documents);
       
@@ -228,7 +211,7 @@ describe('Stage 8: Parity Harness', () => {
 
     it('should produce consistent reports for same inputs', () => {
       const fixturesPath = join(__dirname, '../../../parity/fixtures/golden-dataset.json');
-      const goldenDataset = JSON.parse(require('fs').readFileSync(fixturesPath, 'utf-8'));
+      const goldenDataset = JSON.parse(readFileSync(fixturesPath, 'utf-8'));
       
       const report1 = runner.runParity(goldenDataset.documents);
       const report2 = runner.runParity(goldenDataset.documents);
@@ -250,7 +233,7 @@ describe('Stage 8: Parity Harness', () => {
 
     it('should track matched findings', () => {
       const fixturesPath = join(__dirname, '../../../parity/fixtures/golden-dataset.json');
-      const goldenDataset = JSON.parse(require('fs').readFileSync(fixturesPath, 'utf-8'));
+      const goldenDataset = JSON.parse(readFileSync(fixturesPath, 'utf-8'));
       
       const report = runner.runParity(goldenDataset.documents);
       
@@ -267,7 +250,7 @@ describe('Stage 8: Parity Harness', () => {
 
     it('should detect missing findings', () => {
       const fixturesPath = join(__dirname, '../../../parity/fixtures/golden-dataset.json');
-      const goldenDataset = JSON.parse(require('fs').readFileSync(fixturesPath, 'utf-8'));
+      const goldenDataset = JSON.parse(readFileSync(fixturesPath, 'utf-8'));
       
       // Remove findings from actual results
       const noFindings = goldenDataset.documents.map((doc: GoldenDocument) => ({

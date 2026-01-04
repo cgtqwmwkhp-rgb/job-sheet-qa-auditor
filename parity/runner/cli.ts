@@ -79,7 +79,7 @@ async function main(): Promise<void> {
   console.log('✅ Golden dataset loaded');
   
   // Get golden documents for mock generation
-  const goldenDataset = JSON.parse(require('fs').readFileSync(FIXTURES_PATH, 'utf-8'));
+  const goldenDataset = JSON.parse(readFileSync(FIXTURES_PATH, 'utf-8'));
   const goldenDocs: GoldenDocument[] = goldenDataset.documents;
   
   // Generate mock actual results
