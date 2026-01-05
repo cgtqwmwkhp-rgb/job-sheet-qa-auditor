@@ -6,7 +6,10 @@ This document describes the promotion workflow and required gates for deploying 
 
 The promotion workflow enforces governance, quality, and parity requirements before allowing deployment to any environment. All gates must pass (or be explicitly approved for skip) before a promotion bundle is generated.
 
-**Key Principle:** Parity gate is REAL and NON-BYPASSABLE for production.
+**Key Principles:**
+1. **Parity gate is REAL** - reads from actual parity report output, not computed from dataset
+2. **Production parity is NON-BYPASSABLE** - no `|| true`, no `continue-on-error`, no skip
+3. **Staging skip requires acknowledgement** - must type `I_ACCEPT_PARITY_SKIP`
 
 ## Required Gates
 
@@ -52,10 +55,50 @@ The promotion workflow enforces governance, quality, and parity requirements bef
 - Dataset hash verification passes
 - Provenance generated
 - Full parity suite passes all thresholds
+- **Parity report read from `parity/reports/latest.json`** (real output)
 
 **Can Skip:** 
 - **Staging:** Yes, with explicit acknowledgement
 - **Production:** **NO - NEVER**
+
+## Parity Gate Realism
+
+The parity gate reads results from the **actual parity report** (`parity/reports/latest.json`), not computed directly from the golden dataset. This ensures:
+
+1. **Real validation** - parity tests actually run and produce output
+2. **No bypass** - `|| true` patterns are prohibited
+3. **Fail fast** - job exits with code 1 on parity failure
+
+### Prohibited Patterns
+
+The following patterns are **NOT ALLOWED** in the promotion workflow:
+
+```yaml
+# ❌ PROHIBITED - bypass pattern
+pnpm test:parity:full || true
+
+# ❌ PROHIBITED - continue on error
+- name: Run Parity
+  continue-on-error: true
+
+# ❌ PROHIBITED - computing pass rate from dataset
+node -e "
+  const dataset = JSON.parse(fs.readFileSync('golden-dataset.json'));
+  // Computing passRate directly...
+"
+```
+
+### Required Pattern
+
+```yaml
+# ✅ REQUIRED - real parity output
+if [ -f parity/reports/latest.json ]; then
+  STATUS=$(jq -r '.status' parity/reports/latest.json)
+  if [ "$STATUS" = "fail" ]; then
+    exit 1  # FAIL THE JOB
+  fi
+fi
+```
 
 ## Environment Rules
 
@@ -78,7 +121,7 @@ The promotion workflow enforces governance, quality, and parity requirements bef
 For staging environments only:
 
 1. Set `skip_parity` to `true`
-2. Enter `I_ACCEPT_PARITY_SKIP` in the acknowledgement field
+2. Enter `I_ACCEPT_PARITY_SKIP` in the `skip_parity_acknowledgement` field
 3. Both conditions must be met for skip to be allowed
 
 The skip acknowledgement is logged in the promotion manifest:
@@ -86,12 +129,7 @@ The skip acknowledgement is logged in the promotion manifest:
 ```json
 {
   "paritySkipped": true,
-  "paritySkipAcknowledgement": {
-    "acknowledged": true,
-    "acknowledgementText": "I_ACCEPT_PARITY_SKIP",
-    "acknowledgedBy": "username",
-    "acknowledgedAt": "2025-01-04T10:00:00.000Z"
-  }
+  "paritySkipAcknowledgement": "I_ACCEPT_PARITY_SKIP"
 }
 ```
 
@@ -104,7 +142,7 @@ When all gates pass, a promotion bundle is generated containing:
 | `promotion-manifest.json` | Bundle metadata and gate results |
 | `provenance.json` | Dataset and threshold provenance |
 | `thresholds.json` | Threshold configuration used |
-| `parity-report.json` | Full parity test results |
+| `parity-report.json` | Full parity test results (from `latest.json`) |
 | `dataset-reference.json` | Golden dataset hash reference |
 | `baseline-comparison.json` | Baseline comparison (if available) |
 | `checksums.txt` | SHA-256 checksums of all artifacts |
@@ -136,7 +174,7 @@ This ensures the same artifacts always produce the same bundle hash, regardless 
 # Choose target environment
 # For staging with parity skip:
 #   - Set skip_parity to true
-#   - Enter "I_ACCEPT_PARITY_SKIP" in acknowledgement field
+#   - Enter "I_ACCEPT_PARITY_SKIP" in skip_parity_acknowledgement field
 ```
 
 ### Programmatic Promotion
@@ -182,6 +220,15 @@ All promotions are logged with:
 - Skip acknowledgement (if applicable)
 
 Artifacts are retained for 90 days.
+
+## Contract Tests
+
+The promotion workflow is verified by contract tests in `server/tests/contracts/stage13c.workflow-contract.test.ts`:
+
+- Verifies no `|| true` bypass patterns
+- Verifies no `continue-on-error: true` for parity steps
+- Verifies parity report is read from `parity/reports/latest.json`
+- Verifies skip acknowledgement controls
 
 ## Required CI Checks
 
