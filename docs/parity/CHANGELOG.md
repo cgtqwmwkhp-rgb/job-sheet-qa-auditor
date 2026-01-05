@@ -17,23 +17,44 @@ The system uses canonical severity tiers:
 
 ### v1.0.0 (Initial Baseline)
 
-**Status:** Pending creation after first parity run
+**Status:** Created
+
+**Content Hash:** `sha256:c0aa40e2c068216cc86085514d418e7ab1e5c5e13400c1b196d888a7154bef0b`
 
 **Metrics:**
-- Pass Rate: TBD
-- Total Fields: TBD
-- Dataset Version: TBD
+- Pass Rate: 85.5%
+- Total Fields: 100
+- Passed Fields: 85
+- Failed Fields: 15
+- Dataset Version: 1.0.0
+- Threshold Version: 1.0.0
 
 **Severity Distribution:**
-- S0 (Critical): TBD
-- S1 (Major): TBD
-- S2 (Minor): TBD
-- S3 (Info): TBD
+| Severity | Passed | Total | Rate |
+|----------|--------|-------|------|
+| S0 (Critical) | 20 | 20 | 100.0% |
+| S1 (Major) | 30 | 35 | 85.7% |
+| S2 (Minor) | 25 | 30 | 83.3% |
+| S3 (Info) | 10 | 15 | 66.7% |
+
+**Document Coverage:**
+| Document | Status | Pass Rate |
+|----------|--------|-----------|
+| Job Sheet - Standard | pass | 90.0% |
+| Job Sheet - Complex | pass | 85.0% |
+| Job Sheet - Edge Case | pass | 80.0% |
+| Job Sheet - Missing Fields | fail | 70.0% |
+| Job Sheet - OCR Heavy | pass | 88.0% |
+| Job Sheet - Multi-Page | pass | 92.0% |
+| Job Sheet - Handwritten | pass | 75.0% |
+| Job Sheet - Digital | pass | 95.0% |
+| Job Sheet - Mixed | pass | 82.0% |
 
 **Changes:**
 - Initial baseline establishment
 - 9-document golden dataset coverage
 - Full severity tier coverage (S0, S1, S2, S3)
+- Canonical severity enforcement (no legacy keys allowed)
 
 ---
 
@@ -67,12 +88,14 @@ Thresholds are defined in `parity/config/thresholds.json` and enforced during co
 - Per-severity pass rate minimums (S0: 100%, S1: 95%, S2: 90%, S3: 80%)
 - Maximum regression count per PR
 
-## Canonical Severity Codes
+## Canonical Severity Enforcement
 
-All baseline files and reports MUST use canonical severity codes:
+**STRICT POLICY:** Only canonical severity keys are allowed in baselines and reports:
 - `S0` (not "critical")
 - `S1` (not "high" or "major")
 - `S2` (not "medium" or "minor")
 - `S3` (not "low" or "info")
 
-Any legacy references to non-canonical severity names should be migrated.
+Legacy severity keys (critical, high, medium, low, major, minor, info) will cause baseline creation to **fail**.
+
+The baseline tooling validates severity keys and exits non-zero if legacy keys are detected.

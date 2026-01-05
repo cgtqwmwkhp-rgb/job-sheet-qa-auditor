@@ -3,15 +3,24 @@
  * 
  * Tests for baseline creation, comparison, and listing functionality.
  * Uses canonical severity tiers: S0, S1, S2, S3
+ * 
+ * CANONICAL SEVERITY ENFORCEMENT:
+ * - Only S0, S1, S2, S3 keys are allowed
+ * - Legacy keys (critical, high, medium, low, major, minor, info) are rejected
  */
 
 import { describe, it, expect } from 'vitest';
 import * as crypto from 'crypto';
 
 /**
- * Canonical severity order for deterministic sorting
+ * Canonical severity keys - ONLY these are allowed
  */
-const CANONICAL_SEVERITY_ORDER = ['S0', 'S1', 'S2', 'S3'];
+const CANONICAL_SEVERITY_KEYS = ['S0', 'S1', 'S2', 'S3'];
+
+/**
+ * Legacy severity keys - these are FORBIDDEN
+ */
+const LEGACY_SEVERITY_KEYS = ['critical', 'high', 'medium', 'low', 'major', 'minor', 'info'];
 
 // Test fixtures with canonical severity tiers
 const mockParityReport = {
@@ -115,21 +124,180 @@ describe('Baseline Management', () => {
     });
   });
   
+  describe('Canonical Severity Enforcement', () => {
+    it('should accept canonical severity keys (S0-S3)', () => {
+      const validBySeverity = {
+        S0: { passed: 20, total: 20 },
+        S1: { passed: 30, total: 35 },
+        S2: { passed: 25, total: 30 },
+        S3: { passed: 10, total: 15 }
+      };
+      
+      const error = validateCanonicalSeverity(validBySeverity);
+      expect(error).toBeNull();
+    });
+    
+    it('should accept partial canonical severity keys', () => {
+      const partialBySeverity = {
+        S0: { passed: 20, total: 20 },
+        S2: { passed: 25, total: 30 }
+      };
+      
+      const error = validateCanonicalSeverity(partialBySeverity);
+      expect(error).toBeNull();
+    });
+    
+    it('should accept empty bySeverity', () => {
+      const emptyBySeverity = {};
+      
+      const error = validateCanonicalSeverity(emptyBySeverity);
+      expect(error).toBeNull();
+    });
+    
+    it('should reject legacy severity key "critical"', () => {
+      const legacyBySeverity = {
+        critical: { passed: 20, total: 20 },
+        S1: { passed: 30, total: 35 }
+      };
+      
+      const error = validateCanonicalSeverity(legacyBySeverity);
+      expect(error).not.toBeNull();
+      expect(error).toContain('Legacy severity keys found');
+      expect(error).toContain('critical');
+    });
+    
+    it('should reject legacy severity key "high"', () => {
+      const legacyBySeverity = {
+        high: { passed: 30, total: 35 }
+      };
+      
+      const error = validateCanonicalSeverity(legacyBySeverity);
+      expect(error).not.toBeNull();
+      expect(error).toContain('Legacy severity keys found');
+      expect(error).toContain('high');
+    });
+    
+    it('should reject legacy severity key "medium"', () => {
+      const legacyBySeverity = {
+        medium: { passed: 25, total: 30 }
+      };
+      
+      const error = validateCanonicalSeverity(legacyBySeverity);
+      expect(error).not.toBeNull();
+      expect(error).toContain('Legacy severity keys found');
+      expect(error).toContain('medium');
+    });
+    
+    it('should reject legacy severity key "low"', () => {
+      const legacyBySeverity = {
+        low: { passed: 10, total: 15 }
+      };
+      
+      const error = validateCanonicalSeverity(legacyBySeverity);
+      expect(error).not.toBeNull();
+      expect(error).toContain('Legacy severity keys found');
+      expect(error).toContain('low');
+    });
+    
+    it('should reject legacy severity key "major"', () => {
+      const legacyBySeverity = {
+        major: { passed: 20, total: 25 }
+      };
+      
+      const error = validateCanonicalSeverity(legacyBySeverity);
+      expect(error).not.toBeNull();
+      expect(error).toContain('Legacy severity keys found');
+      expect(error).toContain('major');
+    });
+    
+    it('should reject legacy severity key "minor"', () => {
+      const legacyBySeverity = {
+        minor: { passed: 15, total: 20 }
+      };
+      
+      const error = validateCanonicalSeverity(legacyBySeverity);
+      expect(error).not.toBeNull();
+      expect(error).toContain('Legacy severity keys found');
+      expect(error).toContain('minor');
+    });
+    
+    it('should reject legacy severity key "info"', () => {
+      const legacyBySeverity = {
+        info: { passed: 10, total: 10 }
+      };
+      
+      const error = validateCanonicalSeverity(legacyBySeverity);
+      expect(error).not.toBeNull();
+      expect(error).toContain('Legacy severity keys found');
+      expect(error).toContain('info');
+    });
+    
+    it('should reject multiple legacy severity keys', () => {
+      const legacyBySeverity = {
+        critical: { passed: 20, total: 20 },
+        high: { passed: 30, total: 35 },
+        medium: { passed: 25, total: 30 },
+        low: { passed: 10, total: 15 }
+      };
+      
+      const error = validateCanonicalSeverity(legacyBySeverity);
+      expect(error).not.toBeNull();
+      expect(error).toContain('Legacy severity keys found');
+      expect(error).toContain('critical');
+      expect(error).toContain('high');
+      expect(error).toContain('medium');
+      expect(error).toContain('low');
+    });
+    
+    it('should reject non-canonical severity keys', () => {
+      const invalidBySeverity = {
+        S0: { passed: 20, total: 20 },
+        S5: { passed: 10, total: 15 } // S5 is not canonical
+      };
+      
+      const error = validateCanonicalSeverity(invalidBySeverity);
+      expect(error).not.toBeNull();
+      expect(error).toContain('Non-canonical severity keys found');
+      expect(error).toContain('S5');
+    });
+    
+    it('should reject mixed legacy and non-canonical keys', () => {
+      const mixedBySeverity = {
+        critical: { passed: 20, total: 20 },
+        S0: { passed: 18, total: 20 }
+      };
+      
+      const error = validateCanonicalSeverity(mixedBySeverity);
+      expect(error).not.toBeNull();
+      // Legacy keys are checked first
+      expect(error).toContain('Legacy severity keys found');
+    });
+    
+    it('should be case-insensitive for legacy key detection', () => {
+      const legacyBySeverity = {
+        CRITICAL: { passed: 20, total: 20 }
+      };
+      
+      const error = validateCanonicalSeverity(legacyBySeverity);
+      expect(error).not.toBeNull();
+      expect(error).toContain('Legacy severity keys found');
+    });
+  });
+  
   describe('Canonical Severity Tiers', () => {
     it('should use canonical severity codes (S0-S3)', () => {
       const severities = Object.keys(mockBaseline.metrics.bySeverity);
       
       severities.forEach(sev => {
-        expect(CANONICAL_SEVERITY_ORDER).toContain(sev);
+        expect(CANONICAL_SEVERITY_KEYS).toContain(sev);
       });
     });
     
     it('should not use legacy severity names', () => {
-      const legacyNames = ['critical', 'high', 'medium', 'low', 'major', 'minor', 'info'];
       const severities = Object.keys(mockBaseline.metrics.bySeverity);
       
       severities.forEach(sev => {
-        expect(legacyNames).not.toContain(sev.toLowerCase());
+        expect(LEGACY_SEVERITY_KEYS).not.toContain(sev.toLowerCase());
       });
     });
     
@@ -454,8 +622,8 @@ function classifyDelta(delta: number): 'improved' | 'same' | 'regressed' {
 
 function sortSeverities(severities: string[]): string[] {
   return [...severities].sort((a, b) => {
-    const aIndex = CANONICAL_SEVERITY_ORDER.indexOf(a);
-    const bIndex = CANONICAL_SEVERITY_ORDER.indexOf(b);
+    const aIndex = CANONICAL_SEVERITY_KEYS.indexOf(a);
+    const bIndex = CANONICAL_SEVERITY_KEYS.indexOf(b);
     
     if (aIndex !== -1 && bIndex !== -1) {
       return aIndex - bIndex;
@@ -466,14 +634,49 @@ function sortSeverities(severities: string[]): string[] {
   });
 }
 
+/**
+ * Validate that bySeverity keys are canonical (S0-S3 only).
+ * Rejects legacy keys and any non-canonical keys.
+ * Returns error message if invalid, null if valid.
+ */
+function validateCanonicalSeverity(
+  bySeverity: Record<string, { passed: number; total: number }>
+): string | null {
+  const keys = Object.keys(bySeverity);
+  
+  // Check for legacy keys
+  const legacyKeysFound = keys.filter(k => 
+    LEGACY_SEVERITY_KEYS.includes(k.toLowerCase())
+  );
+  
+  if (legacyKeysFound.length > 0) {
+    return `Legacy severity keys found: ${legacyKeysFound.join(', ')}. ` +
+           `Only canonical keys (${CANONICAL_SEVERITY_KEYS.join(', ')}) are allowed.`;
+  }
+  
+  // Check for non-canonical keys
+  const nonCanonicalKeys = keys.filter(k => !CANONICAL_SEVERITY_KEYS.includes(k));
+  
+  if (nonCanonicalKeys.length > 0) {
+    return `Non-canonical severity keys found: ${nonCanonicalKeys.join(', ')}. ` +
+           `Only canonical keys (${CANONICAL_SEVERITY_KEYS.join(', ')}) are allowed.`;
+  }
+  
+  return null;
+}
+
 function canonicaliseBySeverity(
   bySeverity: Record<string, { passed: number; total: number }>
 ): Record<string, { passed: number; total: number }> {
-  const keys = sortSeverities(Object.keys(bySeverity));
   const result: Record<string, { passed: number; total: number }> = {};
-  for (const key of keys) {
-    result[key] = bySeverity[key];
+  
+  // Only include canonical keys in canonical order
+  for (const key of CANONICAL_SEVERITY_KEYS) {
+    if (bySeverity[key]) {
+      result[key] = bySeverity[key];
+    }
   }
+  
   return result;
 }
 

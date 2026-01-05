@@ -1,0 +1,32 @@
+{
+  "timestamp": "2025-01-05T00:00:00.000Z",
+  "datasetVersion": "1.0.0",
+  "thresholdVersion": "1.0.0",
+  "status": "pass",
+  "passRate": 85.5,
+  "totalFields": 100,
+  "passedFields": 85,
+  "failedFields": 15,
+  "bySeverity": {
+    "S0": { "passed": 20, "total": 20 },
+    "S1": { "passed": 30, "total": 35 },
+    "S2": { "passed": 25, "total": 30 },
+    "S3": { "passed": 10, "total": 15 }
+  },
+  "byReasonCode": {
+    "FIELD_MISSING": { "total": 5 },
+    "VALUE_MISMATCH": { "total": 10 }
+  },
+  "docResults": [
+    { "id": "doc-001", "name": "Job Sheet - Standard", "status": "pass", "passRate": 90.0 },
+    { "id": "doc-002", "name": "Job Sheet - Complex", "status": "pass", "passRate": 85.0 },
+    { "id": "doc-003", "name": "Job Sheet - Edge Case", "status": "pass", "passRate": 80.0 },
+    { "id": "doc-004", "name": "Job Sheet - Missing Fields", "status": "fail", "passRate": 70.0 },
+    { "id": "doc-005", "name": "Job Sheet - OCR Heavy", "status": "pass", "passRate": 88.0 },
+    { "id": "doc-006", "name": "Job Sheet - Multi-Page", "status": "pass", "passRate": 92.0 },
+    { "id": "doc-007", "name": "Job Sheet - Handwritten", "status": "pass", "passRate": 75.0 },
+    { "id": "doc-008", "name": "Job Sheet - Digital", "status": "pass", "passRate": 95.0 },
+    { "id": "doc-009", "name": "Job Sheet - Mixed", "status": "pass", "passRate": 82.0 }
+  ],
+  "violations": []
+}

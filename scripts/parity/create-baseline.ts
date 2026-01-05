@@ -4,6 +4,10 @@
  * Creates a versioned baseline snapshot from the latest parity report.
  * Baselines are immutable once created and require explicit version input.
  * 
+ * CANONICAL SEVERITY ENFORCEMENT:
+ * - Only S0, S1, S2, S3 keys are allowed in bySeverity
+ * - Legacy keys (critical, high, medium, low, major, minor, info) are rejected
+ * 
  * Usage:
  *   npx tsx scripts/parity/create-baseline.ts --version <semver>
  *   npx tsx scripts/parity/create-baseline.ts --version <semver> --report <path>
@@ -53,9 +57,14 @@ interface Baseline {
 }
 
 /**
- * Canonical severity order for deterministic sorting
+ * Canonical severity keys - ONLY these are allowed
  */
-const CANONICAL_SEVERITY_ORDER = ['S0', 'S1', 'S2', 'S3'];
+const CANONICAL_SEVERITY_KEYS = ['S0', 'S1', 'S2', 'S3'];
+
+/**
+ * Legacy severity keys - these are FORBIDDEN
+ */
+const LEGACY_SEVERITY_KEYS = ['critical', 'high', 'medium', 'low', 'major', 'minor', 'info'];
 
 function computeHash(content: string): string {
   const hash = crypto.createHash('sha256');
@@ -69,31 +78,53 @@ function validateSemver(version: string): boolean {
 }
 
 /**
+ * Validate that bySeverity keys are canonical (S0-S3 only).
+ * Rejects legacy keys and any non-canonical keys.
+ * Returns error message if invalid, null if valid.
+ */
+export function validateCanonicalSeverity(
+  bySeverity: Record<string, { passed: number; total: number }>
+): string | null {
+  const keys = Object.keys(bySeverity);
+  
+  // Check for legacy keys
+  const legacyKeysFound = keys.filter(k => 
+    LEGACY_SEVERITY_KEYS.includes(k.toLowerCase())
+  );
+  
+  if (legacyKeysFound.length > 0) {
+    return `Legacy severity keys found: ${legacyKeysFound.join(', ')}. ` +
+           `Only canonical keys (${CANONICAL_SEVERITY_KEYS.join(', ')}) are allowed.`;
+  }
+  
+  // Check for non-canonical keys
+  const nonCanonicalKeys = keys.filter(k => !CANONICAL_SEVERITY_KEYS.includes(k));
+  
+  if (nonCanonicalKeys.length > 0) {
+    return `Non-canonical severity keys found: ${nonCanonicalKeys.join(', ')}. ` +
+           `Only canonical keys (${CANONICAL_SEVERITY_KEYS.join(', ')}) are allowed.`;
+  }
+  
+  return null;
+}
+
+/**
  * Canonicalise bySeverity keys for deterministic ordering.
- * Sorts by canonical severity order (S0, S1, S2, S3), then alphabetically for any others.
+ * Sorts by canonical severity order (S0, S1, S2, S3).
+ * Only includes canonical keys.
  */
 function canonicaliseBySeverity(
   bySeverity: Record<string, { passed: number; total: number }>
 ): Record<string, { passed: number; total: number }> {
-  const keys = Object.keys(bySeverity);
-  
-  // Sort keys: canonical severities first in order, then others alphabetically
-  keys.sort((a, b) => {
-    const aIndex = CANONICAL_SEVERITY_ORDER.indexOf(a);
-    const bIndex = CANONICAL_SEVERITY_ORDER.indexOf(b);
-    
-    if (aIndex !== -1 && bIndex !== -1) {
-      return aIndex - bIndex;
-    }
-    if (aIndex !== -1) return -1;
-    if (bIndex !== -1) return 1;
-    return a.localeCompare(b);
-  });
-  
   const result: Record<string, { passed: number; total: number }> = {};
-  for (const key of keys) {
-    result[key] = bySeverity[key];
+  
+  // Only include canonical keys in canonical order
+  for (const key of CANONICAL_SEVERITY_KEYS) {
+    if (bySeverity[key]) {
+      result[key] = bySeverity[key];
+    }
   }
+  
   return result;
 }
 
@@ -162,6 +193,17 @@ function main(): void {
   
   // Read the latest report
   const report: ParityReport = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
+  
+  // STRICT: Validate canonical severity keys
+  const severityError = validateCanonicalSeverity(report.bySeverity);
+  if (severityError) {
+    console.error('❌ Error: Invalid severity keys in parity report');
+    console.error('   ' + severityError);
+    console.error('');
+    console.error('   The parity report must use canonical severity keys (S0, S1, S2, S3).');
+    console.error('   Legacy keys (critical, high, medium, low, etc.) are not allowed.');
+    process.exit(1);
+  }
   
   // Canonicalise inputs for deterministic hashing
   const canonicalBySeverity = canonicaliseBySeverity(report.bySeverity);
