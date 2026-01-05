@@ -1,5 +1,6 @@
-# Deployment Promotion Workflow - Stage 13
+# Deployment Promotion Workflow - Stage 13d (OPERATIONALISED)
 # Requires governance + parity + rehearsal before promotion
+# PARITY GATE IS REAL: No bypass patterns allowed
 
 name: Deployment Promotion
 
@@ -19,10 +20,15 @@ on:
         default: 'false'
         type: boolean
       skip_parity:
-        description: 'Skip parity check (REQUIRES APPROVAL)'
+        description: 'Skip parity check (STAGING ONLY - requires acknowledgement)'
         required: false
         default: 'false'
         type: boolean
+      skip_parity_acknowledgement:
+        description: 'Type I_ACCEPT_PARITY_SKIP to acknowledge skip (STAGING ONLY)'
+        required: false
+        default: ''
+        type: string
 
 env:
   NODE_VERSION: '22'
@@ -62,14 +68,24 @@ jobs:
             REPORT="${REPORT}✅ On main branch\n"
           fi
           
-          # Check skip_parity requires production approval
+          # Check skip_parity requires acknowledgement and is staging only
           if [ "${{ inputs.skip_parity }}" = "true" ]; then
-            echo "⚠️ Parity skip requested - requires explicit approval"
+            echo "⚠️ Parity skip requested"
             REPORT="${REPORT}⚠️ Parity skip requested\n"
+            
+            # PRODUCTION: Cannot skip parity, ever
             if [ "${{ inputs.target_environment }}" = "production" ]; then
-              echo "❌ Cannot skip parity for production"
+              echo "❌ Cannot skip parity for production - BLOCKED"
               CAN_PROCEED="false"
               REPORT="${REPORT}❌ Cannot skip parity for production\n"
+            # STAGING: Requires explicit acknowledgement
+            elif [ "${{ inputs.skip_parity_acknowledgement }}" != "I_ACCEPT_PARITY_SKIP" ]; then
+              echo "❌ Parity skip requires acknowledgement: I_ACCEPT_PARITY_SKIP"
+              CAN_PROCEED="false"
+              REPORT="${REPORT}❌ Missing skip acknowledgement\n"
+            else
+              echo "⚠️ Parity skip acknowledged for staging"
+              REPORT="${REPORT}⚠️ Parity skip acknowledged for staging\n"
             fi
           fi
           
@@ -223,7 +239,7 @@ jobs:
           echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> promotion-artifacts/build-metadata.txt
           echo "TRIGGERED_BY=${{ github.actor }}" >> promotion-artifacts/build-metadata.txt
 
-  # Gate 5: Parity check
+  # Gate 5: Parity check - REAL GATE (no bypass)
   parity-gate:
     name: Parity Gate
     runs-on: ubuntu-latest
@@ -256,78 +272,30 @@ jobs:
         run: pnpm parity:provenance
 
       - name: Run Parity Full Suite
-        id: parity
+        id: parity-run
         run: |
           echo "Running parity full suite..."
           mkdir -p parity/reports
           
-          # Run parity tests
-          pnpm test:parity:full 2>&1 | tee parity/reports/promotion-parity.txt || true
-          
-          # Generate report
-          node -e "
-          const fs = require('fs');
-          const thresholds = JSON.parse(fs.readFileSync('parity/config/thresholds.json', 'utf-8'));
-          const dataset = JSON.parse(fs.readFileSync('parity/fixtures/golden-dataset.json', 'utf-8'));
-          
-          let totalFields = 0;
-          let passedFields = 0;
-          const violations = [];
-          const bySeverity = {};
-          
-          dataset.documents.forEach(doc => {
-            doc.validatedFields.forEach(f => {
-              totalFields++;
-              bySeverity[f.severity] = bySeverity[f.severity] || { total: 0, passed: 0 };
-              bySeverity[f.severity].total++;
-              if (f.status === 'passed') {
-                passedFields++;
-                bySeverity[f.severity].passed++;
-              }
-            });
-          });
-          
-          const passRate = (passedFields / totalFields * 100).toFixed(1);
-          
-          // Check thresholds
-          const overallThreshold = thresholds.thresholds.overall.minPassRate * 100;
-          if (parseFloat(passRate) < overallThreshold) {
-            violations.push('Overall: ' + passRate + '% < ' + overallThreshold + '%');
-          }
-          
-          Object.entries(bySeverity).forEach(([sev, data]) => {
-            const rate = data.total > 0 ? data.passed / data.total : 1;
-            const threshold = thresholds.thresholds.bySeverity[sev]?.minPassRate || 0;
-            if (rate < threshold) {
-              violations.push(sev + ': ' + (rate * 100).toFixed(1) + '% < ' + (threshold * 100) + '%');
-            }
-          });
-          
-          const status = violations.length > 0 ? 'fail' : 'pass';
-          
-          const report = {
-            timestamp: new Date().toISOString(),
-            sha: '${{ github.sha }}',
-            targetEnv: '${{ inputs.target_environment }}',
-            status,
-            passRate: parseFloat(passRate),
-            totalFields,
-            passedFields,
-            violations
-          };
-          
-          fs.writeFileSync('parity/reports/promotion-parity.json', JSON.stringify(report, null, 2));
-          
-          console.log('status=' + status);
-          console.log('pass_rate=' + passRate);
-          "
-          
-          # Set outputs
-          if [ -f parity/reports/promotion-parity.json ]; then
-            STATUS=$(jq -r '.status' parity/reports/promotion-parity.json)
-            PASS_RATE=$(jq -r '.passRate' parity/reports/promotion-parity.json)
+          # Run parity tests - MUST succeed (no bypass allowed)
+          pnpm test:parity:full 2>&1 | tee parity/reports/promotion-parity.txt
+
+      - name: Read Parity Report
+        id: parity
+        run: |
+          # Read from real parity output
+          if [ -f parity/reports/latest.json ]; then
+            STATUS=$(jq -r '.status' parity/reports/latest.json)
+            PASS_RATE=$(jq -r '.passRate' parity/reports/latest.json)
             echo "status=$STATUS" >> $GITHUB_OUTPUT
             echo "pass_rate=$PASS_RATE" >> $GITHUB_OUTPUT
+            echo "Parity Status: $STATUS"
+            echo "Pass Rate: $PASS_RATE%"
+          else
+            echo "❌ No parity report found at parity/reports/latest.json"
+            echo "status=fail" >> $GITHUB_OUTPUT
+            echo "pass_rate=0" >> $GITHUB_OUTPUT
+            exit 1
           fi
 
       - name: Upload Parity Report
@@ -339,14 +307,17 @@ jobs:
 
       - name: Check Parity Result
         run: |
-          if [ -f parity/reports/promotion-parity.json ]; then
-            STATUS=$(jq -r '.status' parity/reports/promotion-parity.json)
+          if [ -f parity/reports/latest.json ]; then
+            STATUS=$(jq -r '.status' parity/reports/latest.json)
             if [ "$STATUS" = "fail" ]; then
               echo "❌ Parity check failed"
-              jq -r '.violations[]' parity/reports/promotion-parity.json
+              jq -r '.violations[]' parity/reports/latest.json 2>/dev/null || echo 'No violations to display'
               exit 1
             fi
             echo "✅ Parity check passed"
+          else
+            echo "❌ No parity report found"
+            exit 1
           fi
 
   # Final: Generate promotion bundle
@@ -360,7 +331,7 @@ jobs:
       needs.ci-gate.result == 'success' &&
       needs.policy-gate.result == 'success' &&
       needs.rehearsal-gate.result == 'success' &&
-      (needs.parity-gate.result == 'success' || inputs.skip_parity == 'true')
+      (needs.parity-gate.result == 'success' || (inputs.skip_parity == 'true' && inputs.target_environment == 'staging' && inputs.skip_parity_acknowledgement == 'I_ACCEPT_PARITY_SKIP'))
     
     steps:
       - name: Checkout
@@ -401,6 +372,7 @@ jobs:
               "parity": "${{ inputs.skip_parity == 'true' && 'skipped' || 'passed' }}"
             },
             "paritySkipped": ${{ inputs.skip_parity }},
+            "paritySkipAcknowledgement": "${{ inputs.skip_parity_acknowledgement }}",
             "parityPassRate": ${{ needs.parity-gate.outputs.parity_pass_rate || 'null' }}
           }
           EOF
@@ -448,7 +420,7 @@ jobs:
           echo "| Policy | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
           echo "| Rehearsal | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
           if [ "${{ inputs.skip_parity }}" = "true" ]; then
-            echo "| Parity | ⚠️ Skipped |" >> $GITHUB_STEP_SUMMARY
+            echo "| Parity | ⚠️ Skipped (staging only, acknowledged) |" >> $GITHUB_STEP_SUMMARY
           else
             echo "| Parity | ✅ Passed (${{ needs.parity-gate.outputs.parity_pass_rate }}%) |" >> $GITHUB_STEP_SUMMARY
           fi
