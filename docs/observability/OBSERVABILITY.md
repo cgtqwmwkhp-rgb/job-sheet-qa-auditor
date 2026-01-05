@@ -11,6 +11,14 @@ All metrics follow Prometheus best practices:
 - **Labels are stable** - No high-cardinality or PII data in labels
 - **Hash truncation** - Full hashes are never exposed in labels
 
+## Determinism
+
+All metric emissions are deterministic:
+
+- **Canonical severity order** - Severities are always emitted as S0, S1, S2, S3
+- **Label allowlist** - Only `severity`, `hash`, `thresholds_version` labels are permitted
+- **Reproducible output** - Same input always produces same output
+
 ## Metrics
 
 ### Parity Metrics
@@ -50,6 +58,20 @@ All severity-based metrics use canonical labels:
 | `S2` | Medium | Must be >= 90% |
 | `S3` | Low | Must be >= 80% |
 
+**IMPORTANT**: Only canonical severity labels (S0-S3) are accepted. Non-canonical labels like "critical", "high", "medium", "low" are rejected.
+
+## Label Allowlist
+
+Only the following labels are permitted in metrics:
+
+| Label | Description |
+|-------|-------------|
+| `severity` | Canonical severity level (S0-S3) |
+| `hash` | Truncated dataset hash |
+| `thresholds_version` | Version of threshold configuration |
+
+Dynamic or arbitrary labels are not permitted to ensure determinism and prevent label explosion.
+
 ## Alerts
 
 ### Critical Alerts
@@ -79,7 +101,6 @@ All severity-based metrics use canonical labels:
 A Grafana dashboard template is provided at `scripts/monitoring/grafana-dashboard.json`.
 
 ### Panels
-
 1. **Parity Pass Rate** - Current pass rate with color thresholds
 2. **Total Parity Runs** - Counter of all runs
 3. **Threshold Violations** - Violation counter with alerts
@@ -99,7 +120,7 @@ All metrics are validated for PII safety:
 - No SSN/tax IDs
 - No credit card numbers
 - No raw OCR content
-- Hash values are truncated in labels
+- Hash values are truncated in labels (sha256: + 16 chars + ...)
 
 The `validateMetricsSafety()` function checks for common PII patterns before emission.
 
@@ -117,6 +138,13 @@ parity_pass_rate 85.5
 # HELP integrity_last_check_epoch_seconds Unix timestamp of last integrity check
 # TYPE integrity_last_check_epoch_seconds gauge
 integrity_last_check_epoch_seconds 1704326400
+
+# HELP parity_pass_rate_by_severity Pass rate by severity
+# TYPE parity_pass_rate_by_severity gauge
+parity_pass_rate_by_severity{severity="S0"} 100
+parity_pass_rate_by_severity{severity="S1"} 95
+parity_pass_rate_by_severity{severity="S2"} 90
+parity_pass_rate_by_severity{severity="S3"} 85
 ```
 
 ### Grafana
@@ -147,6 +175,36 @@ All observability outputs are vendor-neutral:
 
 No external vendor configuration is required for basic functionality.
 
+## API Reference
+
+### `recordParityRun(results)`
+
+Record parity run results. Only canonical severity labels (S0-S3) are accepted.
+
+### `recordIntegrityCheck(result)`
+
+Record integrity check result. Timestamp is stored as epoch seconds.
+
+### `getMetrics()`
+
+Get current metrics snapshot.
+
+### `formatPrometheusMetrics()`
+
+Format metrics in Prometheus exposition format with deterministic ordering.
+
+### `validateMetricsSafety(metrics)`
+
+Validate metrics for PII safety. Returns `{ safe: boolean, issues: string[] }`.
+
+### `getCanonicalSeverityOrder()`
+
+Get canonical severity order: `['S0', 'S1', 'S2', 'S3']`.
+
+### `getAllowedLabels()`
+
+Get allowed label names: `['severity', 'hash', 'thresholds_version']`.
+
 ## Runbooks
 
 ### Parity Failure on Main
@@ -166,6 +224,7 @@ No external vendor configuration is required for basic functionality.
 5. If tampering, escalate to security
 
 ### Threshold Violations
+
 
 1. Review violation details
 2. Check if thresholds are appropriate
