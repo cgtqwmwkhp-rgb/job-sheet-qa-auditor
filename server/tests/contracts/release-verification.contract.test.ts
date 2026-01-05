@@ -99,8 +99,10 @@ describe("Release Verification Contract Tests", () => {
       expect(scriptContent).toContain('BASE_URL="${1:-}"');
     });
 
-    it("accepts mode as second argument with default soft", () => {
-      expect(scriptContent).toContain('MODE="${2:-soft}"');
+    it("accepts mode as second argument", () => {
+      expect(scriptContent).toContain('MODE_ARG="${2:-}"');
+      // Default is soft when MODE_ARG is empty
+      expect(scriptContent).toContain('MODE="soft"');
     });
 
     it("creates metrics.txt OR missing_evidence.txt", () => {
@@ -189,6 +191,98 @@ describe("Release Verification Contract Tests", () => {
 
     it("production always uses strict mode", () => {
       expect(workflowContent).toContain('"strict"');
+    });
+  });
+
+  // ===========================================================================
+  // ADR-003: Metrics Strict-Mode Policy Tests
+  // ===========================================================================
+  describe("ADR-003: Metrics Strict-Mode Policy", () => {
+    let monitorScript: string;
+    let workflowContent: string;
+    let workflow: any;
+
+    beforeAll(() => {
+      monitorScript = fs.readFileSync(
+        path.join(SCRIPTS_DIR, "monitor-snapshot.sh"),
+        "utf-8"
+      );
+      const workflowPath = path.join(WORKFLOWS_DIR, "release-verification.yml");
+      workflowContent = fs.readFileSync(workflowPath, "utf-8");
+      workflow = yaml.parse(workflowContent);
+    });
+
+    describe("monitor-snapshot.sh ADR-003 Compliance", () => {
+      it("accepts health_only as third argument", () => {
+        expect(monitorScript).toContain('HEALTH_ONLY_ARG="${3:-}"');
+      });
+
+      it("reads HEALTH_ONLY environment variable", () => {
+        expect(monitorScript).toContain('HEALTH_ONLY_ENV="${HEALTH_ONLY:-false}"');
+      });
+
+      it("reads ENVIRONMENT environment variable", () => {
+        expect(monitorScript).toContain('ENVIRONMENT="${ENVIRONMENT:-unknown}"');
+      });
+
+      it("enforces ADR-003 policy for production", () => {
+        expect(monitorScript).toContain('"production"');
+        expect(monitorScript).toContain('ADR-003 POLICY VIOLATION');
+      });
+
+      it("enforces ADR-003 policy for staging", () => {
+        expect(monitorScript).toContain('"staging"');
+      });
+
+      it("includes adr003Compliant in summary.json", () => {
+        expect(monitorScript).toContain('adr003Compliant');
+      });
+
+      it("passes when health_only=true and environment is sandbox", () => {
+        // Script should NOT block sandbox with health_only=true
+        expect(monitorScript).toContain('$HEALTH_ONLY_FLAG');
+        expect(monitorScript).toContain('per ADR-003');
+      });
+    });
+
+    describe("release-verification.yml ADR-003 Compliance", () => {
+      it("has health_only input", () => {
+        const inputs = workflow.on.workflow_dispatch.inputs;
+        expect(inputs).toHaveProperty("health_only");
+        expect(inputs.health_only.type).toBe("boolean");
+        expect(inputs.health_only.default).toBe(false);
+      });
+
+      it("health_only input description references ADR-003", () => {
+        const inputs = workflow.on.workflow_dispatch.inputs;
+        expect(inputs.health_only.description).toContain("ADR-003");
+      });
+
+      it("passes ENVIRONMENT to monitor-snapshot.sh", () => {
+        expect(workflowContent).toContain('ENVIRONMENT:');
+      });
+
+      it("passes HEALTH_ONLY to monitor-snapshot.sh", () => {
+        expect(workflowContent).toContain('HEALTH_ONLY:');
+      });
+
+      it("staging job enforces ADR-003 (blocks health_only=true)", () => {
+        expect(workflowContent).toContain('Enforce ADR-003 (staging cannot use health_only)');
+        expect(workflowContent).toContain('ADR-003 VIOLATION: health_only=true is NOT allowed for staging');
+      });
+
+      it("production job enforces ADR-003 (blocks health_only=true)", () => {
+        expect(workflowContent).toContain('Enforce ADR-003 (production cannot use health_only)');
+        expect(workflowContent).toContain('ADR-003 VIOLATION: health_only=true is NOT allowed for production');
+      });
+
+      it("staging explicitly sets HEALTH_ONLY=false", () => {
+        expect(workflowContent).toContain('ENVIRONMENT: staging');
+      });
+
+      it("production explicitly sets HEALTH_ONLY=false", () => {
+        expect(workflowContent).toContain('ENVIRONMENT: production');
+      });
     });
   });
 
