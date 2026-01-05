@@ -162,3 +162,7 @@ The CI pipeline is designed to pass without external API secrets:
 ## License
 
 Proprietary - All rights reserved
+
+## Related Repositories
+
+- [AI-Scheduler](https://github.com/cgtqwmwkhp-rgb/AI-Scheduler): A backend service responsible for complex scheduling and optimization algorithms.
