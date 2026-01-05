@@ -1,0 +1,92 @@
+{
+  "id": "sandbox-pass-001",
+  "name": "Sandbox Test - Passing Case",
+  "description": "Fully compliant job sheet for UI testing - all checks should pass",
+  "expectedResult": "pass",
+  "schemaVersion": "1.0.0",
+  "extractedFields": {
+    "jobNumber": "JS-2026-SANDBOX-001",
+    "customerName": "SANDBOX_CUSTOMER",
+    "serviceDate": "2026-01-15",
+    "technicianId": "TECH-SANDBOX-01",
+    "workDescription": "Sandbox test maintenance inspection",
+    "partsUsed": ["PART-TEST-A", "PART-TEST-B"],
+    "laborHours": 2.0,
+    "totalCost": 400.00,
+    "customerSignature": true,
+    "technicianSignature": true
+  },
+  "validatedFields": [
+    {
+      "ruleId": "R001",
+      "field": "jobNumber",
+      "status": "passed",
+      "value": "JS-2026-SANDBOX-001",
+      "confidence": 0.98,
+      "pageNumber": 1,
+      "severity": "S0",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R002",
+      "field": "customerName",
+      "status": "passed",
+      "value": "SANDBOX_CUSTOMER",
+      "confidence": 0.95,
+      "pageNumber": 1,
+      "severity": "S0",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R003",
+      "field": "serviceDate",
+      "status": "passed",
+      "value": "2026-01-15",
+      "confidence": 0.99,
+      "pageNumber": 1,
+      "severity": "S1",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R004",
+      "field": "technicianId",
+      "status": "passed",
+      "value": "TECH-SANDBOX-01",
+      "confidence": 0.97,
+      "pageNumber": 1,
+      "severity": "S1",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R005",
+      "field": "customerSignature",
+      "status": "passed",
+      "value": true,
+      "confidence": 0.92,
+      "pageNumber": 1,
+      "severity": "S0",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R006",
+      "field": "technicianSignature",
+      "status": "passed",
+      "value": true,
+      "confidence": 0.94,
+      "pageNumber": 1,
+      "severity": "S0",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R007",
+      "field": "totalCost",
+      "status": "passed",
+      "value": 400.00,
+      "confidence": 0.96,
+      "pageNumber": 1,
+      "severity": "S1",
+      "reasonCode": "VALID"
+    }
+  ],
+  "findings": []
+}

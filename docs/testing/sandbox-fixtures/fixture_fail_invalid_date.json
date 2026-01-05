@@ -1,0 +1,102 @@
+{
+  "id": "sandbox-fail-002",
+  "name": "Sandbox Test - Invalid Date Case",
+  "description": "Job sheet with invalid date format - should fail validation",
+  "expectedResult": "fail",
+  "schemaVersion": "1.0.0",
+  "extractedFields": {
+    "jobNumber": "JS-2026-SANDBOX-003",
+    "customerName": "SANDBOX_CUSTOMER_C",
+    "serviceDate": "01-16-2026",
+    "technicianId": "TECH-SANDBOX-03",
+    "workDescription": "Sandbox test installation",
+    "partsUsed": ["PART-TEST-D", "PART-TEST-E"],
+    "laborHours": 3.0,
+    "totalCost": 550.00,
+    "customerSignature": true,
+    "technicianSignature": true
+  },
+  "validatedFields": [
+    {
+      "ruleId": "R001",
+      "field": "jobNumber",
+      "status": "passed",
+      "value": "JS-2026-SANDBOX-003",
+      "confidence": 0.98,
+      "pageNumber": 1,
+      "severity": "S0",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R002",
+      "field": "customerName",
+      "status": "passed",
+      "value": "SANDBOX_CUSTOMER_C",
+      "confidence": 0.95,
+      "pageNumber": 1,
+      "severity": "S0",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R003",
+      "field": "serviceDate",
+      "status": "failed",
+      "value": "01-16-2026",
+      "confidence": 0.85,
+      "pageNumber": 1,
+      "severity": "S1",
+      "reasonCode": "INVALID_FORMAT",
+      "message": "Date format must be YYYY-MM-DD, received MM-DD-YYYY"
+    },
+    {
+      "ruleId": "R004",
+      "field": "technicianId",
+      "status": "passed",
+      "value": "TECH-SANDBOX-03",
+      "confidence": 0.97,
+      "pageNumber": 1,
+      "severity": "S1",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R005",
+      "field": "customerSignature",
+      "status": "passed",
+      "value": true,
+      "confidence": 0.92,
+      "pageNumber": 1,
+      "severity": "S0",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R006",
+      "field": "technicianSignature",
+      "status": "passed",
+      "value": true,
+      "confidence": 0.94,
+      "pageNumber": 1,
+      "severity": "S0",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R007",
+      "field": "totalCost",
+      "status": "passed",
+      "value": 550.00,
+      "confidence": 0.96,
+      "pageNumber": 1,
+      "severity": "S1",
+      "reasonCode": "VALID"
+    }
+  ],
+  "findings": [
+    {
+      "ruleId": "R003",
+      "field": "serviceDate",
+      "severity": "S1",
+      "message": "Date format must be YYYY-MM-DD, received MM-DD-YYYY",
+      "reasonCode": "INVALID_FORMAT",
+      "pageNumber": 1
+    }
+  ]
+}
