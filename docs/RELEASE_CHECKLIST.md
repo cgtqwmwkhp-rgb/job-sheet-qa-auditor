@@ -2,6 +2,10 @@
 
 This document provides a step-by-step guide for releasing new versions of the Job Sheet QA Auditor.
 
+## Evidence Policy (MANDATORY)
+
+> **No simulated evidence:** All evidence in the release verification pack MUST be real outputs (CI run URLs, curl excerpts, log snippets). The word "SIMULATED" is forbidden in final evidence packs.
+
 ## Pre-Release Validation
 
 ### Automated Checks (CI)
@@ -82,11 +86,36 @@ gh release create v1.x.x --title "v1.x.x" --notes-file CHANGELOG.md
 
 ## Post-Release Verification
 
+### Evidence Pack (REQUIRED)
+
+Generate and validate the release evidence pack:
+
+```bash
+# Generate evidence pack template
+npx tsx scripts/release/generate-evidence-pack.ts
+
+# After filling in real evidence, validate
+npx tsx scripts/release/validate-evidence-pack.ts
+```
+
+### Verification Checklist
+
 - [ ] GitHub Release created successfully
 - [ ] Release artifacts attached
 - [ ] Deployment successful (if applicable)
-- [ ] Smoke tests pass in production
-- [ ] Monitoring shows no anomalies
+- [ ] Smoke tests pass in production (real curl outputs)
+- [ ] Monitoring shows no anomalies (real metrics)
+- [ ] Evidence pack validated (no SIMULATED content)
+
+### Required Evidence
+
+| Item | Source | Format |
+|------|--------|--------|
+| Identity | `/api/trpc/system.version` | `git_sha` + `platform_version` |
+| CI Evidence | GitHub Actions | Run URL + status |
+| Smoke Checks | `scripts/release/smoke-check.sh` | HTTP status + response time |
+| Monitoring | Platform metrics | 4xx/5xx rates, latency |
+| Rollback Plan | Previous SHA | Git SHA + steps |
 
 ## Rollback Procedure
 
@@ -136,6 +165,13 @@ gh pr create --base main
 2. Check for non-deterministic build outputs
 3. Verify no local modifications
 
+### Evidence Pack Validation Fails
+
+1. Check for "SIMULATED" text in the evidence pack
+2. Ensure all required sections are present
+3. Verify identity fields contain real values
+4. Run `npx tsx scripts/release/validate-evidence-pack.ts` for details
+
 ## Version Numbering
 
 We follow [Semantic Versioning](https://semver.org/):
@@ -161,6 +197,7 @@ Follow [Keep a Changelog](https://keepachangelog.com/):
 - Soon-to-be removed features
 
 ### Removed
+
 - Removed features
 
 ### Fixed
