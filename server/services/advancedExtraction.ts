@@ -12,6 +12,9 @@
 
 import { invokeLLM } from '../_core/llm';
 import { getProcessingSettings, ProcessingSettingsConfig } from '../db';
+import { createSafeLogger } from '../utils/safeLogger';
+
+const extractionLogger = createSafeLogger('AdvancedExtraction');
 
 // ============================================================================
 // TYPES
@@ -464,7 +467,7 @@ Respond with ONLY a JSON object:
       }
     }
   } catch (error) {
-    console.error(`LLM extraction failed for ${field.name}:`, error);
+    extractionLogger.error(`LLM extraction failed for ${field.name}`, { error: String(error) });
   }
   
   return { value: null, confidence: 0, strategy: 'llm', evidence: '' };

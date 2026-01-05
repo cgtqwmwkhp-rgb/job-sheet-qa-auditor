@@ -7,6 +7,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { withRetry } from '../utils/resilience';
 import { getCorrelationId } from '../utils/context';
 import { redactObject } from '../utils/piiRedaction';
+import { createSafeLogger } from '../utils/safeLogger';
+
+const webhookLogger = createSafeLogger('Webhooks');
 
 export interface WebhookConfig {
   id: string;
@@ -76,7 +79,7 @@ export function registerWebhook(
   };
 
   webhookRegistry.set(webhook.id, webhook);
-  console.log(`[Webhooks] Registered webhook ${webhook.id} for events: ${events.join(', ')}`);
+  webhookLogger.info(`Registered webhook ${webhook.id}`, { events });
   
   return webhook;
 }
@@ -198,7 +201,7 @@ export async function emitWebhookEvent(
     .filter(w => w.active && w.events.includes(event));
   
   if (subscribers.length === 0) {
-    console.log(`[Webhooks] No subscribers for event: ${event}`);
+    webhookLogger.debug(`No subscribers for event: ${event}`);
     return [];
   }
 
@@ -213,7 +216,7 @@ export async function emitWebhookEvent(
     data: safeData,
   };
 
-  console.log(`[Webhooks] Emitting ${event} to ${subscribers.length} subscribers`, {
+  webhookLogger.info(`Emitting ${event} to ${subscribers.length} subscribers`, {
     correlationId,
     payloadId: payload.id,
   });
@@ -228,7 +231,7 @@ export async function emitWebhookEvent(
     addToDeliveryLog(result);
     
     if (!result.success) {
-      console.error(`[Webhooks] Delivery failed`, {
+      webhookLogger.error('Delivery failed', {
         webhookId: result.webhookId,
         event: result.event,
         error: result.error,

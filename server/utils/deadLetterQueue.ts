@@ -4,6 +4,9 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import { createSafeLogger } from './safeLogger';
+
+const dlqLogger = createSafeLogger('DLQ');
 
 export interface FailedJob {
   id: string;
@@ -80,7 +83,7 @@ export function addToDeadLetterQueue(
 
   deadLetterQueue.set(failedJob.id, failedJob);
 
-  console.error(`[DLQ] Job added: ${failedJob.id}`, {
+  dlqLogger.error(`Job added: ${failedJob.id}`, {
     jobSheetId,
     stage,
     error: error.message,
@@ -162,7 +165,7 @@ export function removeFromDeadLetterQueue(id: string): boolean {
 export function markAsRecovered(id: string): boolean {
   const job = deadLetterQueue.get(id);
   if (job) {
-    console.log(`[DLQ] Job recovered: ${id}`, { jobSheetId: job.jobSheetId });
+    dlqLogger.info(`Job recovered: ${id}`, { jobSheetId: job.jobSheetId });
     return deadLetterQueue.delete(id);
   }
   return false;
@@ -227,7 +230,7 @@ export function getDLQStats(): DLQStats {
 export function clearDeadLetterQueue(): number {
   const count = deadLetterQueue.size;
   deadLetterQueue.clear();
-  console.log(`[DLQ] Cleared ${count} jobs`);
+  dlqLogger.info(`Cleared ${count} jobs`);
   return count;
 }
 
@@ -247,7 +250,7 @@ export function clearOldJobs(maxAgeHours: number = 72): number {
   }
 
   if (cleared > 0) {
-    console.log(`[DLQ] Cleared ${cleared} old jobs (older than ${maxAgeHours}h)`);
+    dlqLogger.info(`Cleared ${cleared} old jobs (older than ${maxAgeHours}h)`);
   }
 
   return cleared;
@@ -271,6 +274,6 @@ export function importDLQ(jobs: FailedJob[]): number {
       imported++;
     }
   }
-  console.log(`[DLQ] Imported ${imported} jobs`);
+  dlqLogger.info(`Imported ${imported} jobs`);
   return imported;
 }

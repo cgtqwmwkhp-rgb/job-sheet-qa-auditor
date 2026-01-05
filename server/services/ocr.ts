@@ -8,6 +8,9 @@ import { withResiliency, mistralCircuitBreaker, CircuitBreakerOpenError } from '
 import { getCorrelationId, addContextMetadata } from '../utils/context';
 import { redactExtractedText } from '../utils/piiRedaction';
 import { addToDeadLetterQueue } from '../utils/deadLetterQueue';
+import { createSafeLogger } from '../utils/safeLogger';
+
+const ocrLogger = createSafeLogger('Mistral OCR');
 
 const MISTRAL_OCR_ENDPOINT = 'https://api.mistral.ai/v1/ocr';
 
@@ -84,7 +87,7 @@ async function callMistralOCR(
     payload.image_limit = options.imageLimit;
   }
 
-  console.log(`[Mistral OCR] Starting extraction`, {
+  ocrLogger.info('Starting extraction', {
     correlationId,
     documentUrl: documentUrl.substring(0, 50) + '...',
   });
@@ -105,7 +108,7 @@ async function callMistralOCR(
     const errorText = await response.text();
     const errorCode = `HTTP_${response.status}`;
     
-    console.error('[Mistral OCR] API error:', {
+    ocrLogger.error('API error', {
       correlationId,
       status: response.status,
       error: errorText,
@@ -150,7 +153,7 @@ async function callMistralOCR(
     }));
   }
 
-  console.log(`[Mistral OCR] Extraction complete`, {
+  ocrLogger.info('Extraction complete', {
     correlationId,
     totalPages: pages.length,
     processingTimeMs,
@@ -209,7 +212,7 @@ export async function extractTextFromDocument(
         backoffMultiplier: 2,
         onRetry: (attempt, error, delayMs) => {
           retryAttempts = attempt;
-          console.warn(`[Mistral OCR] Retry attempt ${attempt}`, {
+          ocrLogger.warn(`Retry attempt ${attempt}`, {
             correlationId,
             error: error.message,
             nextRetryMs: delayMs,
@@ -225,7 +228,7 @@ export async function extractTextFromDocument(
     
     // Handle circuit breaker open
     if (error instanceof CircuitBreakerOpenError) {
-      console.error('[Mistral OCR] Circuit breaker open', {
+      ocrLogger.error('Circuit breaker open', {
         correlationId,
         retryAfterMs: error.retryAfterMs,
       });
@@ -252,7 +255,7 @@ export async function extractTextFromDocument(
       };
     }
 
-    console.error('[Mistral OCR] Processing failed after retries', {
+    ocrLogger.error('Processing failed after retries', {
       correlationId,
       error: error instanceof Error ? error.message : 'Unknown error',
       retryAttempts,
@@ -470,5 +473,5 @@ export function getOCRCircuitBreakerStatus() {
  */
 export function resetOCRCircuitBreaker() {
   mistralCircuitBreaker.reset();
-  console.log('[Mistral OCR] Circuit breaker manually reset');
+  ocrLogger.info('Circuit breaker manually reset');
 }

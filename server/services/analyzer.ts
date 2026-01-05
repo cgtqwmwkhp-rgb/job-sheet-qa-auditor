@@ -9,6 +9,9 @@ import { withResiliency, geminiCircuitBreaker, CircuitBreakerOpenError } from '.
 import { getCorrelationId, addContextMetadata } from '../utils/context';
 import { redactFindings } from '../utils/piiRedaction';
 import { addToDeadLetterQueue } from '../utils/deadLetterQueue';
+import { createSafeLogger } from '../utils/safeLogger';
+
+const analyzerLogger = createSafeLogger('Analyzer');
 
 export interface GoldSpecRule {
   id: string;
@@ -215,7 +218,7 @@ export async function analyzeJobSheet(
   const correlationId = getCorrelationId();
   let retryAttempts = 0;
 
-  console.log(`[Analyzer] Starting analysis`, {
+  analyzerLogger.info('Starting analysis', {
     correlationId,
     specName: goldSpec.name,
     specVersion: goldSpec.version,
@@ -235,7 +238,7 @@ export async function analyzeJobSheet(
         backoffMultiplier: 2,
         onRetry: (attempt, error, delayMs) => {
           retryAttempts = attempt;
-          console.warn(`[Analyzer] Retry attempt ${attempt}`, {
+          analyzerLogger.warn(`Retry attempt ${attempt}`, {
             correlationId,
             error: error.message,
             nextRetryMs: delayMs,
@@ -255,7 +258,7 @@ export async function analyzeJobSheet(
       ? redactFindings(sortedFindings) as Finding[]
       : sortedFindings;
 
-    console.log(`[Analyzer] Analysis complete`, {
+    analyzerLogger.info('Analysis complete', {
       correlationId,
       result: analysisData.overallResult,
       score: analysisData.score,
@@ -285,7 +288,7 @@ export async function analyzeJobSheet(
 
     // Handle circuit breaker open
     if (error instanceof CircuitBreakerOpenError) {
-      console.error('[Analyzer] Circuit breaker open', {
+      analyzerLogger.error('Circuit breaker open', {
         correlationId,
         retryAfterMs: error.retryAfterMs,
       });
@@ -307,7 +310,7 @@ export async function analyzeJobSheet(
       );
     }
 
-    console.error('[Analyzer] Analysis failed after retries', {
+    analyzerLogger.error('Analysis failed after retries', {
       correlationId,
       error: error instanceof Error ? error.message : 'Unknown error',
       retryAttempts,
@@ -496,5 +499,5 @@ export function getAnalyzerCircuitBreakerStatus() {
  */
 export function resetAnalyzerCircuitBreaker() {
   geminiCircuitBreaker.reset();
-  console.log('[Analyzer] Circuit breaker manually reset');
+  analyzerLogger.info('Circuit breaker manually reset');
 }

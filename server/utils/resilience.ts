@@ -3,6 +3,10 @@
  * Provides retry logic, circuit breaker, and fault tolerance patterns
  */
 
+import { createSafeLogger } from './safeLogger';
+
+const resilienceLogger = createSafeLogger('CircuitBreaker');
+
 export interface RetryOptions {
   maxRetries: number;
   baseDelayMs: number;
@@ -159,7 +163,7 @@ export class CircuitBreaker {
         this.options.onStateChange(oldState, newState);
       }
 
-      console.log(`[CircuitBreaker:${this.name}] State transition: ${oldState} → ${newState}`);
+      resilienceLogger.info(`[${this.name}] State transition: ${oldState} → ${newState}`);
     }
   }
 
@@ -284,7 +288,7 @@ export const mistralCircuitBreaker = new CircuitBreaker('mistral-ocr', {
   resetTimeoutMs: 30000,
   halfOpenRequests: 2,
   onStateChange: (from, to) => {
-    console.log(`[Mistral OCR] Circuit breaker: ${from} → ${to}`);
+    resilienceLogger.info(`[Mistral OCR] ${from} → ${to}`);
   },
 });
 
@@ -293,6 +297,6 @@ export const geminiCircuitBreaker = new CircuitBreaker('gemini-analyzer', {
   resetTimeoutMs: 30000,
   halfOpenRequests: 2,
   onStateChange: (from, to) => {
-    console.log(`[Gemini Analyzer] Circuit breaker: ${from} → ${to}`);
+    resilienceLogger.info(`[Gemini Analyzer] ${from} → ${to}`);
   },
 });

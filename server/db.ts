@@ -12,6 +12,9 @@ import {
   InsertProcessingSetting, processingSettings
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { createSafeLogger } from './utils/safeLogger';
+
+const dbLogger = createSafeLogger('Database');
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -21,7 +24,7 @@ export async function getDb() {
     try {
       _db = drizzle(process.env.DATABASE_URL);
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      dbLogger.warn('Failed to connect', { error: String(error) });
       _db = null;
     }
   }
@@ -37,7 +40,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
   const db = await getDb();
   if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
+    dbLogger.warn('Cannot upsert user: database not available');
     return;
   }
 
@@ -84,7 +87,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       set: updateSet,
     });
   } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
+    dbLogger.error('Failed to upsert user', { error: String(error) });
     throw error;
   }
 }
@@ -92,7 +95,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
+    dbLogger.warn('Cannot get user: database not available');
     return undefined;
   }
 
@@ -387,7 +390,7 @@ export async function getWaiverByFindingId(auditFindingId: number) {
 export async function logAction(data: InsertSystemAuditLog) {
   const db = await getDb();
   if (!db) {
-    console.warn("[Database] Cannot log action: database not available");
+    dbLogger.warn('Cannot log action: database not available');
     return;
   }
   
@@ -503,7 +506,7 @@ export async function getProcessingSettings(): Promise<ProcessingSettingsConfig>
     
     return config;
   } catch (error) {
-    console.error('[Database] Failed to get processing settings:', error);
+    dbLogger.error('Failed to get processing settings', { error: String(error) });
     return DEFAULT_PROCESSING_SETTINGS;
   }
 }

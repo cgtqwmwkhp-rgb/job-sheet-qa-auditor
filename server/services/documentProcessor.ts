@@ -10,6 +10,9 @@ import { extractTextFromDocument, OCRResult } from './ocr';
 import { analyzeJobSheet, AnalysisResult, GoldSpec, getDefaultGoldSpec } from './analyzer';
 import * as db from '../db';
 import { v4 as uuidv4 } from 'uuid';
+import { createSafeLogger } from '../utils/safeLogger';
+
+const processorLogger = createSafeLogger('DocumentProcessor');
 
 export interface ProcessingResult {
   success: boolean;
@@ -45,7 +48,7 @@ export async function processJobSheet(
   try {
     await db.updateJobSheetStatus(jobSheetId, 'processing');
   } catch (error) {
-    console.warn('[DocumentProcessor] Could not update job sheet status:', error);
+    processorLogger.warn('Could not update job sheet status', { error: String(error) });
   }
 
   // Stage 1: OCR Text Extraction
@@ -81,7 +84,7 @@ export async function processJobSheet(
     try {
       await db.updateJobSheetStatus(jobSheetId, 'failed');
     } catch (error) {
-      console.warn('[DocumentProcessor] Could not update job sheet status:', error);
+      processorLogger.warn('Could not update job sheet status', { error: String(error) });
     }
     
     return {
@@ -213,7 +216,7 @@ export async function processJobSheet(
       durationMs: Date.now() - storageStartTime,
     });
   } catch (error) {
-    console.error('[DocumentProcessor] Failed to store results:', error);
+    processorLogger.error('Failed to store results', { error: String(error) });
     stages.push({
       stage: 'Store Results',
       status: 'failed',
