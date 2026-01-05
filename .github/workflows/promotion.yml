@@ -504,3 +504,19 @@ jobs:
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ **Promotion bundle generated successfully**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "After deployment, run release verification:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Run smoke checks" >> $GITHUB_STEP_SUMMARY
+          echo "./scripts/release/smoke-check.sh <TARGET_URL>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Capture monitoring snapshot" >> $GITHUB_STEP_SUMMARY
+          echo "./scripts/release/monitor-snapshot.sh <TARGET_URL>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Generate evidence pack" >> $GITHUB_STEP_SUMMARY
+          echo "npx tsx scripts/release/generate-evidence-pack.ts --sha ${{ github.sha }} --env ${{ inputs.target_environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Or trigger the Release Verification workflow from Actions tab." >> $GITHUB_STEP_SUMMARY
