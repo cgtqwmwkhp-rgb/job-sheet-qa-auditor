@@ -1,0 +1,458 @@
+{
+  "version": "3.0.0",
+  "schemaVersion": "1.0.0",
+  "description": "Positive suite - Documents expected to pass all validations",
+  "createdAt": "2026-01-05T00:00:00.000Z",
+  "documents": [
+    {
+      "id": "doc-001",
+      "name": "Standard Job Sheet - Complete",
+      "description": "Fully compliant job sheet with all required fields",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-001",
+        "customerName": "CUSTOMER_A",
+        "serviceDate": "2026-01-15",
+        "technicianId": "TECH-042",
+        "workDescription": "Quarterly maintenance inspection",
+        "partsUsed": [
+          "PART-A100",
+          "PART-B200"
+        ],
+        "laborHours": 2.5,
+        "totalCost": 450,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-001",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "Job Number: JS-2026-001",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_A",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "S0",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "Customer: CUSTOMER_A",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-01-15",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "Date: 2026-01-15",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-042",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "Technician: TECH-042",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Quarterly maintenance inspection",
+          "confidence": 0.92,
+          "pageNumber": 1,
+          "severity": "S2",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "Work: Quarterly maintenance inspection",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-003",
+      "name": "Job Sheet - Low Confidence OCR",
+      "description": "Job sheet with low confidence extraction requiring review",
+      "expectedResult": "pass",
+      "reviewQueueReasons": [
+        "LOW_CONFIDENCE"
+      ],
+      "extractedFields": {
+        "jobNumber": "JS-2026-003",
+        "customerName": "CUSTOMER_C",
+        "serviceDate": "2026-01-17",
+        "technicianId": "TECH-008",
+        "workDescription": "Installation",
+        "partsUsed": [],
+        "laborHours": 6,
+        "totalCost": 900,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-003",
+          "confidence": 0.65,
+          "pageNumber": 1,
+          "severity": "S0",
+          "reasonCode": "LOW_CONFIDENCE",
+          "message": "Low confidence extraction - requires review",
+          "evidence": {
+            "snippet": "Job Number: JS-2026-003",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_C",
+          "confidence": 0.7,
+          "pageNumber": 1,
+          "severity": "S0",
+          "reasonCode": "LOW_CONFIDENCE",
+          "message": "Low confidence extraction - requires review",
+          "evidence": {
+            "snippet": "Customer: CUSTOMER_C",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-01-17",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "Date: 2026-01-17",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-008",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "Technician: TECH-008",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Installation",
+          "confidence": 0.6,
+          "pageNumber": 1,
+          "severity": "S2",
+          "reasonCode": "LOW_CONFIDENCE",
+          "message": "Low confidence extraction - requires review",
+          "evidence": {
+            "snippet": "Work: Installation",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-009",
+      "name": "Job Sheet - Table Heavy",
+      "description": "Job sheet with complex table extraction (multi-page parts list)",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-009",
+        "customerName": "CUSTOMER_I",
+        "serviceDate": "2026-01-22",
+        "technicianId": "TECH-088",
+        "workDescription": "Full system replacement",
+        "partsUsed": [
+          "PART-I901",
+          "PART-I902",
+          "PART-I903",
+          "PART-I904",
+          "PART-I905"
+        ],
+        "laborHours": 8,
+        "totalCost": 2500,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-009",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "Job Number: JS-2026-009",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_I",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "S0",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "Customer: CUSTOMER_I",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-01-22",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "Date: 2026-01-22",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-088",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "Technician: TECH-088",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Full system replacement",
+          "confidence": 0.92,
+          "pageNumber": 1,
+          "severity": "S2",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "Work: Full system replacement",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 3,
+          "severity": "S0",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 3,
+          "severity": "S0",
+          "reasonCode": "VALID",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ],
+      "findings": []
+    }
+  ],
+  "rules": [
+    {
+      "ruleId": "R001",
+      "field": "jobNumber",
+      "description": "Job number must be present and match format JS-YYYY-NNN",
+      "severity": "S0",
+      "type": "pattern",
+      "pattern": "^JS-\\d{4}-\\d{3}$",
+      "enabled": true
+    },
+    {
+      "ruleId": "R002",
+      "field": "customerName",
+      "description": "Customer name must be present",
+      "severity": "S0",
+      "type": "required",
+      "enabled": true
+    },
+    {
+      "ruleId": "R003",
+      "field": "serviceDate",
+      "description": "Service date must be present and valid",
+      "severity": "S1",
+      "type": "pattern",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "enabled": true
+    },
+    {
+      "ruleId": "R004",
+      "field": "technicianId",
+      "description": "Technician ID must be present and match format TECH-NNN",
+      "severity": "S1",
+      "type": "pattern",
+      "pattern": "^TECH-\\d{3}$",
+      "enabled": true
+    },
+    {
+      "ruleId": "R005",
+      "field": "workDescription",
+      "description": "Work description must be present",
+      "severity": "S2",
+      "type": "required",
+      "enabled": true
+    },
+    {
+      "ruleId": "R006",
+      "field": "customerSignature",
+      "description": "Customer signature must be present",
+      "severity": "S0",
+      "type": "required",
+      "enabled": true
+    },
+    {
+      "ruleId": "R007",
+      "field": "technicianSignature",
+      "description": "Technician signature must be present",
+      "severity": "S0",
+      "type": "required",
+      "enabled": true
+    },
+    {
+      "ruleId": "R008",
+      "field": "laborHours",
+      "description": "Labor hours must be within 0-24 range",
+      "severity": "S1",
+      "type": "range",
+      "enabled": true
+    }
+  ],
+  "reasonCodes": {
+    "VALID": "Field passed validation",
+    "MISSING_FIELD": "Required field is missing",
+    "INVALID_FORMAT": "Field value does not match expected format",
+    "OUT_OF_RANGE": "Field value is outside acceptable range",
+    "OUT_OF_POLICY": "Field value violates business policy",
+    "CONFLICT": "Conflicting values detected for field",
+    "LOW_CONFIDENCE": "Extraction confidence below threshold"
+  }
+}
