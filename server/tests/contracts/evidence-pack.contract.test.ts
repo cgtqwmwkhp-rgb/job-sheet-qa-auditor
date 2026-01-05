@@ -192,20 +192,16 @@ describe("Evidence Pack Contract Tests", () => {
         return;
       }
 
-      try {
-        const result = execSync(`${scriptPath} ${samplePath}`, {
-          encoding: "utf-8",
-          cwd: REPO_ROOT,
-        });
-        expect(result).toContain("VALIDATION PASSED");
-      } catch (error: any) {
-        // If it fails, check if it's a real failure or just stderr output
-        if (error.stdout && error.stdout.includes("VALIDATION PASSED")) {
-          expect(error.stdout).toContain("VALIDATION PASSED");
-        } else {
-          throw error;
-        }
-      }
+      // Use spawnSync for better control over exit codes
+      const { spawnSync } = require("child_process");
+      const result = spawnSync(scriptPath, [samplePath], {
+        encoding: "utf-8",
+        cwd: REPO_ROOT,
+      });
+
+      // Check exit code and output
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("VALIDATION PASSED");
     });
   });
 
