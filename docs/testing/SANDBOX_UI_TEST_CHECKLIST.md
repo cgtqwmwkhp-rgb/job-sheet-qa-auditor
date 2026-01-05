@@ -74,3 +74,16 @@
 ---
 
 **Completion:** Once all checkboxes are marked, the sandbox UX verification is complete.
+
+
+---
+
+## RBAC & PII Safety Confirmation
+
+This section confirms that default sandbox behavior aligns with security best practices.
+
+- **Exports are Redacted:** The default JSON export contains the `validatedFields` and `findings`, but does not include the raw OCR text or the original document. This prevents accidental leakage of sensitive information.
+
+- **No Raw OCR in UI:** The UI displays the extracted field values but does not provide a view of the raw, unprocessed OCR text. This reduces the surface area for PII exposure.
+
+- **Fixture Ingestion is Sandbox-Only:** The `scripts/load-fixture.ts` script is guarded by a `NODE_ENV !== 'production'` check. It is impossible to run this script in a production environment, preventing test data from contaminating the production database.
