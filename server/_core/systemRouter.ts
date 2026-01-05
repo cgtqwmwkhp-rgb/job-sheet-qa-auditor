@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { notifyOwner } from "./notification";
 import { adminProcedure, publicProcedure, router } from "./trpc";
+import { ENV } from "./env";
+
+// Runtime environment variables for version info (injected at build/deploy time)
+const GIT_SHA = process.env.GIT_SHA || "unknown";
+const PLATFORM_VERSION = process.env.PLATFORM_VERSION || "unknown";
+const BUILD_TIME = process.env.BUILD_TIME || new Date().toISOString();
 
 export const systemRouter = router({
   health: publicProcedure
@@ -11,7 +17,21 @@ export const systemRouter = router({
     )
     .query(() => ({
       ok: true,
+      oauthEnabled: ENV.oauthEnabled,
+      config: {
+        oauthConfigured: ENV.oauthEnabled,
+        databaseConfigured: Boolean(ENV.databaseUrl),
+        environment: ENV.isProduction ? "production" : "development",
+      },
     })),
+
+  version: publicProcedure.query(() => ({
+    gitSha: GIT_SHA,
+    gitShaShort: GIT_SHA.substring(0, 7),
+    platformVersion: PLATFORM_VERSION,
+    buildTime: BUILD_TIME,
+    environment: process.env.NODE_ENV || "development",
+  })),
 
   notifyOwner: adminProcedure
     .input(

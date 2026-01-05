@@ -7,4 +7,6 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  // OAuth is enabled only when OAUTH_SERVER_URL is configured
+  oauthEnabled: Boolean(process.env.OAUTH_SERVER_URL),
 };
