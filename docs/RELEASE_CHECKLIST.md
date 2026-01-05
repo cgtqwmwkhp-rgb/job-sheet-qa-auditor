@@ -80,19 +80,108 @@ git push origin v1.x.x
 gh release create v1.x.x --title "v1.x.x" --notes-file CHANGELOG.md
 ```
 
-## Post-Release Verification
+## Post-Release Verification (MANDATORY)
 
-- [ ] GitHub Release created successfully
-- [ ] Release artifacts attached
-- [ ] Deployment successful (if applicable)
-- [ ] Smoke tests pass in production
-- [ ] Monitoring shows no anomalies
+> **CRITICAL:** Post-release verification MUST use the canonical `release-verification.yml` workflow.
+> Evidence MUST be captured from the DEPLOYED environment, not simulated.
+
+### Staging Verification
+
+Run the release verification workflow for staging:
+
+```bash
+gh workflow run release-verification.yml \
+  --field environment_name=staging \
+  --field target_url=https://staging.example.com \
+  --field expected_git_sha=$(git rev-parse HEAD) \
+  --field mode=soft
+```
+
+**Required Evidence (from workflow artifacts):**
+
+- [ ] `smoke/deployed_sha.txt` - Contains actual deployed SHA (NOT "MISSING_EVIDENCE")
+- [ ] `smoke/summary.json` - All checks PASS
+- [ ] `monitoring/summary.json` - evidenceType is "METRICS" or "HEALTH_ONLY"
+
+### Production Verification
+
+Run the release verification workflow for production (STRICT mode):
+
+```bash
+gh workflow run release-verification.yml \
+  --field environment_name=production \
+  --field target_url=https://production.example.com \
+  --field expected_git_sha=$(git rev-parse HEAD) \
+  --field mode=strict
+```
+
+**Required Evidence (from workflow artifacts):**
+
+- [ ] `smoke/deployed_sha.txt` - Contains actual deployed SHA matching expected
+- [ ] `smoke/summary.json` - All checks PASS, SHA match MATCH
+- [ ] `monitoring/summary.json` - evidenceType is "METRICS" or "HEALTH_ONLY"
+
+### Multi-Environment Orchestration (Recommended)
+
+For coordinated staging→production verification:
+
+```bash
+gh workflow run release-verification.yml \
+  --field verify_staging=true \
+  --field verify_production=true \
+  --field staging_url=https://staging.example.com \
+  --field production_url=https://production.example.com \
+  --field expected_git_sha=$(git rev-parse HEAD)
+```
+
+This will:
+1. Run staging verification (soft mode)
+2. Only proceed to production if staging passes
+3. Run production verification (strict mode)
+4. Generate combined summary
+
+### Local Verification (Development Only)
+
+For local testing before deployment:
+
+```bash
+# Smoke checks
+./scripts/release/smoke-check.sh http://localhost:3000 $(git rev-parse HEAD) soft
+
+# Monitoring snapshot
+./scripts/release/monitor-snapshot.sh http://localhost:3000 soft
+```
+
+**Output files:**
+- `logs/release/smoke/` - Smoke check results
+- `logs/release/monitoring/` - Monitoring snapshot
+
+## Evidence Pack Requirements
+
+**NO SIMULATED EVIDENCE ALLOWED**
+
+All evidence MUST be captured from real deployed environments:
+
+| Evidence File | Required Content | Failure Marker |
+|--------------|------------------|----------------|
+| `deployed_sha.txt` | Full Git SHA | `MISSING_EVIDENCE:` |
+| `smoke/summary.json` | `overallStatus: PASS` | `overallStatus: FAIL` |
+| `monitoring/summary.json` | `evidenceType: METRICS` or `HEALTH_ONLY` | `evidenceType: NONE` |
+
+If any evidence file contains `MISSING_EVIDENCE:` or `SIMULATED`, the release verification FAILS.
 
 ## Rollback Procedure
 
 If issues are discovered after release:
 
-### 1. Immediate Mitigation
+### 1. Identify Rollback Target
+
+```bash
+# Get previous deployed SHA from promotion history
+gh run list --workflow=promotion.yml --limit=5
+```
+
+### 2. Immediate Mitigation
 
 ```bash
 # Revert to previous version
@@ -100,7 +189,7 @@ git revert HEAD
 git push origin main
 ```
 
-### 2. Create Hotfix
+### 3. Create Hotfix
 
 ```bash
 git checkout -b hotfix/v1.x.x
@@ -110,7 +199,7 @@ git push origin hotfix/v1.x.x
 gh pr create --base main
 ```
 
-### 3. Document Incident
+### 4. Document Incident
 
 - Create incident report
 - Update CHANGELOG with fix
@@ -135,6 +224,23 @@ gh pr create --base main
 1. Re-run the build
 2. Check for non-deterministic build outputs
 3. Verify no local modifications
+
+### Release Verification Fails
+
+1. **deployed_sha.txt contains MISSING_EVIDENCE:**
+   - Check if `/api/trpc/system.version` endpoint exists
+   - Verify the endpoint returns `gitSha` field
+   - Check network connectivity to target environment
+
+2. **SHA Mismatch:**
+   - Verify deployment completed successfully
+   - Check if correct commit was deployed
+   - Confirm no caching issues
+
+3. **Monitoring shows HEALTH_ONLY:**
+   - This is acceptable in soft mode
+   - For strict mode, ensure metrics endpoint is available
+   - Check `/metrics` or `/api/metrics` endpoint
 
 ## Version Numbering
 

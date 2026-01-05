@@ -38,6 +38,17 @@ The following CI jobs MUST pass before merging to `main`:
 | **Release Rehearsal** | Blocking | Validates release readiness |
 | Branch Protection Proof | Non-blocking | Verifies protection rules (informational) |
 
+### Release Verification Workflow (`release-verification.yml`)
+
+| Job Name | Type | Purpose |
+|----------|------|---------|
+| verify-single | Non-blocking | Single environment verification (manual trigger) |
+| verify-staging | Non-blocking | Staging environment verification (orchestration mode) |
+| verify-production | Non-blocking | Production environment verification (requires staging pass) |
+| summary | Non-blocking | Combined verification summary |
+
+**Note:** Release verification is triggered manually post-deployment and is not a merge gate.
+
 ## Review Requirements
 
 ### Assumed Configuration

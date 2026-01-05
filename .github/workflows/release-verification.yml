@@ -1,0 +1,383 @@
+# =============================================================================
+# CANONICAL RELEASE VERIFICATION WORKFLOW
+# =============================================================================
+# This is the ONLY release verification workflow. Do not create alternatives.
+#
+# Features:
+# - Multi-environment orchestration (staging → production)
+# - Deployed SHA capture from /api/trpc/system.version
+# - Strict mode enforcement for production
+# - No secrets required in default CI
+# =============================================================================
+
+name: Release Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      # Single environment mode
+      environment_name:
+        description: 'Environment name (staging/production) - for single-target mode'
+        required: false
+        type: string
+        default: ''
+      target_url:
+        description: 'Target URL - for single-target mode'
+        required: false
+        type: string
+        default: ''
+      expected_git_sha:
+        description: 'Expected Git SHA to verify against deployed version'
+        required: false
+        type: string
+        default: ''
+      mode:
+        description: 'Verification mode (soft=warn on issues, strict=fail on issues)'
+        required: false
+        type: choice
+        options:
+          - soft
+          - strict
+        default: 'soft'
+      
+      # Multi-environment orchestration mode
+      verify_staging:
+        description: 'Verify staging environment'
+        required: false
+        type: boolean
+        default: false
+      verify_production:
+        description: 'Verify production environment'
+        required: false
+        type: boolean
+        default: false
+      staging_url:
+        description: 'Staging environment URL'
+        required: false
+        type: string
+        default: ''
+      production_url:
+        description: 'Production environment URL'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  # ===========================================================================
+  # Single Environment Verification
+  # ===========================================================================
+  verify-single:
+    if: ${{ inputs.target_url != '' && inputs.verify_staging == false && inputs.verify_production == false }}
+    runs-on: ubuntu-latest
+    outputs:
+      deployed_sha: ${{ steps.smoke.outputs.deployed_sha }}
+      smoke_status: ${{ steps.smoke.outputs.status }}
+      monitor_status: ${{ steps.monitor.outputs.status }}
+    steps:
+      - name: Log CI context
+        env:
+          REPO_CONTEXT: "job-sheet-qa-auditor (TypeScript/Node)"
+        run: |
+          echo "=================================================="
+          echo "  REPO:        ${REPO_CONTEXT}"
+          echo "  WORKFLOW:    ${{ github.workflow }}"
+          echo "  JOB:         ${{ github.job }}"
+          echo "  SHA:         ${{ github.sha }}"
+          echo "  REF:         ${{ github.ref }}"
+          echo "  EVENT:       ${{ github.event_name }}"
+          echo "  ENVIRONMENT: ${{ inputs.environment_name }}"
+          echo "  TARGET:      ${{ inputs.target_url }}"
+          echo "  MODE:        ${{ inputs.mode }}"
+          echo "=================================================="
+
+      - uses: actions/checkout@v4
+
+      - name: Run smoke checks
+        id: smoke
+        run: |
+          chmod +x scripts/release/smoke-check.sh
+          set +e
+          ./scripts/release/smoke-check.sh "${{ inputs.target_url }}" "${{ inputs.expected_git_sha }}" "${{ inputs.mode }}"
+          EXIT_CODE=$?
+          set -e
+          
+          # Read deployed SHA
+          if [[ -f logs/release/smoke/deployed_sha.txt ]]; then
+            DEPLOYED_SHA=$(cat logs/release/smoke/deployed_sha.txt)
+            echo "deployed_sha=$DEPLOYED_SHA" >> $GITHUB_OUTPUT
+          else
+            echo "deployed_sha=MISSING" >> $GITHUB_OUTPUT
+          fi
+          
+          # Set status
+          if [[ $EXIT_CODE -eq 0 ]]; then
+            echo "status=PASS" >> $GITHUB_OUTPUT
+          else
+            echo "status=FAIL" >> $GITHUB_OUTPUT
+            exit $EXIT_CODE
+          fi
+
+      - name: Run monitoring snapshot
+        id: monitor
+        run: |
+          chmod +x scripts/release/monitor-snapshot.sh
+          set +e
+          ./scripts/release/monitor-snapshot.sh "${{ inputs.target_url }}" "${{ inputs.mode }}"
+          EXIT_CODE=$?
+          set -e
+          
+          # Set status
+          if [[ $EXIT_CODE -eq 0 ]]; then
+            echo "status=PASS" >> $GITHUB_OUTPUT
+          else
+            echo "status=WARN" >> $GITHUB_OUTPUT
+            # In soft mode, don't fail the job for monitoring issues
+            if [[ "${{ inputs.mode }}" == "strict" ]]; then
+              exit $EXIT_CODE
+            fi
+          fi
+
+      - name: Upload verification artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-${{ inputs.environment_name || 'single' }}-${{ github.run_id }}
+          path: logs/release/
+          retention-days: 30
+
+      - name: Generate summary
+        run: |
+          echo "## Release Verification: ${{ inputs.environment_name || 'Single Target' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Target URL | ${{ inputs.target_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Expected SHA | ${{ inputs.expected_git_sha || 'Not specified' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deployed SHA | ${{ steps.smoke.outputs.deployed_sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mode | ${{ inputs.mode }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Status | ${{ steps.smoke.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Monitor Status | ${{ steps.monitor.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # Staging Verification (Orchestration Mode)
+  # ===========================================================================
+  verify-staging:
+    if: ${{ inputs.verify_staging == true }}
+    runs-on: ubuntu-latest
+    outputs:
+      deployed_sha: ${{ steps.smoke.outputs.deployed_sha }}
+      smoke_status: ${{ steps.smoke.outputs.status }}
+      monitor_status: ${{ steps.monitor.outputs.status }}
+    steps:
+      - name: Log CI context
+        env:
+          REPO_CONTEXT: "job-sheet-qa-auditor (TypeScript/Node)"
+        run: |
+          echo "=================================================="
+          echo "  REPO:        ${REPO_CONTEXT}"
+          echo "  WORKFLOW:    ${{ github.workflow }}"
+          echo "  JOB:         ${{ github.job }}"
+          echo "  SHA:         ${{ github.sha }}"
+          echo "  REF:         ${{ github.ref }}"
+          echo "  EVENT:       ${{ github.event_name }}"
+          echo "  ENVIRONMENT: staging"
+          echo "  TARGET:      ${{ inputs.staging_url }}"
+          echo "  MODE:        soft (staging always soft)"
+          echo "=================================================="
+
+      - uses: actions/checkout@v4
+
+      - name: Run smoke checks (staging - soft mode)
+        id: smoke
+        run: |
+          chmod +x scripts/release/smoke-check.sh
+          set +e
+          ./scripts/release/smoke-check.sh "${{ inputs.staging_url }}" "${{ inputs.expected_git_sha }}" "soft"
+          EXIT_CODE=$?
+          set -e
+          
+          # Read deployed SHA
+          if [[ -f logs/release/smoke/deployed_sha.txt ]]; then
+            DEPLOYED_SHA=$(cat logs/release/smoke/deployed_sha.txt)
+            echo "deployed_sha=$DEPLOYED_SHA" >> $GITHUB_OUTPUT
+          else
+            echo "deployed_sha=MISSING" >> $GITHUB_OUTPUT
+          fi
+          
+          # Set status
+          if [[ $EXIT_CODE -eq 0 ]]; then
+            echo "status=PASS" >> $GITHUB_OUTPUT
+          else
+            echo "status=FAIL" >> $GITHUB_OUTPUT
+            exit $EXIT_CODE
+          fi
+
+      - name: Run monitoring snapshot (staging - soft mode)
+        id: monitor
+        run: |
+          chmod +x scripts/release/monitor-snapshot.sh
+          set +e
+          ./scripts/release/monitor-snapshot.sh "${{ inputs.staging_url }}" "soft"
+          EXIT_CODE=$?
+          set -e
+          
+          if [[ $EXIT_CODE -eq 0 ]]; then
+            echo "status=PASS" >> $GITHUB_OUTPUT
+          else
+            echo "status=WARN" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload staging artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-staging-${{ github.run_id }}
+          path: logs/release/
+          retention-days: 30
+
+      - name: Generate staging summary
+        run: |
+          echo "## Staging Verification" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Target URL | ${{ inputs.staging_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Expected SHA | ${{ inputs.expected_git_sha || 'Not specified' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deployed SHA | ${{ steps.smoke.outputs.deployed_sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mode | soft |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Status | ${{ steps.smoke.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Monitor Status | ${{ steps.monitor.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # Production Verification (Orchestration Mode - Requires Staging Pass)
+  # ===========================================================================
+  verify-production:
+    if: ${{ inputs.verify_production == true }}
+    needs: [verify-staging]
+    runs-on: ubuntu-latest
+    outputs:
+      deployed_sha: ${{ steps.smoke.outputs.deployed_sha }}
+      smoke_status: ${{ steps.smoke.outputs.status }}
+      monitor_status: ${{ steps.monitor.outputs.status }}
+    steps:
+      - name: Check staging gate
+        if: ${{ inputs.verify_staging == true }}
+        run: |
+          if [[ "${{ needs.verify-staging.outputs.smoke_status }}" != "PASS" ]]; then
+            echo "::error::Staging smoke checks did not pass. Cannot proceed to production."
+            exit 1
+          fi
+          echo "✅ Staging passed. Proceeding to production verification."
+
+      - name: Log CI context
+        env:
+          REPO_CONTEXT: "job-sheet-qa-auditor (TypeScript/Node)"
+        run: |
+          echo "=================================================="
+          echo "  REPO:        ${REPO_CONTEXT}"
+          echo "  WORKFLOW:    ${{ github.workflow }}"
+          echo "  JOB:         ${{ github.job }}"
+          echo "  SHA:         ${{ github.sha }}"
+          echo "  REF:         ${{ github.ref }}"
+          echo "  EVENT:       ${{ github.event_name }}"
+          echo "  ENVIRONMENT: production"
+          echo "  TARGET:      ${{ inputs.production_url }}"
+          echo "  MODE:        strict (production always strict)"
+          echo "=================================================="
+
+      - uses: actions/checkout@v4
+
+      - name: Run smoke checks (production - STRICT mode)
+        id: smoke
+        run: |
+          chmod +x scripts/release/smoke-check.sh
+          set +e
+          ./scripts/release/smoke-check.sh "${{ inputs.production_url }}" "${{ inputs.expected_git_sha }}" "strict"
+          EXIT_CODE=$?
+          set -e
+          
+          # Read deployed SHA
+          if [[ -f logs/release/smoke/deployed_sha.txt ]]; then
+            DEPLOYED_SHA=$(cat logs/release/smoke/deployed_sha.txt)
+            echo "deployed_sha=$DEPLOYED_SHA" >> $GITHUB_OUTPUT
+          else
+            echo "deployed_sha=MISSING" >> $GITHUB_OUTPUT
+          fi
+          
+          # Set status - strict mode fails on any issue
+          if [[ $EXIT_CODE -eq 0 ]]; then
+            echo "status=PASS" >> $GITHUB_OUTPUT
+          else
+            echo "status=FAIL" >> $GITHUB_OUTPUT
+            exit $EXIT_CODE
+          fi
+
+      - name: Run monitoring snapshot (production - STRICT mode)
+        id: monitor
+        run: |
+          chmod +x scripts/release/monitor-snapshot.sh
+          set +e
+          ./scripts/release/monitor-snapshot.sh "${{ inputs.production_url }}" "strict"
+          EXIT_CODE=$?
+          set -e
+          
+          if [[ $EXIT_CODE -eq 0 ]]; then
+            echo "status=PASS" >> $GITHUB_OUTPUT
+          else
+            echo "status=FAIL" >> $GITHUB_OUTPUT
+            exit $EXIT_CODE
+          fi
+
+      - name: Upload production artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-production-${{ github.run_id }}
+          path: logs/release/
+          retention-days: 30
+
+      - name: Generate production summary
+        run: |
+          echo "## Production Verification" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Target URL | ${{ inputs.production_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Expected SHA | ${{ inputs.expected_git_sha || 'Not specified' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deployed SHA | ${{ steps.smoke.outputs.deployed_sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mode | strict |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Status | ${{ steps.smoke.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Monitor Status | ${{ steps.monitor.outputs.status }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # Combined Summary (Orchestration Mode)
+  # ===========================================================================
+  summary:
+    if: ${{ always() && (inputs.verify_staging == true || inputs.verify_production == true) }}
+    needs: [verify-staging, verify-production]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate combined summary
+        run: |
+          echo "# Release Verification Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Environments Verified" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ inputs.verify_staging }}" == "true" ]]; then
+            echo "### Staging" >> $GITHUB_STEP_SUMMARY
+            echo "- URL: ${{ inputs.staging_url }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Deployed SHA: ${{ needs.verify-staging.outputs.deployed_sha }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Smoke: ${{ needs.verify-staging.outputs.smoke_status }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Monitor: ${{ needs.verify-staging.outputs.monitor_status }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [[ "${{ inputs.verify_production }}" == "true" ]]; then
+            echo "### Production" >> $GITHUB_STEP_SUMMARY
+            echo "- URL: ${{ inputs.production_url }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Deployed SHA: ${{ needs.verify-production.outputs.deployed_sha }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Smoke: ${{ needs.verify-production.outputs.smoke_status }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Monitor: ${{ needs.verify-production.outputs.monitor_status }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "## Expected vs Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "- Expected SHA: ${{ inputs.expected_git_sha || 'Not specified' }}" >> $GITHUB_STEP_SUMMARY
