@@ -20,7 +20,7 @@ groups:
         annotations:
           summary: "Parity check failed on main branch"
           description: "Parity validation has failed on the main branch. This may indicate a regression."
-          runbook_url: "https://docs.example.com/runbooks/parity-failure"
+          runbook_url: "docs/observability/OBSERVABILITY.md#parity-failure-on-main"
 
       # Alert on repeated threshold violations
       - alert: RepeatedThresholdViolations
@@ -32,7 +32,7 @@ groups:
         annotations:
           summary: "Multiple parity threshold violations detected"
           description: "More than 3 threshold violations in the last hour. Review validation rules and thresholds."
-          runbook_url: "https://docs.example.com/runbooks/threshold-violations"
+          runbook_url: "docs/observability/OBSERVABILITY.md#threshold-violations"
 
       # Alert when pass rate drops significantly
       - alert: ParityPassRateDrop
@@ -44,7 +44,7 @@ groups:
         annotations:
           summary: "Parity pass rate below 80%"
           description: "Current pass rate: {{ $value }}%. This is below the acceptable threshold."
-          runbook_url: "https://docs.example.com/runbooks/pass-rate-drop"
+          runbook_url: "docs/observability/OBSERVABILITY.md#runbooks"
 
       # Alert on S0 (critical) severity failures - MUST be 100%
       - alert: CriticalSeverityFailures
@@ -56,7 +56,7 @@ groups:
         annotations:
           summary: "Critical (S0) severity fields failing"
           description: "S0 severity fields are not at 100% pass rate (current: {{ $value }}%). Immediate attention required."
-          runbook_url: "https://docs.example.com/runbooks/critical-failures"
+          runbook_url: "docs/observability/OBSERVABILITY.md#severity-specific-failures"
 
       # Alert on S1 (high) severity failures - MUST be >= 95%
       - alert: HighSeverityFailures
@@ -68,7 +68,7 @@ groups:
         annotations:
           summary: "High (S1) severity fields below threshold"
           description: "S1 severity fields are below 95% pass rate (current: {{ $value }}%). Review required."
-          runbook_url: "https://docs.example.com/runbooks/high-severity-failures"
+          runbook_url: "docs/observability/OBSERVABILITY.md#severity-specific-failures"
 
       # Alert on S2 (medium) severity failures - MUST be >= 90%
       - alert: MediumSeverityFailures
@@ -80,7 +80,7 @@ groups:
         annotations:
           summary: "Medium (S2) severity fields below threshold"
           description: "S2 severity fields are below 90% pass rate (current: {{ $value }}%)."
-          runbook_url: "https://docs.example.com/runbooks/medium-severity-failures"
+          runbook_url: "docs/observability/OBSERVABILITY.md#severity-specific-failures"
 
       # Alert on S3 (low) severity failures - MUST be >= 80%
       - alert: LowSeverityFailures
@@ -92,7 +92,7 @@ groups:
         annotations:
           summary: "Low (S3) severity fields below threshold"
           description: "S3 severity fields are below 80% pass rate (current: {{ $value }}%)."
-          runbook_url: "https://docs.example.com/runbooks/low-severity-failures"
+          runbook_url: "docs/observability/OBSERVABILITY.md#severity-specific-failures"
 
   - name: integrity_alerts
     rules:
@@ -106,7 +106,7 @@ groups:
         annotations:
           summary: "Integrity mismatch spike detected"
           description: "More than 5 integrity mismatches in the last hour. Possible data corruption or tampering."
-          runbook_url: "https://docs.example.com/runbooks/integrity-mismatch"
+          runbook_url: "docs/observability/OBSERVABILITY.md#integrity-mismatch"
 
       # Alert when dataset hash changes unexpectedly
       - alert: DatasetHashChanged
@@ -118,7 +118,7 @@ groups:
         annotations:
           summary: "Dataset hash changed"
           description: "The golden dataset hash has changed. Verify this was intentional."
-          runbook_url: "https://docs.example.com/runbooks/dataset-change"
+          runbook_url: "docs/observability/OBSERVABILITY.md#runbooks"
 
       # Alert when integrity check is stale (no check in 24h)
       - alert: IntegrityCheckStale
@@ -130,7 +130,7 @@ groups:
         annotations:
           summary: "Integrity check is stale"
           description: "No integrity check has run in the last 24 hours. Check CI/CD pipeline."
-          runbook_url: "https://docs.example.com/runbooks/integrity-stale"
+          runbook_url: "docs/observability/OBSERVABILITY.md#runbooks"
 
   - name: operational_alerts
     rules:
@@ -144,7 +144,7 @@ groups:
         annotations:
           summary: "No parity runs in 24 hours"
           description: "Parity checks have not run in the last 24 hours. Check CI/CD pipeline."
-          runbook_url: "https://docs.example.com/runbooks/parity-stalled"
+          runbook_url: "docs/observability/OBSERVABILITY.md#runbooks"
 
       # Alert when metrics endpoint is unavailable
       - alert: MetricsEndpointDown
@@ -156,4 +156,4 @@ groups:
         annotations:
           summary: "Parity metrics endpoint is down"
           description: "The parity metrics endpoint has been unavailable for 5 minutes."
-          runbook_url: "https://docs.example.com/runbooks/metrics-down"
+          runbook_url: "docs/observability/OBSERVABILITY.md#runbooks"
