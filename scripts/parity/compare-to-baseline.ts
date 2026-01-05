@@ -4,6 +4,10 @@
  * Compares current parity outputs to a selected baseline deterministically.
  * Applies threshold rules and reports regressions.
  * 
+ * CANONICAL SEVERITY ENFORCEMENT:
+ * - Only S0, S1, S2, S3 keys are allowed in bySeverity
+ * - Legacy keys (critical, high, medium, low, major, minor, info) are rejected
+ * 
  * Usage:
  *   npx tsx scripts/parity/compare-to-baseline.ts --baseline <version>
  *   npx tsx scripts/parity/compare-to-baseline.ts --baseline <version> --strict
@@ -106,14 +110,50 @@ interface ComparisonResult {
 }
 
 /**
- * Canonical severity order for deterministic sorting
+ * Canonical severity keys - ONLY these are allowed
  */
-const CANONICAL_SEVERITY_ORDER = ['S0', 'S1', 'S2', 'S3'];
+const CANONICAL_SEVERITY_KEYS = ['S0', 'S1', 'S2', 'S3'];
+
+/**
+ * Legacy severity keys - these are FORBIDDEN
+ */
+const LEGACY_SEVERITY_KEYS = ['critical', 'high', 'medium', 'low', 'major', 'minor', 'info'];
+
+/**
+ * Validate that bySeverity keys are canonical (S0-S3 only).
+ * Rejects legacy keys and any non-canonical keys.
+ * Returns error message if invalid, null if valid.
+ */
+export function validateCanonicalSeverity(
+  bySeverity: Record<string, { passed: number; total: number }>
+): string | null {
+  const keys = Object.keys(bySeverity);
+  
+  // Check for legacy keys
+  const legacyKeysFound = keys.filter(k => 
+    LEGACY_SEVERITY_KEYS.includes(k.toLowerCase())
+  );
+  
+  if (legacyKeysFound.length > 0) {
+    return `Legacy severity keys found: ${legacyKeysFound.join(', ')}. ` +
+           `Only canonical keys (${CANONICAL_SEVERITY_KEYS.join(', ')}) are allowed.`;
+  }
+  
+  // Check for non-canonical keys
+  const nonCanonicalKeys = keys.filter(k => !CANONICAL_SEVERITY_KEYS.includes(k));
+  
+  if (nonCanonicalKeys.length > 0) {
+    return `Non-canonical severity keys found: ${nonCanonicalKeys.join(', ')}. ` +
+           `Only canonical keys (${CANONICAL_SEVERITY_KEYS.join(', ')}) are allowed.`;
+  }
+  
+  return null;
+}
 
 function sortSeverities(severities: string[]): string[] {
   return [...severities].sort((a, b) => {
-    const aIndex = CANONICAL_SEVERITY_ORDER.indexOf(a);
-    const bIndex = CANONICAL_SEVERITY_ORDER.indexOf(b);
+    const aIndex = CANONICAL_SEVERITY_KEYS.indexOf(a);
+    const bIndex = CANONICAL_SEVERITY_KEYS.indexOf(b);
     
     if (aIndex !== -1 && bIndex !== -1) {
       return aIndex - bIndex;
@@ -180,6 +220,28 @@ function main(): void {
   const baseline: Baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf-8'));
   const report: ParityReport = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
   const thresholds: ThresholdConfig = JSON.parse(fs.readFileSync(thresholdsPath, 'utf-8'));
+  
+  // STRICT: Validate canonical severity keys in baseline
+  const baselineSeverityError = validateCanonicalSeverity(baseline.metrics.bySeverity);
+  if (baselineSeverityError) {
+    console.error('❌ Error: Invalid severity keys in baseline');
+    console.error('   ' + baselineSeverityError);
+    console.error('');
+    console.error('   The baseline must use canonical severity keys (S0, S1, S2, S3).');
+    console.error('   This baseline may have been created with an older version.');
+    process.exit(1);
+  }
+  
+  // STRICT: Validate canonical severity keys in current report
+  const reportSeverityError = validateCanonicalSeverity(report.bySeverity);
+  if (reportSeverityError) {
+    console.error('❌ Error: Invalid severity keys in parity report');
+    console.error('   ' + reportSeverityError);
+    console.error('');
+    console.error('   The parity report must use canonical severity keys (S0, S1, S2, S3).');
+    console.error('   Legacy keys (critical, high, medium, low, etc.) are not allowed.');
+    process.exit(1);
+  }
   
   // Check version compatibility
   const versionWarnings: string[] = [];
