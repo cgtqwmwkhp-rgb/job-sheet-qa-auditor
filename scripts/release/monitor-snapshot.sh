@@ -1,12 +1,22 @@
 #!/bin/bash
 # =============================================================================
-# MONITORING SNAPSHOT SCRIPT - Contract Aligned
+# MONITORING SNAPSHOT SCRIPT - ADR-003 Compliant
 # =============================================================================
-# Usage: ./monitor-snapshot.sh <base_url> [mode]
+# Usage: ./monitor-snapshot.sh <base_url> [mode] [health_only]
 #
 # Arguments:
-#   base_url - Required. Target URL (e.g., https://staging.example.com)
-#   mode     - Optional. soft (default) or strict
+#   base_url    - Required. Target URL (e.g., https://staging.example.com)
+#   mode        - Optional. soft (default) or strict
+#   health_only - Optional. true or false (default). Per ADR-003.
+#
+# Environment Variables:
+#   STRICT_MODE  - Alternative to mode argument (true/false)
+#   HEALTH_ONLY  - Alternative to health_only argument (true/false)
+#   ENVIRONMENT  - Environment name (sandbox/staging/production)
+#
+# ADR-003 Policy:
+#   - Production/Staging: MUST NOT use health_only=true
+#   - Sandbox/Development: MAY use health_only=true
 #
 # Output Files (always written to logs/release/monitoring/):
 #   - metrics.txt OR missing_evidence.txt - Metrics data or missing marker
@@ -14,21 +24,46 @@
 #   - summary.json                        - Structured summary
 #
 # Exit Codes:
-#   0 - Metrics captured (or soft mode with health-only)
-#   1 - Critical failure (strict mode with missing metrics)
+#   0 - Success (metrics captured, or health_only mode with health OK)
+#   1 - Failure (strict mode without metrics, or health_only violation)
 # =============================================================================
 
 set -euo pipefail
 
 # =============================================================================
-# Arguments
+# Arguments and Environment
 # =============================================================================
 BASE_URL="${1:-}"
-MODE="${2:-soft}"
+MODE_ARG="${2:-}"
+HEALTH_ONLY_ARG="${3:-}"
+
+# Environment variable fallbacks
+STRICT_MODE_ENV="${STRICT_MODE:-false}"
+HEALTH_ONLY_ENV="${HEALTH_ONLY:-false}"
+ENVIRONMENT="${ENVIRONMENT:-unknown}"
+
+# Resolve mode
+if [[ -n "$MODE_ARG" ]]; then
+  MODE="$MODE_ARG"
+elif [[ "$STRICT_MODE_ENV" == "true" ]]; then
+  MODE="strict"
+else
+  MODE="soft"
+fi
+
+# Resolve health_only
+if [[ -n "$HEALTH_ONLY_ARG" ]]; then
+  HEALTH_ONLY_FLAG="$HEALTH_ONLY_ARG"
+else
+  HEALTH_ONLY_FLAG="$HEALTH_ONLY_ENV"
+fi
+
+# Normalize to lowercase
+HEALTH_ONLY_FLAG=$(echo "$HEALTH_ONLY_FLAG" | tr '[:upper:]' '[:lower:]')
 
 if [[ -z "$BASE_URL" ]]; then
   echo "ERROR: base_url is required"
-  echo "Usage: $0 <base_url> [mode]"
+  echo "Usage: $0 <base_url> [mode] [health_only]"
   exit 1
 fi
 
@@ -36,6 +71,36 @@ fi
 if [[ "$MODE" != "soft" && "$MODE" != "strict" ]]; then
   echo "ERROR: mode must be 'soft' or 'strict', got '$MODE'"
   exit 1
+fi
+
+# Validate health_only
+if [[ "$HEALTH_ONLY_FLAG" != "true" && "$HEALTH_ONLY_FLAG" != "false" ]]; then
+  echo "ERROR: health_only must be 'true' or 'false', got '$HEALTH_ONLY_FLAG'"
+  exit 1
+fi
+
+# =============================================================================
+# ADR-003 Enforcement: Production/Staging MUST NOT use health_only
+# =============================================================================
+if [[ "$HEALTH_ONLY_FLAG" == "true" ]]; then
+  ENV_LOWER=$(echo "$ENVIRONMENT" | tr '[:upper:]' '[:lower:]')
+  
+  if [[ "$ENV_LOWER" == "production" || "$ENV_LOWER" == "staging" || "$ENV_LOWER" == "prod" || "$ENV_LOWER" == "stage" ]]; then
+    echo "=================================================="
+    echo "  ❌ ADR-003 POLICY VIOLATION"
+    echo "=================================================="
+    echo "  HEALTH_ONLY=true is NOT allowed for $ENVIRONMENT"
+    echo ""
+    echo "  Per ADR-003:"
+    echo "    - Production/Staging: MUST require /metrics endpoint"
+    echo "    - Sandbox/Development: MAY use HEALTH_ONLY=true"
+    echo ""
+    echo "  To fix:"
+    echo "    - Remove HEALTH_ONLY=true from your workflow"
+    echo "    - OR ensure /metrics endpoint is available"
+    echo "=================================================="
+    exit 1
+  fi
 fi
 
 # =============================================================================
@@ -88,11 +153,13 @@ log_not_available() {
 # Banner
 # =============================================================================
 echo "=================================================="
-echo "  MONITORING SNAPSHOT"
+echo "  MONITORING SNAPSHOT (ADR-003)"
 echo "=================================================="
-echo "  Base URL:  $BASE_URL"
-echo "  Mode:      $MODE"
-echo "  Timestamp: $TIMESTAMP"
+echo "  Base URL:    $BASE_URL"
+echo "  Mode:        $MODE"
+echo "  Health Only: $HEALTH_ONLY_FLAG"
+echo "  Environment: $ENVIRONMENT"
+echo "  Timestamp:   $TIMESTAMP"
 echo "=================================================="
 echo ""
 
@@ -187,14 +254,15 @@ else
 fi
 
 # =============================================================================
-# Determine Evidence Type and Overall Status
+# Determine Evidence Type and Overall Status (ADR-003 Logic)
 # =============================================================================
 if [[ "$METRICS_STATUS" == "CAPTURED" ]]; then
   EVIDENCE_TYPE="METRICS"
 elif [[ "$HEALTH_STATUS" == "CAPTURED" ]]; then
   EVIDENCE_TYPE="HEALTH_ONLY"
   
-  if [[ "$MODE" == "strict" ]]; then
+  # ADR-003: In strict mode, HEALTH_ONLY is only acceptable if health_only=true
+  if [[ "$MODE" == "strict" && "$HEALTH_ONLY_FLAG" != "true" ]]; then
     OVERALL_STATUS="FAIL"
   fi
 else
@@ -203,7 +271,7 @@ else
 fi
 
 # =============================================================================
-# Write Summary JSON
+# Write Summary JSON (ADR-003 Extended)
 # =============================================================================
 SUMMARY_FILE="$LOG_DIR/summary.json"
 
@@ -212,13 +280,16 @@ cat > "$SUMMARY_FILE" << EOF
   "timestamp": "$TIMESTAMP",
   "baseUrl": "$BASE_URL",
   "mode": "$MODE",
+  "healthOnly": $HEALTH_ONLY_FLAG,
+  "environment": "$ENVIRONMENT",
   "metricsStatus": "$METRICS_STATUS",
   "metricsHttpCode": $METRICS_HTTP_CODE,
   "healthStatus": "$HEALTH_STATUS",
   "healthHttpCode": $HEALTH_HTTP_CODE,
   "evidenceType": "$EVIDENCE_TYPE",
   "missingEvidenceReason": $(if [[ -n "$MISSING_EVIDENCE_REASON" ]]; then echo "\"$MISSING_EVIDENCE_REASON\""; else echo "null"; fi),
-  "overallStatus": "$OVERALL_STATUS"
+  "overallStatus": "$OVERALL_STATUS",
+  "adr003Compliant": true
 }
 EOF
 
@@ -230,6 +301,7 @@ echo "--- Summary ---"
 echo "  Metrics:       $METRICS_STATUS"
 echo "  Health Sample: $HEALTH_STATUS"
 echo "  Evidence Type: $EVIDENCE_TYPE"
+echo "  Health Only:   $HEALTH_ONLY_FLAG"
 echo "  Overall:       $OVERALL_STATUS"
 echo "  Logs:          $LOG_DIR"
 
@@ -238,15 +310,20 @@ echo "  Logs:          $LOG_DIR"
 # =============================================================================
 if [[ "$OVERALL_STATUS" == "FAIL" ]]; then
   echo ""
-  if [[ "$MODE" == "strict" && "$EVIDENCE_TYPE" == "HEALTH_ONLY" ]]; then
+  if [[ "$MODE" == "strict" && "$EVIDENCE_TYPE" == "HEALTH_ONLY" && "$HEALTH_ONLY_FLAG" != "true" ]]; then
     echo "❌ Monitoring snapshot failed (strict mode requires metrics)"
+    echo "   Hint: Use HEALTH_ONLY=true for sandbox/dev environments (per ADR-003)"
   else
     echo "❌ Monitoring snapshot failed"
   fi
   exit 1
 elif [[ "$EVIDENCE_TYPE" == "HEALTH_ONLY" ]]; then
   echo ""
-  echo "⚠️  Monitoring snapshot captured (health only, no metrics)"
+  if [[ "$HEALTH_ONLY_FLAG" == "true" ]]; then
+    echo "✅ Monitoring snapshot passed (health only, per ADR-003)"
+  else
+    echo "⚠️  Monitoring snapshot captured (health only, no metrics)"
+  fi
   exit 0
 else
   echo ""

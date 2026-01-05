@@ -39,6 +39,11 @@ on:
           - soft
           - strict
         default: 'soft'
+      health_only:
+        description: 'ADR-003: Skip /metrics requirement (sandbox/dev only, NOT for prod/staging)'
+        required: false
+        type: boolean
+        default: false
       
       # Multi-environment orchestration mode
       verify_staging:
@@ -119,10 +124,13 @@ jobs:
 
       - name: Run monitoring snapshot
         id: monitor
+        env:
+          ENVIRONMENT: ${{ inputs.environment_name || 'sandbox' }}
+          HEALTH_ONLY: ${{ inputs.health_only }}
         run: |
           chmod +x scripts/release/monitor-snapshot.sh
           set +e
-          ./scripts/release/monitor-snapshot.sh "${{ inputs.target_url }}" "${{ inputs.mode }}"
+          ./scripts/release/monitor-snapshot.sh "${{ inputs.target_url }}" "${{ inputs.mode }}" "${{ inputs.health_only }}"
           EXIT_CODE=$?
           set -e
           
@@ -211,12 +219,21 @@ jobs:
             exit $EXIT_CODE
           fi
 
+      - name: Enforce ADR-003 (staging cannot use health_only)
+        if: ${{ inputs.health_only == true }}
+        run: |
+          echo "::error::ADR-003 VIOLATION: health_only=true is NOT allowed for staging"
+          exit 1
+
       - name: Run monitoring snapshot (staging - soft mode)
         id: monitor
+        env:
+          ENVIRONMENT: staging
+          HEALTH_ONLY: "false"
         run: |
           chmod +x scripts/release/monitor-snapshot.sh
           set +e
-          ./scripts/release/monitor-snapshot.sh "${{ inputs.staging_url }}" "soft"
+          ./scripts/release/monitor-snapshot.sh "${{ inputs.staging_url }}" "soft" "false"
           EXIT_CODE=$?
           set -e
           
@@ -310,12 +327,21 @@ jobs:
             exit $EXIT_CODE
           fi
 
+      - name: Enforce ADR-003 (production cannot use health_only)
+        if: ${{ inputs.health_only == true }}
+        run: |
+          echo "::error::ADR-003 VIOLATION: health_only=true is NOT allowed for production"
+          exit 1
+
       - name: Run monitoring snapshot (production - STRICT mode)
         id: monitor
+        env:
+          ENVIRONMENT: production
+          HEALTH_ONLY: "false"
         run: |
           chmod +x scripts/release/monitor-snapshot.sh
           set +e
-          ./scripts/release/monitor-snapshot.sh "${{ inputs.production_url }}" "strict"
+          ./scripts/release/monitor-snapshot.sh "${{ inputs.production_url }}" "strict" "false"
           EXIT_CODE=$?
           set -e
           
