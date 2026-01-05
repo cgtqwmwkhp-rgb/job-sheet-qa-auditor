@@ -61,7 +61,7 @@ describe("systemRouter.health", () => {
   });
 });
 
-describe("systemRouter.version", () => {
+describe("systemRouter.version (Canonical Contract)", () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
@@ -101,7 +101,7 @@ describe("systemRouter.version", () => {
   });
 
   it("should not expose any secrets in version response", async () => {
-    process.env.GIT_SHA = "abc123";
+    process.env.GIT_SHA = "abc123def";
     process.env.MISTRAL_API_KEY = "secret-mistral-key";
     process.env.GEMINI_API_KEY = "secret-gemini-key";
     process.env.DATABASE_URL = "mysql://user:password@localhost/db";
@@ -117,20 +117,81 @@ describe("systemRouter.version", () => {
     expect(responseString).not.toContain("secret-gemini-key");
     expect(responseString).not.toContain("password");
     expect(responseString).not.toContain("DATABASE_URL");
+  });
 
-    // Only expected fields should be present
+  it("should include schemaVersion field for forward compatibility", async () => {
+    process.env.GIT_SHA = "abc123def";
+
+    const { systemRouter } = await import("./systemRouter");
+    const caller = systemRouter.createCaller({});
+    const result = await caller.version();
+
+    expect(result.schemaVersion).toBe("1.0.0");
+  });
+
+  it("should return canonical response structure (CONTRACT)", async () => {
+    process.env.GIT_SHA = "test123abc";
+    process.env.NODE_ENV = "production";
+
+    const { systemRouter } = await import("./systemRouter");
+    const caller = systemRouter.createCaller({});
+    const result = await caller.version();
+
+    // CANONICAL CONTRACT: These fields MUST be present
     expect(Object.keys(result).sort()).toEqual([
       "buildTime",
       "environment",
       "gitSha",
       "gitShaShort",
       "platformVersion",
+      "schemaVersion",
     ]);
+
+    // Type checks
+    expect(typeof result.gitSha).toBe("string");
+    expect(typeof result.gitShaShort).toBe("string");
+    expect(typeof result.platformVersion).toBe("string");
+    expect(typeof result.buildTime).toBe("string");
+    expect(typeof result.environment).toBe("string");
+    expect(typeof result.schemaVersion).toBe("string");
+
+    // gitShaShort must be 7 characters or less (for "unknown")
+    expect(result.gitShaShort.length).toBeLessThanOrEqual(7);
+
+    // environment must be one of the allowed values
+    expect(["development", "staging", "production"]).toContain(result.environment);
   });
 
-  it("should include environment field", async () => {
+  it("should validate against VersionResponseSchema", async () => {
+    process.env.GIT_SHA = "abc123def456789";
+    process.env.BUILD_TIME = "2026-01-05T12:00:00Z";
     process.env.NODE_ENV = "production";
-    process.env.GIT_SHA = "abc123";
+
+    const { systemRouter, VersionResponseSchema } = await import("./systemRouter");
+    const caller = systemRouter.createCaller({});
+    const result = await caller.version();
+
+    // Schema validation should pass
+    const parseResult = VersionResponseSchema.safeParse(result);
+    expect(parseResult.success).toBe(true);
+  });
+
+  it("should return staging environment when DEPLOY_ENV=staging", async () => {
+    process.env.GIT_SHA = "abc123def";
+    process.env.NODE_ENV = "production";
+    process.env.DEPLOY_ENV = "staging";
+
+    const { systemRouter } = await import("./systemRouter");
+    const caller = systemRouter.createCaller({});
+    const result = await caller.version();
+
+    expect(result.environment).toBe("staging");
+  });
+
+  it("should return production environment when NODE_ENV=production", async () => {
+    process.env.GIT_SHA = "abc123def";
+    process.env.NODE_ENV = "production";
+    delete process.env.DEPLOY_ENV;
 
     const { systemRouter } = await import("./systemRouter");
     const caller = systemRouter.createCaller({});
@@ -139,20 +200,14 @@ describe("systemRouter.version", () => {
     expect(result.environment).toBe("production");
   });
 
-  it("should return deterministic response structure", async () => {
-    process.env.GIT_SHA = "test123";
+  it("should return development environment when NODE_ENV is not production", async () => {
+    process.env.GIT_SHA = "abc123def";
+    process.env.NODE_ENV = "development";
 
     const { systemRouter } = await import("./systemRouter");
     const caller = systemRouter.createCaller({});
     const result = await caller.version();
 
-    // Verify response structure is deterministic
-    expect(Object.keys(result).sort()).toEqual([
-      "buildTime",
-      "environment",
-      "gitSha",
-      "gitShaShort",
-      "platformVersion",
-    ]);
+    expect(result.environment).toBe("development");
   });
 });
