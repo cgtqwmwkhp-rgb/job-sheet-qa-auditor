@@ -1,0 +1,102 @@
+{
+  "id": "sandbox-fail-001",
+  "name": "Sandbox Test - Missing Field Case",
+  "description": "Job sheet with missing customer signature - should fail validation",
+  "expectedResult": "fail",
+  "schemaVersion": "1.0.0",
+  "extractedFields": {
+    "jobNumber": "JS-2026-SANDBOX-002",
+    "customerName": "SANDBOX_CUSTOMER_B",
+    "serviceDate": "2026-01-16",
+    "technicianId": "TECH-SANDBOX-02",
+    "workDescription": "Sandbox test repair work",
+    "partsUsed": ["PART-TEST-C"],
+    "laborHours": 1.5,
+    "totalCost": 275.00,
+    "customerSignature": false,
+    "technicianSignature": true
+  },
+  "validatedFields": [
+    {
+      "ruleId": "R001",
+      "field": "jobNumber",
+      "status": "passed",
+      "value": "JS-2026-SANDBOX-002",
+      "confidence": 0.98,
+      "pageNumber": 1,
+      "severity": "S0",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R002",
+      "field": "customerName",
+      "status": "passed",
+      "value": "SANDBOX_CUSTOMER_B",
+      "confidence": 0.95,
+      "pageNumber": 1,
+      "severity": "S0",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R003",
+      "field": "serviceDate",
+      "status": "passed",
+      "value": "2026-01-16",
+      "confidence": 0.99,
+      "pageNumber": 1,
+      "severity": "S1",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R004",
+      "field": "technicianId",
+      "status": "passed",
+      "value": "TECH-SANDBOX-02",
+      "confidence": 0.97,
+      "pageNumber": 1,
+      "severity": "S1",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R005",
+      "field": "customerSignature",
+      "status": "failed",
+      "value": false,
+      "confidence": 0.92,
+      "pageNumber": 1,
+      "severity": "S0",
+      "reasonCode": "MISSING_FIELD",
+      "message": "Customer signature is required but not present"
+    },
+    {
+      "ruleId": "R006",
+      "field": "technicianSignature",
+      "status": "passed",
+      "value": true,
+      "confidence": 0.94,
+      "pageNumber": 1,
+      "severity": "S0",
+      "reasonCode": "VALID"
+    },
+    {
+      "ruleId": "R007",
+      "field": "totalCost",
+      "status": "passed",
+      "value": 275.00,
+      "confidence": 0.96,
+      "pageNumber": 1,
+      "severity": "S1",
+      "reasonCode": "VALID"
+    }
+  ],
+  "findings": [
+    {
+      "ruleId": "R005",
+      "field": "customerSignature",
+      "severity": "S0",
+      "message": "Customer signature is required but not present",
+      "reasonCode": "MISSING_FIELD",
+      "pageNumber": 1
+    }
+  ]
+}
