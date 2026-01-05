@@ -80,13 +80,42 @@ git push origin v1.x.x
 gh release create v1.x.x --title "v1.x.x" --notes-file CHANGELOG.md
 ```
 
-## Post-Release Verification
+## Post-Release Verification (Authoritative)
 
-- [ ] GitHub Release created successfully
-- [ ] Release artifacts attached
-- [ ] Deployment successful (if applicable)
-- [ ] Smoke tests pass in production
-- [ ] Monitoring shows no anomalies
+**No simulated evidence is allowed.** All verification must be performed against the live deployed environment.
+
+### 1. Trigger Release Verification Workflow
+
+Navigate to the **Actions** tab in the GitHub repository and run the **Release Verification** workflow with the following inputs:
+
+- **environment_name**: `staging` or `production`
+- **target_url**: The full URL of the deployed environment
+- **expected_git_sha**: The Git SHA of the release tag (e.g., `v1.x.x`)
+- **mode**: `soft` for staging, `strict` for production
+
+Alternatively, for orchestrated staging→production verification:
+
+- **verify_staging**: `true`
+- **verify_production**: `true`
+- **staging_url**: The full URL of the staging environment
+- **production_url**: The full URL of the production environment
+
+### 2. Verify Workflow Outputs
+
+- [ ] **Smoke Checks**: ✅ Passed
+- [ ] **Monitoring Snapshot**: ✅ Captured (or ⚠️ Missing Evidence if no metrics endpoint)
+- [ ] **Deployed SHA**: Matches `expected_git_sha`
+
+### 3. Review Artifacts
+
+- [ ] Review `smoke-logs` artifact for any anomalies
+- [ ] Review `monitoring-logs` artifact for any anomalies
+
+### 4. Manual Verification (if needed)
+
+- [ ] Manually navigate to the `target_url` and verify UI loads
+- [ ] Check browser console for errors
+- [ ] Check monitoring dashboard (Sentry, Grafana, etc.) for any new errors or spikes
 
 ## Rollback Procedure
 
@@ -161,6 +190,7 @@ Follow [Keep a Changelog](https://keepachangelog.com/):
 - Soon-to-be removed features
 
 ### Removed
+
 - Removed features
 
 ### Fixed

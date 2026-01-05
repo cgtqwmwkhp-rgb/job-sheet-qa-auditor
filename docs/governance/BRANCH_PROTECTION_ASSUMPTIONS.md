@@ -121,3 +121,5 @@ Provides evidence of governance controls for compliance purposes.
 - [CODEOWNERS](../../.github/CODEOWNERS)
 - [SECURITY.md](../../SECURITY.md)
 - [CONTRIBUTING.md](../../CONTRIBUTING.md)
+
+| release-verification | workflow_dispatch | Post-deploy verification |
