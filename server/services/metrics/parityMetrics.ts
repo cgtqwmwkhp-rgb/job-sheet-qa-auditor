@@ -9,7 +9,18 @@
  * - Timestamps are exposed as epoch seconds (gauge)
  * - Labels are stable and PII-safe
  * - In-memory store is for testing; production uses proper backend
+ * 
+ * DETERMINISM:
+ * - Severity labels are emitted in canonical order (S0, S1, S2, S3)
+ * - Label names are from allowlist only
  */
+
+// Canonical severity order (MUST be maintained)
+const CANONICAL_SEVERITY_ORDER = ['S0', 'S1', 'S2', 'S3'] as const;
+type CanonicalSeverity = typeof CANONICAL_SEVERITY_ORDER[number];
+
+// Allowed label names (no dynamic labels)
+const ALLOWED_LABELS = ['severity', 'hash', 'thresholds_version'] as const;
 
 export interface ParityMetrics {
   // Gauges (all numeric)
@@ -27,7 +38,7 @@ export interface ParityMetrics {
   parity_dataset_hash: string;
   parity_thresholds_version: string;
   
-  // By severity (all numeric)
+  // By severity (all numeric) - keys MUST be canonical S0-S3
   parity_pass_rate_by_severity: Record<string, number>;
   
   // Integrity (numeric)
@@ -60,6 +71,13 @@ let metricsStore: ParityMetrics = {
 };
 
 /**
+ * Validate severity label is canonical
+ */
+function isCanonicalSeverity(severity: string): severity is CanonicalSeverity {
+  return CANONICAL_SEVERITY_ORDER.includes(severity as CanonicalSeverity);
+}
+
+/**
  * Record parity run results
  */
 export function recordParityRun(results: {
@@ -86,11 +104,14 @@ export function recordParityRun(results: {
   metricsStore.parity_dataset_hash = results.datasetHash;
   metricsStore.parity_thresholds_version = results.thresholdsVersion;
   
-  // Calculate pass rate by severity
+  // Calculate pass rate by severity - ONLY canonical severities
   metricsStore.parity_pass_rate_by_severity = {};
   Object.entries(results.bySeverity).forEach(([severity, data]) => {
-    metricsStore.parity_pass_rate_by_severity[severity] = 
-      data.total > 0 ? (data.passed / data.total) * 100 : 0;
+    // Only accept canonical severity labels
+    if (isCanonicalSeverity(severity)) {
+      metricsStore.parity_pass_rate_by_severity[severity] = 
+        data.total > 0 ? (data.passed / data.total) * 100 : 0;
+    }
   });
 }
 
@@ -139,6 +160,7 @@ export function resetMetrics(): void {
  * Format metrics in Prometheus exposition format
  * 
  * IMPORTANT: All values MUST be numeric. Labels are for metadata only.
+ * DETERMINISM: Severity labels are emitted in canonical order (S0, S1, S2, S3)
  */
 export function formatPrometheusMetrics(): string {
   const metrics = getMetrics();
@@ -156,10 +178,18 @@ export function formatPrometheusMetrics(): string {
     lines.push(`# TYPE ${name} ${type}`);
     
     if (labels && Object.keys(labels).length > 0) {
-      const labelStr = Object.entries(labels)
-        .map(([k, v]) => `${k}="${escapeLabel(v)}"`)
-        .join(',');
-      lines.push(`${name}{${labelStr}} ${value}`);
+      // Validate labels are from allowlist
+      const validLabels = Object.entries(labels)
+        .filter(([k]) => ALLOWED_LABELS.includes(k as typeof ALLOWED_LABELS[number]));
+      
+      if (validLabels.length > 0) {
+        const labelStr = validLabels
+          .map(([k, v]) => `${k}="${escapeLabel(v)}"`)
+          .join(',');
+        lines.push(`${name}{${labelStr}} ${value}`);
+      } else {
+        lines.push(`${name} ${value}`);
+      }
     } else {
       lines.push(`${name} ${value}`);
     }
@@ -193,9 +223,13 @@ export function formatPrometheusMetrics(): string {
     });
   }
   
-  // By severity (all numeric values)
-  Object.entries(metrics.parity_pass_rate_by_severity).forEach(([severity, rate]) => {
-    addMetric('parity_pass_rate_by_severity', rate, 'Pass rate by severity', 'gauge', { severity });
+  // By severity (all numeric values) - DETERMINISTIC ORDER
+  // Emit in canonical order: S0, S1, S2, S3
+  CANONICAL_SEVERITY_ORDER.forEach(severity => {
+    if (severity in metrics.parity_pass_rate_by_severity) {
+      const rate = metrics.parity_pass_rate_by_severity[severity];
+      addMetric('parity_pass_rate_by_severity', rate, 'Pass rate by severity', 'gauge', { severity });
+    }
   });
   
   return lines.join('\n') + '\n';
@@ -261,4 +295,18 @@ export function validateMetricsSafety(metrics: ParityMetrics): { safe: boolean; 
   });
   
   return { safe: issues.length === 0, issues };
+}
+
+/**
+ * Get canonical severity order for external use
+ */
+export function getCanonicalSeverityOrder(): readonly string[] {
+  return CANONICAL_SEVERITY_ORDER;
+}
+
+/**
+ * Get allowed label names for external use
+ */
+export function getAllowedLabels(): readonly string[] {
+  return ALLOWED_LABELS;
 }

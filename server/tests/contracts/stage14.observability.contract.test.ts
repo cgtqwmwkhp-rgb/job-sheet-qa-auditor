@@ -1,5 +1,5 @@
 /**
- * Stage 14b: Observability Contract Tests (Hardened)
+ * Stage 14c: Observability Contract Tests (Finalised)
  * 
  * Tests for parity metrics, alerts, and dashboard configuration.
  * 
@@ -7,6 +7,10 @@
  * - All metric values MUST be numeric
  * - Timestamps are epoch seconds (not ISO strings)
  * - Labels are stable and PII-safe
+ * 
+ * DETERMINISM:
+ * - Severity labels are emitted in canonical order (S0, S1, S2, S3)
+ * - Label names are from allowlist only
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -17,10 +21,12 @@ import {
   resetMetrics,
   formatPrometheusMetrics,
   validateMetricsSafety,
+  getCanonicalSeverityOrder,
+  getAllowedLabels,
   type ParityMetrics
 } from '../../services/metrics/parityMetrics';
 
-describe('Stage 14b: Observability (Hardened)', () => {
+describe('Stage 14c: Observability (Finalised)', () => {
   beforeEach(() => {
     resetMetrics();
   });
@@ -93,6 +99,33 @@ describe('Stage 14b: Observability (Hardened)', () => {
       expect(metrics.parity_pass_rate_by_severity['S1']).toBe(80);
       expect(metrics.parity_pass_rate_by_severity['S2']).toBeCloseTo(83.33, 1);
       expect(metrics.parity_pass_rate_by_severity['S3']).toBe(80);
+    });
+    
+    it('should ONLY accept canonical severity labels (S0-S3)', () => {
+      recordParityRun({
+        passRate: 85,
+        totalFields: 100,
+        passedFields: 85,
+        failedFields: 15,
+        violations: [],
+        datasetHash: 'sha256:test',
+        thresholdsVersion: '1.0.0',
+        bySeverity: {
+          S0: { passed: 20, total: 20 },
+          'critical': { passed: 10, total: 10 }, // Non-canonical - should be ignored
+          'high': { passed: 15, total: 20 }, // Non-canonical - should be ignored
+          S1: { passed: 28, total: 35 }
+        }
+      });
+      
+      const metrics = getMetrics();
+      
+      // Only canonical labels should be present
+      expect(Object.keys(metrics.parity_pass_rate_by_severity)).toEqual(
+        expect.arrayContaining(['S0', 'S1'])
+      );
+      expect(metrics.parity_pass_rate_by_severity['critical']).toBeUndefined();
+      expect(metrics.parity_pass_rate_by_severity['high']).toBeUndefined();
     });
     
     it('should accumulate runs across multiple calls', () => {
@@ -280,6 +313,81 @@ describe('Stage 14b: Observability (Hardened)', () => {
       expect(output).toContain('hash="sha256:abcdef1234567890...');
       // Full hash should NOT be present
       expect(output).not.toContain('sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890');
+    });
+  });
+  
+  describe('Deterministic Severity Ordering', () => {
+    it('should emit severity metrics in canonical order (S0, S1, S2, S3)', () => {
+      recordParityRun({
+        passRate: 85,
+        totalFields: 100,
+        passedFields: 85,
+        failedFields: 15,
+        violations: [],
+        datasetHash: 'sha256:test',
+        thresholdsVersion: '1.0.0',
+        bySeverity: {
+          S3: { passed: 10, total: 15 },  // Out of order
+          S0: { passed: 20, total: 20 },
+          S2: { passed: 25, total: 30 },
+          S1: { passed: 30, total: 35 }
+        }
+      });
+      
+      const output = formatPrometheusMetrics();
+      
+      // Find all severity metric lines
+      const severityLines = output.split('\n')
+        .filter(l => l.includes('parity_pass_rate_by_severity{severity='));
+      
+      // Extract severity values in order
+      const severities = severityLines.map(line => {
+        const match = line.match(/severity="(S[0-3])"/);
+        return match ? match[1] : null;
+      }).filter(Boolean);
+      
+      // Should be in canonical order
+      expect(severities).toEqual(['S0', 'S1', 'S2', 'S3']);
+    });
+    
+    it('should provide canonical severity order via API', () => {
+      const order = getCanonicalSeverityOrder();
+      expect(order).toEqual(['S0', 'S1', 'S2', 'S3']);
+    });
+    
+    it('should provide allowed labels via API', () => {
+      const labels = getAllowedLabels();
+      expect(labels).toContain('severity');
+      expect(labels).toContain('hash');
+      expect(labels).toContain('thresholds_version');
+    });
+    
+    it('should produce identical output for identical input (determinism)', () => {
+      const input = {
+        passRate: 85.5,
+        totalFields: 100,
+        passedFields: 85,
+        failedFields: 15,
+        violations: [],
+        datasetHash: 'sha256:abc123',
+        thresholdsVersion: '1.0.0',
+        bySeverity: { 
+          S3: { passed: 10, total: 15 },
+          S0: { passed: 20, total: 20 },
+          S2: { passed: 25, total: 30 },
+          S1: { passed: 30, total: 35 }
+        }
+      };
+      
+      resetMetrics();
+      recordParityRun(input);
+      const output1 = formatPrometheusMetrics();
+      
+      resetMetrics();
+      recordParityRun(input);
+      const output2 = formatPrometheusMetrics();
+      
+      expect(output1).toBe(output2);
     });
   });
   
@@ -506,58 +614,6 @@ describe('Stage 14b: Observability (Hardened)', () => {
         expect(threshold).toBeGreaterThan(0);
         expect(threshold).toBeLessThanOrEqual(100);
       });
-    });
-  });
-  
-  describe('Deterministic Emission', () => {
-    it('should produce identical output for identical input', () => {
-      const input = {
-        passRate: 85.5,
-        totalFields: 100,
-        passedFields: 85,
-        failedFields: 15,
-        violations: [],
-        datasetHash: 'sha256:abc123',
-        thresholdsVersion: '1.0.0',
-        bySeverity: { S0: { passed: 20, total: 20 } }
-      };
-      
-      resetMetrics();
-      recordParityRun(input);
-      const output1 = formatPrometheusMetrics();
-      
-      resetMetrics();
-      recordParityRun(input);
-      const output2 = formatPrometheusMetrics();
-      
-      expect(output1).toBe(output2);
-    });
-    
-    it('should order severity labels consistently', () => {
-      recordParityRun({
-        passRate: 85,
-        totalFields: 100,
-        passedFields: 85,
-        failedFields: 15,
-        violations: [],
-        datasetHash: 'sha256:test',
-        thresholdsVersion: '1.0.0',
-        bySeverity: {
-          S3: { passed: 10, total: 15 },
-          S0: { passed: 20, total: 20 },
-          S2: { passed: 25, total: 30 },
-          S1: { passed: 30, total: 35 }
-        }
-      });
-      
-      const metrics = getMetrics();
-      const severities = Object.keys(metrics.parity_pass_rate_by_severity);
-      
-      // Should contain all canonical severities
-      expect(severities).toContain('S0');
-      expect(severities).toContain('S1');
-      expect(severities).toContain('S2');
-      expect(severities).toContain('S3');
     });
   });
 });
