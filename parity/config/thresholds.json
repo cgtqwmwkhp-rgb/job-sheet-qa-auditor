@@ -1,46 +1,41 @@
 {
   "$schema": "./thresholds.schema.json",
-  "version": "1.0.0",
-  "description": "Parity threshold governance configuration",
+  "version": "2.0.0",
+  "description": "Parity threshold governance configuration - applies to POSITIVE suite only",
   "thresholds": {
     "overall": {
-      "minPassRate": 0.95,
+      "minPassRate": 1.0,
       "maxWorseCount": 0,
       "maxNewFailures": 0,
-      "description": "Overall parity must maintain 95% pass rate with no regressions"
+      "description": "Positive suite must maintain 100% pass rate with no regressions"
     },
     "bySeverity": {
       "S0": {
         "minPassRate": 1.0,
         "maxWorseCount": 0,
-        "description": "Critical fields must have 100% pass rate"
+        "description": "Critical fields must have 100% pass rate in positive suite"
       },
       "S1": {
-        "minPassRate": 0.95,
-        "maxWorseCount": 1,
-        "description": "Major fields must have 95% pass rate, max 1 regression"
+        "minPassRate": 1.0,
+        "maxWorseCount": 0,
+        "description": "Major fields must have 100% pass rate in positive suite"
       },
       "S2": {
-        "minPassRate": 0.90,
-        "maxWorseCount": 2,
-        "description": "Minor fields must have 90% pass rate, max 2 regressions"
+        "minPassRate": 1.0,
+        "maxWorseCount": 0,
+        "description": "Minor fields must have 100% pass rate in positive suite"
       },
       "S3": {
-        "minPassRate": 0.80,
-        "maxWorseCount": 5,
-        "description": "Info fields must have 80% pass rate, max 5 regressions"
-      }
-    },
-    "byDocumentType": {
-      "standard": {
-        "minPassRate": 0.98,
-        "description": "Standard documents must have 98% pass rate"
-      },
-      "edge-case": {
-        "minPassRate": 0.90,
-        "description": "Edge case documents must have 90% pass rate"
+        "minPassRate": 1.0,
+        "maxWorseCount": 0,
+        "description": "Info fields must have 100% pass rate in positive suite"
       }
     }
+  },
+  "negativeSuite": {
+    "description": "Negative suite validates that expected failures are correctly detected",
+    "requireAllExpectedFailures": true,
+    "allowUnexpectedFailures": false
   },
   "alerts": {
     "warnOnImprovement": true,
@@ -58,5 +53,13 @@
     "requireApprovalForThresholdChange": true,
     "approvers": ["@qa-team", "@tech-lead"],
     "changeLogRequired": true
-  }
+  },
+  "canonicalReasonCodes": [
+    "VALID",
+    "MISSING_FIELD",
+    "INVALID_FORMAT",
+    "OUT_OF_POLICY",
+    "LOW_CONFIDENCE",
+    "CONFLICT"
+  ]
 }

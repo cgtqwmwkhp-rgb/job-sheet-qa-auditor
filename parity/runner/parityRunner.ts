@@ -1,7 +1,9 @@
 /**
- * Parity Runner - Stage 8
+ * Parity Runner - Stage 8 v2
  * 
- * Runs parity tests against golden dataset and generates reports.
+ * Runs parity tests against positive and negative golden datasets.
+ * - Positive suite: Documents expected to pass (strict thresholds)
+ * - Negative suite: Documents expected to fail with specific reason codes
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
@@ -12,18 +14,25 @@ import type {
   GoldenDocument,
   GoldenValidatedField,
   ParityReport,
+  PositiveParityReport,
+  NegativeParityReport,
+  CombinedParityReport,
   DocumentComparison,
+  NegativeDocumentResult,
   FieldComparison,
   ParityStatus,
   ParityThresholds,
+  ExpectedFailure,
+  CanonicalReasonCode,
 } from './types';
-import { DEFAULT_THRESHOLDS } from './types';
+import { DEFAULT_THRESHOLDS, isCanonicalReasonCode, mapToCanonicalReasonCode } from './types';
 
 /**
- * Parity Runner class
+ * Parity Runner class with positive/negative suite support
  */
 export class ParityRunner {
-  private goldenDataset: GoldenDataset | null = null;
+  private positiveDataset: GoldenDataset | null = null;
+  private negativeDataset: GoldenDataset | null = null;
   private thresholds: ParityThresholds;
 
   constructor(thresholds?: Partial<ParityThresholds>) {
@@ -31,70 +40,287 @@ export class ParityRunner {
   }
 
   /**
-   * Load golden dataset from file
+   * Load positive golden dataset from file
    */
-  loadGoldenDataset(path: string): void {
+  loadPositiveDataset(path: string): void {
     const content = readFileSync(path, 'utf-8');
-    this.goldenDataset = JSON.parse(content);
+    this.positiveDataset = JSON.parse(content);
+    this.validateDataset(this.positiveDataset!, 'positive');
   }
 
   /**
-   * Run parity test with actual results
+   * Load negative golden dataset from file
    */
-  runParity(actualResults: GoldenDocument[]): ParityReport {
-    if (!this.goldenDataset) {
-      throw new Error('Golden dataset not loaded');
+  loadNegativeDataset(path: string): void {
+    const content = readFileSync(path, 'utf-8');
+    this.negativeDataset = JSON.parse(content);
+    this.validateDataset(this.negativeDataset!, 'negative');
+  }
+
+  /**
+   * Load legacy golden dataset (for backwards compatibility)
+   */
+  loadGoldenDataset(path: string): void {
+    const content = readFileSync(path, 'utf-8');
+    const dataset: GoldenDataset = JSON.parse(content);
+    
+    // Split into positive and negative
+    this.positiveDataset = {
+      ...dataset,
+      documents: dataset.documents.filter(d => d.expectedResult === 'pass'),
+    };
+    
+    this.negativeDataset = {
+      ...dataset,
+      documents: dataset.documents.filter(d => d.expectedResult === 'fail'),
+    };
+  }
+
+  /**
+   * Validate dataset for canonical reason codes
+   */
+  private validateDataset(dataset: GoldenDataset, suiteType: string): void {
+    const errors: string[] = [];
+    
+    for (const doc of dataset.documents) {
+      for (const field of doc.validatedFields) {
+        if (field.reasonCode && !isCanonicalReasonCode(field.reasonCode)) {
+          errors.push(
+            `${suiteType}/${doc.id}/${field.ruleId}: Non-canonical reason code '${field.reasonCode}'`
+          );
+        }
+      }
+    }
+    
+    if (errors.length > 0) {
+      throw new Error(`Dataset validation failed:\n${errors.join('\n')}`);
+    }
+  }
+
+  /**
+   * Run positive suite parity test
+   */
+  runPositiveSuite(actualResults: GoldenDocument[]): PositiveParityReport {
+    if (!this.positiveDataset) {
+      throw new Error('Positive dataset not loaded');
     }
 
     const runId = this.generateRunId();
     const documentComparisons: DocumentComparison[] = [];
 
     // Compare each golden document with actual
-    for (const goldenDoc of this.goldenDataset.documents) {
+    for (const goldenDoc of this.positiveDataset.documents) {
       const actualDoc = actualResults.find(d => d.id === goldenDoc.id);
       const comparison = this.compareDocument(goldenDoc, actualDoc);
       documentComparisons.push(comparison);
-    }
-
-    // Check for extra documents in actual
-    for (const actualDoc of actualResults) {
-      if (!this.goldenDataset.documents.find(d => d.id === actualDoc.id)) {
-        documentComparisons.push({
-          documentId: actualDoc.id,
-          documentName: actualDoc.name,
-          status: 'new',
-          expectedResult: 'pass', // Unknown expected
-          actualResult: actualDoc.expectedResult,
-          fieldComparisons: [],
-          findingsComparison: {
-            expected: 0,
-            actual: actualDoc.findings.length,
-            matched: 0,
-            missing: 0,
-            extra: actualDoc.findings.length,
-          },
-          summary: { same: 0, improved: 0, worse: 0, new: actualDoc.validatedFields.length, missing: 0 },
-        });
-      }
     }
 
     // Calculate summary
     const summary = this.calculateSummary(documentComparisons);
     const violations = this.checkThresholds(summary, documentComparisons);
 
-    const report: ParityReport = {
-      version: '1.0.0',
+    return {
+      version: '2.0.0',
       runId,
       timestamp: new Date().toISOString(),
-      goldenVersion: this.goldenDataset.version,
+      goldenVersion: this.positiveDataset.version,
+      suiteType: 'positive',
       status: violations.length === 0 ? 'pass' : 'fail',
       summary,
       documents: documentComparisons,
       thresholds: this.thresholds,
       violations,
     };
+  }
 
-    return report;
+  /**
+   * Run negative suite parity test
+   */
+  runNegativeSuite(actualResults: GoldenDocument[]): NegativeParityReport {
+    if (!this.negativeDataset) {
+      throw new Error('Negative dataset not loaded');
+    }
+
+    const runId = this.generateRunId();
+    const documentResults: NegativeDocumentResult[] = [];
+    const violations: string[] = [];
+
+    let totalExpectedFailures = 0;
+    let matchedFailures = 0;
+    let missedFailures = 0;
+    let unexpectedFailures = 0;
+
+    for (const goldenDoc of this.negativeDataset.documents) {
+      const actualDoc = actualResults.find(d => d.id === goldenDoc.id);
+      const result = this.compareNegativeDocument(goldenDoc, actualDoc);
+      documentResults.push(result);
+
+      totalExpectedFailures += result.expectedFailures.length;
+      matchedFailures += result.matchedFailures.length;
+      missedFailures += result.missedFailures.length;
+      unexpectedFailures += result.unexpectedFailures.length;
+
+      if (result.status === 'fail') {
+        violations.push(
+          `Document ${goldenDoc.id}: Expected failures not detected - ${result.missedFailures.map(f => f.ruleId).join(', ')}`
+        );
+      }
+    }
+
+    return {
+      version: '2.0.0',
+      runId,
+      timestamp: new Date().toISOString(),
+      goldenVersion: this.negativeDataset.version,
+      suiteType: 'negative',
+      status: violations.length === 0 ? 'pass' : 'fail',
+      summary: {
+        totalDocuments: documentResults.length,
+        passed: documentResults.filter(d => d.status === 'pass').length,
+        failed: documentResults.filter(d => d.status === 'fail').length,
+        totalExpectedFailures,
+        matchedFailures,
+        missedFailures,
+        unexpectedFailures,
+      },
+      documents: documentResults,
+      violations,
+    };
+  }
+
+  /**
+   * Run combined parity test (both suites)
+   */
+  runCombinedParity(actualResults: GoldenDocument[]): CombinedParityReport {
+    const positiveReport = this.runPositiveSuite(actualResults);
+    const negativeReport = this.runNegativeSuite(actualResults);
+
+    const allViolations = [
+      ...positiveReport.violations.map(v => `[POSITIVE] ${v}`),
+      ...negativeReport.violations.map(v => `[NEGATIVE] ${v}`),
+    ];
+
+    return {
+      version: '2.0.0',
+      runId: this.generateRunId(),
+      timestamp: new Date().toISOString(),
+      status: allViolations.length === 0 ? 'pass' : 'fail',
+      positive: positiveReport,
+      negative: negativeReport,
+      violations: allViolations,
+    };
+  }
+
+  /**
+   * Legacy run parity (for backwards compatibility)
+   */
+  runParity(actualResults: GoldenDocument[]): ParityReport {
+    if (!this.positiveDataset) {
+      throw new Error('Golden dataset not loaded');
+    }
+
+    const runId = this.generateRunId();
+    const documentComparisons: DocumentComparison[] = [];
+
+    // Combine positive and negative datasets
+    const allGoldenDocs = [
+      ...(this.positiveDataset?.documents || []),
+      ...(this.negativeDataset?.documents || []),
+    ];
+
+    for (const goldenDoc of allGoldenDocs) {
+      const actualDoc = actualResults.find(d => d.id === goldenDoc.id);
+      const comparison = this.compareDocument(goldenDoc, actualDoc);
+      documentComparisons.push(comparison);
+    }
+
+    const summary = this.calculateSummary(documentComparisons);
+    const violations = this.checkThresholds(summary, documentComparisons);
+
+    return {
+      version: '1.0.0',
+      runId,
+      timestamp: new Date().toISOString(),
+      goldenVersion: this.positiveDataset.version,
+      status: violations.length === 0 ? 'pass' : 'fail',
+      summary,
+      documents: documentComparisons,
+      thresholds: this.thresholds,
+      violations,
+    };
+  }
+
+  /**
+   * Compare a negative document (check expected failures are detected)
+   */
+  private compareNegativeDocument(
+    golden: GoldenDocument,
+    actual: GoldenDocument | undefined
+  ): NegativeDocumentResult {
+    const expectedFailures = golden.expectedFailures || [];
+    
+    if (!actual) {
+      return {
+        documentId: golden.id,
+        documentName: golden.name,
+        status: 'fail',
+        expectedFailures,
+        detectedFailures: [],
+        matchedFailures: [],
+        missedFailures: expectedFailures,
+        unexpectedFailures: [],
+      };
+    }
+
+    // Extract detected failures from actual results
+    const detectedFailures: ExpectedFailure[] = actual.validatedFields
+      .filter(f => f.status === 'failed')
+      .map(f => ({
+        ruleId: f.ruleId,
+        field: f.field,
+        reasonCode: mapToCanonicalReasonCode(f.reasonCode || 'OUT_OF_POLICY'),
+        severity: f.severity,
+      }));
+
+    // Match expected vs detected
+    const matchedFailures: ExpectedFailure[] = [];
+    const missedFailures: ExpectedFailure[] = [];
+    const unexpectedFailures: ExpectedFailure[] = [];
+
+    for (const expected of expectedFailures) {
+      const match = detectedFailures.find(
+        d => d.ruleId === expected.ruleId && 
+             d.field === expected.field &&
+             d.reasonCode === expected.reasonCode
+      );
+      
+      if (match) {
+        matchedFailures.push(expected);
+      } else {
+        missedFailures.push(expected);
+      }
+    }
+
+    for (const detected of detectedFailures) {
+      const isExpected = expectedFailures.some(
+        e => e.ruleId === detected.ruleId && e.field === detected.field
+      );
+      
+      if (!isExpected) {
+        unexpectedFailures.push(detected);
+      }
+    }
+
+    return {
+      documentId: golden.id,
+      documentName: golden.name,
+      status: missedFailures.length === 0 ? 'pass' : 'fail',
+      expectedFailures,
+      detectedFailures,
+      matchedFailures,
+      missedFailures,
+      unexpectedFailures,
+    };
   }
 
   /**
@@ -150,7 +376,6 @@ export class ParityRunner {
       missing: fieldComparisons.filter(f => f.status === 'missing').length,
     };
 
-    // Determine overall document status
     let status: ParityStatus = 'same';
     if (summary.worse > 0 || summary.missing > 0) {
       status = 'worse';
@@ -179,7 +404,6 @@ export class ParityRunner {
   ): FieldComparison[] {
     const comparisons: FieldComparison[] = [];
 
-    // Compare each golden field
     for (const goldenField of golden) {
       const actualField = actual.find(f => f.ruleId === goldenField.ruleId);
       
@@ -198,7 +422,6 @@ export class ParityRunner {
       comparisons.push(comparison);
     }
 
-    // Check for new fields in actual
     for (const actualField of actual) {
       if (!golden.find(f => f.ruleId === actualField.ruleId)) {
         comparisons.push({
@@ -226,45 +449,40 @@ export class ParityRunner {
   ): FieldComparison {
     const diff: FieldComparison['diff'] = {};
 
-    // Check status change
     if (golden.status !== actual.status) {
       diff.statusChanged = true;
     }
 
-    // Check value change
     if (JSON.stringify(golden.value) !== JSON.stringify(actual.value)) {
       diff.valueChanged = true;
     }
 
-    // Check confidence change
     if (golden.confidence !== actual.confidence) {
       diff.confidenceChanged = actual.confidence - golden.confidence;
     }
 
-    // Check severity change
     if (golden.severity !== actual.severity) {
       diff.severityChanged = true;
     }
 
-    // Determine status
+    if (golden.reasonCode !== actual.reasonCode) {
+      diff.reasonCodeChanged = true;
+    }
+
     let status: ParityStatus = 'same';
     
     if (Object.keys(diff).length > 0) {
-      // Improved: status changed from failed to passed, or confidence increased
       if (
         (golden.status === 'failed' && actual.status === 'passed') ||
         (diff.confidenceChanged && diff.confidenceChanged > 0)
       ) {
         status = 'improved';
-      }
-      // Worse: status changed from passed to failed, or confidence decreased
-      else if (
+      } else if (
         (golden.status === 'passed' && actual.status === 'failed') ||
         (diff.confidenceChanged && diff.confidenceChanged < 0)
       ) {
         status = 'worse';
       }
-      // Other changes are considered same (neutral)
     }
 
     return {
@@ -288,15 +506,15 @@ export class ParityRunner {
     const actualFindings = actual.findings;
 
     let matched = 0;
-    const matchedActual = new Set<number>();
+    const matchedIds = new Set<string | number>();
 
     for (const gf of goldenFindings) {
       const match = actualFindings.find(
-        af => af.ruleId === gf.ruleId && af.field === gf.field && !matchedActual.has(af.id)
+        af => af.ruleId === gf.ruleId && af.field === gf.field && !matchedIds.has(af.id)
       );
       if (match) {
         matched++;
-        matchedActual.add(match.id);
+        matchedIds.add(match.id);
       }
     }
 
@@ -314,7 +532,7 @@ export class ParityRunner {
    */
   private calculateSummary(
     comparisons: DocumentComparison[]
-  ): ParityReport['summary'] {
+  ): PositiveParityReport['summary'] {
     let totalFields = 0;
     let fieldsSame = 0;
     let fieldsImproved = 0;
@@ -343,7 +561,7 @@ export class ParityRunner {
    * Check thresholds and return violations
    */
   private checkThresholds(
-    summary: ParityReport['summary'],
+    summary: PositiveParityReport['summary'],
     _comparisons: DocumentComparison[]
   ): string[] {
     const violations: string[] = [];
@@ -386,7 +604,7 @@ export class ParityRunner {
   /**
    * Save report to file
    */
-  saveReport(report: ParityReport, outputDir: string): string {
+  saveReport(report: ParityReport | CombinedParityReport, outputDir: string): string {
     if (!existsSync(outputDir)) {
       mkdirSync(outputDir, { recursive: true });
     }
@@ -400,7 +618,66 @@ export class ParityRunner {
   }
 
   /**
-   * Generate summary markdown
+   * Generate summary markdown for combined report
+   */
+  generateCombinedSummaryMarkdown(report: CombinedParityReport): string {
+    const lines: string[] = [
+      '# Parity Report (v2)',
+      '',
+      `**Run ID:** ${report.runId}`,
+      `**Timestamp:** ${report.timestamp}`,
+      `**Status:** ${report.status.toUpperCase()}`,
+      '',
+      '---',
+      '',
+      '## Positive Suite',
+      '',
+      `**Status:** ${report.positive.status.toUpperCase()}`,
+      `**Golden Version:** ${report.positive.goldenVersion}`,
+      '',
+      '| Metric | Value |',
+      '|--------|-------|',
+      `| Total Documents | ${report.positive.summary.totalDocuments} |`,
+      `| Same | ${report.positive.summary.same} |`,
+      `| Improved | ${report.positive.summary.improved} |`,
+      `| Worse | ${report.positive.summary.worse} |`,
+      `| Total Fields | ${report.positive.summary.totalFields} |`,
+      `| Fields Same | ${report.positive.summary.fieldsSame} |`,
+      '',
+      '---',
+      '',
+      '## Negative Suite',
+      '',
+      `**Status:** ${report.negative.status.toUpperCase()}`,
+      `**Golden Version:** ${report.negative.goldenVersion}`,
+      '',
+      '| Metric | Value |',
+      '|--------|-------|',
+      `| Total Documents | ${report.negative.summary.totalDocuments} |`,
+      `| Passed | ${report.negative.summary.passed} |`,
+      `| Failed | ${report.negative.summary.failed} |`,
+      `| Expected Failures | ${report.negative.summary.totalExpectedFailures} |`,
+      `| Matched Failures | ${report.negative.summary.matchedFailures} |`,
+      `| Missed Failures | ${report.negative.summary.missedFailures} |`,
+      '',
+    ];
+
+    if (report.violations.length > 0) {
+      lines.push('---');
+      lines.push('');
+      lines.push('## Violations');
+      lines.push('');
+      for (const violation of report.violations) {
+        lines.push(`- ❌ ${violation}`);
+      }
+      lines.push('');
+    }
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Generate summary markdown (legacy)
    */
   generateSummaryMarkdown(report: ParityReport): string {
     const lines: string[] = [

@@ -1,8 +1,37 @@
 /**
- * Parity Runner Types - Stage 8
+ * Parity Runner Types - Stage 8 v2
  * 
- * Types for parity testing and comparison.
+ * Types for parity testing with positive/negative suite support.
  */
+
+/**
+ * Canonical reason codes - the only valid codes in the system
+ */
+export const CANONICAL_REASON_CODES = [
+  'VALID',
+  'MISSING_FIELD',
+  'INVALID_FORMAT',
+  'OUT_OF_POLICY',
+  'LOW_CONFIDENCE',
+  'CONFLICT',
+] as const;
+
+export type CanonicalReasonCode = typeof CANONICAL_REASON_CODES[number];
+
+/**
+ * Severity levels
+ */
+export type Severity = 'S0' | 'S1' | 'S2' | 'S3';
+
+/**
+ * Expected failure specification for negative suite
+ */
+export interface ExpectedFailure {
+  ruleId: string;
+  field: string;
+  reasonCode: CanonicalReasonCode;
+  severity: Severity;
+}
 
 /**
  * Golden document fixture
@@ -16,6 +45,8 @@ export interface GoldenDocument {
   extractedFields: Record<string, unknown>;
   validatedFields: GoldenValidatedField[];
   findings: GoldenFinding[];
+  /** Expected failures for negative suite documents */
+  expectedFailures?: ExpectedFailure[];
 }
 
 /**
@@ -28,33 +59,46 @@ export interface GoldenValidatedField {
   value: unknown;
   confidence: number;
   pageNumber?: number;
-  severity: 'critical' | 'major' | 'minor' | 'info';
+  severity: Severity;
+  reasonCode?: CanonicalReasonCode;
   message?: string;
+  evidence?: {
+    snippet: string;
+    boundingBox: unknown;
+  };
 }
 
 /**
  * Golden finding
  */
 export interface GoldenFinding {
-  id: number;
+  id: number | string;
   ruleId: string;
   field: string;
-  severity: 'critical' | 'major' | 'minor' | 'info';
+  severity: Severity;
+  reasonCode?: CanonicalReasonCode;
   message: string;
   extractedValue?: string;
   expectedPattern?: string;
   pageNumber?: number;
+  evidence?: {
+    snippet: string;
+    boundingBox: unknown;
+  };
 }
 
 /**
- * Golden dataset
+ * Golden dataset (base structure)
  */
 export interface GoldenDataset {
   version: string;
+  schemaVersion: string;
   description: string;
   createdAt: string;
   documents: GoldenDocument[];
-  rules: GoldenRule[];
+  rules?: GoldenRule[];
+  reasonCodes?: Record<string, string>;
+  canonicalReasonCodes?: CanonicalReasonCode[];
 }
 
 /**
@@ -64,7 +108,7 @@ export interface GoldenRule {
   ruleId: string;
   field: string;
   description: string;
-  severity: 'critical' | 'major' | 'minor' | 'info';
+  severity: Severity;
   pattern?: string;
 }
 
@@ -87,6 +131,7 @@ export interface FieldComparison {
     valueChanged?: boolean;
     confidenceChanged?: number;
     severityChanged?: boolean;
+    reasonCodeChanged?: boolean;
   };
 }
 
@@ -117,7 +162,82 @@ export interface DocumentComparison {
 }
 
 /**
- * Parity report
+ * Negative suite result for a single document
+ */
+export interface NegativeDocumentResult {
+  documentId: string;
+  documentName: string;
+  status: 'pass' | 'fail';
+  expectedFailures: ExpectedFailure[];
+  detectedFailures: ExpectedFailure[];
+  matchedFailures: ExpectedFailure[];
+  missedFailures: ExpectedFailure[];
+  unexpectedFailures: ExpectedFailure[];
+}
+
+/**
+ * Parity report for positive suite
+ */
+export interface PositiveParityReport {
+  version: string;
+  runId: string;
+  timestamp: string;
+  goldenVersion: string;
+  suiteType: 'positive';
+  status: 'pass' | 'fail' | 'warning';
+  summary: {
+    totalDocuments: number;
+    same: number;
+    improved: number;
+    worse: number;
+    totalFields: number;
+    fieldsSame: number;
+    fieldsImproved: number;
+    fieldsWorse: number;
+  };
+  documents: DocumentComparison[];
+  thresholds: ParityThresholds;
+  violations: string[];
+}
+
+/**
+ * Parity report for negative suite
+ */
+export interface NegativeParityReport {
+  version: string;
+  runId: string;
+  timestamp: string;
+  goldenVersion: string;
+  suiteType: 'negative';
+  status: 'pass' | 'fail';
+  summary: {
+    totalDocuments: number;
+    passed: number;
+    failed: number;
+    totalExpectedFailures: number;
+    matchedFailures: number;
+    missedFailures: number;
+    unexpectedFailures: number;
+  };
+  documents: NegativeDocumentResult[];
+  violations: string[];
+}
+
+/**
+ * Combined parity report
+ */
+export interface CombinedParityReport {
+  version: string;
+  runId: string;
+  timestamp: string;
+  status: 'pass' | 'fail';
+  positive: PositiveParityReport;
+  negative: NegativeParityReport;
+  violations: string[];
+}
+
+/**
+ * Legacy parity report (for backwards compatibility)
  */
 export interface ParityReport {
   version: string;
@@ -141,7 +261,7 @@ export interface ParityReport {
 }
 
 /**
- * Parity thresholds
+ * Parity thresholds for positive suite
  */
 export interface ParityThresholds {
   maxWorseDocuments: number;
@@ -151,11 +271,35 @@ export interface ParityThresholds {
 }
 
 /**
- * Default thresholds
+ * Default thresholds for positive suite (strict - 100% pass required)
  */
 export const DEFAULT_THRESHOLDS: ParityThresholds = {
   maxWorseDocuments: 0,
   maxWorseFields: 0,
   maxMissingFields: 0,
-  minSamePercentage: 95,
+  minSamePercentage: 100,
 };
+
+/**
+ * Validate that a reason code is canonical
+ */
+export function isCanonicalReasonCode(code: string): code is CanonicalReasonCode {
+  return CANONICAL_REASON_CODES.includes(code as CanonicalReasonCode);
+}
+
+/**
+ * Map legacy reason codes to canonical codes
+ */
+export function mapToCanonicalReasonCode(code: string): CanonicalReasonCode {
+  const mapping: Record<string, CanonicalReasonCode> = {
+    'OUT_OF_RANGE': 'OUT_OF_POLICY',
+    'RANGE_ERROR': 'OUT_OF_POLICY',
+    'POLICY_VIOLATION': 'OUT_OF_POLICY',
+  };
+  
+  if (isCanonicalReasonCode(code)) {
+    return code;
+  }
+  
+  return mapping[code] || 'OUT_OF_POLICY';
+}

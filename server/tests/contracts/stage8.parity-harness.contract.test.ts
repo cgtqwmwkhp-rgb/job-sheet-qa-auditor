@@ -149,11 +149,11 @@ describe('Stage 8: Parity Harness', () => {
   });
 
   describe('Threshold Enforcement', () => {
-    it('should use default thresholds', () => {
+    it('should use default thresholds (v2: 100% for positive suite)', () => {
       expect(DEFAULT_THRESHOLDS.maxWorseDocuments).toBe(0);
       expect(DEFAULT_THRESHOLDS.maxWorseFields).toBe(0);
       expect(DEFAULT_THRESHOLDS.maxMissingFields).toBe(0);
-      expect(DEFAULT_THRESHOLDS.minSamePercentage).toBe(95);
+      expect(DEFAULT_THRESHOLDS.minSamePercentage).toBe(100); // v2: strict 100% for positive suite
     });
 
     it('should allow custom thresholds', () => {
