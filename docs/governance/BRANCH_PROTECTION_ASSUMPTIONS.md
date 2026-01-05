@@ -38,6 +38,14 @@ The following CI jobs MUST pass before merging to `main`:
 | **Release Rehearsal** | Blocking | Validates release readiness |
 | Branch Protection Proof | Non-blocking | Verifies protection rules (informational) |
 
+### Release Verification Workflow (`release-verification.yml`)
+
+| Job Name | Type | Purpose |
+|----------|------|---------|
+| Smoke Checks | Non-blocking | Post-deploy smoke verification |
+| Monitoring Snapshot | Non-blocking | Captures monitoring metrics |
+| Validate Evidence Pack | Non-blocking | Ensures no SIMULATED content |
+
 ## Review Requirements
 
 ### Assumed Configuration
