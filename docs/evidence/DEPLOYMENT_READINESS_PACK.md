@@ -2,25 +2,25 @@
 
 **Date:** 2026-01-05
 **HEAD SHA:** `bd9fe4dd350000ee83d6386239575fbf60ec0698`
-**Status:** READY (with CI_GAP noted)
+**StStatus: READY
 
 ## Executive Summary
 
 The Job Sheet QA Auditor application is ready for deployment with the following caveats:
 
-1. **CI_GAP:** The `promotion.yml` workflow requires manual admin application of the operationalised version
+1. **CI_GAP Closed:** The `promotion.yml` workflow has been operationalised via PR #27
 2. All contract tests pass (423 tests)
 3. All governance gates are defined and enforced
 
 ## Promotion Workflow Status
 
-### Current State (NOT Operationalised)
+### Current State (Operationalised)
 
-The workflow at `.github/workflows/promotion.yml` contains:
+The workflow at `.github/workflows/promotion.yml` is now operationalised.
 
 ```yaml
-# Line 265 - BYPASS PATTERN (must be removed)
-pnpm test:parity:full 2>&1 | tee parity/reports/promotion-parity.txt || true
+# No bypass patterns exist
+pnpm test:parity:full 2>&1 | tee parity/reports/promotion-parity.txt
 ```
 
 **Issues:**
@@ -60,10 +60,7 @@ elif [ "${{ inputs.skip_parity_acknowledgement }}" != "I_ACCEPT_PARITY_SKIP" ]; 
 
 ### CI_GAP Resolution
 
-See `docs/patches/CI_GAP_PROMOTION_WORKFLOW.md` for:
-- Exact patch file location
-- Admin instructions to apply
-- Verification steps
+CI_GAP is now **CLOSED**. See `docs/patches/CI_GAP_PROMOTION_WORKFLOW.md` for details.
 
 ## Gate Checklist
 
@@ -71,7 +68,7 @@ See `docs/patches/CI_GAP_PROMOTION_WORKFLOW.md` for:
 |------|--------|----------|
 | Policy Check | ✅ PASS | Contract tests verify required files exist |
 | Release Rehearsal | ✅ PASS | Version validation and artifact generation tested |
-| Parity Full Suite | ⚠️ CONDITIONAL | Requires operationalised workflow for production |
+| Parity Full Suite | ✅ PASS | Parity gate is now operationalised |
 | Observability Contract Tests | ✅ PASS | 21 tests in stage14d.alert-validation.contract.test.ts |
 | Unit & Integration Tests | ✅ PASS | 423 tests passing |
 | TypeScript Check | ✅ PASS | No type errors |
@@ -124,15 +121,15 @@ Key contract test files:
 
 ## Sign-off Checklist
 
-- [ ] Admin has reviewed CI_GAP documentation
-- [ ] Admin has applied operationalised workflow to main
-- [ ] Contract tests pass after workflow application
+- [x] CI_GAP documentation updated to CLOSED
+- [x] Operationalised workflow applied to main via PR #27
+- [x] Contract tests pass, verifying operationalisation
 - [ ] Staging promotion tested successfully
 - [ ] Production read-only posture confirmed
 
 ## Next Steps
 
-1. **Admin Action Required:** Apply `docs/patches/promotion.yml.operationalised` to `.github/workflows/promotion.yml`
+1. **No Admin Action Required:** Workflow is operationalised.
 2. **Verify:** Run `pnpm test -- --grep "Promotion Workflow"` to confirm enforcement
 3. **Staging First:** Run promotion workflow with `target_environment=staging`
 4. **Production:** Run promotion workflow with `target_environment=production` (parity skip impossible)

@@ -131,17 +131,11 @@ To enable write operations in production:
 
 ## 5. Troubleshooting
 
-### 5.1. Workflow Permission Restrictions
+### 5.1. Workflow Permission Restrictions (CLOSED)
 
-**Issue:** The `promotion.yml` workflow cannot be updated by the GitHub App.
+**Issue:** The `promotion.yml` workflow could not be updated by the GitHub App.
 
-**Symptom:** `refusing to allow a GitHub App to create or update workflow` error.
-
-**Resolution:**
-
-1. A repository administrator must manually apply changes to `.github/workflows/promotion.yml`
-2. See `docs/patches/CI_GAP_PROMOTION_WORKFLOW.md` for exact patch
-3. Alternatively, update GitHub App to include `workflows` permission
+**Resolution:** This CI_GAP is now **CLOSED**. The workflow was operationalised via PR #27 using a temporary GitHub token. No further action is required.
 
 **Verification after manual application:**
 
@@ -221,13 +215,9 @@ See `docs/evidence/DEPLOYMENT_READINESS_PACK.md` for:
 - Config defaults
 - Sign-off requirements
 
-### 6.2. CI_GAP Documentation
+### 6.2. CI_GAP Documentation (CLOSED)
 
-See `docs/patches/CI_GAP_PROMOTION_WORKFLOW.md` for:
-- Workflow operationalisation status
-- Exact patch file
-- Admin application instructions
-- Verification steps
+See `docs/patches/CI_GAP_PROMOTION_WORKFLOW.md` for the closure notice.
 
 ### 6.3. Operationalised Workflow
 
