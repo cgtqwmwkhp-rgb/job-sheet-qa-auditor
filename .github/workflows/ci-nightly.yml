@@ -29,6 +29,19 @@ jobs:
     continue-on-error: true
 
     steps:
+      - name: Log CI context
+        env:
+          REPO_CONTEXT: "job-sheet-qa-auditor (TypeScript/Node)"
+        run: |
+          echo "=================================================="
+          echo "  REPO:       ${REPO_CONTEXT}"
+          echo "  WORKFLOW:   ${{ github.workflow }}"
+          echo "  JOB:        ${{ github.job }}"
+          echo "  SHA:        ${{ github.sha }}"
+          echo "  REF:        ${{ github.ref }}"
+          echo "  EVENT:      ${{ github.event_name }}"
+          echo "=================================================="
+
       - name: Checkout code
         uses: actions/checkout@v4
 

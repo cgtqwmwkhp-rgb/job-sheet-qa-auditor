@@ -53,6 +53,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Log CI context
+        run: |
+          echo "=================================================="
+          echo "  REPO:    job-sheet-qa-auditor (Node/pnpm)"
+          echo "  CI:      ci.yml"
+          echo "=================================================="
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -105,6 +112,13 @@ jobs:
     needs: unit-tests
 
     steps:
+      - name: Log CI context
+        run: |
+          echo "=================================================="
+          echo "  REPO:    job-sheet-qa-auditor (Node/pnpm)"
+          echo "  CI:      ci.yml"
+          echo "=================================================="
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -171,6 +185,13 @@ jobs:
     continue-on-error: true
 
     steps:
+      - name: Log CI context
+        run: |
+          echo "=================================================="
+          echo "  REPO:    job-sheet-qa-auditor (Node/pnpm)"
+          echo "  CI:      ci.yml"
+          echo "=================================================="
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -238,6 +259,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Log CI context
+        run: |
+          echo "=================================================="
+          echo "  REPO:    job-sheet-qa-auditor (Node/pnpm)"
+          echo "  CI:      ci.yml"
+          echo "=================================================="
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -276,6 +304,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Log CI context
+        run: |
+          echo "=================================================="
+          echo "  REPO:    job-sheet-qa-auditor (Node/pnpm)"
+          echo "  CI:      ci.yml"
+          echo "=================================================="
+
       - name: Checkout code
         uses: actions/checkout@v4
 

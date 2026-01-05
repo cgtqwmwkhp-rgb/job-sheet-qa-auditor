@@ -43,6 +43,19 @@ jobs:
       validation_report: ${{ steps.validate.outputs.report }}
     
     steps:
+      - name: Log CI context
+        env:
+          REPO_CONTEXT: "job-sheet-qa-auditor (TypeScript/Node)"
+        run: |
+          echo "=================================================="
+          echo "  REPO:       ${REPO_CONTEXT}"
+          echo "  WORKFLOW:   ${{ github.workflow }}"
+          echo "  JOB:        ${{ github.job }}"
+          echo "  SHA:        ${{ github.sha }}"
+          echo "  REF:        ${{ github.ref }}"
+          echo "  EVENT:      ${{ github.event_name }}"
+          echo "=================================================="
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -102,6 +115,19 @@ jobs:
     if: needs.validate-request.outputs.can_proceed == 'true'
     
     steps:
+      - name: Log CI context
+        env:
+          REPO_CONTEXT: "job-sheet-qa-auditor (TypeScript/Node)"
+        run: |
+          echo "=================================================="
+          echo "  REPO:       ${REPO_CONTEXT}"
+          echo "  WORKFLOW:   ${{ github.workflow }}"
+          echo "  JOB:        ${{ github.job }}"
+          echo "  SHA:        ${{ github.sha }}"
+          echo "  REF:        ${{ github.ref }}"
+          echo "  EVENT:      ${{ github.event_name }}"
+          echo "=================================================="
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -139,6 +165,19 @@ jobs:
     if: needs.validate-request.outputs.can_proceed == 'true'
     
     steps:
+      - name: Log CI context
+        env:
+          REPO_CONTEXT: "job-sheet-qa-auditor (TypeScript/Node)"
+        run: |
+          echo "=================================================="
+          echo "  REPO:       ${REPO_CONTEXT}"
+          echo "  WORKFLOW:   ${{ github.workflow }}"
+          echo "  JOB:        ${{ github.job }}"
+          echo "  SHA:        ${{ github.sha }}"
+          echo "  REF:        ${{ github.ref }}"
+          echo "  EVENT:      ${{ github.event_name }}"
+          echo "=================================================="
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -194,6 +233,19 @@ jobs:
     if: needs.validate-request.outputs.can_proceed == 'true'
     
     steps:
+      - name: Log CI context
+        env:
+          REPO_CONTEXT: "job-sheet-qa-auditor (TypeScript/Node)"
+        run: |
+          echo "=================================================="
+          echo "  REPO:       ${REPO_CONTEXT}"
+          echo "  WORKFLOW:   ${{ github.workflow }}"
+          echo "  JOB:        ${{ github.job }}"
+          echo "  SHA:        ${{ github.sha }}"
+          echo "  REF:        ${{ github.ref }}"
+          echo "  EVENT:      ${{ github.event_name }}"
+          echo "=================================================="
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -250,6 +302,19 @@ jobs:
       parity_pass_rate: ${{ steps.parity.outputs.pass_rate }}
     
     steps:
+      - name: Log CI context
+        env:
+          REPO_CONTEXT: "job-sheet-qa-auditor (TypeScript/Node)"
+        run: |
+          echo "=================================================="
+          echo "  REPO:       ${REPO_CONTEXT}"
+          echo "  WORKFLOW:   ${{ github.workflow }}"
+          echo "  JOB:        ${{ github.job }}"
+          echo "  SHA:        ${{ github.sha }}"
+          echo "  REF:        ${{ github.ref }}"
+          echo "  EVENT:      ${{ github.event_name }}"
+          echo "=================================================="
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -334,6 +399,19 @@ jobs:
       (needs.parity-gate.result == 'success' || (inputs.skip_parity == 'true' && inputs.target_environment == 'staging' && inputs.skip_parity_acknowledgement == 'I_ACCEPT_PARITY_SKIP'))
     
     steps:
+      - name: Log CI context
+        env:
+          REPO_CONTEXT: "job-sheet-qa-auditor (TypeScript/Node)"
+        run: |
+          echo "=================================================="
+          echo "  REPO:       ${REPO_CONTEXT}"
+          echo "  WORKFLOW:   ${{ github.workflow }}"
+          echo "  JOB:        ${{ github.job }}"
+          echo "  SHA:        ${{ github.sha }}"
+          echo "  REF:        ${{ github.ref }}"
+          echo "  EVENT:      ${{ github.event_name }}"
+          echo "=================================================="
+
       - name: Checkout
         uses: actions/checkout@v4
 
