@@ -2,6 +2,15 @@
 
 This document describes the observability features for monitoring parity and integrity.
 
+## Prometheus Correctness
+
+All metrics follow Prometheus best practices:
+
+- **All metric values are numeric** - No string values in metric data
+- **Timestamps are epoch seconds** - Not ISO strings
+- **Labels are stable** - No high-cardinality or PII data in labels
+- **Hash truncation** - Full hashes are never exposed in labels
+
 ## Metrics
 
 ### Parity Metrics
@@ -15,20 +24,31 @@ This document describes the observability features for monitoring parity and int
 | `parity_threshold_violations_total` | Counter | Total threshold violations |
 | `parity_runs_total` | Counter | Total parity runs |
 | `parity_failures_total` | Counter | Total parity failures |
-| `parity_pass_rate_by_severity` | Gauge | Pass rate by severity level |
+| `parity_pass_rate_by_severity` | Gauge | Pass rate by severity level (S0-S3) |
 
 ### Integrity Metrics
 
 | Metric | Type | Description |
 |--------|------|-------------|
 | `integrity_mismatch_total` | Counter | Total integrity mismatches |
-| `integrity_last_check_timestamp` | Info | Last integrity check time |
+| `integrity_last_check_epoch_seconds` | Gauge | Unix timestamp of last integrity check |
 
 ### Info Metrics
 
 | Metric | Labels | Description |
 |--------|--------|-------------|
-| `parity_dataset_info` | `hash`, `thresholds_version` | Dataset metadata |
+| `parity_dataset_info` | `hash` (truncated), `thresholds_version` | Dataset metadata |
+
+## Canonical Severity Labels
+
+All severity-based metrics use canonical labels:
+
+| Label | Description | Threshold |
+|-------|-------------|-----------|
+| `S0` | Critical | Must be 100% |
+| `S1` | High | Must be >= 95% |
+| `S2` | Medium | Must be >= 90% |
+| `S3` | Low | Must be >= 80% |
 
 ## Alerts
 
@@ -38,7 +58,9 @@ This document describes the observability features for monitoring parity and int
 |-------|-----------|-------------|
 | `ParityFailureOnMain` | Parity fails on main | Immediate attention required |
 | `CriticalSeverityFailures` | S0 < 100% | Critical fields failing |
+| `HighSeverityFailures` | S1 < 95% | High severity fields below threshold |
 | `IntegrityMismatchSpike` | >5 mismatches/hour | Possible data corruption |
+| `MetricsEndpointDown` | Endpoint unavailable | Metrics collection broken |
 
 ### Warning Alerts
 
@@ -46,8 +68,11 @@ This document describes the observability features for monitoring parity and int
 |-------|-----------|-------------|
 | `RepeatedThresholdViolations` | >3 violations/hour | Review thresholds |
 | `ParityPassRateDrop` | Pass rate < 80% | Quality degradation |
+| `MediumSeverityFailures` | S2 < 90% | Medium severity below threshold |
+| `LowSeverityFailures` | S3 < 80% | Low severity below threshold |
 | `DatasetHashChanged` | Hash changed | Verify intentional |
 | `ParityRunsStalled` | No runs in 24h | Check CI pipeline |
+| `IntegrityCheckStale` | No check in 24h | Check integrity pipeline |
 
 ## Dashboard
 
@@ -60,9 +85,10 @@ A Grafana dashboard template is provided at `scripts/monitoring/grafana-dashboar
 3. **Threshold Violations** - Violation counter with alerts
 4. **Integrity Mismatches** - Mismatch counter
 5. **Pass Rate Over Time** - Time series graph
-6. **Pass Rate by Severity** - Bar chart by severity
+6. **Pass Rate by Severity** - Bar chart by severity (S0-S3)
 7. **Field Status Distribution** - Pie chart of passed/failed
 8. **Dataset Information** - Metadata display
+9. **Integrity Last Check** - Time since last check
 
 ## PII Safety
 
@@ -73,6 +99,7 @@ All metrics are validated for PII safety:
 - No SSN/tax IDs
 - No credit card numbers
 - No raw OCR content
+- Hash values are truncated in labels
 
 The `validateMetricsSafety()` function checks for common PII patterns before emission.
 
@@ -86,6 +113,10 @@ Metrics are exposed in Prometheus exposition format:
 # HELP parity_pass_rate Current parity pass rate percentage
 # TYPE parity_pass_rate gauge
 parity_pass_rate 85.5
+
+# HELP integrity_last_check_epoch_seconds Unix timestamp of last integrity check
+# TYPE integrity_last_check_epoch_seconds gauge
+integrity_last_check_epoch_seconds 1704326400
 ```
 
 ### Grafana
@@ -141,3 +172,27 @@ No external vendor configuration is required for basic functionality.
 3. If rules changed, update thresholds
 4. If quality issue, fix validation
 5. Document decision in changelog
+
+### Severity-Specific Failures
+
+For S0 (Critical) failures:
+1. Stop all deployments immediately
+2. Identify failing fields
+3. Root cause analysis required
+4. Fix must be deployed same day
+
+For S1 (High) failures:
+1. Block promotion to production
+2. Identify failing fields
+3. Fix within 24 hours
+
+For S2/S3 (Medium/Low) failures:
+1. Document in tracking system
+2. Schedule fix in next sprint
+3. Consider threshold adjustment if appropriate
+
+## Related Documentation
+
+- [Parity Harness](../parity/PARITY_HARNESS.md)
+- [Threshold Governance](../parity/THRESHOLD_GOVERNANCE.md)
+- [Promotion Gates](../release/PROMOTION_GATES.md)

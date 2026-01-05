@@ -1,7 +1,12 @@
 /**
- * Stage 14: Observability Contract Tests
+ * Stage 14b: Observability Contract Tests (Hardened)
  * 
  * Tests for parity metrics, alerts, and dashboard configuration.
+ * 
+ * PROMETHEUS CORRECTNESS:
+ * - All metric values MUST be numeric
+ * - Timestamps are epoch seconds (not ISO strings)
+ * - Labels are stable and PII-safe
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -15,7 +20,7 @@ import {
   type ParityMetrics
 } from '../../services/metrics/parityMetrics';
 
-describe('Stage 14: Observability', () => {
+describe('Stage 14b: Observability (Hardened)', () => {
   beforeEach(() => {
     resetMetrics();
   });
@@ -65,7 +70,7 @@ describe('Stage 14: Observability', () => {
       expect(metrics.parity_failures_total).toBe(1);
     });
     
-    it('should calculate pass rate by severity', () => {
+    it('should calculate pass rate by severity using canonical labels (S0-S3)', () => {
       recordParityRun({
         passRate: 85,
         totalFields: 100,
@@ -121,16 +126,22 @@ describe('Stage 14: Observability', () => {
   });
   
   describe('Integrity Metrics Recording', () => {
-    it('should record integrity check results', () => {
+    it('should record integrity check results with epoch seconds', () => {
+      const beforeTime = Math.floor(Date.now() / 1000);
+      
       recordIntegrityCheck({
         hashVerified: true,
         mismatch: false
       });
       
+      const afterTime = Math.floor(Date.now() / 1000);
       const metrics = getMetrics();
       
       expect(metrics.integrity_mismatch_total).toBe(0);
-      expect(metrics.integrity_last_check_timestamp).toBeTruthy();
+      // Timestamp should be numeric epoch seconds
+      expect(typeof metrics.integrity_last_check_epoch_seconds).toBe('number');
+      expect(metrics.integrity_last_check_epoch_seconds).toBeGreaterThanOrEqual(beforeTime);
+      expect(metrics.integrity_last_check_epoch_seconds).toBeLessThanOrEqual(afterTime);
     });
     
     it('should increment mismatch counter on integrity failure', () => {
@@ -155,7 +166,7 @@ describe('Stage 14: Observability', () => {
     });
   });
   
-  describe('Prometheus Format', () => {
+  describe('Prometheus Format Correctness', () => {
     it('should format metrics in Prometheus exposition format', () => {
       recordParityRun({
         passRate: 85.5,
@@ -209,6 +220,67 @@ describe('Stage 14: Observability', () => {
       
       expect(output).toContain('parity_pass_rate_by_severity{severity="S0"} 100');
     });
+    
+    it('should emit all metric values as numeric (Prometheus requirement)', () => {
+      recordParityRun({
+        passRate: 85.5,
+        totalFields: 100,
+        passedFields: 85,
+        failedFields: 15,
+        violations: [],
+        datasetHash: 'sha256:test',
+        thresholdsVersion: '1.0.0',
+        bySeverity: { S0: { passed: 20, total: 20 } }
+      });
+      
+      recordIntegrityCheck({ hashVerified: true, mismatch: false });
+      
+      const output = formatPrometheusMetrics();
+      const lines = output.split('\n').filter(l => !l.startsWith('#') && l.trim());
+      
+      // Each metric line should have a numeric value
+      lines.forEach(line => {
+        const parts = line.split(' ');
+        const value = parts[parts.length - 1];
+        expect(Number.isFinite(parseFloat(value))).toBe(true);
+      });
+    });
+    
+    it('should emit integrity timestamp as epoch seconds', () => {
+      recordIntegrityCheck({ hashVerified: true, mismatch: false });
+      
+      const output = formatPrometheusMetrics();
+      
+      expect(output).toContain('integrity_last_check_epoch_seconds');
+      expect(output).toContain('# TYPE integrity_last_check_epoch_seconds gauge');
+      
+      // Extract the value and verify it's a reasonable epoch timestamp
+      const match = output.match(/integrity_last_check_epoch_seconds (\d+)/);
+      expect(match).toBeTruthy();
+      const epochSeconds = parseInt(match![1], 10);
+      expect(epochSeconds).toBeGreaterThan(1700000000); // After 2023
+      expect(epochSeconds).toBeLessThan(2000000000); // Before 2033
+    });
+    
+    it('should truncate hash in labels for PII safety', () => {
+      recordParityRun({
+        passRate: 85,
+        totalFields: 100,
+        passedFields: 85,
+        failedFields: 15,
+        violations: [],
+        datasetHash: 'sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+        thresholdsVersion: '1.0.0',
+        bySeverity: {}
+      });
+      
+      const output = formatPrometheusMetrics();
+      
+      // Hash should be truncated (sha256: + 16 chars + ...)
+      expect(output).toContain('hash="sha256:abcdef1234567890...');
+      // Full hash should NOT be present
+      expect(output).not.toContain('sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890');
+    });
   });
   
   describe('PII Safety Validation', () => {
@@ -225,7 +297,7 @@ describe('Stage 14: Observability', () => {
         parity_thresholds_version: '1.0.0',
         parity_pass_rate_by_severity: {},
         integrity_mismatch_total: 0,
-        integrity_last_check_timestamp: '2025-01-04T00:00:00.000Z'
+        integrity_last_check_epoch_seconds: 1704326400
       };
       
       const result = validateMetricsSafety(metrics);
@@ -247,13 +319,14 @@ describe('Stage 14: Observability', () => {
         parity_thresholds_version: '1.0.0',
         parity_pass_rate_by_severity: {},
         integrity_mismatch_total: 0,
-        integrity_last_check_timestamp: ''
+        integrity_last_check_epoch_seconds: 0
       };
       
       const result = validateMetricsSafety(metrics);
       
       expect(result.safe).toBe(false);
       expect(result.issues.length).toBeGreaterThan(0);
+      expect(result.issues.some(i => i.includes('email'))).toBe(true);
     });
     
     it('should detect phone number in metrics', () => {
@@ -269,7 +342,31 @@ describe('Stage 14: Observability', () => {
         parity_thresholds_version: '1.0.0',
         parity_pass_rate_by_severity: {},
         integrity_mismatch_total: 0,
-        integrity_last_check_timestamp: ''
+        integrity_last_check_epoch_seconds: 0
+      };
+      
+      const result = validateMetricsSafety(metrics);
+      
+      expect(result.safe).toBe(false);
+      expect(result.issues.some(i => i.includes('phone'))).toBe(true);
+    });
+    
+    it('should detect PII in severity labels', () => {
+      const metrics: ParityMetrics = {
+        parity_pass_rate: 85,
+        parity_total_fields: 100,
+        parity_passed_fields: 85,
+        parity_failed_fields: 15,
+        parity_threshold_violations_total: 0,
+        parity_runs_total: 1,
+        parity_failures_total: 0,
+        parity_dataset_hash: 'sha256:test',
+        parity_thresholds_version: '1.0.0',
+        parity_pass_rate_by_severity: {
+          'user@example.com': 100 // PII in label!
+        },
+        integrity_mismatch_total: 0,
+        integrity_last_check_epoch_seconds: 0
       };
       
       const result = validateMetricsSafety(metrics);
@@ -320,6 +417,24 @@ describe('Stage 14: Observability', () => {
       expect(output).not.toMatch(/secret/i);
       expect(output).not.toMatch(/password/i);
     });
+    
+    it('should escape special characters in labels', () => {
+      recordParityRun({
+        passRate: 85,
+        totalFields: 100,
+        passedFields: 85,
+        failedFields: 15,
+        violations: [],
+        datasetHash: 'sha256:test"with"quotes',
+        thresholdsVersion: '1.0.0',
+        bySeverity: {}
+      });
+      
+      const output = formatPrometheusMetrics();
+      
+      // Quotes should be escaped
+      expect(output).toContain('\\"');
+    });
   });
   
   describe('Metrics Reset', () => {
@@ -343,15 +458,16 @@ describe('Stage 14: Observability', () => {
       expect(metrics.parity_runs_total).toBe(0);
       expect(metrics.parity_threshold_violations_total).toBe(0);
       expect(metrics.parity_dataset_hash).toBe('');
+      expect(metrics.integrity_last_check_epoch_seconds).toBe(0);
     });
   });
   
   describe('Alert Rules Validation', () => {
     it('should define critical alerts for main branch failures', () => {
-      // This is a structural test - actual alert rules are in YAML
       const criticalAlerts = [
         'ParityFailureOnMain',
         'CriticalSeverityFailures',
+        'HighSeverityFailures',
         'IntegrityMismatchSpike'
       ];
       
@@ -364,12 +480,31 @@ describe('Stage 14: Observability', () => {
       const warningAlerts = [
         'RepeatedThresholdViolations',
         'ParityPassRateDrop',
+        'MediumSeverityFailures',
+        'LowSeverityFailures',
         'DatasetHashChanged',
-        'ParityRunsStalled'
+        'ParityRunsStalled',
+        'IntegrityCheckStale'
       ];
       
       warningAlerts.forEach(alert => {
         expect(alert).toBeTruthy();
+      });
+    });
+    
+    it('should define alerts for all canonical severity levels (S0-S3)', () => {
+      const severityAlerts = [
+        { severity: 'S0', alert: 'CriticalSeverityFailures', threshold: 100 },
+        { severity: 'S1', alert: 'HighSeverityFailures', threshold: 95 },
+        { severity: 'S2', alert: 'MediumSeverityFailures', threshold: 90 },
+        { severity: 'S3', alert: 'LowSeverityFailures', threshold: 80 }
+      ];
+      
+      severityAlerts.forEach(({ severity, alert, threshold }) => {
+        expect(severity).toMatch(/^S[0-3]$/);
+        expect(alert).toBeTruthy();
+        expect(threshold).toBeGreaterThan(0);
+        expect(threshold).toBeLessThanOrEqual(100);
       });
     });
   });
@@ -418,7 +553,7 @@ describe('Stage 14: Observability', () => {
       const metrics = getMetrics();
       const severities = Object.keys(metrics.parity_pass_rate_by_severity);
       
-      // Should maintain insertion order (not sorted)
+      // Should contain all canonical severities
       expect(severities).toContain('S0');
       expect(severities).toContain('S1');
       expect(severities).toContain('S2');
