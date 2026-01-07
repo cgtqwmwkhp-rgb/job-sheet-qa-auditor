@@ -6,9 +6,29 @@
  * - Form code regex matching
  * - Client context
  * - ROI (Region of Interest) support
+ * 
+ * Integrates with canonical semantics for selection safety:
+ * - HIGH confidence: auto-select
+ * - MEDIUM confidence: auto-select only if gap >= 10
+ * - LOW confidence: HARD STOP without explicit templateId
  */
 
 import { getTemplateRegistry, type Template } from './templateRegistry';
+import {
+  SelectionTraceBuilder,
+  createSelectionArtifact,
+  serializeSelectionArtifact,
+  getConfidenceBand,
+  makeSelectionDecision,
+  createInputHash,
+  DEFAULT_SELECTION_POLICY,
+  type ScoredCandidate,
+  type SelectionTrace,
+  type SelectionArtifact,
+  type SelectionDecision,
+  type ConfidenceBand,
+  type SelectionPolicy,
+} from './canonicalSemantics';
 
 // ============================================================================
 // Types
@@ -42,6 +62,10 @@ export interface SelectionResult {
   selectionMethod: 'fingerprint' | 'formCode' | 'manual' | 'fallback' | 'none';
   confidence: 'high' | 'medium' | 'low' | 'none';
   warnings: string[];
+  /** Selection trace for audit and debugging */
+  selectionTrace?: SelectionTrace;
+  /** Selection decision with safety enforcement */
+  decision?: SelectionDecision;
 }
 
 export interface ROIRegion {
@@ -64,6 +88,8 @@ export interface DocumentContext {
   workType?: string;
   formCode?: string;
   pageCount?: number;
+  /** Explicit template ID to bypass selection */
+  explicitTemplateId?: string;
 }
 
 // ============================================================================
@@ -167,7 +193,6 @@ function scoreTemplate(template: Template, context: DocumentContext): SelectionS
       }
     }
     if (!allMatched) {
-      // If not all required tokens match, this template is not a candidate
       return {
         templateId: template.templateId,
         score: -1000,
@@ -202,7 +227,7 @@ function scoreTemplate(template: Template, context: DocumentContext): SelectionS
         matchedOptional,
         matchedExclude,
         formCodeMatch,
-        reasons: [`None of the required-any tokens matched`],
+        reasons: ['None of the required-any tokens matched'],
       };
     }
   }
@@ -294,17 +319,54 @@ function scoreTemplate(template: Template, context: DocumentContext): SelectionS
   };
 }
 
+/**
+ * Convert SelectionScore to ScoredCandidate for canonical semantics
+ */
+function toScoredCandidate(score: SelectionScore, context: DocumentContext): ScoredCandidate {
+  const registry = getTemplateRegistry();
+  const template = registry.getTemplate(score.templateId);
+  
+  return {
+    templateId: score.templateId,
+    score: score.score,
+    confidenceBand: getConfidenceBand(score.score),
+    tokensMatched: {
+      requiredAll: score.matchedRequiredAll,
+      requiredAny: score.matchedRequiredAny,
+      optional: score.matchedOptional,
+      excluded: score.matchedExclude,
+    },
+    formCodeMatch: score.formCodeMatch,
+    contextMatches: {
+      client: template?.client === context.client,
+      assetType: false, // TODO: implement
+      workType: false, // TODO: implement
+    },
+  };
+}
+
 // ============================================================================
 // Template Selection Engine
 // ============================================================================
 
 export class TemplateSelector {
+  private policy: SelectionPolicy;
+  
+  constructor(policy: SelectionPolicy = DEFAULT_SELECTION_POLICY) {
+    this.policy = policy;
+  }
+  
   /**
-   * Select the best template for a document
+   * Select the best template for a document with selection safety enforcement
    */
   selectTemplate(context: DocumentContext): SelectionResult {
     const registry = getTemplateRegistry();
     const warnings: string[] = [];
+    const traceBuilder = new SelectionTraceBuilder(this.policy);
+    
+    // Set input hash for trace
+    traceBuilder.setInputHash(context.extractedText);
+    traceBuilder.setExplicitTemplateId(context.explicitTemplateId || null);
     
     // Get all active templates
     let templates = registry.getActiveTemplates();
@@ -320,6 +382,7 @@ export class TemplateSelector {
     }
     
     if (templates.length === 0) {
+      const trace = traceBuilder.build();
       return {
         selectedTemplate: null,
         selectedScore: null,
@@ -327,37 +390,72 @@ export class TemplateSelector {
         selectionMethod: 'none',
         confidence: 'none',
         warnings: ['No active templates available'],
+        selectionTrace: trace,
+        decision: trace.decision,
       };
     }
     
     // Score all templates
     const allScores = templates
       .map(t => scoreTemplate(t, context))
-      .sort((a, b) => b.score - a.score);
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.templateId.localeCompare(b.templateId); // Stable sort
+      });
     
-    // Filter out disqualified templates (negative scores)
-    const validScores = allScores.filter(s => s.score >= 0);
+    // Convert to scored candidates for canonical semantics
+    const candidates = allScores
+      .filter(s => s.score >= 0)
+      .map(s => toScoredCandidate(s, context));
     
-    if (validScores.length === 0) {
+    traceBuilder.setCandidates(candidates);
+    
+    // Build trace and get decision
+    const trace = traceBuilder.build();
+    const decision = trace.decision;
+    
+    // Handle decision
+    if (decision.type === 'HARD_STOP') {
       return {
         selectedTemplate: null,
         selectedScore: null,
         allScores,
         selectionMethod: 'none',
         confidence: 'none',
-        warnings: ['No templates matched the document fingerprint'],
+        warnings: [decision.reason, `Fix path: ${decision.fixPath}`],
+        selectionTrace: trace,
+        decision,
       };
     }
     
-    // Select the highest scoring template
-    const selectedScore = validScores[0];
-    const selectedTemplate = registry.getTemplate(selectedScore.templateId);
+    if (decision.type === 'REVIEW_QUEUE') {
+      // Still return the top candidate but mark as needing review
+      const validScores = allScores.filter(s => s.score >= 0);
+      const selectedScore = validScores[0] || null;
+      const selectedTemplate = selectedScore ? registry.getTemplate(selectedScore.templateId) : null;
+      
+      return {
+        selectedTemplate,
+        selectedScore,
+        allScores,
+        selectionMethod: 'fingerprint',
+        confidence: 'medium',
+        warnings: [decision.reason, `Reason: ${decision.reasonCode}`],
+        selectionTrace: trace,
+        decision,
+      };
+    }
+    
+    // AUTO_SELECT
+    const selectedTemplate = registry.getTemplate(decision.templateId);
+    const selectedScore = allScores.find(s => s.templateId === decision.templateId) || null;
     
     // Check for ambiguous selection (multiple templates with similar scores)
+    const validScores = allScores.filter(s => s.score >= 0);
     if (validScores.length > 1) {
       const scoreDiff = validScores[0].score - validScores[1].score;
-      if (scoreDiff < 10) {
-        warnings.push(`Ambiguous selection: ${validScores[0].templateId} and ${validScores[1].templateId} have similar scores`);
+      if (scoreDiff < 10 && !context.explicitTemplateId) {
+        warnings.push(`Ambiguous selection: ${validScores[0].templateId} and ${validScores[1].templateId} have similar scores (gap=${scoreDiff})`);
       }
     }
     
@@ -365,9 +463,11 @@ export class TemplateSelector {
       selectedTemplate,
       selectedScore,
       allScores,
-      selectionMethod: 'fingerprint',
-      confidence: selectedScore.confidence,
+      selectionMethod: context.explicitTemplateId ? 'manual' : 'fingerprint',
+      confidence: selectedScore?.confidence || 'none',
       warnings,
+      selectionTrace: trace,
+      decision,
     };
   }
   
@@ -378,6 +478,22 @@ export class TemplateSelector {
     const registry = getTemplateRegistry();
     const template = registry.getTemplate(templateId);
     
+    const traceBuilder = new SelectionTraceBuilder(this.policy);
+    traceBuilder.setExplicitTemplateId(templateId);
+    
+    if (template) {
+      traceBuilder.addCandidate({
+        templateId,
+        score: 100,
+        confidenceBand: 'HIGH',
+        tokensMatched: { requiredAll: [], requiredAny: [], optional: [], excluded: [] },
+        formCodeMatch: false,
+        contextMatches: { client: false, assetType: false, workType: false },
+      });
+    }
+    
+    const trace = traceBuilder.build();
+    
     if (!template) {
       return {
         selectedTemplate: null,
@@ -386,6 +502,8 @@ export class TemplateSelector {
         selectionMethod: 'manual',
         confidence: 'none',
         warnings: [`Template not found: ${templateId}`],
+        selectionTrace: trace,
+        decision: trace.decision,
       };
     }
     
@@ -406,6 +524,8 @@ export class TemplateSelector {
       selectionMethod: 'manual',
       confidence: 'high',
       warnings: [],
+      selectionTrace: trace,
+      decision: trace.decision,
     };
   }
   
@@ -454,6 +574,20 @@ export class TemplateSelector {
     
     return null;
   }
+  
+  /**
+   * Get selection artifact for persistence
+   */
+  getSelectionArtifact(trace: SelectionTrace): SelectionArtifact {
+    return createSelectionArtifact(trace);
+  }
+  
+  /**
+   * Serialize selection artifact to deterministic JSON
+   */
+  serializeArtifact(artifact: SelectionArtifact): string {
+    return serializeSelectionArtifact(artifact);
+  }
 }
 
 // ============================================================================
@@ -472,3 +606,6 @@ export function getTemplateSelector(): TemplateSelector {
 export function resetTemplateSelector(): void {
   selectorInstance = null;
 }
+
+// Re-export types from canonical semantics for convenience
+export type { SelectionTrace, SelectionArtifact, SelectionDecision, ScoredCandidate, ConfidenceBand };
