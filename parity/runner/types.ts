@@ -10,10 +10,16 @@
 export const CANONICAL_REASON_CODES = [
   'VALID',
   'MISSING_FIELD',
-  'INVALID_FORMAT',
-  'OUT_OF_POLICY',
+  'UNREADABLE_FIELD',
   'LOW_CONFIDENCE',
+  'INVALID_FORMAT',
   'CONFLICT',
+  'OUT_OF_POLICY',
+  'INCOMPLETE_EVIDENCE',
+  'OCR_FAILURE',
+  'PIPELINE_ERROR',
+  'SPEC_GAP',
+  'SECURITY_RISK',
 ] as const;
 
 export type CanonicalReasonCode = typeof CANONICAL_REASON_CODES[number];
@@ -292,9 +298,19 @@ export function isCanonicalReasonCode(code: string): code is CanonicalReasonCode
  */
 export function mapToCanonicalReasonCode(code: string): CanonicalReasonCode {
   const mapping: Record<string, CanonicalReasonCode> = {
+    // Legacy policy codes
     'OUT_OF_RANGE': 'OUT_OF_POLICY',
     'RANGE_ERROR': 'OUT_OF_POLICY',
     'POLICY_VIOLATION': 'OUT_OF_POLICY',
+    // Legacy field codes
+    'MISSING_CRITICAL_FIELD': 'MISSING_FIELD',
+    'FIELD_MISSING': 'MISSING_FIELD',
+    // Legacy evidence codes
+    'INSUFFICIENT_DETAIL': 'INCOMPLETE_EVIDENCE',
+    'MISSING_EVIDENCE': 'INCOMPLETE_EVIDENCE',
+    // Legacy OCR codes
+    'EXTRACTION_FAILED': 'OCR_FAILURE',
+    'UNREADABLE': 'UNREADABLE_FIELD',
   };
   
   if (isCanonicalReasonCode(code)) {

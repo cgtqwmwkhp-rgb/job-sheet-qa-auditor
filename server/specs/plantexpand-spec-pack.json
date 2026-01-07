@@ -1,0 +1,906 @@
+{
+  "packVersion": "1.0.0",
+  "packId": "PLANTEXPAND_SPEC_PACK",
+  "displayName": "Plantexpand Document Specification Pack",
+  "client": "PLANTEXPAND",
+  "createdAt": "2026-01-06",
+  "auditPerspective": {
+    "description": "This system audits DOCUMENTATION QUALITY, not asset condition. A document PASSES when the engineer correctly fills in the paperwork, even if the asset itself has issues.",
+    "passConditions": [
+      "All required fields are completed",
+      "Findings are internally consistent with conclusions",
+      "Appropriate follow-up actions are documented when issues are found",
+      "Supporting evidence (photos, comments) is provided where required"
+    ],
+    "failConditions": [
+      "Missing required fields",
+      "Internal conflicts (e.g., checklist shows failures but Asset Safe = Yes for safety-critical equipment)",
+      "Missing evidence when failures are recorded",
+      "Process violations (e.g., Return Visit = No when parts are still required)"
+    ]
+  },
+  "defaults": {
+    "dateFormat": "DD/MM/YYYY",
+    "timezone": "Europe/London",
+    "reviewQueueTriggers": ["LOW_CONFIDENCE", "UNREADABLE_FIELD", "CONFLICT", "MISSING_FIELD", "INCOMPLETE_EVIDENCE"],
+    "reviewQueueTriggerMappings": {
+      "MISSING_CRITICAL_FIELD": "MISSING_FIELD",
+      "INSUFFICIENT_DETAIL": "INCOMPLETE_EVIDENCE"
+    },
+    "criticalFields": [
+      "assetId",
+      "completionDate",
+      "assetSafeToUse",
+      "technicianSignature"
+    ],
+    "llmPersonas": {
+      "engineering_expert": {
+        "description": "Analyzes engineer comments for clarity, detail, and actionable information. Challenges vague or insufficient detail.",
+        "promptPrefix": "You are an experienced field service engineering expert reviewing job documentation."
+      },
+      "parts_specialist": {
+        "description": "Identifies part numbers based on asset make/model and part descriptions.",
+        "promptPrefix": "You are a parts specialist with extensive knowledge of industrial equipment components."
+      }
+    },
+    "checklistStatusLegend": {
+      "GREEN": { "label": "Ok", "meaning": "Check passed", "impact": "Asset safe, service complete" },
+      "ORANGE": { "label": "Adv. (Advisory)", "meaning": "Minor issue", "impact": "Follow-up required with notes explaining why" },
+      "RED": { "label": "Fail", "meaning": "Critical failure", "impact": "Asset NOT safe, return visit required" },
+      "YELLOW": { "label": "N/A", "meaning": "Not Applicable", "impact": "Task not warranted for this asset type" }
+    }
+  },
+  "templates": [
+    {
+      "templateId": "PE_LOLER_EXAM_V1",
+      "displayName": "Plantexpand LOLER Thorough Examination Report v1",
+      "description": "LOLER certificate for lifting equipment thorough examination",
+      "client": "PLANTEXPAND",
+      "assetTypes": ["PUMP", "GENERATOR", "TIPPER", "LIFTING_EQUIPMENT"],
+      "workTypes": ["COMPLIANCE"],
+      "selection": {
+        "method": "fingerprint",
+        "requiredTokensAll": ["Thorough Examination Report", "Plantexpand"],
+        "optionalTokens": ["LOLER", "Lifting Operations"],
+        "formCodeRegex": "PE-[0-9]{8,}"
+      },
+      "files": {
+        "blankTemplatePdf": "files/PE_LOLER_EXAM_V1_blank.pdf",
+        "samples": [
+          { "id": "PE_LOLER_PASS_001", "path": "files/ComplianceReport-050F_470_20251110.pdf", "expectedOutcome": "PASS" },
+          { "id": "PE_LOLER_FAIL_NO_SIG_001", "path": "files/PE_LOLER_FAIL_NO_SIG_001.pdf", "expectedOutcome": "FAIL", "expectedReasonCodes": ["MISSING_FIELD"] },
+          { "id": "PE_LOLER_FAIL_UNSAFE_001", "path": "files/PE_LOLER_FAIL_UNSAFE_001.pdf", "expectedOutcome": "FAIL", "expectedReasonCodes": ["OUT_OF_POLICY"] },
+          { "id": "PE_LOLER_FAIL_DATE_MISMATCH_001", "path": "files/PE_LOLER_FAIL_DATE_MISMATCH_001.pdf", "expectedOutcome": "FAIL", "expectedReasonCodes": ["INVALID_FORMAT"] }
+        ]
+      },
+      "fieldRules": {
+        "engineerName": {
+          "required": true,
+          "extractionHints": { "labels": ["Name:"] },
+          "notes": "Name of the engineer conducting the examination"
+        },
+        "customerName": {
+          "required": true,
+          "extractionHints": { "labels": ["Customer:"] }
+        },
+        "employerAddress": {
+          "required": true,
+          "extractionHints": { "labels": ["Address of employer:"] }
+        },
+        "siteAddress": {
+          "required": true,
+          "extractionHints": { "labels": ["Site address:"] }
+        },
+        "assetId": {
+          "required": true,
+          "validators": [{ "type": "regex", "pattern": "^[A-Z0-9-]{4,20}$" }],
+          "extractionHints": { "labels": ["Asset ID:"] }
+        },
+        "makeAndModel": {
+          "required": true,
+          "extractionHints": { "labels": ["Make and model:"] }
+        },
+        "yearOfManufacture": {
+          "required": true,
+          "validators": [{ "type": "regex", "pattern": "^\\d{4}$" }],
+          "extractionHints": { "labels": ["Year of manufacture:"] }
+        },
+        "serialNumber": {
+          "required": true,
+          "extractionHints": { "labels": ["Serial number:"] }
+        },
+        "safeWorkingLoad": {
+          "required": true,
+          "extractionHints": { "labels": ["Safe working load and configuration:"] }
+        },
+        "dateOfLastExamination": {
+          "required": true,
+          "validators": [{ "type": "date", "format": "DD/MM/YYYY" }],
+          "extractionHints": { "labels": ["Date of last examination:"] }
+        },
+        "examinationType": {
+          "required": true,
+          "validators": [{ "type": "enum", "values": ["Within an interval of 6 months", "Within an interval of 12 months"] }],
+          "extractionHints": { "labels": ["Type of thorough examination carried out:"] }
+        },
+        "dateOfExamination": {
+          "required": true,
+          "validators": [{ "type": "date", "format": "DD/MM/YYYY" }],
+          "extractionHints": { "labels": ["Date of Examination:"] }
+        },
+        "dateOfReport": {
+          "required": true,
+          "validators": [{ "type": "date", "format": "DD/MM/YYYY" }],
+          "constraints": [{ "type": "afterField", "field": "dateOfExamination", "allowSameDay": true }],
+          "extractionHints": { "labels": ["Date of Report:"] }
+        },
+        "nextExaminationInterval": {
+          "required": true,
+          "validators": [{ "type": "enum", "values": ["6 Months", "12 Months"] }],
+          "extractionHints": { "labels": ["Next examination interval:"] }
+        },
+        "dateNextExaminationDue": {
+          "required": true,
+          "validators": [{ "type": "date", "format": "DD/MM/YYYY" }],
+          "constraints": [
+            { "type": "dateInterval", "fromField": "dateOfExamination", "intervalField": "nextExaminationInterval", "rule": "If interval is 6 Months, next due date must be exactly 6 months after examination date. If interval is 12 Months, next due date must be exactly 12 months after examination date." }
+          ],
+          "extractionHints": { "labels": ["Date next examination due:"] }
+        },
+        "isEquipmentSafe": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "extractionHints": { "labels": ["Is the equipment safe to operate Yes/No:"] },
+          "notes": "If YES, defect section should be empty. If NO, defect section must have Category, Details, and Remedial Action."
+        },
+        "defectCategory": {
+          "required": false,
+          "validators": [{ "type": "enum", "values": ["A", "B", "C"] }],
+          "constraints": [{ "type": "requiredIf", "field": "isEquipmentSafe", "value": false }],
+          "extractionHints": { "labels": ["Category of defect:"] }
+        },
+        "defectDetails": {
+          "required": false,
+          "constraints": [{ "type": "requiredIf", "field": "isEquipmentSafe", "value": false }],
+          "extractionHints": { "labels": ["Details of defect, remedial action required and timescale by which defects should be remedied"] }
+        },
+        "competentPersonSignature": {
+          "required": true,
+          "visualRule": { "type": "signaturePresent" },
+          "notes": "Signature of the competent person who conducted the examination"
+        },
+        "competentPersonName": {
+          "required": true,
+          "extractionHints": { "labels": ["Print name:"], "section": "Competent Person" }
+        },
+        "competentPersonQualifications": {
+          "required": true,
+          "extractionHints": { "labels": ["Qualifications:"] }
+        },
+        "competentPersonAddress": {
+          "required": true,
+          "extractionHints": { "labels": ["Address:"], "section": "Competent Person" }
+        },
+        "receivingPersonSignature": {
+          "required": true,
+          "visualRule": { "type": "signaturePresent" },
+          "notes": "Signature of the person receiving the report"
+        },
+        "receivingPersonName": {
+          "required": true,
+          "extractionHints": { "labels": ["Print name:"], "section": "Receiving Person" }
+        },
+        "receivingPersonAddress": {
+          "required": true,
+          "extractionHints": { "labels": ["Address:"], "section": "Receiving Person" }
+        }
+      },
+      "validationRules": [
+        { "ruleId": "DATE_INTERVAL_6M", "description": "If interval = 6 months, next due date must be exactly 6 months after examination date" },
+        { "ruleId": "DATE_INTERVAL_12M", "description": "If interval = 12 months, next due date must be exactly 12 months after examination date" },
+        { "ruleId": "SAFE_YES_NO_DEFECTS", "description": "If safe = YES, defect section must be empty" },
+        { "ruleId": "SAFE_NO_REQUIRES_DEFECTS", "description": "If safe = NO, defect section must have at least one entry with Category, Details, and Remedial Action" },
+        { "ruleId": "SIGNATURE_REQUIRED", "description": "Both competent person and receiving person signatures must be present" }
+      ],
+      "roiOptional": {
+        "pageIndex0Based": 0,
+        "regions": [
+          { "name": "headerBlock", "x": 0.05, "y": 0.03, "w": 0.90, "h": 0.15 },
+          { "name": "employerBlock", "x": 0.05, "y": 0.18, "w": 0.45, "h": 0.10 },
+          { "name": "customerBlock", "x": 0.50, "y": 0.18, "w": 0.45, "h": 0.10 },
+          { "name": "equipmentBlock", "x": 0.05, "y": 0.30, "w": 0.90, "h": 0.20 },
+          { "name": "defectBlock", "x": 0.05, "y": 0.52, "w": 0.90, "h": 0.30 }
+        ]
+      }
+    },
+    {
+      "templateId": "PE_JOB_SUMMARY_REPAIR_V1",
+      "displayName": "Plantexpand Job Summary (Repair/VOR) v1",
+      "description": "Job summary report for breakdown/repair events with VOR status",
+      "client": "PLANTEXPAND",
+      "assetTypes": ["PUMP", "GENERATOR", "TIPPER", "LIFTING_EQUIPMENT", "PRESSURE_WASHER", "COMPRESSOR"],
+      "workTypes": ["REPAIR", "BREAKDOWN"],
+      "selection": {
+        "method": "fingerprint",
+        "requiredTokensAll": ["Job Summary Report", "Plantexpand"],
+        "requiredTokensAny": ["VOR", "This Vehicle is marked as VOR"],
+        "optionalTokens": ["Asset Details", "Completion Details", "Repairs Required"]
+      },
+      "files": {
+        "blankTemplatePdf": "files/PE_JOB_SUMMARY_REPAIR_V1_blank.pdf",
+        "samples": [
+          { "id": "PE_REPAIR_VOR_001", "path": "files/RepairReport-3070_13_20251110.pdf", "expectedOutcome": "FAIL", "expectedReasonCodes": ["OUT_OF_POLICY"] }
+        ]
+      },
+      "fieldRules": {
+        "isVor": {
+          "required": true,
+          "visualRule": { "type": "textPresent", "text": "This Vehicle is marked as VOR" },
+          "notes": "Critical banner indicating asset is not safe to use. If present, Asset Safe To Use must be No."
+        },
+        "assetNumber": {
+          "required": false,
+          "extractionHints": { "labels": ["Asset No:"] },
+          "notes": "Observational, not mandatory"
+        },
+        "makeAndModel": {
+          "required": false,
+          "extractionHints": { "labels": ["Make/Model:"] },
+          "notes": "Observational, not mandatory"
+        },
+        "customerName": {
+          "required": false,
+          "extractionHints": { "labels": ["Customer:"] },
+          "notes": "Observational, not mandatory"
+        },
+        "siteAddress": {
+          "required": false,
+          "extractionHints": { "labels": ["Site Address / Contact:"] },
+          "notes": "Observational, not mandatory"
+        },
+        "serialNumber": {
+          "required": false,
+          "extractionHints": { "labels": ["Serial No:"] },
+          "notes": "Observational, not mandatory"
+        },
+        "completionDate": {
+          "required": true,
+          "validators": [{ "type": "date", "format": "DD/MM/YYYY" }],
+          "extractionHints": { "labels": ["Date:"] }
+        },
+        "contactName": {
+          "required": false,
+          "extractionHints": { "labels": ["Contact Name:"] }
+        },
+        "assetSafeToUse": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "constraints": [{ "type": "mustBe", "value": false, "when": { "field": "isVor", "value": true } }],
+          "extractionHints": { "labels": ["Asset Safe To Use?"] },
+          "notes": "Must be NO if VOR banner is present"
+        },
+        "returnVisitRequired": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "constraints": [{ "type": "mustBe", "value": true, "when": { "field": "isVor", "value": true } }],
+          "extractionHints": { "labels": ["Is a Return Visit Required?"] },
+          "notes": "Must be YES if VOR banner is present"
+        },
+        "repairs": {
+          "required": true,
+          "type": "array",
+          "itemSchema": {
+            "engineerComments": {
+              "required": true,
+              "llmRule": {
+                "persona": "engineering_expert",
+                "prompt": "Analyze the engineer's comment for clarity, detail, and actionable information. Does it explain WHY the repair is needed? Does it provide enough detail for a parts processor to act? Flag as INSUFFICIENT_DETAIL if it is vague (e.g., 'needs service kit') without justification.",
+                "minQualityScore": 0.7
+              }
+            },
+            "faultReason": {
+              "required": true,
+              "constraints": [{ "type": "dependsOn", "field": "engineerComments" }],
+              "notes": "Must logically align with Engineer Comments (parent-child relationship)"
+            }
+          },
+          "extractionHints": { "section": "Repairs Required" },
+          "notes": "Engineer Comments is the parent, Fault Reason is the child. They must align."
+        },
+        "partsRequired": {
+          "required": false,
+          "type": "array",
+          "itemSchema": {
+            "partNumber": {
+              "required": false,
+              "llmRule": {
+                "persona": "parts_specialist",
+                "prompt": "If the part number is missing but the part detail is present, attempt to identify a possible part number based on the make/model of the asset and the part description. Flag as PART_NUMBER_MISSING if unable to identify."
+              },
+              "notes": "Part numbers are important for the processor to order parts"
+            },
+            "partDetails": {
+              "required": true,
+              "notes": "Part details are critical for identifying what parts are needed"
+            }
+          },
+          "extractionHints": { "section": "Parts Still Required" }
+        },
+        "technicianName": {
+          "required": true,
+          "extractionHints": { "labels": ["Technician Name:"] }
+        },
+        "technicianSignature": {
+          "required": true,
+          "visualRule": { "type": "signaturePresent" }
+        },
+        "images": {
+          "required": true,
+          "visualRule": { "type": "imagePresent", "minCount": 1 },
+          "notes": "Images are critical for identifying asset make/model and required parts"
+        }
+      },
+      "validationRules": [
+        { "ruleId": "VOR_SAFE_TO_USE_NO", "description": "If VOR banner present, Asset Safe To Use must be No" },
+        { "ruleId": "VOR_RETURN_VISIT_YES", "description": "If VOR, Return Visit Required must be Yes" },
+        { "ruleId": "VOR_CONFLICT", "description": "If Asset Safe To Use = Yes but VOR banner present → CONFLICT" },
+        { "ruleId": "ENGINEER_COMMENT_QUALITY", "description": "LLM must analyze for sufficient detail" },
+        { "ruleId": "FAULT_REASON_ALIGNMENT", "description": "Fault Reason must logically align with Engineer Comment" },
+        { "ruleId": "PART_NUMBER_RECOMMENDED", "description": "Part numbers should be provided where possible" },
+        { "ruleId": "SIGNATURE_REQUIRED", "description": "Technician signature must be present" },
+        { "ruleId": "IMAGES_REQUIRED", "description": "At least one image must be attached" }
+      ],
+      "roiOptional": {
+        "pageIndex0Based": 0,
+        "regions": [
+          { "name": "vorBanner", "x": 0.05, "y": 0.15, "w": 0.90, "h": 0.05 },
+          { "name": "assetDetails", "x": 0.05, "y": 0.22, "w": 0.90, "h": 0.15 },
+          { "name": "completionDetails", "x": 0.05, "y": 0.38, "w": 0.90, "h": 0.15 },
+          { "name": "repairsRequired", "x": 0.05, "y": 0.55, "w": 0.90, "h": 0.25 },
+          { "name": "partsRequired", "x": 0.05, "y": 0.82, "w": 0.90, "h": 0.10 },
+          { "name": "technicianSignOff", "x": 0.05, "y": 0.93, "w": 0.90, "h": 0.05 }
+        ]
+      }
+    },
+    {
+      "templateId": "PE_JOB_SUMMARY_COMPLIANCE_V1",
+      "displayName": "Plantexpand Job Summary (Compliance/Service) v1",
+      "description": "Job summary report for compliance/service events with checklist validation",
+      "client": "PLANTEXPAND",
+      "assetTypes": ["TRAILER", "PUMP", "GENERATOR"],
+      "workTypes": ["COMPLIANCE", "SERVICE"],
+      "selection": {
+        "method": "fingerprint",
+        "requiredTokensAll": ["Job Summary Report", "Plantexpand", "Compliance Checklist"],
+        "excludeTokens": ["PTO Service", "VOR"],
+        "optionalTokens": ["Asset Details", "Completion Details", "General Trailer Test Summary"]
+      },
+      "files": {
+        "blankTemplatePdf": "files/PE_JOB_SUMMARY_COMPLIANCE_V1_blank.pdf",
+        "samples": [
+          { "id": "PE_COMP_PASS_001", "path": "files/ComplianceReport-4231_283_20251110.pdf", "expectedOutcome": "PASS" }
+        ]
+      },
+      "fieldRules": {
+        "assetNumber": {
+          "required": true,
+          "extractionHints": { "labels": ["Asset No:"] }
+        },
+        "makeAndModel": {
+          "required": true,
+          "extractionHints": { "labels": ["Make/Model:"] }
+        },
+        "completionDate": {
+          "required": true,
+          "validators": [{ "type": "date", "format": "DD/MM/YYYY" }],
+          "extractionHints": { "labels": ["Date:"] }
+        },
+        "nextServiceDate": {
+          "required": true,
+          "validators": [{ "type": "date", "format": "DD/MM/YYYY" }],
+          "constraints": [{ "type": "afterField", "field": "completionDate" }],
+          "extractionHints": { "labels": ["Next Service Date:"] },
+          "notes": "Interval depends on client and asset type"
+        },
+        "complianceType": {
+          "required": true,
+          "extractionHints": { "labels": ["Compliance Type:"] }
+        },
+        "complianceTitle": {
+          "required": true,
+          "extractionHints": { "labels": ["Compliance Title:"] }
+        },
+        "serviceCompleted": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "extractionHints": { "labels": ["Service Completed?"] }
+        },
+        "allWorksCompleted": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "extractionHints": { "labels": ["All Works Completed?"] }
+        },
+        "consumablesUsed": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "constraints": [{ "type": "requiredIf", "field": "partsUsed", "value": "notEmpty" }],
+          "extractionHints": { "labels": ["Consumables Used?"] },
+          "notes": "If Yes, Parts Used section must have entries"
+        },
+        "returnVisitNeeded": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "extractionHints": { "labels": ["Return Visit Needed?"] },
+          "notes": "Must be Yes if any checklist item is Advisory (Orange) or Fail (Red)"
+        },
+        "assetSafeToUse": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "extractionHints": { "labels": ["Asset Safe To Use?"] },
+          "notes": "Must be No if any checklist item is Fail (Red)"
+        },
+        "complianceChecklist": {
+          "required": true,
+          "type": "visualRule",
+          "visualRule": {
+            "type": "checkboxGroup",
+            "statusColors": {
+              "GREEN": "Ok - Check passed",
+              "ORANGE": "Adv. (Advisory) - Follow-up required",
+              "RED": "Fail - Asset NOT safe",
+              "YELLOW": "N/A - Not applicable"
+            },
+            "groups": [
+              {
+                "groupId": "GENERAL_TRAILER_CHECKS",
+                "description": "General Trailer Test Summary checklist items",
+                "requiredStates": [],
+                "forbiddenStates": [{ "label": "*", "state": "CHECKED", "color": "RED" }]
+              }
+            ]
+          },
+          "notes": "All checks must be OK (Green) or Advisory (Orange). No checks can be Fail (Red). N/A (Yellow) items do not affect pass/fail."
+        },
+        "tyreInformation": {
+          "required": true,
+          "constraints": [{ "type": "requiredIf", "field": "assetType", "value": "TRAILER" }],
+          "itemSchema": {
+            "tyreSize": { "required": true, "extractionHints": { "labels": ["Tyre Size:", "Size:"] } },
+            "tyrePressurePsi": { "required": true, "extractionHints": { "labels": ["PSI:", "Set Pressure:"] } },
+            "osfTreadDepth": { "required": true, "extractionHints": { "labels": ["OSF Tyre Tread Depth"] } },
+            "osrTreadDepth": { "required": true, "extractionHints": { "labels": ["OSR Tyre Tread Depth"] } },
+            "nsfTreadDepth": { "required": true, "extractionHints": { "labels": ["NSF Tyre Tread Depth"] } },
+            "nsrTreadDepth": { "required": true, "extractionHints": { "labels": ["NSR Tyre Tread Depth"] } }
+          },
+          "notes": "Mandatory for any asset with wheels (trailers, vehicles)"
+        },
+        "repairsRequired": {
+          "required": false,
+          "type": "array",
+          "itemSchema": {
+            "engineerComments": {
+              "required": true,
+              "llmRule": {
+                "persona": "engineering_expert",
+                "prompt": "Analyze the engineer's comment for clarity and appropriateness given the compliance context. Does it clearly state what was done and why?"
+              }
+            },
+            "faultReason": { "required": true },
+            "repairDuration": { "required": true, "validators": [{ "type": "number" }] }
+          },
+          "extractionHints": { "section": "Repairs Required" }
+        },
+        "partsUsed": {
+          "required": false,
+          "type": "array",
+          "itemSchema": {
+            "partNumber": { "required": false },
+            "partDescription": { "required": true }
+          },
+          "extractionHints": { "section": "Parts Used" }
+        },
+        "technicianName": {
+          "required": true,
+          "extractionHints": { "labels": ["Technician Name:"] }
+        },
+        "technicianSignature": {
+          "required": true,
+          "visualRule": { "type": "signaturePresent" }
+        },
+        "images": {
+          "required": true,
+          "visualRule": { "type": "imagePresent", "minCount": 2 },
+          "notes": "Before and after images are required"
+        }
+      },
+      "validationRules": [
+        { "ruleId": "CHECKLIST_ALL_OK", "description": "If all checks Green → Service Complete, Asset Safe" },
+        { "ruleId": "CHECKLIST_ADVISORY", "description": "If any Orange → Return Visit Required with follow-up date" },
+        { "ruleId": "CHECKLIST_FAIL", "description": "If any Red → Asset NOT Safe, Return Visit Required" },
+        { "ruleId": "CHECKLIST_NA_OK", "description": "Yellow (N/A) items do not affect pass/fail" },
+        { "ruleId": "TYRE_INFO_REQUIRED", "description": "Tyre size and pressure mandatory for wheeled assets" },
+        { "ruleId": "CONSUMABLES_DETAIL", "description": "If consumables used, must detail in Parts Used" },
+        { "ruleId": "NEXT_SERVICE_AFTER_DATE", "description": "Next Service Date must be after Completion Date" },
+        { "ruleId": "SIGNATURE_REQUIRED", "description": "Technician signature must be present" },
+        { "ruleId": "IMAGES_BEFORE_AFTER", "description": "At least 2 images required (before and after)" }
+      ],
+      "roiOptional": {
+        "pageIndex0Based": 0,
+        "regions": [
+          { "name": "assetDetails", "x": 0.05, "y": 0.12, "w": 0.90, "h": 0.15 },
+          { "name": "completionDetails", "x": 0.05, "y": 0.28, "w": 0.90, "h": 0.15 },
+          { "name": "complianceChecklist", "x": 0.05, "y": 0.45, "w": 0.90, "h": 0.40 },
+          { "name": "repairsRequired", "x": 0.05, "y": 0.86, "w": 0.90, "h": 0.08 },
+          { "name": "technicianSignOff", "x": 0.05, "y": 0.95, "w": 0.90, "h": 0.05 }
+        ]
+      }
+    },
+    {
+      "templateId": "PE_JOB_SUMMARY_PTO_V1",
+      "displayName": "Plantexpand Job Summary (PTO Service) v1",
+      "description": "Job summary report for PTO service compliance events",
+      "client": "PLANTEXPAND",
+      "assetTypes": ["COMPRESSOR", "GENERATOR"],
+      "workTypes": ["COMPLIANCE", "SERVICE"],
+      "selection": {
+        "method": "fingerprint",
+        "requiredTokensAll": ["Job Summary Report", "Plantexpand", "PTO Service"],
+        "optionalTokens": ["Asset Details", "Completion Details", "Compliance Checklist", "Lubricate", "Check/Do", "Change"]
+      },
+      "files": {
+        "blankTemplatePdf": "files/PE_JOB_SUMMARY_PTO_V1_blank.pdf",
+        "samples": [
+          { "id": "PE_PTO_PASS_001", "path": "files/ComplianceReport-YA73JBE_428_20251110.pdf", "expectedOutcome": "PASS" }
+        ]
+      },
+      "fieldRules": {
+        "assetNumber": {
+          "required": true,
+          "extractionHints": { "labels": ["Asset No:"] }
+        },
+        "makeAndModel": {
+          "required": true,
+          "extractionHints": { "labels": ["Make/Model:"] }
+        },
+        "milesOrHours": {
+          "required": true,
+          "extractionHints": { "labels": ["Miles/Hours:"] },
+          "notes": "Important for tracking asset usage"
+        },
+        "completionDate": {
+          "required": true,
+          "validators": [{ "type": "date", "format": "DD/MM/YYYY" }],
+          "extractionHints": { "labels": ["Date:"] }
+        },
+        "nextServiceDate": {
+          "required": true,
+          "validators": [{ "type": "date", "format": "DD/MM/YYYY" }],
+          "constraints": [{ "type": "afterField", "field": "completionDate" }],
+          "extractionHints": { "labels": ["Next Service Date:"] }
+        },
+        "serviceCompleted": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "extractionHints": { "labels": ["Service Completed?"] }
+        },
+        "assetSafeToUse": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "extractionHints": { "labels": ["Asset Safe To Use?"] }
+        },
+        "returnVisitNeeded": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "extractionHints": { "labels": ["Return Visit Needed?"] }
+        },
+        "ptoChecklist": {
+          "required": true,
+          "type": "visualRule",
+          "visualRule": {
+            "type": "checkboxGroup",
+            "statusColors": {
+              "GREEN": "Ok - Check passed",
+              "ORANGE": "Adv. (Advisory) - Follow-up required",
+              "RED": "Fail - Asset NOT safe",
+              "YELLOW": "N/A - Not applicable"
+            },
+            "groups": [
+              {
+                "groupId": "LUBRICATE",
+                "description": "Lubrication tasks",
+                "items": [
+                  "Clean and lubricate PTO end selector cable/actuator/air control",
+                  "All prop shaft joints",
+                  "Overtemperature switch terminals",
+                  "PTO switch and terminals (when external on PTO)"
+                ],
+                "forbiddenStates": [{ "label": "*", "state": "CHECKED", "color": "RED" }]
+              },
+              {
+                "groupId": "CHECK_DO",
+                "description": "Inspection and operational checks",
+                "items": [
+                  "Belt tension and condition",
+                  "Compressor oil level and condition",
+                  "Oil cooler is clean",
+                  "Safety valves condition",
+                  "Fan operation",
+                  "Operating temperature",
+                  "Operating speeds and shutdowns",
+                  "Autodrain operation",
+                  "Fuses and electrical connectors",
+                  "Propshaft joints for play",
+                  "Oil and air pipes",
+                  "Air pressure gauge on separator/airline",
+                  "Air outlets",
+                  "Socket outlets and consumer unit",
+                  "General visual inspection of entire OVP system",
+                  "Carry out electrical test procedure"
+                ],
+                "forbiddenStates": [{ "label": "*", "state": "CHECKED", "color": "RED" }]
+              },
+              {
+                "groupId": "CHANGE",
+                "description": "Component replacement checks (may be N/A if not due)",
+                "items": [
+                  "Compressor oil",
+                  "Compressor oil filter",
+                  "Thermo bulb (thermostatic valve)",
+                  "Compressor air filter",
+                  "Compressor air filter cover",
+                  "Driveline PTO oil",
+                  "Drive belts",
+                  "Separator filter",
+                  "Oil return valves",
+                  "Airline water filter element"
+                ],
+                "forbiddenStates": [{ "label": "*", "state": "CHECKED", "color": "RED" }]
+              }
+            ]
+          },
+          "notes": "All checks must be OK (Green) or Advisory (Orange). No checks can be Fail (Red). N/A (Yellow) items do not affect pass/fail."
+        },
+        "repairsRequired": {
+          "required": false,
+          "type": "array",
+          "itemSchema": {
+            "engineerComments": {
+              "required": true,
+              "llmRule": {
+                "persona": "engineering_expert",
+                "prompt": "Analyze the engineer's comment for clarity and appropriateness. Does it clearly state what was done and why?"
+              }
+            },
+            "faultReason": { "required": true },
+            "repairDuration": { "required": true, "validators": [{ "type": "number" }] }
+          },
+          "extractionHints": { "section": "Repairs Required" },
+          "notes": "Can be blank if no repairs needed (outside service requirement)"
+        },
+        "partsUsed": {
+          "required": false,
+          "type": "array",
+          "itemSchema": {
+            "partNumber": { "required": false },
+            "partDescription": { "required": true }
+          },
+          "extractionHints": { "section": "Parts Used" },
+          "notes": "Can be blank"
+        },
+        "partsStillRequired": {
+          "required": false,
+          "type": "array",
+          "itemSchema": {
+            "partNumber": { "required": false },
+            "partDescription": { "required": true }
+          },
+          "constraints": [{ "type": "implies", "then": { "field": "returnVisitNeeded", "value": true } }],
+          "extractionHints": { "section": "Parts Still Required" },
+          "notes": "If populated → Return Visit Required = Yes"
+        },
+        "technicianName": {
+          "required": true,
+          "extractionHints": { "labels": ["Technician Name:"] }
+        },
+        "technicianSignature": {
+          "required": true,
+          "visualRule": { "type": "signaturePresent" }
+        },
+        "images": {
+          "required": true,
+          "visualRule": { "type": "imagePresent", "minCount": 1 },
+          "notes": "Images showing asset condition and PTO components"
+        }
+      },
+      "validationRules": [
+        { "ruleId": "CHECKLIST_ALL_OK", "description": "If all checks Green/N/A → Service Complete, Asset Safe" },
+        { "ruleId": "CHECKLIST_ADVISORY", "description": "If any Orange → Return Visit Required with follow-up notes" },
+        { "ruleId": "CHECKLIST_FAIL", "description": "If any Red → Asset NOT Safe, Return Visit Required" },
+        { "ruleId": "CHECKLIST_NA_OK", "description": "Yellow (N/A) items do not affect pass/fail" },
+        { "ruleId": "PARTS_REQUIRED_FOLLOWUP", "description": "If Parts Still Required populated → Return Visit Required" },
+        { "ruleId": "REPAIRS_DETAIL", "description": "If repairs done, must identify what and why" },
+        { "ruleId": "SIGNATURE_REQUIRED", "description": "Technician signature must be present" },
+        { "ruleId": "IMAGES_REQUIRED", "description": "At least one image must be attached" }
+      ],
+      "roiOptional": {
+        "pageIndex0Based": 0,
+        "regions": [
+          { "name": "assetDetails", "x": 0.05, "y": 0.12, "w": 0.90, "h": 0.15 },
+          { "name": "completionDetails", "x": 0.05, "y": 0.28, "w": 0.90, "h": 0.15 },
+          { "name": "ptoChecklist", "x": 0.05, "y": 0.45, "w": 0.90, "h": 0.40 },
+          { "name": "repairsRequired", "x": 0.05, "y": 0.86, "w": 0.90, "h": 0.08 },
+          { "name": "technicianSignOff", "x": 0.05, "y": 0.95, "w": 0.90, "h": 0.05 }
+        ]
+      }
+    },
+    {
+      "templateId": "PE_JOB_SUMMARY_AZTEC_V1",
+      "displayName": "Plantexpand Job Summary (Aztec Weighing) v1",
+      "description": "Compliance checklist for Aztec Onboard Weighing Systems. Uses simple task/result format (not color-coded).",
+      "client": "PLANTEXPAND",
+      "assetTypes": ["VEHICLE"],
+      "workTypes": ["COMPLIANCE", "SERVICE"],
+      "selection": {
+        "method": "fingerprint",
+        "requiredTokensAll": ["Job Summary Report", "Plantexpand", "Aztec On Board Weighing"],
+        "optionalTokens": ["Asset Details", "Completion Details", "Compliance Checklist", "Weighing System Operational"]
+      },
+      "files": {
+        "blankTemplatePdf": "files/PE_JOB_SUMMARY_AZTEC_V1_blank.pdf",
+        "samples": [
+          { "id": "PE_AZTEC_DOC_PASS_001", "path": "files/ComplianceReport-WX24UFM_28_20251110.pdf", "expectedOutcome": "PASS", "expectedReasonCodes": [], "notes": "Documentation PASS: Engineer correctly documented the system failure with detailed comments." }
+        ]
+      },
+      "fieldRules": {
+        "assetNumber": {
+          "required": true,
+          "extractionHints": { "labels": ["Asset No:"] }
+        },
+        "makeAndModel": {
+          "required": true,
+          "extractionHints": { "labels": ["Make/Model:"] }
+        },
+        "milesOrHours": {
+          "required": true,
+          "extractionHints": { "labels": ["Miles/Hours:"] }
+        },
+        "completionDate": {
+          "required": true,
+          "validators": [{ "type": "date", "format": "DD/MM/YYYY" }],
+          "extractionHints": { "labels": ["Date:"] }
+        },
+        "nextServiceDate": {
+          "required": true,
+          "validators": [{ "type": "date", "format": "DD/MM/YYYY" }],
+          "constraints": [{ "type": "afterField", "field": "completionDate" }],
+          "extractionHints": { "labels": ["Next Service Date:"] }
+        },
+        "allWorksCompleted": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "extractionHints": { "labels": ["All Works Completed?"] }
+        },
+        "additionalTasksComplete": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "extractionHints": { "labels": ["Additional Tasks Complete?"] },
+          "notes": "If No, then Return Visit Needed should be Yes."
+        },
+        "returnVisitNeeded": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "constraints": [{ "type": "mustBe", "value": true, "when": { "field": "additionalTasksComplete", "value": false } }],
+          "extractionHints": { "labels": ["Return Visit Needed?"] }
+        },
+        "assetSafeToUse": {
+          "required": true,
+          "validators": [{ "type": "boolean" }],
+          "extractionHints": { "labels": ["Asset Safe To Use?"] },
+          "notes": "Can be YES even if a return visit is needed, as this is not safety-critical equipment."
+        },
+        "aztecChecklist": {
+          "required": true,
+          "type": "taskResultList",
+          "description": "Simple task/result format checklist (not color-coded).",
+          "items": [
+            { "taskId": "chassisNumber", "task": "Chassis number", "resultType": "string", "required": true },
+            { "taskId": "systemSerialNumber", "task": "System serial number", "resultType": "string", "required": false },
+            { "taskId": "isSystemPoweringUpOk", "task": "Is the system powering up ok?", "resultType": "yesNo", "required": true, "killerQuestion": true },
+            { "taskId": "checkCabDisplayScreen", "task": "Check condition & security of cab mounted display screen", "resultType": "yesNoNa", "required": false },
+            { "taskId": "visualExamInstallation", "task": "Carry out visual examination of front & rear system installation", "resultType": "yesNoNa", "required": false },
+            { "taskId": "repairsRequiredPriorToZero", "task": "Were any repairs required to the system prior to ZERO adjust process?", "resultType": "yesNo", "required": false },
+            { "taskId": "isDataLoggerFull", "task": "Is the system displaying \"data logger full\"?", "resultType": "yesNo", "required": true, "killerQuestion": true, "expectedValue": "No" },
+            { "taskId": "clearDataLoggerIfFull", "task": "If data logger is full, please complete clear down of data.", "resultType": "yesNoNa", "required": false },
+            { "taskId": "checkRawWeightsTolerance", "task": "Check RAW Weights are within tolerance (10,000 - 30,000)", "resultType": "yesNoNa", "required": false },
+            { "taskId": "ensureRawWeightsNotRed", "task": "Ensure RAW Weights are not displayed in red, fluctuating excessively or at zero.", "resultType": "yesNoNa", "required": false },
+            { "taskId": "checkCalFactorsRange", "task": "Check CAL Factors are within the expected range (0.06 - 2.00)", "resultType": "yesNoNa", "required": false },
+            { "taskId": "parkFirstAxleOnWeighPads", "task": "If RAW & CAL are as expected, park first axle onto weigh pads.", "resultType": "yesNoNa", "required": false },
+            { "taskId": "followZeroAdjustProcedure", "task": "Follow ZERO ADJUST proceedure for both axles.", "resultType": "yesNoNa", "required": false },
+            { "taskId": "systemFirmwareVersion", "task": "System firmware version", "resultType": "string", "required": false },
+            { "taskId": "weightLimitsUsingVinPlate", "task": "Weight Limits (Using VIN plate)", "resultType": "number", "required": true, "notes": "Direct relationship to the weighing system." },
+            { "taskId": "rawWeight", "task": "RAW Weight", "resultType": "string", "required": false },
+            { "taskId": "calFactor", "task": "CAL Factor", "resultType": "string", "required": false },
+            { "taskId": "includePicturesOfSystemData", "task": "Include pictures of system data.", "resultType": "yesNo", "required": true, "expectedValue": "Yes" },
+            { "taskId": "isVehicleExceedingGvw", "task": "Using the weigh pads, is this vehicle exceeding the GVW?", "resultType": "yesNo", "required": true, "documentationRule": { "ifYes": { "requiresFollowUp": true, "requiresComments": true, "description": "If GVW exceeded, engineer must document follow-up actions" } } },
+            { "taskId": "weighingSystemOperational", "task": "Weighing System Operational?", "resultType": "yesNo", "required": true, "summaryQuestion": true, "notes": "Key summary question. If No, engineer comments are mandatory." }
+          ],
+          "notes": "This is a simple task/result checklist. Killer questions (system powering up, data logger full) drive the summary question (Weighing System Operational)."
+        },
+        "engineerComments": {
+          "required": false,
+          "constraints": [{ "type": "requiredIf", "field": "aztecChecklist.weighingSystemOperational", "value": "No" }],
+          "llmRule": {
+            "persona": "engineering_expert",
+            "prompt": "Analyze the engineer's comments. Do they clearly explain the reason for the failure and provide sufficient detail for a follow-up diagnostic?"
+          },
+          "extractionHints": { "section": "Repairs Required" },
+          "notes": "Mandatory if Weighing System Operational is No."
+        },
+        "faultReason": {
+          "required": false,
+          "constraints": [{ "type": "requiredIf", "field": "aztecChecklist.weighingSystemOperational", "value": "No" }],
+          "extractionHints": { "labels": ["Fault Reason"] }
+        },
+        "repairDuration": {
+          "required": false,
+          "validators": [{ "type": "number" }],
+          "extractionHints": { "labels": ["Repair Duration"] }
+        },
+        "partsUsed": {
+          "required": false,
+          "type": "array",
+          "itemSchema": {
+            "partNumber": { "required": false },
+            "partDescription": { "required": true }
+          },
+          "extractionHints": { "section": "Parts Used" },
+          "notes": "Can be blank."
+        },
+        "partsStillRequired": {
+          "required": false,
+          "type": "array",
+          "itemSchema": {
+            "partNumber": { "required": false },
+            "partDescription": { "required": true }
+          },
+          "extractionHints": { "section": "Parts Still Required" },
+          "notes": "Empty Parts Still Required does NOT cause a failure."
+        },
+        "technicianName": {
+          "required": true,
+          "extractionHints": { "labels": ["Technician Name:"] }
+        },
+        "technicianSignature": {
+          "required": true,
+          "visualRule": { "type": "signaturePresent" }
+        },
+        "images": {
+          "required": true,
+          "visualRule": { "type": "imagePresent", "minCount": 2 },
+          "notes": "Multiple photos of the asset and system data are required."
+        }
+      },
+      "validationRules": [
+        { "ruleId": "DOC_AUDIT_CONSISTENCY_RETURN_VISIT", "description": "Documentation Consistency: If Additional Tasks Complete is No, then Return Visit Needed must be Yes." },
+        { "ruleId": "DOC_AUDIT_EVIDENCE_OPERATIONAL_FAIL", "description": "Documentation Evidence: If Weighing System Operational is No, engineer comments explaining the failure are mandatory." },
+        { "ruleId": "DOC_AUDIT_CONSISTENCY_POWER_VS_OPERATIONAL", "description": "Documentation Consistency: If system is not powering up, Weighing System Operational must be No." },
+        { "ruleId": "DOC_AUDIT_CONFLICT_POWER_VS_OPERATIONAL", "description": "Documentation Conflict: FAIL if system is not powering up but is marked as operational." },
+        { "ruleId": "DOC_AUDIT_COMPLETENESS_VIN_WEIGHTS", "description": "Documentation Completeness: Weight Limits from VIN plate must always be recorded." },
+        { "ruleId": "DOC_AUDIT_COMPLETENESS_SYSTEM_PHOTOS", "description": "Documentation Completeness: Pictures of system data must be included." },
+        { "ruleId": "DOC_AUDIT_CONSISTENCY_GVW_FOLLOWUP", "description": "Documentation Consistency: If GVW exceeded = Yes, engineer must document follow-up actions and comments explaining the situation. FAIL only if GVW=Yes but no follow-up documentation." },
+        { "ruleId": "DOC_AUDIT_SAFE_TO_USE_INDEPENDENT", "description": "Documentation Note: Asset Safe To Use can be Yes even if Return Visit Needed is Yes (non-critical equipment)." },
+        { "ruleId": "DOC_AUDIT_COMPLETENESS_SIGNATURE_IMAGES", "description": "Documentation Completeness: Technician signature and at least two images must be present." }
+      ],
+      "roiOptional": {
+        "pageIndex0Based": 0,
+        "regions": [
+          { "name": "assetDetails", "x": 0.05, "y": 0.12, "w": 0.90, "h": 0.15 },
+          { "name": "completionDetails", "x": 0.05, "y": 0.28, "w": 0.90, "h": 0.15 },
+          { "name": "aztecChecklist", "x": 0.05, "y": 0.45, "w": 0.90, "h": 0.40 },
+          { "name": "repairsRequired", "x": 0.05, "y": 0.86, "w": 0.90, "h": 0.08 },
+          { "name": "technicianSignOff", "x": 0.05, "y": 0.95, "w": 0.90, "h": 0.05 }
+        ]
+      }
+    }
+  ]
+}

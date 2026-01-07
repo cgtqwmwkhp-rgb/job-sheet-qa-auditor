@@ -1,0 +1,169 @@
+{
+  "fixtureVersion": "1.0.0",
+  "packId": "PLANTEXPAND_SPEC_PACK",
+  "generatedAt": "2026-01-06T18:00:00.000Z",
+  "fixtures": [
+    {
+      "fixtureId": "PE_LOLER_PASS_001",
+      "templateId": "PE_LOLER_EXAM_V1",
+      "sampleFile": "files/ComplianceReport-050F_470_20251110.pdf",
+      "expectedOutcome": "PASS",
+      "expectedReasonCodes": [],
+      "expectedExtractedFields": {
+        "engineerName": { "expectedPresent": true, "expectedType": "string" },
+        "customerName": { "expectedPresent": true, "expectedType": "string" },
+        "assetId": { "expectedPresent": true, "expectedType": "string", "expectedPattern": "^[A-Z0-9-]{4,20}$" },
+        "makeAndModel": { "expectedPresent": true, "expectedType": "string" },
+        "yearOfManufacture": { "expectedPresent": true, "expectedType": "string", "expectedPattern": "^\\d{4}$" },
+        "serialNumber": { "expectedPresent": true, "expectedType": "string" },
+        "safeWorkingLoad": { "expectedPresent": true, "expectedType": "string" },
+        "dateOfLastExamination": { "expectedPresent": true, "expectedType": "date" },
+        "examinationType": { "expectedPresent": true, "expectedType": "enum", "expectedValues": ["Within an interval of 6 months", "Within an interval of 12 months"] },
+        "dateOfExamination": { "expectedPresent": true, "expectedType": "date" },
+        "dateOfReport": { "expectedPresent": true, "expectedType": "date" },
+        "nextExaminationInterval": { "expectedPresent": true, "expectedType": "enum", "expectedValues": ["6 Months", "12 Months"] },
+        "dateNextExaminationDue": { "expectedPresent": true, "expectedType": "date" },
+        "isEquipmentSafe": { "expectedPresent": true, "expectedType": "boolean", "expectedValue": true },
+        "competentPersonSignature": { "expectedPresent": true, "expectedType": "signature" },
+        "competentPersonName": { "expectedPresent": true, "expectedType": "string" },
+        "receivingPersonSignature": { "expectedPresent": true, "expectedType": "signature" },
+        "receivingPersonName": { "expectedPresent": true, "expectedType": "string" }
+      },
+      "expectedValidatedFields": [
+        { "ruleId": "DATE_INTERVAL_6M", "field": "dateNextExaminationDue", "status": "passed" },
+        { "ruleId": "SAFE_YES_NO_DEFECTS", "field": "isEquipmentSafe", "status": "passed" },
+        { "ruleId": "SIGNATURE_REQUIRED", "field": "competentPersonSignature", "status": "passed" },
+        { "ruleId": "SIGNATURE_REQUIRED", "field": "receivingPersonSignature", "status": "passed" }
+      ],
+      "notes": "This is a passing LOLER certificate with all required fields present and valid."
+    },
+    {
+      "fixtureId": "PE_REPAIR_VOR_001",
+      "templateId": "PE_JOB_SUMMARY_REPAIR_V1",
+      "sampleFile": "files/RepairReport-3070_13_20251110.pdf",
+      "expectedOutcome": "FAIL",
+      "expectedReasonCodes": ["OUT_OF_POLICY"],
+      "expectedExtractedFields": {
+        "isVor": { "expectedPresent": true, "expectedType": "boolean", "expectedValue": true },
+        "assetNumber": { "expectedPresent": true, "expectedType": "string" },
+        "makeAndModel": { "expectedPresent": true, "expectedType": "string" },
+        "completionDate": { "expectedPresent": true, "expectedType": "date" },
+        "assetSafeToUse": { "expectedPresent": true, "expectedType": "boolean", "expectedValue": false },
+        "returnVisitRequired": { "expectedPresent": true, "expectedType": "boolean", "expectedValue": true },
+        "repairs": { "expectedPresent": true, "expectedType": "array", "minLength": 1 },
+        "technicianName": { "expectedPresent": true, "expectedType": "string" },
+        "technicianSignature": { "expectedPresent": true, "expectedType": "signature" },
+        "images": { "expectedPresent": true, "expectedType": "imageArray", "minCount": 1 }
+      },
+      "expectedValidatedFields": [
+        { "ruleId": "VOR_SAFE_TO_USE_NO", "field": "assetSafeToUse", "status": "passed" },
+        { "ruleId": "VOR_RETURN_VISIT_YES", "field": "returnVisitRequired", "status": "passed" },
+        { "ruleId": "ENGINEER_COMMENT_QUALITY", "field": "repairs.engineerComments", "status": "review_required", "reason": "INSUFFICIENT_DETAIL" },
+        { "ruleId": "SIGNATURE_REQUIRED", "field": "technicianSignature", "status": "passed" },
+        { "ruleId": "IMAGES_REQUIRED", "field": "images", "status": "passed" }
+      ],
+      "notes": "This is a VOR report. The asset is marked as VOR and requires a return visit. Expected to fail due to insufficient engineer comment detail."
+    },
+    {
+      "fixtureId": "PE_COMP_PASS_001",
+      "templateId": "PE_JOB_SUMMARY_COMPLIANCE_V1",
+      "sampleFile": "files/ComplianceReport-4231_283_20251110.pdf",
+      "expectedOutcome": "PASS",
+      "expectedReasonCodes": [],
+      "expectedExtractedFields": {
+        "assetNumber": { "expectedPresent": true, "expectedType": "string" },
+        "makeAndModel": { "expectedPresent": true, "expectedType": "string" },
+        "completionDate": { "expectedPresent": true, "expectedType": "date" },
+        "nextServiceDate": { "expectedPresent": true, "expectedType": "date" },
+        "serviceCompleted": { "expectedPresent": true, "expectedType": "boolean", "expectedValue": true },
+        "assetSafeToUse": { "expectedPresent": true, "expectedType": "boolean", "expectedValue": true },
+        "complianceChecklist": { "expectedPresent": true, "expectedType": "checklistGroup", "forbiddenColors": ["RED"] },
+        "tyreInformation": { "expectedPresent": true, "expectedType": "object" },
+        "technicianName": { "expectedPresent": true, "expectedType": "string" },
+        "technicianSignature": { "expectedPresent": true, "expectedType": "signature" },
+        "images": { "expectedPresent": true, "expectedType": "imageArray", "minCount": 2 }
+      },
+      "expectedValidatedFields": [
+        { "ruleId": "CHECKLIST_ALL_OK", "field": "complianceChecklist", "status": "passed" },
+        { "ruleId": "TYRE_INFO_REQUIRED", "field": "tyreInformation", "status": "passed" },
+        { "ruleId": "NEXT_SERVICE_AFTER_DATE", "field": "nextServiceDate", "status": "passed" },
+        { "ruleId": "SIGNATURE_REQUIRED", "field": "technicianSignature", "status": "passed" },
+        { "ruleId": "IMAGES_BEFORE_AFTER", "field": "images", "status": "passed" }
+      ],
+      "notes": "This is a passing compliance report with all checklist items Green or N/A."
+    },
+    {
+      "fixtureId": "PE_PTO_PASS_001",
+      "templateId": "PE_JOB_SUMMARY_PTO_V1",
+      "sampleFile": "files/ComplianceReport-YA73JBE_428_20251110.pdf",
+      "expectedOutcome": "PASS",
+      "expectedReasonCodes": [],
+      "expectedExtractedFields": {
+        "assetNumber": { "expectedPresent": true, "expectedType": "string" },
+        "makeAndModel": { "expectedPresent": true, "expectedType": "string" },
+        "milesOrHours": { "expectedPresent": true, "expectedType": "string" },
+        "completionDate": { "expectedPresent": true, "expectedType": "date" },
+        "nextServiceDate": { "expectedPresent": true, "expectedType": "date" },
+        "serviceCompleted": { "expectedPresent": true, "expectedType": "boolean", "expectedValue": true },
+        "assetSafeToUse": { "expectedPresent": true, "expectedType": "boolean", "expectedValue": true },
+        "ptoChecklist": { "expectedPresent": true, "expectedType": "checklistGroup", "forbiddenColors": ["RED"] },
+        "technicianName": { "expectedPresent": true, "expectedType": "string" },
+        "technicianSignature": { "expectedPresent": true, "expectedType": "signature" },
+        "images": { "expectedPresent": true, "expectedType": "imageArray", "minCount": 1 }
+      },
+      "expectedValidatedFields": [
+        { "ruleId": "CHECKLIST_ALL_OK", "field": "ptoChecklist", "status": "passed" },
+        { "ruleId": "SIGNATURE_REQUIRED", "field": "technicianSignature", "status": "passed" },
+        { "ruleId": "IMAGES_REQUIRED", "field": "images", "status": "passed" }
+      ],
+      "notes": "This is a passing PTO service report with all checklist items Green or N/A."
+    },
+    {
+      "fixtureId": "PE_AZTEC_DOC_PASS_001",
+      "templateId": "PE_JOB_SUMMARY_AZTEC_V1",
+      "sampleFile": "files/ComplianceReport-WX24UFM_28_20251110.pdf",
+      "expectedOutcome": "PASS",
+      "expectedReasonCodes": [],
+      "expectedExtractedFields": {
+        "assetNumber": { "expectedPresent": true, "expectedType": "string", "expectedValue": "WX24UFM" },
+        "makeAndModel": { "expectedPresent": true, "expectedType": "string", "expectedValue": "Mercedes-Benz Sprinter" },
+        "milesOrHours": { "expectedPresent": true, "expectedType": "string", "expectedValue": "10275" },
+        "completionDate": { "expectedPresent": true, "expectedType": "date", "expectedValue": "10/11/2025" },
+        "nextServiceDate": { "expectedPresent": true, "expectedType": "date", "expectedValue": "09/11/2026" },
+        "allWorksCompleted": { "expectedPresent": true, "expectedType": "boolean", "expectedValue": false },
+        "additionalTasksComplete": { "expectedPresent": true, "expectedType": "boolean", "expectedValue": false },
+        "returnVisitNeeded": { "expectedPresent": true, "expectedType": "boolean", "expectedValue": true },
+        "assetSafeToUse": { "expectedPresent": true, "expectedType": "boolean", "expectedValue": true },
+        "aztecChecklist": {
+          "expectedPresent": true,
+          "expectedType": "taskResultList",
+          "expectedItems": {
+            "chassisNumber": { "expectedValue": "W1V3KBFZXRP653277" },
+            "systemSerialNumber": { "expectedValue": "n/a" },
+            "isSystemPoweringUpOk": { "expectedValue": "No" },
+            "isDataLoggerFull": { "expectedValue": "No" },
+            "weightLimitsUsingVinPlate": { "expectedValue": 3500 },
+            "includePicturesOfSystemData": { "expectedValue": "Yes" },
+            "isVehicleExceedingGvw": { "expectedValue": "No" },
+            "weighingSystemOperational": { "expectedValue": "No" }
+          }
+        },
+        "engineerComments": { "expectedPresent": true, "expectedType": "string", "expectedContains": "FAULT 62" },
+        "technicianName": { "expectedPresent": true, "expectedType": "string", "expectedValue": "joe.butler" },
+        "technicianSignature": { "expectedPresent": true, "expectedType": "signature" },
+        "images": { "expectedPresent": true, "expectedType": "imageArray", "minCount": 3 }
+      },
+      "expectedValidatedFields": [
+        { "ruleId": "RETURN_VISIT_IF_INCOMPLETE", "field": "returnVisitNeeded", "status": "passed" },
+        { "ruleId": "SYSTEM_NOT_OPERATIONAL_IMPLIES_COMMENTS", "field": "engineerComments", "status": "passed" },
+        { "ruleId": "POWER_UP_FAILURE_IMPLIES_NOT_OPERATIONAL", "field": "weighingSystemOperational", "status": "passed" },
+        { "ruleId": "VIN_WEIGHT_LIMITS_MANDATORY", "field": "weightLimitsUsingVinPlate", "status": "passed" },
+        { "ruleId": "SYSTEM_DATA_PICTURES_MANDATORY", "field": "includePicturesOfSystemData", "status": "passed" },
+        { "ruleId": "NO_OVERWEIGHT_VEHICLES", "field": "isVehicleExceedingGvw", "status": "passed" },
+        { "ruleId": "SAFE_TO_USE_INDEPENDENT", "field": "assetSafeToUse", "status": "passed" },
+        { "ruleId": "SIGNATURE_AND_IMAGES_REQUIRED", "field": "technicianSignature", "status": "passed" }
+      ],
+      "notes": "Documentation PASS: The engineer correctly documented the system failure. The asset has issues (weighing system not operational), but the documentation is complete and consistent - engineer identified the failure, provided detailed comments (FAULT 62, loose connection), marked Return Visit Needed = Yes, and correctly set Asset Safe To Use = Yes (appropriate for non-critical equipment)."
+    }
+  ]
+}

@@ -77,7 +77,20 @@ describe('Parity Governance v2 Contract Tests', () => {
 
   describe('Canonical Reason Codes', () => {
     it('only allows canonical reason codes', () => {
-      const validCodes = ['VALID', 'MISSING_FIELD', 'INVALID_FORMAT', 'OUT_OF_POLICY', 'LOW_CONFIDENCE', 'CONFLICT'];
+      const validCodes = [
+        'VALID',
+        'MISSING_FIELD',
+        'UNREADABLE_FIELD',
+        'LOW_CONFIDENCE',
+        'INVALID_FORMAT',
+        'CONFLICT',
+        'OUT_OF_POLICY',
+        'INCOMPLETE_EVIDENCE',
+        'OCR_FAILURE',
+        'PIPELINE_ERROR',
+        'SPEC_GAP',
+        'SECURITY_RISK',
+      ];
       
       expect(CANONICAL_REASON_CODES).toEqual(validCodes);
     });
