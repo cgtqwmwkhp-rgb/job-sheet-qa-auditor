@@ -904,11 +904,11 @@
       "roiOptional": {
         "pageIndex0Based": 0,
         "regions": [
-          { "name": "assetDetails", "x": 0.05, "y": 0.12, "w": 0.90, "h": 0.15 },
-          { "name": "completionDetails", "x": 0.05, "y": 0.28, "w": 0.90, "h": 0.15 },
-          { "name": "aztecChecklist", "x": 0.05, "y": 0.45, "w": 0.90, "h": 0.40 },
-          { "name": "repairsRequired", "x": 0.05, "y": 0.86, "w": 0.90, "h": 0.08 },
-          { "name": "technicianSignOff", "x": 0.05, "y": 0.95, "w": 0.90, "h": 0.05 }
+          { "name": "assetDetails", "x": 0.05, "y": 0.12, "width": 0.90, "height": 0.15 },
+          { "name": "completionDetails", "x": 0.05, "y": 0.28, "width": 0.90, "height": 0.15 },
+          { "name": "aztecChecklist", "x": 0.05, "y": 0.45, "width": 0.90, "height": 0.40 },
+          { "name": "repairsRequired", "x": 0.05, "y": 0.86, "width": 0.90, "height": 0.08 },
+          { "name": "technicianSignOff", "x": 0.05, "y": 0.95, "width": 0.90, "height": 0.05 }
         ]
       }
     }
