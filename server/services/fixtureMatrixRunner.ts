@@ -241,10 +241,10 @@ export class FixtureMatrixRunner {
       code => !actualReasonCodes.includes(code)
     );
     const unexpectedReasonCodes = actualReasonCodes.filter(
-      code => !expectedReasonCodes.includes(code) && expectedReasonCodes.length > 0
+      code => !(expectedReasonCodes as string[]).includes(code) && expectedReasonCodes.length > 0
     );
     const nonCanonicalReasonCodes = actualReasonCodes.filter(
-      code => !CANONICAL_REASON_CODES.includes(code as CanonicalReasonCode)
+      code => !(CANONICAL_REASON_CODES as readonly string[]).includes(code)
     );
     
     // Check evidence keys
