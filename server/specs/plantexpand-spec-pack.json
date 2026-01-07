@@ -53,9 +53,11 @@
   "templates": [
     {
       "templateId": "PE_LOLER_EXAM_V1",
-      "displayName": "Plantexpand LOLER Thorough Examination Report v1",
+      "displayName": "LOLER Thorough Examination Report v1",
+      "version": "1.0.0",
       "description": "LOLER certificate for lifting equipment thorough examination",
       "client": "PLANTEXPAND",
+      "documentType": "loler_examination",
       "assetTypes": ["PUMP", "GENERATOR", "TIPPER", "LIFTING_EQUIPMENT"],
       "workTypes": ["COMPLIANCE"],
       "selection": {
@@ -215,9 +217,11 @@
     },
     {
       "templateId": "PE_JOB_SUMMARY_REPAIR_V1",
-      "displayName": "Plantexpand Job Summary (Repair/VOR) v1",
+      "displayName": "Job Summary (Repair/VOR) v1",
+      "version": "1.0.0",
       "description": "Job summary report for breakdown/repair events with VOR status",
       "client": "PLANTEXPAND",
+      "documentType": "job_summary_repair",
       "assetTypes": ["PUMP", "GENERATOR", "TIPPER", "LIFTING_EQUIPMENT", "PRESSURE_WASHER", "COMPRESSOR"],
       "workTypes": ["REPAIR", "BREAKDOWN"],
       "selection": {
@@ -364,9 +368,11 @@
     },
     {
       "templateId": "PE_JOB_SUMMARY_COMPLIANCE_V1",
-      "displayName": "Plantexpand Job Summary (Compliance/Service) v1",
+      "displayName": "Job Summary (Compliance/Service) v1",
+      "version": "1.0.0",
       "description": "Job summary report for compliance/service events with checklist validation",
       "client": "PLANTEXPAND",
+      "documentType": "job_summary_compliance",
       "assetTypes": ["TRAILER", "PUMP", "GENERATOR"],
       "workTypes": ["COMPLIANCE", "SERVICE"],
       "selection": {
@@ -537,9 +543,11 @@
     },
     {
       "templateId": "PE_JOB_SUMMARY_PTO_V1",
-      "displayName": "Plantexpand Job Summary (PTO Service) v1",
+      "displayName": "Job Summary (PTO Service) v1",
+      "version": "1.0.0",
       "description": "Job summary report for PTO service compliance events",
       "client": "PLANTEXPAND",
+      "documentType": "job_summary_pto",
       "assetTypes": ["COMPRESSOR", "GENERATOR"],
       "workTypes": ["COMPLIANCE", "SERVICE"],
       "selection": {
@@ -735,9 +743,11 @@
     },
     {
       "templateId": "PE_JOB_SUMMARY_AZTEC_V1",
-      "displayName": "Plantexpand Job Summary (Aztec Weighing) v1",
+      "displayName": "Job Summary (Aztec Weighing) v1",
+      "version": "1.0.0",
       "description": "Compliance checklist for Aztec Onboard Weighing Systems. Uses simple task/result format (not color-coded).",
       "client": "PLANTEXPAND",
+      "documentType": "job_summary_aztec",
       "assetTypes": ["VEHICLE"],
       "workTypes": ["COMPLIANCE", "SERVICE"],
       "selection": {
