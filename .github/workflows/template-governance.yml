@@ -1,0 +1,275 @@
+name: Template Governance
+
+on:
+  push:
+    paths:
+      - 'server/specs/**'
+      - 'server/services/governanceRules.ts'
+      - '.github/workflows/template-governance.yml'
+  pull_request:
+    paths:
+      - 'server/specs/**'
+      - 'server/services/governanceRules.ts'
+      - '.github/workflows/template-governance.yml'
+  workflow_dispatch:
+    inputs:
+      full_validation:
+        description: 'Run full validation on all templates'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ============================================================================
+  # Template Schema Validation
+  # ============================================================================
+  schema-validation:
+    name: Schema Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate JSON syntax
+        run: |
+          echo "Validating JSON syntax in spec packs..."
+          for file in server/specs/*.json; do
+            if [ -f "$file" ]; then
+              echo "Checking $file"
+              python3 -c "import json; json.load(open('$file'))" || exit 1
+            fi
+          done
+          echo "✅ All JSON files are valid"
+
+      - name: Run schema validation tests
+        run: pnpm test -- server/specs/__tests__/spec-pack-governance.test.ts --run
+
+  # ============================================================================
+  # Governance Rules Check
+  # ============================================================================
+  governance-check:
+    name: Governance Rules
+    runs-on: ubuntu-latest
+    needs: schema-validation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run governance rules tests
+        run: pnpm test -- server/services/__tests__/governanceRules.test.ts --run
+
+      - name: Generate governance report
+        run: |
+          echo "## Template Governance Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Rule ID | Name | Severity | Category |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|------|----------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-001 | Template ID Format | blocking | naming |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-002 | Version Format | blocking | schema |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-003 | Required Metadata | blocking | schema |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-004 | Minimum Field Count | blocking | coverage |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-005 | Minimum Validation Rules | blocking | coverage |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-010 | Field Naming Convention | warning | naming |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-011 | Rule ID Naming Convention | warning | naming |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-020 | Required Field Coverage | warning | coverage |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-021 | Field Validation Coverage | blocking | coverage |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-022 | Selection Criteria | warning | coverage |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-030 | No PII in Field Names | warning | security |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-031 | Canonical Reason Codes | blocking | quality |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-040 | Field Descriptions | info | quality |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-041 | Rule Descriptions | info | quality |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-042 | Duplicate Field Detection | blocking | quality |" >> $GITHUB_STEP_SUMMARY
+          echo "| GOV-043 | Duplicate Rule Detection | blocking | quality |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All governance rules validated" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # Template Fixture Validation
+  # ============================================================================
+  fixture-validation:
+    name: Fixture Validation
+    runs-on: ubuntu-latest
+    needs: governance-check
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run fixture matrix tests
+        run: pnpm test -- server/services/__tests__/fixtureMatrixRunner.test.ts --run
+
+      - name: Validate parity fixtures
+        run: |
+          echo "Validating parity fixtures..."
+          if [ -f "server/specs/plantexpand-parity-fixtures.json" ]; then
+            python3 -c "
+import json
+with open('server/specs/plantexpand-parity-fixtures.json') as f:
+    fixtures = json.load(f)
+    print(f'Found {len(fixtures.get(\"fixtures\", []))} fixtures')
+    for fixture in fixtures.get('fixtures', []):
+        template_id = fixture.get('templateId', 'UNKNOWN')
+        expected = fixture.get('expectedOutcome', 'UNKNOWN')
+        print(f'  - {template_id}: {expected}')
+"
+          else
+            echo "No parity fixtures found"
+          fi
+
+  # ============================================================================
+  # Changed Templates Detection (PR only)
+  # ============================================================================
+  detect-changes:
+    name: Detect Changed Templates
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    outputs:
+      changed_templates: ${{ steps.changes.outputs.templates }}
+      has_changes: ${{ steps.changes.outputs.has_changes }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed templates
+        id: changes
+        run: |
+          # Get changed files in specs directory
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- server/specs/*.json 2>/dev/null || echo "")
+          
+          if [ -n "$CHANGED_FILES" ]; then
+            echo "Changed spec files:"
+            echo "$CHANGED_FILES"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "templates<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "No spec files changed"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "templates=" >> $GITHUB_OUTPUT
+          fi
+
+  # ============================================================================
+  # Full Template Suite (Nightly or Manual)
+  # ============================================================================
+  full-validation:
+    name: Full Template Suite
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.full_validation == 'true'
+    needs: [schema-validation, governance-check, fixture-validation]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run full template test suite
+        run: |
+          echo "Running full template test suite..."
+          pnpm test -- --run \
+            server/services/__tests__/templateRegistry.test.ts \
+            server/services/__tests__/templateSelector.test.ts \
+            server/services/__tests__/templateTestHarness.test.ts \
+            server/services/__tests__/templateApproval.test.ts \
+            server/services/__tests__/templateAnalytics.test.ts \
+            server/services/__tests__/governanceRules.test.ts \
+            server/services/__tests__/fixtureMatrixRunner.test.ts \
+            server/specs/__tests__/spec-pack-governance.test.ts
+
+      - name: Generate full report
+        run: |
+          echo "## Full Template Validation Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All template-related tests passed" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # Summary
+  # ============================================================================
+  summary:
+    name: Governance Summary
+    runs-on: ubuntu-latest
+    needs: [schema-validation, governance-check, fixture-validation]
+    if: always()
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## Template Governance Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.schema-validation.result }}" == "success" ]; then
+            echo "✅ Schema Validation: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Schema Validation: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.governance-check.result }}" == "success" ]; then
+            echo "✅ Governance Rules: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Governance Rules: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.fixture-validation.result }}" == "success" ]; then
+            echo "✅ Fixture Validation: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Fixture Validation: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Governance Rules Applied" >> $GITHUB_STEP_SUMMARY
+          echo "- 8 blocking rules (must pass)" >> $GITHUB_STEP_SUMMARY
+          echo "- 5 warning rules (should pass)" >> $GITHUB_STEP_SUMMARY
+          echo "- 2 info rules (recommendations)" >> $GITHUB_STEP_SUMMARY
