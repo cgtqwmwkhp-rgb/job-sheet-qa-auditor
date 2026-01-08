@@ -16,6 +16,9 @@ WORKDIR /app
 # Copy package files first for better layer caching
 COPY package.json pnpm-lock.yaml ./
 
+# Copy patches directory (required by pnpm for patched dependencies)
+COPY patches/ ./patches/
+
 # Install all dependencies (including devDependencies for build)
 RUN pnpm install --frozen-lockfile
 
