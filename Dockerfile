@@ -47,6 +47,9 @@ COPY --from=builder --chown=appuser:nodejs /app/dist ./dist
 COPY --from=builder --chown=appuser:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=appuser:nodejs /app/package.json ./package.json
 
+# Create uploads directory with correct ownership (for local storage provider)
+RUN mkdir -p ./uploads && chown appuser:nodejs ./uploads
+
 # Build-time metadata (injected by CI)
 ARG GIT_SHA=unknown
 ARG PLATFORM_VERSION=unknown
