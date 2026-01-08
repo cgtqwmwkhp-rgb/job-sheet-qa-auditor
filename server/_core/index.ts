@@ -7,6 +7,8 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { handleHealthz, handleReadyz } from "./health";
+import { handleMetrics } from "./metrics";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -33,6 +35,16 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Health check endpoints (before auth, before static files)
+  // These must be accessible without authentication for container orchestration
+  app.get("/healthz", handleHealthz);
+  app.get("/readyz", handleReadyz);
+  
+  // Prometheus metrics endpoint (ADR-003)
+  // MUST be before SPA fallback to return text/plain, not HTML
+  app.get("/metrics", handleMetrics);
+
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API
@@ -59,6 +71,9 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    console.log(`  Health:    http://localhost:${port}/healthz`);
+    console.log(`  Readiness: http://localhost:${port}/readyz`);
+    console.log(`  Metrics:   http://localhost:${port}/metrics`);
   });
 }
 

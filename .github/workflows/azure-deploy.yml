@@ -1,0 +1,354 @@
+# =============================================================================
+# AZURE CONTAINER APPS DEPLOYMENT WORKFLOW
+# =============================================================================
+# Builds, pushes to ACR, and deploys to Azure Container Apps.
+#
+# Flow:
+#   1. Build & push to ACR (on push to main or manual dispatch)
+#   2. Deploy to staging automatically
+#   3. Run release verification on staging
+#   4. Manual approval gate for production
+#   5. Deploy to production (manual trigger only)
+#
+# Required Secrets:
+#   AZURE_CREDENTIALS        - Azure Service Principal JSON
+#   ACR_LOGIN_SERVER         - e.g., myregistry.azurecr.io
+#   ACR_USERNAME             - ACR username
+#   ACR_PASSWORD             - ACR password
+#   STAGING_CONTAINER_APP    - Staging Container App name
+#   PRODUCTION_CONTAINER_APP - Production Container App name
+#   AZURE_RESOURCE_GROUP     - Azure Resource Group name
+#   DATABASE_URL_STAGING     - MySQL connection string for staging
+#   DATABASE_URL_PRODUCTION  - MySQL connection string for production
+#
+# Optional Secrets:
+#   AZURE_STORAGE_CONNECTION_STRING - For Azure Blob storage
+#   MISTRAL_API_KEY          - For OCR functionality
+#   GEMINI_API_KEY           - For AI insights
+# =============================================================================
+
+name: Azure Deploy
+
+on:
+  # Automatic deployment on push to main
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/workflows/ci*.yml'
+      - '.github/workflows/parity*.yml'
+
+  # Manual deployment trigger
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
+      skip_verification:
+        description: 'Skip release verification (NOT recommended)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: "22"
+  IMAGE_NAME: job-sheet-qa-auditor
+
+jobs:
+  # ===========================================================================
+  # Build and Push to ACR
+  # ===========================================================================
+  build-and-push:
+    name: Build & Push to ACR
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+      git_sha: ${{ github.sha }}
+
+    steps:
+      - name: Log context
+        run: |
+          echo "=================================================="
+          echo "  Azure Container Apps Deployment"
+          echo "  SHA:    ${{ github.sha }}"
+          echo "  REF:    ${{ github.ref }}"
+          echo "  EVENT:  ${{ github.event_name }}"
+          echo "=================================================="
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Login to ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            PLATFORM_VERSION=${{ github.ref_name }}
+            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+
+  # ===========================================================================
+  # Deploy to Staging
+  # ===========================================================================
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging') }}
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.app_url }}
+    outputs:
+      app_url: ${{ steps.deploy.outputs.app_url }}
+
+    steps:
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Container App (Staging)
+        id: deploy
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          containerAppName: ${{ secrets.STAGING_CONTAINER_APP }}
+          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Set environment variables
+        run: |
+          az containerapp update \
+            --name ${{ secrets.STAGING_CONTAINER_APP }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --set-env-vars \
+              NODE_ENV=production \
+              GIT_SHA=${{ github.sha }} \
+              PLATFORM_VERSION=${{ github.ref_name }} \
+              BUILD_TIME="${{ github.event.head_commit.timestamp }}" \
+              STORAGE_PROVIDER=azure \
+              ENABLE_PURGE_EXECUTION=false \
+              ENABLE_SCHEDULER=false
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting 60 seconds for deployment to stabilize..."
+          sleep 60
+
+      - name: Smoke test staging
+        run: |
+          APP_URL="${{ steps.deploy.outputs.app_url }}"
+          echo "Testing: $APP_URL"
+          
+          # Test healthz
+          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/healthz" --max-time 30)
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "❌ /healthz returned $HTTP_CODE"
+            exit 1
+          fi
+          echo "✅ /healthz returned 200"
+          
+          # Test readyz
+          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/readyz" --max-time 30)
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "❌ /readyz returned $HTTP_CODE"
+            exit 1
+          fi
+          echo "✅ /readyz returned 200"
+          
+          # Test metrics
+          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/metrics" --max-time 30)
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "❌ /metrics returned $HTTP_CODE"
+            exit 1
+          fi
+          echo "✅ /metrics returned 200"
+
+  # ===========================================================================
+  # Verify Staging (Full Release Verification)
+  # ===========================================================================
+  verify-staging:
+    name: Verify Staging
+    needs: [build-and-push, deploy-staging]
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_verification }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run release verification
+        env:
+          STAGING_URL: ${{ needs.deploy-staging.outputs.app_url }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          chmod +x scripts/release/smoke-check.sh
+          chmod +x scripts/release/monitor-snapshot.sh
+          
+          # Run smoke checks (soft mode for staging)
+          ./scripts/release/smoke-check.sh "$STAGING_URL" "$EXPECTED_SHA" "soft"
+          
+          # Run monitoring snapshot
+          ENVIRONMENT=staging HEALTH_ONLY=false \
+            ./scripts/release/monitor-snapshot.sh "$STAGING_URL" "soft" "false"
+
+      - name: Upload verification artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-verification-${{ github.run_id }}
+          path: logs/release/
+          retention-days: 30
+
+  # ===========================================================================
+  # Deploy to Production (Manual Trigger Only)
+  # ===========================================================================
+  deploy-production:
+    name: Deploy to Production
+    needs: [build-and-push, verify-staging]
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'production' }}
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.app_url }}
+    outputs:
+      app_url: ${{ steps.deploy.outputs.app_url }}
+
+    steps:
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Container App (Production)
+        id: deploy
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          containerAppName: ${{ secrets.PRODUCTION_CONTAINER_APP }}
+          imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Set environment variables
+        run: |
+          az containerapp update \
+            --name ${{ secrets.PRODUCTION_CONTAINER_APP }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --set-env-vars \
+              NODE_ENV=production \
+              GIT_SHA=${{ github.sha }} \
+              PLATFORM_VERSION=${{ github.ref_name }} \
+              BUILD_TIME="${{ github.event.head_commit.timestamp }}" \
+              STORAGE_PROVIDER=azure \
+              ENABLE_PURGE_EXECUTION=false \
+              ENABLE_SCHEDULER=false
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting 60 seconds for deployment to stabilize..."
+          sleep 60
+
+      - name: Smoke test production
+        run: |
+          APP_URL="${{ steps.deploy.outputs.app_url }}"
+          echo "Testing: $APP_URL"
+          
+          # Test all endpoints
+          for ENDPOINT in healthz readyz metrics; do
+            HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/$ENDPOINT" --max-time 30)
+            if [[ "$HTTP_CODE" != "200" ]]; then
+              echo "❌ /$ENDPOINT returned $HTTP_CODE"
+              exit 1
+            fi
+            echo "✅ /$ENDPOINT returned 200"
+          done
+
+  # ===========================================================================
+  # Verify Production (Strict Mode)
+  # ===========================================================================
+  verify-production:
+    name: Verify Production
+    needs: [build-and-push, deploy-production]
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'production' && !inputs.skip_verification }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run release verification (STRICT)
+        env:
+          PRODUCTION_URL: ${{ needs.deploy-production.outputs.app_url }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          chmod +x scripts/release/smoke-check.sh
+          chmod +x scripts/release/monitor-snapshot.sh
+          
+          # Run smoke checks (STRICT mode for production)
+          ./scripts/release/smoke-check.sh "$PRODUCTION_URL" "$EXPECTED_SHA" "strict"
+          
+          # Run monitoring snapshot (STRICT mode, metrics REQUIRED)
+          ENVIRONMENT=production HEALTH_ONLY=false \
+            ./scripts/release/monitor-snapshot.sh "$PRODUCTION_URL" "strict" "false"
+
+      - name: Upload verification artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-verification-${{ github.run_id }}
+          path: logs/release/
+          retention-days: 30
+
+      - name: Generate deployment summary
+        run: |
+          {
+            echo "# Production Deployment Complete ✅"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| SHA | ${{ github.sha }} |"
+            echo "| URL | ${{ needs.deploy-production.outputs.app_url }} |"
+            echo "| Verification | STRICT mode PASSED |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
