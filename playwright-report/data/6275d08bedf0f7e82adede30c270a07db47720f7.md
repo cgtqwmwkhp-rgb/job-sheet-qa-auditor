@@ -1,0 +1,5 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]: "{\"error\":{\"json\":{\"message\":\"No procedure found on path \\\"system.version\\\"\",\"code\":-32004,\"data\":{\"code\":\"NOT_FOUND\",\"httpStatus\":404,\"stack\":\"TRPCError: No procedure found on path \\\"system.version\\\"\\n at <anonymous> (/Users/davidharris/GIT-Sales/smr-pipeline-dashboard/node_modules/.pnpm/@trpc+server@11.8.1_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:340:17)\\n at Array.map (<anonymous>)\\n at resolveResponse (/Users/davidharris/GIT-Sales/smr-pipeline-dashboard/node_modules/.pnpm/@trpc+server@11.8.1_typescript@5.9.3/node_modules/@trpc/server/src/unstable-core-do-not-import/http/resolveResponse.ts:331:33)\\n at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\\n at async <anonymous> (/Users/davidharris/GIT-Sales/smr-pipeline-dashboard/node_modules/.pnpm/@trpc+server@11.8.1_typescript@5.9.3/node_modules/@trpc/server/src/adapters/node-http/nodeHTTPRequestHandler.ts:100:26)\",\"path\":\"system.version\"}}}}"
+```

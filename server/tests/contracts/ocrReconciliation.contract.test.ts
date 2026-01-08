@@ -243,9 +243,15 @@ describe('OCR Reconciliation Contract Tests', () => {
       const artifact1 = generateReconciliationArtifact(result1);
       const artifact2 = generateReconciliationArtifact(result2);
       
-      // Remove timestamps for comparison
-      const normalized1 = artifact1.replace(/"processedAt":"[^"]+"/g, '"processedAt":"X"');
-      const normalized2 = artifact2.replace(/"processedAt":"[^"]+"/g, '"processedAt":"X"');
+      // Normalize non-deterministic fields for comparison:
+      // - processedAt: ISO timestamp varies between calls
+      // - processingTimeMs: execution time varies based on system load/timing
+      const normalizeArtifact = (s: string) =>
+        s.replace(/"processedAt":"[^"]+"/g, '"processedAt":"X"')
+         .replace(/"processingTimeMs":\s*\d+/g, '"processingTimeMs":0');
+      
+      const normalized1 = normalizeArtifact(artifact1);
+      const normalized2 = normalizeArtifact(artifact2);
       
       expect(normalized1).toBe(normalized2);
     });
