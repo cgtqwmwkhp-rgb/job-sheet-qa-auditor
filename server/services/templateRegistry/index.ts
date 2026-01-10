@@ -11,3 +11,4 @@ export * from './selectionTraceWriter';
 export * from './fixtureRunner';
 export * from './importPack';
 export * from './roiValidator';
+export * from './activationPolicy';
