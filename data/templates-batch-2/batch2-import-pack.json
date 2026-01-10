@@ -1,0 +1,241 @@
+{
+  "packVersion": "1.0.0",
+  "exportedAt": "2024-01-20T10:00:00.000Z",
+  "sourceSystem": "batch-2-onboarding",
+  "templates": [
+    {
+      "metadata": {
+        "templateId": "hvac-service-v1",
+        "name": "HVAC Service Report",
+        "description": "Heating, ventilation and air conditioning service documentation",
+        "category": "hvac",
+        "tags": ["hvac", "service", "air-conditioning", "heating"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "HVAC Service Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Unit ID", "type": "string", "required": true },
+          { "field": "date", "label": "Service Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Technician Sign Off", "type": "boolean", "required": true },
+          { "field": "refrigerantLevel", "label": "Refrigerant Level", "type": "string", "required": false },
+          { "field": "filterCondition", "label": "Filter Condition", "type": "string", "required": false },
+          { "field": "compressorCheck", "label": "Compressor Check", "type": "boolean", "required": false }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Job reference required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Unit ID required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Service date required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "engineerSignOff", "description": "Technician must sign", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["hvac"],
+        "requiredTokensAny": ["service", "air conditioning", "heating", "ventilation", "ac unit"],
+        "formCodeRegex": "^HVAC-\\d+$",
+        "optionalTokens": ["refrigerant", "filter", "compressor", "thermostat"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.25, "width": 0.9, "height": 0.35 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      },
+      "fixturePackRef": "hvac-service-fixtures"
+    },
+    {
+      "metadata": {
+        "templateId": "electrical-safety-v1",
+        "name": "Electrical Safety Certificate",
+        "description": "Electrical installation condition report and safety certification",
+        "category": "electrical",
+        "tags": ["electrical", "safety", "certificate", "inspection"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Electrical Safety Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Certificate Number", "type": "string", "required": true },
+          { "field": "assetId", "label": "Property Reference", "type": "string", "required": true },
+          { "field": "date", "label": "Inspection Date", "type": "date", "required": true },
+          { "field": "expiryDate", "label": "Next Inspection Due", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Electrician Sign Off", "type": "boolean", "required": true },
+          { "field": "overallResult", "label": "Overall Result", "type": "string", "required": true },
+          { "field": "circuitsChecked", "label": "Circuits Checked", "type": "number", "required": false }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Certificate number required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Property reference required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Inspection date required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "expiryDate", "description": "Next inspection date required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R005", "field": "engineerSignOff", "description": "Electrician must sign", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["electrical", "safety"],
+        "requiredTokensAny": ["certificate", "inspection", "condition report", "eicr"],
+        "formCodeRegex": "^ELEC-\\d+$",
+        "optionalTokens": ["circuits", "fuse", "earthing", "bonding"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.3, "width": 0.9, "height": 0.4 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      },
+      "fixturePackRef": "electrical-safety-fixtures"
+    },
+    {
+      "metadata": {
+        "templateId": "plumbing-repair-v1",
+        "name": "Plumbing Repair Order",
+        "description": "Plumbing and drainage repair work documentation",
+        "category": "plumbing",
+        "tags": ["plumbing", "repair", "drainage", "water"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Plumbing Repair Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Work Order", "type": "string", "required": true },
+          { "field": "assetId", "label": "Property ID", "type": "string", "required": true },
+          { "field": "date", "label": "Repair Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Plumber Sign Off", "type": "boolean", "required": true },
+          { "field": "workCompleted", "label": "Work Completed", "type": "string", "required": false },
+          { "field": "materialsUsed", "label": "Materials Used", "type": "list", "required": false }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Work order required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Property ID required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Repair date required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "engineerSignOff", "description": "Plumber must sign", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["plumbing"],
+        "requiredTokensAny": ["repair", "drainage", "water", "pipe", "leak"],
+        "formCodeRegex": "^PLUMB-\\d+$",
+        "optionalTokens": ["tap", "boiler", "radiator", "valve"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.25, "width": 0.9, "height": 0.3 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      },
+      "fixturePackRef": "plumbing-repair-fixtures"
+    },
+    {
+      "metadata": {
+        "templateId": "fire-safety-v1",
+        "name": "Fire Safety Inspection",
+        "description": "Fire alarm and safety equipment inspection report",
+        "category": "fire-safety",
+        "tags": ["fire", "safety", "inspection", "alarm"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Fire Safety Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Inspection Number", "type": "string", "required": true },
+          { "field": "assetId", "label": "Building Reference", "type": "string", "required": true },
+          { "field": "date", "label": "Inspection Date", "type": "date", "required": true },
+          { "field": "expiryDate", "label": "Next Due Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Inspector Sign Off", "type": "boolean", "required": true },
+          { "field": "alarmsChecked", "label": "Alarms Checked", "type": "number", "required": false },
+          { "field": "extinguishersChecked", "label": "Extinguishers Checked", "type": "number", "required": false }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Inspection number required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Building reference required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Inspection date required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "expiryDate", "description": "Next due date required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R005", "field": "engineerSignOff", "description": "Inspector must sign", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["fire", "safety"],
+        "requiredTokensAny": ["inspection", "alarm", "extinguisher", "detection"],
+        "formCodeRegex": "^FIRE-\\d+$",
+        "optionalTokens": ["smoke", "detector", "sprinkler", "emergency"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.25, "width": 0.9, "height": 0.4 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      },
+      "fixturePackRef": "fire-safety-fixtures"
+    },
+    {
+      "metadata": {
+        "templateId": "gas-boiler-v1",
+        "name": "Gas Boiler Service Certificate",
+        "description": "Gas boiler annual service and safety check documentation",
+        "category": "gas",
+        "tags": ["gas", "boiler", "service", "safety"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Gas Boiler Service Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Certificate Number", "type": "string", "required": true },
+          { "field": "assetId", "label": "Boiler Serial", "type": "string", "required": true },
+          { "field": "date", "label": "Service Date", "type": "date", "required": true },
+          { "field": "expiryDate", "label": "Next Service Due", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Gas Safe Engineer Sign Off", "type": "boolean", "required": true },
+          { "field": "gasEngineerNumber", "label": "Gas Safe Number", "type": "string", "required": true },
+          { "field": "flueFlowTest", "label": "Flue Flow Test", "type": "boolean", "required": false },
+          { "field": "combustionAnalysis", "label": "Combustion Analysis", "type": "string", "required": false }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Certificate number required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Boiler serial required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Service date required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "expiryDate", "description": "Next service date required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R005", "field": "engineerSignOff", "description": "Engineer must sign", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R006", "field": "gasEngineerNumber", "description": "Gas Safe number required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["gas", "boiler"],
+        "requiredTokensAny": ["service", "safety", "certificate", "annual"],
+        "formCodeRegex": "^GAS-\\d+$",
+        "optionalTokens": ["flue", "combustion", "pressure", "thermostat"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.25, "width": 0.9, "height": 0.35 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      },
+      "fixturePackRef": "gas-boiler-fixtures"
+    }
+  ]
+}

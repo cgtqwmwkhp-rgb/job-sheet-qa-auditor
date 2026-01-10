@@ -1,0 +1,161 @@
+{
+  "packVersion": "1.0.0",
+  "createdAt": "2024-01-20T10:00:00.000Z",
+  "standard": "TEMPLATE_FIXTURE_PACK_STANDARD v1.0",
+  "fixturePacks": {
+    "hvac-service-fixtures": {
+      "templateVersionRef": "hvac-service-v1:1.0.0",
+      "cases": [
+        {
+          "caseId": "HVAC-PASS-001",
+          "description": "Complete HVAC service with all required fields",
+          "inputText": "HVAC Service Report Job Ref HVAC-12345 Unit ID AC-UNIT-789 Service Date 2024-01-15 Refrigerant Level OK Filter Condition Good Compressor Check Pass Technician Sign Off Complete",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "HVAC-PASS-002",
+          "description": "HVAC service with minimal required fields",
+          "inputText": "HVAC service report Job Reference HVAC-99999 Unit ID UNIT-001 Date 2024-01-10 Technician signed",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "HVAC-FAIL-001",
+          "description": "Missing job reference",
+          "inputText": "HVAC Service Report Unit ID AC-999 Date 2024-01-15 Technician Sign Off Yes",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["MISSING_FIELD"],
+          "required": true
+        },
+        {
+          "caseId": "HVAC-FAIL-002",
+          "description": "Missing technician sign off",
+          "inputText": "HVAC Service Report Job Ref HVAC-12345 Unit ID AC-999 Date 2024-01-15",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["MISSING_FIELD"],
+          "required": true
+        }
+      ]
+    },
+    "electrical-safety-fixtures": {
+      "templateVersionRef": "electrical-safety-v1:1.0.0",
+      "cases": [
+        {
+          "caseId": "ELEC-PASS-001",
+          "description": "Complete electrical safety certificate",
+          "inputText": "Electrical Safety Certificate ELEC-55555 Property Ref PROP-123 Inspection Date 2024-01-15 Next Inspection 2025-01-15 Overall Result Satisfactory Electrician Sign Off Complete",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "ELEC-FAIL-001",
+          "description": "Missing expiry date",
+          "inputText": "Electrical Safety Certificate ELEC-55555 Property Ref PROP-123 Inspection Date 2024-01-15 Electrician Sign Off Yes",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["MISSING_FIELD"],
+          "required": true
+        },
+        {
+          "caseId": "ELEC-FAIL-002",
+          "description": "Missing property reference",
+          "inputText": "Electrical Safety Certificate ELEC-55555 Inspection Date 2024-01-15 Next Due 2025-01-15 Electrician Signed",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["MISSING_FIELD"],
+          "required": true
+        }
+      ]
+    },
+    "plumbing-repair-fixtures": {
+      "templateVersionRef": "plumbing-repair-v1:1.0.0",
+      "cases": [
+        {
+          "caseId": "PLUMB-PASS-001",
+          "description": "Complete plumbing repair order",
+          "inputText": "Plumbing Repair Order PLUMB-77777 Property ID HOUSE-456 Repair Date 2024-01-15 Work Completed Fixed leak under sink Materials Used Copper pipe, sealant Plumber Sign Off Complete",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "PLUMB-FAIL-001",
+          "description": "Missing work order number",
+          "inputText": "Plumbing repair Property ID HOUSE-456 Date 2024-01-15 Plumber signed",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["MISSING_FIELD"],
+          "required": true
+        },
+        {
+          "caseId": "PLUMB-FAIL-002",
+          "description": "Missing plumber sign off",
+          "inputText": "Plumbing Repair Order PLUMB-77777 Property ID HOUSE-456 Repair Date 2024-01-15",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["MISSING_FIELD"],
+          "required": true
+        }
+      ]
+    },
+    "fire-safety-fixtures": {
+      "templateVersionRef": "fire-safety-v1:1.0.0",
+      "cases": [
+        {
+          "caseId": "FIRE-PASS-001",
+          "description": "Complete fire safety inspection",
+          "inputText": "Fire Safety Inspection FIRE-33333 Building Ref BLDG-789 Inspection Date 2024-01-15 Next Due Date 2024-07-15 Alarms Checked 12 Extinguishers Checked 8 Inspector Sign Off Complete",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "FIRE-FAIL-001",
+          "description": "Missing next due date",
+          "inputText": "Fire Safety Inspection FIRE-33333 Building Ref BLDG-789 Inspection Date 2024-01-15 Inspector Signed",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["MISSING_FIELD"],
+          "required": true
+        },
+        {
+          "caseId": "FIRE-FAIL-002",
+          "description": "Missing building reference",
+          "inputText": "Fire Safety Inspection FIRE-33333 Inspection Date 2024-01-15 Next Due 2024-07-15 Inspector Signed",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["MISSING_FIELD"],
+          "required": true
+        }
+      ]
+    },
+    "gas-boiler-fixtures": {
+      "templateVersionRef": "gas-boiler-v1:1.0.0",
+      "cases": [
+        {
+          "caseId": "GAS-PASS-001",
+          "description": "Complete gas boiler service certificate",
+          "inputText": "Gas Boiler Service Certificate GAS-11111 Boiler Serial BLR-XYZ-001 Service Date 2024-01-15 Next Service Due 2025-01-15 Gas Safe Number 123456 Flue Flow Test Pass Gas Safe Engineer Sign Off Complete",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "GAS-PASS-002",
+          "description": "Gas boiler service with minimal fields",
+          "inputText": "Gas boiler certificate GAS-22222 Serial BOILER-002 Date 2024-01-10 Next due 2025-01-10 Gas Safe 654321 Engineer signed",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "GAS-FAIL-001",
+          "description": "Missing Gas Safe number",
+          "inputText": "Gas Boiler Service Certificate GAS-11111 Boiler Serial BLR-001 Service Date 2024-01-15 Next Due 2025-01-15 Engineer Signed",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["MISSING_FIELD"],
+          "required": true
+        },
+        {
+          "caseId": "GAS-FAIL-002",
+          "description": "Missing next service date",
+          "inputText": "Gas Boiler Certificate GAS-11111 Serial BLR-001 Date 2024-01-15 Gas Safe 123456 Engineer Signed",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["MISSING_FIELD"],
+          "required": true
+        }
+      ]
+    }
+  }
+}
