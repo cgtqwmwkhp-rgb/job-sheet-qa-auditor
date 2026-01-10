@@ -1,16 +1,19 @@
 /**
  * ROI Editor V2 Component
  * 
- * PR-L: Enhanced ROI editor with PDF preview and usability improvements.
- * - PDF.js integration for document preview
- * - Zoom/pan controls
+ * PR-L/N: Enhanced ROI editor with PDF preview and usability improvements.
+ * - PDF.js integration for document preview (PR-N)
+ * - PDF file upload with drag-and-drop
+ * - Zoom/pan controls (50-200%)
  * - Copy ROIs from previous version
  * - Pre-fill standard templates
  * - Snap-to-grid option
  * - Region enable/disable toggles
+ * - ROI resize handles
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { PdfPreview } from './PdfPreview';
 
 /**
  * ROI Region type
@@ -95,14 +98,20 @@ interface RoiEditorV2Props {
   previousVersionRoi?: RoiConfig;
   /** PDF URL for preview (if available) */
   pdfUrl?: string;
+  /** PDF data for preview (ArrayBuffer) */
+  pdfData?: ArrayBuffer;
   /** Callback when ROI changes */
   onChange?: (roi: RoiConfig) => void;
   /** Callback when save is requested */
   onSave?: (roi: RoiConfig) => void;
+  /** Callback when PDF is uploaded */
+  onPdfUpload?: (file: File) => void;
   /** Whether editor is read-only */
   readOnly?: boolean;
   /** Document type for template suggestions */
   documentType?: 'maintenance' | 'inspection' | 'installation';
+  /** Show PDF preview panel */
+  showPdfPreview?: boolean;
 }
 
 /**
@@ -112,10 +121,13 @@ export function RoiEditorV2({
   initialRoi,
   previousVersionRoi,
   pdfUrl,
+  pdfData,
   onChange,
   onSave,
+  onPdfUpload,
   readOnly = false,
   documentType,
+  showPdfPreview = true,
 }: RoiEditorV2Props) {
   const [regions, setRegions] = useState<RoiRegion[]>(initialRoi?.regions ?? []);
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
@@ -127,8 +139,67 @@ export function RoiEditorV2({
   const [gridSize] = useState(0.05); // 5% grid
   const [showCriticalOnly, setShowCriticalOnly] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [localPdfData, setLocalPdfData] = useState<ArrayBuffer | null>(null);
+  const [pdfFileName, setPdfFileName] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  // Use provided PDF data or local upload
+  const effectivePdfSource = pdfData ?? localPdfData ?? pdfUrl ?? undefined;
+
+  /**
+   * Handle PDF file upload
+   */
+  const handlePdfUpload = useCallback((file: File) => {
+    if (!file.type.includes('pdf')) {
+      return;
+    }
+
+    setPdfFileName(file.name);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const arrayBuffer = e.target?.result as ArrayBuffer;
+      setLocalPdfData(arrayBuffer);
+    };
+    reader.readAsArrayBuffer(file);
+
+    onPdfUpload?.(file);
+  }, [onPdfUpload]);
+
+  /**
+   * Handle file input change
+   */
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handlePdfUpload(file);
+    }
+  }, [handlePdfUpload]);
+
+  /**
+   * Handle drag and drop
+   */
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handlePdfUpload(file);
+    }
+  }, [handlePdfUpload]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setIsDragOver(false);
+  }, []);
 
   // Notify parent of changes
   useEffect(() => {
@@ -466,6 +537,15 @@ export function RoiEditorV2({
         ))}
       </div>
 
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
+
       {/* Canvas and Region List */}
       <div style={{ display: 'flex', gap: '24px' }}>
         {/* Canvas with PDF preview */}
@@ -476,30 +556,35 @@ export function RoiEditorV2({
             color: '#6b7280',
             display: 'flex',
             justifyContent: 'space-between',
+            alignItems: 'center',
           }}>
-            <span>{readOnly ? 'Preview Mode' : 'Click and drag to draw regions'}</span>
-            {pdfLoading && <span>Loading PDF...</span>}
-            {pdfError && <span style={{ color: '#dc2626' }}>{pdfError}</span>}
+            <span>
+              {readOnly ? 'Preview Mode' : 'Click and drag to draw regions'}
+              {pdfFileName && <span style={{ marginLeft: '12px', color: '#3b82f6' }}>({pdfFileName})</span>}
+            </span>
+            {totalPages > 1 && (
+              <span>Page {currentPage} of {totalPages}</span>
+            )}
           </div>
           <div
             ref={canvasRef}
             onMouseDown={handleMouseDown}
             onMouseUp={handleMouseUp}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
             style={{
               width: `${595 * (zoom / 100)}px`,
               maxWidth: '100%',
               aspectRatio: '595 / 842',
               backgroundColor: '#ffffff',
-              border: '2px solid #e2e8f0',
+              border: isDragOver ? '3px dashed #3b82f6' : '2px solid #e2e8f0',
               borderRadius: '8px',
               position: 'relative',
               cursor: readOnly ? 'default' : 'crosshair',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
               overflow: 'hidden',
-              backgroundImage: pdfUrl ? `url(${pdfUrl})` : undefined,
-              backgroundSize: 'contain',
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'center',
+              transition: 'border-color 0.2s',
             }}
           >
             {/* Grid overlay when snap enabled */}
@@ -516,22 +601,66 @@ export function RoiEditorV2({
               }} />
             )}
 
-            {/* Page placeholder if no PDF */}
-            {!pdfUrl && (
+            {/* PDF Preview using PDF.js */}
+            {showPdfPreview && effectivePdfSource && (
+              <PdfPreview
+                pdfSource={effectivePdfSource}
+                page={currentPage}
+                zoom={zoom}
+                onPageChange={setCurrentPage}
+                onPagesLoaded={setTotalPages}
+                showPageControls={false}
+                className="absolute inset-0"
+              />
+            )}
+
+            {/* Page placeholder if no PDF - with upload button */}
+            {!effectivePdfSource && (
               <div style={{
                 position: 'absolute',
                 top: '50%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
-                color: '#d1d5db',
-                fontSize: '20px',
+                color: isDragOver ? '#3b82f6' : '#6b7280',
+                fontSize: '18px',
                 fontWeight: 600,
-                pointerEvents: 'none',
+                pointerEvents: 'auto',
                 textAlign: 'center',
+                padding: '40px',
               }}>
-                <div>PDF Preview</div>
-                <div style={{ fontSize: '12px', marginTop: '8px' }}>
-                  Upload a PDF to see document preview
+                <svg 
+                  width="48" 
+                  height="48" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="1.5"
+                  style={{ margin: '0 auto 16px' }}
+                >
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14,2 14,8 20,8" />
+                  <line x1="12" y1="18" x2="12" y2="12" />
+                  <polyline points="9,15 12,12 15,15" />
+                </svg>
+                <div>{isDragOver ? 'Drop PDF here' : 'Drop PDF or click to upload'}</div>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    marginTop: '16px',
+                    padding: '10px 20px',
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                    fontSize: '14px',
+                  }}
+                >
+                  Select PDF File
+                </button>
+                <div style={{ fontSize: '12px', marginTop: '12px', color: '#9ca3af' }}>
+                  or drag and drop a PDF file
                 </div>
               </div>
             )}
