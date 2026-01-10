@@ -1,0 +1,216 @@
+{
+  "packVersion": "1.0.0",
+  "exportedAt": "2024-01-30T10:00:00.000Z",
+  "sourceSystem": "batch-4-onboarding",
+  "templates": [
+    {
+      "metadata": {
+        "templateId": "generator-service-v1",
+        "name": "Generator Service Report",
+        "description": "Backup generator maintenance and testing documentation",
+        "category": "generator",
+        "tags": ["generator", "service", "backup", "power"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Generator Service Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["generator", "service"],
+        "requiredTokensAny": ["backup", "power", "diesel"],
+        "optionalTokens": ["load", "test", "fuel"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.25, "width": 0.9, "height": 0.4 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "templateId": "security-alarm-v1",
+        "name": "Security Alarm System Test",
+        "description": "Intruder alarm and security system testing documentation",
+        "category": "security",
+        "tags": ["security", "alarm", "intruder", "testing"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Security Alarm Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "expiryDate", "label": "Expiry Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "expiryDate", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R005", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["security", "alarm"],
+        "requiredTokensAny": ["intruder", "testing", "system"],
+        "optionalTokens": ["panel", "sensor", "zone"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.25, "width": 0.9, "height": 0.35 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "templateId": "access-control-v1",
+        "name": "Access Control System Maintenance",
+        "description": "Door access control and keycard system maintenance",
+        "category": "access",
+        "tags": ["access", "control", "door", "keycard"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Access Control Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["access", "control"],
+        "requiredTokensAny": ["door", "keycard", "entry"],
+        "optionalTokens": ["reader", "fob", "biometric"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.25, "width": 0.9, "height": 0.4 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "templateId": "cctv-maintenance-v1",
+        "name": "CCTV System Maintenance Report",
+        "description": "Surveillance camera system maintenance and testing",
+        "category": "cctv",
+        "tags": ["cctv", "camera", "surveillance", "maintenance"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "CCTV Maintenance Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["cctv", "camera"],
+        "requiredTokensAny": ["surveillance", "maintenance", "recording"],
+        "optionalTokens": ["dvr", "nvr", "lens"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.25, "width": 0.9, "height": 0.4 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "templateId": "duct-cleaning-v1",
+        "name": "Duct Cleaning Certification",
+        "description": "Air duct cleaning and hygiene certification",
+        "category": "ductwork",
+        "tags": ["duct", "cleaning", "hygiene", "air"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Duct Cleaning Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "expiryDate", "label": "Expiry Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "expiryDate", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R005", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["duct", "cleaning"],
+        "requiredTokensAny": ["hygiene", "certification", "air"],
+        "optionalTokens": ["ventilation", "filter", "sanitize"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.25, "width": 0.9, "height": 0.35 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      }
+    }
+  ]
+}
