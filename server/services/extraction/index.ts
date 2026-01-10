@@ -1,8 +1,9 @@
 /**
- * Extraction Service Module
+ * Extraction Services Module
  * 
- * Provides field extraction from OCR text.
+ * Exports extraction utilities and critical field extraction engine.
  */
 
 export * from './types';
 export * from './extractor';
+export * from './criticalFieldExtractor';
