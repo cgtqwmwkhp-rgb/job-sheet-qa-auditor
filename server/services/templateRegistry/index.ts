@@ -10,3 +10,4 @@ export * from './activationGates';
 export * from './selectionTraceWriter';
 export * from './fixtureRunner';
 export * from './importPack';
+export * from './roiValidator';

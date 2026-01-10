@@ -365,6 +365,25 @@ export function updateTemplateStatus(
 }
 
 /**
+ * Update ROI configuration for a template version
+ * 
+ * PR-H: Allows saving ROI from the visual editor
+ */
+export function updateVersionRoi(
+  versionId: number,
+  roiJson: RoiConfig
+): VersionRecord {
+  const version = versionStore.get(versionId);
+  if (!version) {
+    throw new Error(`Version not found: ${versionId}`);
+  }
+  
+  version.roiJson = roiJson;
+  
+  return version;
+}
+
+/**
  * Reset the registry (for testing)
  */
 export function resetRegistry(): void {

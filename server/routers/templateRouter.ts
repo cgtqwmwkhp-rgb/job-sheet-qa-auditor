@@ -24,11 +24,17 @@ import {
   hasFixturePack,
   getFixturePack,
   runFixtureMatrix,
+  validateRoiConfig,
+  normalizeRoiConfig,
+  createStandardJobSheetRoi,
+  updateVersionRoi,
+  STANDARD_ROI_TYPES,
   type CreateTemplateInput,
   type CreateVersionInput,
   type SelectionConfig,
   type SpecJson,
   type BulkImportPack,
+  type RoiConfig,
 } from '../services/templateRegistry';
 
 // Zod schemas for validation
@@ -295,6 +301,81 @@ export const templateRouter = router({
         version.specJson,
         version.selectionConfigJson
       );
+    }),
+
+  // ============================================================
+  // PR-H: ROI Editor Endpoints
+  // ============================================================
+
+  /**
+   * Get ROI config for a version
+   */
+  getRoi: protectedProcedure
+    .input(z.object({ versionId: z.number() }))
+    .query(({ input }) => {
+      const version = getTemplateVersion(input.versionId);
+      if (!version) {
+        throw new Error(`Version not found: ${input.versionId}`);
+      }
+      return {
+        versionId: input.versionId,
+        roiJson: version.roiJson,
+        hasRoi: version.roiJson !== null,
+      };
+    }),
+
+  /**
+   * Update ROI config for a version (admin only)
+   */
+  updateRoi: adminProcedure
+    .input(z.object({
+      versionId: z.number(),
+      roiJson: z.object({
+        regions: z.array(z.object({
+          name: z.string(),
+          page: z.number().int().min(1),
+          bounds: z.object({
+            x: z.number().min(0).max(1),
+            y: z.number().min(0).max(1),
+            width: z.number().min(0).max(1),
+            height: z.number().min(0).max(1),
+          }),
+          fields: z.array(z.string()).optional(),
+        })),
+      }),
+    }))
+    .mutation(({ input }) => {
+      // Validate ROI
+      const validation = validateRoiConfig(input.roiJson as RoiConfig);
+      if (!validation.valid) {
+        throw new Error(`ROI validation failed: ${validation.errors.join(', ')}`);
+      }
+      
+      // Normalize and save
+      const normalized = normalizeRoiConfig(input.roiJson as RoiConfig);
+      return updateVersionRoi(input.versionId, normalized);
+    }),
+
+  /**
+   * Validate ROI config (admin only)
+   */
+  validateRoi: adminProcedure
+    .input(z.object({
+      roiJson: z.any(),
+    }))
+    .mutation(({ input }) => {
+      return validateRoiConfig(input.roiJson as RoiConfig);
+    }),
+
+  /**
+   * Get standard ROI template
+   */
+  getStandardRoiTemplate: protectedProcedure
+    .query(() => {
+      return {
+        standardTypes: STANDARD_ROI_TYPES,
+        template: createStandardJobSheetRoi(),
+      };
     }),
 });
 

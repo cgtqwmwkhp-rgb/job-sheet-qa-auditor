@@ -13,3 +13,5 @@ export { reviewQueueRouter, type ReviewQueueRouter, type ReviewQueueItemResponse
 export { exportsRouter, type ExportsRouter, type ExportFormat, setMockAuditForExport, resetExportStore } from './exportsRouter';
 
 export { templateRouter, type TemplateRouter } from './templateRouter';
+
+export { analyticsRouter, type AnalyticsRouter } from './analyticsRouter';
