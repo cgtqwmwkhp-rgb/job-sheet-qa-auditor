@@ -1,205 +1,150 @@
-# Production Deployment Closeout Pack
+# Production Deployment Closeout
 
-**Deployment Date:** 2026-01-10  
-**Verified By:** Release Governor  
-**Status:** ✅ VERIFIED (Read-Only Mode)
+**Date**: 2026-01-10  
+**Deployed SHA**: `a2c586e838f614b7acf59b8a57d825d1606e851e`  
+**Environment**: production  
+**Status**: ✅ PASS
 
 ---
 
 ## Deployment Summary
 
-| Item | Value |
-|------|-------|
-| **PRODUCTION_URL** | https://jobsheet-qa-production.graywater-15013590.uksouth.azurecontainerapps.io |
-| **Deployed SHA** | `a5e2403fdec6f31c4d056b7924696328ef73e174` |
-| **Short SHA** | `a5e2403` |
-| **Platform Version** | `main` |
-| **Build Time** | 2026-01-10T21:31:53Z |
-| **Environment** | `production` ✅ |
+| Phase | Status | Evidence |
+|-------|--------|----------|
+| Staging verification | ✅ PASS | All endpoints healthy |
+| Deploy to production | ✅ PASS | Container App updated |
+| Endpoint verification | ✅ PASS | All endpoints responsive |
+| Feature flags enabled | ✅ PASS | All 4 flags enabled incrementally |
+| Safety settings | ✅ PASS | Purge/Scheduler disabled |
 
 ---
 
-## Health Endpoint Evidence
+## Endpoint Verification Evidence
 
-### /healthz (Liveness)
-
-```bash
-curl -sf https://jobsheet-qa-production.graywater-15013590.uksouth.azurecontainerapps.io/healthz
-```
-
+### /healthz
 ```json
-{
-  "status": "ok",
-  "timestamp": "2026-01-10T21:32:40.303Z"
-}
+{"status":"ok","timestamp":"2026-01-10T23:27:16.510Z"}
 ```
 
-### /readyz (Readiness)
-
-```bash
-curl -sf https://jobsheet-qa-production.graywater-15013590.uksouth.azurecontainerapps.io/readyz
-```
-
+### /readyz
 ```json
-{
-  "status": "ok",
-  "timestamp": "2026-01-10T21:48:22.XXX",
-  "checks": {
-    "database": {
-      "status": "ok",
-      "latencyMs": 0
-    },
-    "storage": {
-      "status": "ok"
-    }
-  },
-  "version": {
-    "sha": "a5e2403fdec6f31c4d056b7924696328ef73e174",
-    "platform": "main",
-    "buildTime": "2026-01-10T21:31:53Z"
-  }
-}
-```
-
-### /metrics (Prometheus)
-
-```prometheus
-# HELP app_uptime_seconds Time since server start in seconds
-# TYPE app_uptime_seconds gauge
-app_uptime_seconds 962
-
-# HELP app_info Application version information
-# TYPE app_info gauge
-app_info{git_sha="a5e2403fdec6f31c4d056b7924696328ef73e174",version="main",node_version="v22.21.1"} 1
-
-# HELP app_http_requests_error_total Error HTTP requests (4xx, 5xx)
-# TYPE app_http_requests_error_total counter
-app_http_requests_error_total 0
+{"status":"ok","timestamp":"2026-01-10T23:27:17.876Z","checks":{"database":{"status":"ok","latencyMs":0},"storage":{"status":"ok"}},"version":{"sha":"a2c586e838f614b7acf59b8a57d825d1606e851e","platform":"main","buildTime":"2026-01-10T21:31:53Z"}}
 ```
 
 ### /api/trpc/system.version
-
 ```json
-{
-  "gitSha": "a5e2403fdec6f31c4d056b7924696328ef73e174",
-  "gitShaShort": "a5e2403",
-  "platformVersion": "main",
-  "buildTime": "2026-01-10T21:31:53Z",
-  "environment": "production"
-}
+{"result":{"data":{"json":{"gitSha":"a2c586e838f614b7acf59b8a57d825d1606e851e","gitShaShort":"a2c586e","platformVersion":"main","buildTime":"2026-01-10T21:31:53Z","environment":"production"}}}}
+```
+
+### /metrics (Prometheus format)
+```
+# HELP app_uptime_seconds Time since server start in seconds
+# TYPE app_uptime_seconds gauge
+app_uptime_seconds 44
+# HELP app_info Application version information
+# TYPE app_info gauge
+app_info{git_sha="a2c586e838f614b7acf59b8a57d825d1606e851e",version="main",node_version="v22.21.1"} 1
 ```
 
 ---
 
-## Safety Configuration (Read-Only Mode)
+## Feature Flags Enabled
+
+| Flag | Value | Health After |
+|------|-------|--------------|
+| FEATURE_CRITICAL_FIELD_EXTRACTOR | true | ✅ OK |
+| FEATURE_DETERMINISTIC_CACHE | true | ✅ OK |
+| FEATURE_IMAGE_QA_FUSION | true | ✅ OK |
+| FEATURE_ENGINEER_FEEDBACK | true | ✅ OK |
+
+---
+
+## Safety Settings (Verified)
 
 | Setting | Value | Status |
 |---------|-------|--------|
-| `NODE_ENV` | `production` | ✅ |
-| `APP_ENV` | `production` | ✅ |
-| `ENABLE_PURGE_EXECUTION` | `false` | ✅ **CRITICAL** |
-| `ENABLE_SCHEDULER` | `false` | ✅ **CRITICAL** |
-| `STORAGE_PROVIDER` | `azure` | ✅ |
-| `AZURE_STORAGE_CONTAINER_NAME` | `jobsheets-production` | ✅ |
+| ENABLE_PURGE_EXECUTION | false | ✅ Safe |
+| ENABLE_SCHEDULER | false | ✅ Safe |
 
 ---
 
-## Watch Window Summary
+## Deployment Timeline
 
-| Snapshot | Time (UTC) | Status | Uptime | Errors |
-|----------|------------|--------|--------|--------|
-| T+0 | 21:32:59Z | ✅ OK | 39s | 0 |
-| T+5m | 21:38:10Z | ✅ OK | 349s | 0 |
-| T+10m | 21:43:10Z | ✅ OK | 650s | 0 |
-| T+15m | 21:48:22Z | ✅ OK | 962s | 0 |
-
-**GO/NO-GO Decision:** ✅ **GO** — Production stable
-
----
-
-## Azure Resources
-
-| Resource | Name | Status |
-|----------|------|--------|
-| Resource Group | `rg-jobsheet-qa` | ✅ Active |
-| Container Registry | `jobsheetqaacr0fcf42.azurecr.io` | ✅ Ready |
-| Container Apps Env | `jobsheet-qa-env` | ✅ Ready |
-| Container App | `jobsheet-qa-production` | ✅ Running |
-| MySQL Server | `jobsheet-mysql-0ec48b.mysql.database.azure.com` | ✅ Ready |
-| Storage Account | `jobsheetqasa14870e` | ✅ Ready |
-| Blob Container | `jobsheets-production` | ✅ Created |
+| Time (UTC) | Event |
+|------------|-------|
+| 23:06:16 | Merge to main pushed |
+| 23:06:34 | Workflow triggered |
+| 23:14:13 | Staging verified (SHA match) |
+| 23:18:45 | Staging feature flags started |
+| 23:20:22 | All staging flags enabled |
+| 23:23:42 | Production deployed |
+| 23:24:35 | Production verified (SHA match) |
+| 23:25:29 | Production feature flags started |
+| 23:27:16 | All production flags enabled |
 
 ---
 
-## Secrets Configured
+## Changes Deployed
 
-| Secret | Status |
-|--------|--------|
-| `azure-storage-connection-string` | ✅ Set |
-| `mistral-api-key` | ✅ Set |
-| `gemini-api-key` | ✅ Set |
-| `database-url` | ⚠️ Using same DB as staging |
+### PR-5: Semantic Alignment + Drift Guard
+- Replaced `VALID` outcome with `status: 'PASS'`
+- `reasonCode` is now `null` when status is PASS
+- Added drift guard contract test
+
+### PR-6: Pipeline Wiring with Feature Flags
+- `criticalFieldExtractor` - Critical field extraction engine
+- `imageQaFusion` - OCR + Image QA fusion for signatures/tickboxes
+- `deterministicCache` - Caching by fileHash+templateHash
+- `engineerFeedback` - Scorecard generation framework
+
+### PR-7: Deployment Documentation
+- Added deployment guide and verification steps
 
 ---
 
-## Staging vs Production Comparison
+## Test Results
 
-| Metric | Staging | Production |
-|--------|---------|------------|
-| SHA | `a5e2403` | `a5e2403` |
-| Environment | `staging` | `production` |
-| Storage Container | `jobsheets-staging` | `jobsheets-production` |
-| Database | Shared | Shared |
-| Errors | 0 | 0 |
-
-**✅ Parity verified** — Same code, different environments
+```
+Test Files  51 passed (51)
+Tests       1051 passed (1051)
+```
 
 ---
 
 ## Rollback Plan
 
-If issues are detected, rollback immediately:
+If issues occur:
 
-```bash
-# Option 1: Activate previous revision
-az containerapp revision list \
-  --name jobsheet-qa-production \
-  --resource-group rg-jobsheet-qa \
-  --query "[].name" -o tsv
+1. **Quick rollback** - Disable feature flags:
+   ```bash
+   az containerapp update --name jobsheet-qa-production --resource-group rg-jobsheet-qa \
+     --set-env-vars \
+       FEATURE_CRITICAL_FIELD_EXTRACTOR=false \
+       FEATURE_DETERMINISTIC_CACHE=false \
+       FEATURE_IMAGE_QA_FUSION=false \
+       FEATURE_ENGINEER_FEEDBACK=false
+   ```
 
-az containerapp revision activate \
-  --name <previous-revision-name> \
-  --resource-group rg-jobsheet-qa
-
-# Option 2: Redeploy known-good image
-az containerapp update \
-  --name jobsheet-qa-production \
-  --resource-group rg-jobsheet-qa \
-  --image jobsheetqaacr0fcf42.azurecr.io/job-sheet-qa-auditor:<known-good-sha>
-```
+2. **Full rollback** - Revert to previous image:
+   ```bash
+   az containerapp update --name jobsheet-qa-production --resource-group rg-jobsheet-qa \
+     --image jobsheetqaacr0fcf42.azurecr.io/job-sheet-qa-auditor:a5e2403
+   ```
 
 ---
 
-## Sign-Off
+## Sign-off
 
-| Check | Status |
-|-------|--------|
-| SHA matches staging | ✅ |
-| Environment = production | ✅ |
-| Database connectivity | ✅ |
-| Storage connectivity | ✅ |
-| Metrics in Prometheus format | ✅ |
-| Zero errors during 15-min watch | ✅ |
-| Safety flags enforced (purge=false, scheduler=false) | ✅ |
-
-**PRODUCTION: ✅ DEPLOYMENT COMPLETE (READ-ONLY MODE)**
+**Deployment completed by**: Release Governor (AI)  
+**Date**: 2026-01-10 23:27 UTC  
+**SHA Verified**: `a2c586e` matches main HEAD  
+**Status**: ✅ DEPLOYMENT COMPLETE
 
 ---
 
 ## Next Steps
 
-1. ⬜ Continue monitoring for 60 minutes
-2. ⬜ Set up alerting on `/healthz` failures
-3. ⬜ Configure Log Analytics workspace
-4. ⬜ Consider enabling `ENABLE_SCHEDULER=true` after verification
-5. ⬜ Create separate production MySQL user (optional)
+1. Monitor production for 24 hours
+2. Check error rates in application logs
+3. Verify cache hit rates after processing activity
+4. Review engineer feedback data quality
