@@ -36,8 +36,21 @@ describe("systemRouter.health", () => {
     expect(result.config.oauthConfigured).toBe(false);
   });
 
-  it("should include environment in config", async () => {
+  it("should include environment in config using APP_ENV", async () => {
     process.env.NODE_ENV = "production";
+    process.env.APP_ENV = "staging";
+
+    const { systemRouter } = await import("./systemRouter");
+    const caller = systemRouter.createCaller({});
+    const result = await caller.health({ timestamp: Date.now() });
+
+    // APP_ENV takes priority over NODE_ENV
+    expect(result.config.environment).toBe("staging");
+  });
+
+  it("should fallback to production when NODE_ENV=production and APP_ENV not set", async () => {
+    process.env.NODE_ENV = "production";
+    delete process.env.APP_ENV;
 
     const { systemRouter } = await import("./systemRouter");
     const caller = systemRouter.createCaller({});
@@ -128,8 +141,22 @@ describe("systemRouter.version", () => {
     ]);
   });
 
-  it("should include environment field", async () => {
+  it("should include environment field using APP_ENV", async () => {
     process.env.NODE_ENV = "production";
+    process.env.APP_ENV = "staging";
+    process.env.GIT_SHA = "abc123";
+
+    const { systemRouter } = await import("./systemRouter");
+    const caller = systemRouter.createCaller({});
+    const result = await caller.version();
+
+    // APP_ENV takes priority
+    expect(result.environment).toBe("staging");
+  });
+
+  it("should fallback to production when NODE_ENV=production and APP_ENV not set", async () => {
+    process.env.NODE_ENV = "production";
+    delete process.env.APP_ENV;
     process.env.GIT_SHA = "abc123";
 
     const { systemRouter } = await import("./systemRouter");

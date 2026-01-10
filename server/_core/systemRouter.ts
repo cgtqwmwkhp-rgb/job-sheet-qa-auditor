@@ -21,7 +21,8 @@ export const systemRouter = router({
       config: {
         oauthConfigured: ENV.oauthEnabled,
         databaseConfigured: Boolean(ENV.databaseUrl),
-        environment: ENV.isProduction ? "production" : "development",
+        // Use APP_ENV for environment identity
+        environment: ENV.appEnvironment,
       },
     })),
 
@@ -30,7 +31,8 @@ export const systemRouter = router({
     gitShaShort: GIT_SHA.substring(0, 7),
     platformVersion: PLATFORM_VERSION,
     buildTime: BUILD_TIME,
-    environment: process.env.NODE_ENV || "development",
+    // Use APP_ENV for environment identity (staging vs production vs development)
+    environment: ENV.appEnvironment,
   })),
 
   notifyOwner: adminProcedure
