@@ -14,6 +14,7 @@ import {
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _connectionVerified = false;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
@@ -26,6 +27,56 @@ export async function getDb() {
     }
   }
   return _db;
+}
+
+/**
+ * Test database connectivity by running a simple query.
+ * Returns { connected: true, latencyMs } on success, or { connected: false, error } on failure.
+ */
+export async function testDbConnection(): Promise<{ connected: boolean; latencyMs?: number; error?: string }> {
+  const db = await getDb();
+  
+  if (!db) {
+    if (!process.env.DATABASE_URL) {
+      // No database configured - this is OK for demo mode
+      return { connected: true, latencyMs: 0 };
+    }
+    return { connected: false, error: 'Database instance not available' };
+  }
+
+  const startTime = Date.now();
+  try {
+    // Run a simple SELECT 1 to test connectivity
+    await db.execute(sql`SELECT 1`);
+    _connectionVerified = true;
+    return { connected: true, latencyMs: Date.now() - startTime };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.warn('[Database] Connection test failed:', errorMessage);
+    
+    // Check for common Azure MySQL issues
+    if (errorMessage.includes('SSL') || errorMessage.includes('ssl')) {
+      return { connected: false, error: 'SSL connection required - check DATABASE_URL includes ?ssl=true' };
+    }
+    if (errorMessage.includes('ECONNREFUSED')) {
+      return { connected: false, error: 'Connection refused - check firewall rules' };
+    }
+    if (errorMessage.includes('ETIMEDOUT')) {
+      return { connected: false, error: 'Connection timeout - check network/firewall' };
+    }
+    if (errorMessage.includes('Access denied')) {
+      return { connected: false, error: 'Authentication failed - check credentials' };
+    }
+    
+    return { connected: false, error: errorMessage };
+  }
+}
+
+/**
+ * Check if database connection has been verified at least once.
+ */
+export function isConnectionVerified(): boolean {
+  return _connectionVerified;
 }
 
 // ============ USER QUERIES ============

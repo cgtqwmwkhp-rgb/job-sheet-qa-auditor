@@ -8,7 +8,7 @@
  */
 
 import type { Request, Response } from 'express';
-import { getDb } from '../db';
+import { testDbConnection } from '../db';
 import { checkStorageHealth } from '../storage';
 
 export interface HealthStatus {
@@ -47,28 +47,19 @@ export async function handleReadyz(_req: Request, res: Response): Promise<void> 
   const checks: HealthStatus['checks'] = {};
   let isReady = true;
 
-  // Check database connectivity
+  // Check database connectivity with actual query
   try {
-    const startTime = Date.now();
-    const db = await getDb();
+    const dbResult = await testDbConnection();
     
-    if (db) {
-      // Simple connectivity check - if getDb() returns non-null, we're connected
+    if (dbResult.connected) {
       checks.database = {
         status: 'ok',
-        latencyMs: Date.now() - startTime,
-      };
-    } else if (!process.env.DATABASE_URL) {
-      // No DATABASE_URL configured - acceptable for demo mode
-      checks.database = {
-        status: 'ok',
-        latencyMs: 0,
+        latencyMs: dbResult.latencyMs,
       };
     } else {
-      // DATABASE_URL configured but connection failed
       checks.database = {
         status: 'error',
-        error: 'Database connection unavailable',
+        error: dbResult.error || 'Database connection failed',
       };
       isReady = false;
     }
