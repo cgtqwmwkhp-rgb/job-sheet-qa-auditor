@@ -222,3 +222,98 @@ export const processingSettings = mysqlTable("processing_settings", {
 
 export type ProcessingSetting = typeof processingSettings.$inferSelect;
 export type InsertProcessingSetting = typeof processingSettings.$inferInsert;
+
+// ============================================================================
+// TEMPLATE SYSTEM (PR-A)
+// ============================================================================
+
+/**
+ * Templates - document type templates for validation
+ * Replaces hardcoded goldStandardSpec with DB-driven templates
+ */
+export const templates = mysqlTable("templates", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Unique template identifier (e.g., 'job-sheet-standard', 'repair-report-v2') */
+  templateId: varchar("templateId", { length: 128 }).notNull().unique(),
+  /** Human-readable name */
+  name: varchar("name", { length: 255 }).notNull(),
+  /** Client/customer this template is for (null = global) */
+  client: varchar("client", { length: 128 }),
+  /** Asset type this template applies to */
+  assetType: varchar("assetType", { length: 128 }),
+  /** Work type this template applies to */
+  workType: varchar("workType", { length: 128 }),
+  /** Template status: draft, active, deprecated, archived */
+  status: mysqlEnum("status", ["draft", "active", "deprecated", "archived"]).default("draft").notNull(),
+  /** Description of the template */
+  description: text("description"),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Template = typeof templates.$inferSelect;
+export type InsertTemplate = typeof templates.$inferInsert;
+
+/**
+ * Template Versions - versioned specification packs
+ * Each version is immutable once created; new versions are appended
+ */
+export const templateVersions = mysqlTable("template_versions", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Parent template ID */
+  templateId: int("templateId").notNull(),
+  /** Semantic version (e.g., '1.0.0', '1.1.0') */
+  version: varchar("version", { length: 32 }).notNull(),
+  /** SHA-256 hash of specJson + selectionConfigJson for determinism */
+  hashSha256: varchar("hashSha256", { length: 64 }).notNull(),
+  /** The full specification JSON (fields, rules, etc.) */
+  specJson: json("specJson").notNull(),
+  /** Selection configuration for template matching */
+  selectionConfigJson: json("selectionConfigJson").notNull(),
+  /** ROI (Region of Interest) configuration for document zones (nullable) */
+  roiJson: json("roiJson"),
+  /** Whether this version is currently active for this template */
+  isActive: boolean("isActive").default(false).notNull(),
+  /** Change notes for this version */
+  changeNotes: text("changeNotes"),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type TemplateVersion = typeof templateVersions.$inferSelect;
+export type InsertTemplateVersion = typeof templateVersions.$inferInsert;
+
+/**
+ * Selection Traces - audit trail for template selection decisions
+ * Records why a particular template was selected (or not) for a job sheet
+ */
+export const selectionTraces = mysqlTable("selection_traces", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Job sheet this selection was for */
+  jobSheetId: int("jobSheetId").notNull(),
+  /** Selected template ID (null if no selection made) */
+  templateId: int("templateId"),
+  /** Selected version ID (null if no selection made) */
+  versionId: int("versionId"),
+  /** Confidence band: HIGH (>=80), MEDIUM (50-79), LOW (<50) */
+  confidenceBand: mysqlEnum("confidenceBand", ["HIGH", "MEDIUM", "LOW"]).notNull(),
+  /** Top confidence score (0-100) */
+  topScore: decimal("topScore", { precision: 5, scale: 2 }).notNull(),
+  /** Runner-up score for ambiguity detection */
+  runnerUpScore: decimal("runnerUpScore", { precision: 5, scale: 2 }),
+  /** Gap between top and runner-up */
+  scoreGap: decimal("scoreGap", { precision: 5, scale: 2 }),
+  /** Detailed scores for all candidates as JSON */
+  scoresJson: json("scoresJson").notNull(),
+  /** Matched tokens for the selected template */
+  tokensJson: json("tokensJson").notNull(),
+  /** Whether auto-processing was allowed based on selection */
+  autoProcessingAllowed: boolean("autoProcessingAllowed").default(false).notNull(),
+  /** Reason if auto-processing was blocked */
+  blockReason: varchar("blockReason", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SelectionTrace = typeof selectionTraces.$inferSelect;
+export type InsertSelectionTrace = typeof selectionTraces.$inferInsert;

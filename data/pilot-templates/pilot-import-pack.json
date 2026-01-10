@@ -1,0 +1,238 @@
+{
+  "packVersion": "1.0.0",
+  "exportedAt": "2024-01-15T10:00:00.000Z",
+  "sourceSystem": "pilot-onboarding",
+  "templates": [
+    {
+      "metadata": {
+        "templateId": "maintenance-standard-v1",
+        "name": "Standard Maintenance Job Sheet",
+        "description": "Generic maintenance work order template for field engineers",
+        "category": "maintenance",
+        "tags": ["maintenance", "repair", "field-service"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Standard Maintenance Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true },
+          { "field": "customerName", "label": "Customer Name", "type": "string", "required": false },
+          { "field": "workDescription", "label": "Work Description", "type": "string", "required": false },
+          { "field": "partsUsed", "label": "Parts Used", "type": "list", "required": false },
+          { "field": "timeOnSite", "label": "Time on Site", "type": "string", "required": false }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Job reference is required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Asset ID is required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Date must be present", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "engineerSignOff", "description": "Engineer must sign off", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["maintenance", "job"],
+        "requiredTokensAny": ["repair", "service", "work order", "field service"],
+        "formCodeRegex": "^MAINT-\\d+$",
+        "optionalTokens": ["customer", "engineer", "parts", "time"]
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          { "name": "header", "x": 0.0, "y": 0.0, "w": 1.0, "h": 0.12 },
+          { "name": "jobReference", "x": 0.05, "y": 0.12, "w": 0.4, "h": 0.05 },
+          { "name": "assetId", "x": 0.5, "y": 0.12, "w": 0.45, "h": 0.05 },
+          { "name": "date", "x": 0.7, "y": 0.0, "w": 0.25, "h": 0.05 },
+          { "name": "signatureBlock", "x": 0.0, "y": 0.85, "w": 1.0, "h": 0.15 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "PASS-001",
+          "description": "Complete maintenance job sheet",
+          "inputText": "MAINTENANCE JOB SHEET\n\nForm: MAINT-12345\n\nJob Reference: JOB-M-001\nAsset ID: PUMP-ASSET-001\nDate: 15/01/2024\n\nWork Description: Repair pump seal and check motor bearings\nParts Used: Seal kit, O-rings, Grease\nTime on Site: 3.5 hours\n\nCustomer: Test Manufacturing Ltd\n\nEngineer Sign Off: J. Smith\nSignature: [Signed]",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "PASS-002",
+          "description": "Minimal valid maintenance sheet",
+          "inputText": "Maintenance Work Order\n\nJob Reference: JOB-M-002\nAsset ID: MOTOR-002\nDate: 16-01-2024\nService completed\nEngineer Sign Off: Completed",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "FAIL-001",
+          "description": "Non-maintenance document",
+          "inputText": "Invoice\nInvoice Number: INV-12345\nDate: 2024-01-15\nAmount Due: £1,500.00\nPayment Terms: 30 days",
+          "expectedOutcome": "fail",
+          "required": true
+        },
+        {
+          "caseId": "REVIEW-001",
+          "description": "Maintenance sheet missing signature",
+          "inputText": "Maintenance Job Sheet\n\nJob Reference: JOB-M-003\nAsset ID: VALVE-003\nDate: 17/01/2024\nRepair work completed\n\nEngineer Sign Off: [Not signed]",
+          "expectedOutcome": "review_queue",
+          "required": true
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "templateId": "safety-inspection-v1",
+        "name": "Safety Inspection Report",
+        "description": "Annual safety inspection checklist with compliance tickboxes",
+        "category": "inspection",
+        "tags": ["safety", "inspection", "compliance", "checklist"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Safety Inspection Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Inspection Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Equipment ID", "type": "string", "required": true },
+          { "field": "date", "label": "Inspection Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Inspector Sign Off", "type": "boolean", "required": true },
+          { "field": "expiryDate", "label": "Next Inspection Due", "type": "date", "required": true },
+          { "field": "complianceTickboxes", "label": "Compliance Checks", "type": "boolean", "required": true },
+          { "field": "safetyRating", "label": "Safety Rating", "type": "string", "required": false },
+          { "field": "defectsFound", "label": "Defects Found", "type": "list", "required": false }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Inspection reference required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Equipment ID required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "expiryDate", "description": "Next inspection date required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "complianceTickboxes", "description": "All compliance checks must be completed", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R005", "field": "engineerSignOff", "description": "Inspector must sign off", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["safety", "inspection"],
+        "requiredTokensAny": ["compliance", "checklist", "certificate", "annual"],
+        "formCodeRegex": "^(SAFE|INSP)-\\d+$",
+        "optionalTokens": ["defects", "rating", "equipment", "next due"]
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          { "name": "header", "x": 0.0, "y": 0.0, "w": 1.0, "h": 0.1 },
+          { "name": "jobReference", "x": 0.05, "y": 0.1, "w": 0.4, "h": 0.05 },
+          { "name": "assetId", "x": 0.5, "y": 0.1, "w": 0.45, "h": 0.05 },
+          { "name": "tickboxBlock", "x": 0.05, "y": 0.25, "w": 0.9, "h": 0.4 },
+          { "name": "expiryDate", "x": 0.6, "y": 0.7, "w": 0.35, "h": 0.05 },
+          { "name": "signatureBlock", "x": 0.0, "y": 0.8, "w": 1.0, "h": 0.2 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "PASS-001",
+          "description": "Complete safety inspection with all checks passed",
+          "inputText": "SAFETY INSPECTION REPORT\n\nForm: SAFE-2024-001\n\nInspection Reference: INS-SAFE-001\nEquipment ID: CRANE-001\nInspection Date: 10/01/2024\nNext Inspection Due: 10/01/2025\n\nCOMPLIANCE CHECKLIST:\n[X] Structural integrity check\n[X] Electrical safety test\n[X] Load capacity verification\n[X] Emergency stop function\n[X] Warning labels present\n\nSafety Rating: A (Excellent)\nDefects Found: None\n\nInspector Sign Off: Certified\nInspector: M. Jones\nCertificate No: CERT-12345",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "PASS-002",
+          "description": "Annual inspection with minor defects noted",
+          "inputText": "Annual Safety Inspection Certificate\n\nInspection Reference: INS-SAFE-002\nEquipment ID: LIFT-002\nInspection Date: 2024-01-12\nNext Inspection Due: 2025-01-12\n\nCompliance Checklist Complete\nAll safety checks passed\n\nInspector Sign Off: Approved",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "FAIL-001",
+          "description": "Non-inspection document (invoice)",
+          "inputText": "Purchase Order\nPO Number: PO-12345\nVendor: Safety Supplies Ltd\nItems: Hard hats, Safety goggles\nTotal: £450.00",
+          "expectedOutcome": "fail",
+          "required": true
+        },
+        {
+          "caseId": "REVIEW-001",
+          "description": "Inspection with incomplete checklist",
+          "inputText": "Safety Inspection Report\n\nInspection Reference: INS-SAFE-003\nEquipment ID: HOIST-003\nInspection Date: 15/01/2024\n\nCompliance Checks:\n[X] Structural check\n[ ] Electrical test - INCOMPLETE\n[X] Load test\n\nNext Inspection Due: Not specified\n\nInspector Sign Off: Pending",
+          "expectedOutcome": "review_queue",
+          "required": true
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "templateId": "installation-cert-v1",
+        "name": "Installation Certificate",
+        "description": "New equipment installation completion certificate",
+        "category": "installation",
+        "tags": ["installation", "certificate", "commissioning", "new equipment"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Installation Certificate Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Installation Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "New Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Installation Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true },
+          { "field": "customerSignature", "label": "Customer Signature", "type": "boolean", "required": true },
+          { "field": "serialNumber", "label": "Serial Number", "type": "string", "required": false },
+          { "field": "warrantyStart", "label": "Warranty Start Date", "type": "date", "required": false },
+          { "field": "commissioningNotes", "label": "Commissioning Notes", "type": "string", "required": false }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Installation reference required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "New asset ID required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "customerSignature", "description": "Customer must sign acceptance", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "engineerSignOff", "description": "Engineer must confirm installation", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["installation"],
+        "requiredTokensAny": ["certificate", "commissioning", "new equipment", "handover"],
+        "formCodeRegex": "^INST-\\d+$",
+        "optionalTokens": ["serial", "warranty", "customer acceptance", "handover"]
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          { "name": "header", "x": 0.0, "y": 0.0, "w": 1.0, "h": 0.12 },
+          { "name": "jobReference", "x": 0.05, "y": 0.12, "w": 0.4, "h": 0.05 },
+          { "name": "assetId", "x": 0.5, "y": 0.12, "w": 0.45, "h": 0.05 },
+          { "name": "serialNumber", "x": 0.05, "y": 0.2, "w": 0.4, "h": 0.05 },
+          { "name": "engineerSignature", "x": 0.0, "y": 0.75, "w": 0.5, "h": 0.12 },
+          { "name": "customerSignature", "x": 0.5, "y": 0.75, "w": 0.5, "h": 0.12 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "PASS-001",
+          "description": "Complete installation certificate with both signatures",
+          "inputText": "INSTALLATION CERTIFICATE\n\nForm: INST-2024-001\n\nInstallation Reference: INST-001\nNew Asset ID: PUMP-NEW-001\nSerial Number: SN-12345-ABC\nInstallation Date: 20/01/2024\nWarranty Start Date: 20/01/2024\n\nCommissioning Notes: Unit tested at full load, all parameters within spec.\n\nEngineer Sign Off: Installation Complete\nEngineer: D. Brown\n\nCustomer Acceptance:\nI confirm the equipment has been installed and tested satisfactorily.\nCustomer Signature: [Signed]\nCustomer Name: Test Customer Ltd\nDate: 20/01/2024",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "PASS-002",
+          "description": "Minimal valid installation cert",
+          "inputText": "New Equipment Installation Certificate\n\nInstallation Reference: INST-002\nNew Asset ID: MOTOR-NEW-002\nInstallation Date: 21-01-2024\n\nInstallation completed and tested.\n\nEngineer Sign Off: Confirmed\nCustomer Signature: Accepted",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "FAIL-001",
+          "description": "Maintenance document (not installation)",
+          "inputText": "Maintenance Report\n\nEquipment serviced: Pump-001\nService Date: 2024-01-15\nWork done: Oil change and filter replacement\nEngineer: J. Smith",
+          "expectedOutcome": "fail",
+          "required": true
+        },
+        {
+          "caseId": "REVIEW-001",
+          "description": "Installation missing customer signature",
+          "inputText": "Installation Certificate\n\nInstallation Reference: INST-003\nNew Asset ID: VALVE-NEW-003\nInstallation Date: 22/01/2024\n\nEquipment installed and commissioned.\n\nEngineer Sign Off: Complete\n\nCustomer Signature: [AWAITING SIGNATURE]",
+          "expectedOutcome": "review_queue",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

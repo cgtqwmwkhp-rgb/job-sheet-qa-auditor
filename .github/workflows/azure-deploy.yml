@@ -1,6 +1,4 @@
-# =============================================================================
 # AZURE CONTAINER APPS DEPLOYMENT WORKFLOW
-# =============================================================================
 # Builds, pushes to ACR, and deploys to Azure Container Apps.
 #
 # Flow:
@@ -30,7 +28,6 @@
 # Optional Secrets:
 #   MISTRAL_API_KEY                - For OCR functionality
 #   GEMINI_API_KEY                 - For AI insights
-# =============================================================================
 
 name: Azure Deploy
 
@@ -56,6 +53,14 @@ on:
           - staging
           - production
         default: staging
+      staging_url_override:
+        description: 'Staging URL override (leave empty to auto-detect)'
+        required: false
+        type: string
+      production_url_override:
+        description: 'Production URL override (leave empty to auto-detect)'
+        required: false
+        type: string
       skip_verification:
         description: 'Skip release verification (NOT recommended)'
         required: false
@@ -67,9 +72,7 @@ env:
   IMAGE_NAME: job-sheet-qa-auditor
 
 jobs:
-  # ===========================================================================
   # Build and Push to ACR
-  # ===========================================================================
   build-and-push:
     name: Build & Push to ACR
     runs-on: ubuntu-latest
@@ -81,12 +84,10 @@ jobs:
     steps:
       - name: Log context
         run: |
-          echo "=================================================="
           echo "  Azure Container Apps Deployment"
           echo "  SHA:    ${{ github.sha }}"
           echo "  REF:    ${{ github.ref }}"
           echo "  EVENT:  ${{ github.event_name }}"
-          echo "=================================================="
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -146,9 +147,7 @@ jobs:
             PLATFORM_VERSION=${{ github.ref_name }}
             BUILD_TIME=${{ github.event.head_commit.timestamp }}
 
-  # ===========================================================================
   # Deploy to Staging
-  # ===========================================================================
   deploy-staging:
     name: Deploy to Staging
     needs: build-and-push
@@ -192,6 +191,7 @@ jobs:
             --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
             --set-env-vars \
               NODE_ENV=production \
+              APP_ENV=staging \
               GIT_SHA="${{ github.sha }}" \
               PLATFORM_VERSION="${{ github.ref_name }}" \
               BUILD_TIME="${{ github.event.head_commit.timestamp }}" \
@@ -284,9 +284,7 @@ jobs:
             exit 1
           fi
 
-  # ===========================================================================
   # Verify Staging (Full Release Verification)
-  # ===========================================================================
   verify-staging:
     name: Verify Staging
     needs: [build-and-push, deploy-staging]
@@ -319,9 +317,7 @@ jobs:
           path: logs/release/
           retention-days: 30
 
-  # ===========================================================================
   # Deploy to Production (Manual Trigger Only)
-  # ===========================================================================
   deploy-production:
     name: Deploy to Production
     needs: [build-and-push, verify-staging]
@@ -365,6 +361,7 @@ jobs:
             --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
             --set-env-vars \
               NODE_ENV=production \
+              APP_ENV=production \
               GIT_SHA="${{ github.sha }}" \
               PLATFORM_VERSION="${{ github.ref_name }}" \
               BUILD_TIME="${{ github.event.head_commit.timestamp }}" \
@@ -441,9 +438,7 @@ jobs:
           fi
           echo "✅ /metrics is valid Prometheus format"
 
-  # ===========================================================================
   # Verify Production (Strict Mode)
-  # ===========================================================================
   verify-production:
     name: Verify Production
     needs: [build-and-push, deploy-production]

@@ -1,0 +1,218 @@
+{
+  "packVersion": "1.0.0",
+  "exportedAt": "2024-01-25T10:00:00.000Z",
+  "sourceSystem": "batch-3-onboarding",
+  "templates": [
+    {
+      "metadata": {
+        "templateId": "lift-inspection-v1",
+        "name": "Lift/Elevator Inspection Report",
+        "description": "Periodic lift safety inspection and certification",
+        "category": "lift",
+        "tags": ["lift", "elevator", "inspection", "safety"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Lift Inspection Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "expiryDate", "label": "Expiry Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "expiryDate", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R005", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["lift", "inspection"],
+        "requiredTokensAny": ["elevator", "safety", "certificate"],
+        "optionalTokens": ["annual", "periodic"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.25, "width": 0.9, "height": 0.4 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "templateId": "legionella-test-v1",
+        "name": "Legionella Water Testing Report",
+        "description": "Water quality testing for legionella bacteria compliance",
+        "category": "water-quality",
+        "tags": ["legionella", "water", "testing", "compliance"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Legionella Test Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "expiryDate", "label": "Expiry Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "expiryDate", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R005", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["legionella", "water"],
+        "requiredTokensAny": ["testing", "quality", "compliance"],
+        "optionalTokens": ["bacteria", "sample"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.25, "width": 0.9, "height": 0.35 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "templateId": "ppm-schedule-v1",
+        "name": "Planned Preventive Maintenance Schedule",
+        "description": "Scheduled preventive maintenance work order",
+        "category": "ppm",
+        "tags": ["ppm", "preventive", "maintenance", "schedule"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "PPM Schedule Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["ppm", "preventive"],
+        "requiredTokensAny": ["maintenance", "schedule", "planned"],
+        "optionalTokens": ["quarterly", "monthly", "annual"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.25, "width": 0.9, "height": 0.4 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "templateId": "asbestos-survey-v1",
+        "name": "Asbestos Survey Report",
+        "description": "Asbestos presence survey and management plan",
+        "category": "asbestos",
+        "tags": ["asbestos", "survey", "safety", "hazmat"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Asbestos Survey Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "expiryDate", "label": "Expiry Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "expiryDate", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R005", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["asbestos", "survey"],
+        "requiredTokensAny": ["report", "management", "assessment"],
+        "optionalTokens": ["hazmat", "acm", "removal"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.25, "width": 0.9, "height": 0.35 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "templateId": "roof-inspection-v1",
+        "name": "Roof Inspection Report",
+        "description": "Structural roof condition survey and maintenance report",
+        "category": "building",
+        "tags": ["roof", "inspection", "building", "structural"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Roof Inspection Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["roof", "inspection"],
+        "requiredTokensAny": ["survey", "condition", "report"],
+        "optionalTokens": ["structural", "leak", "membrane"]
+      },
+      "roiJson": {
+        "regions": [
+          { "name": "jobReference", "page": 1, "bounds": { "x": 0.05, "y": 0.1, "width": 0.4, "height": 0.05 } },
+          { "name": "assetId", "page": 1, "bounds": { "x": 0.5, "y": 0.1, "width": 0.45, "height": 0.05 } },
+          { "name": "date", "page": 1, "bounds": { "x": 0.7, "y": 0.02, "width": 0.25, "height": 0.04 } },
+          { "name": "expiryDate", "page": 1, "bounds": { "x": 0.7, "y": 0.08, "width": 0.25, "height": 0.04 } },
+          { "name": "tickboxBlock", "page": 1, "bounds": { "x": 0.05, "y": 0.25, "width": 0.9, "height": 0.4 } },
+          { "name": "signatureBlock", "page": 1, "bounds": { "x": 0, "y": 0.85, "width": 1, "height": 0.15 } }
+        ]
+      }
+    }
+  ]
+}
