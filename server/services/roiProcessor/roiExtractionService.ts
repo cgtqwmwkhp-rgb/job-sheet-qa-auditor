@@ -277,40 +277,61 @@ export function processWithRoi(
 }
 
 /**
+ * Canonical reason codes (from parity/runner/types.ts)
+ * 
+ * Mapping:
+ * - MISSING_CRITICAL_ROI → MISSING_FIELD (critical ROI absence = missing required field data)
+ * - IMAGE_QA_FAILED → LOW_CONFIDENCE (image QA failure = cannot confidently verify)
+ * - LOW_CONFIDENCE → LOW_CONFIDENCE (already canonical)
+ */
+export const CANONICAL_REASON_CODE_MAP = {
+  MISSING_CRITICAL_ROI: 'MISSING_FIELD',
+  IMAGE_QA_FAILED: 'LOW_CONFIDENCE',
+  LOW_CONFIDENCE: 'LOW_CONFIDENCE',
+} as const;
+
+/**
  * Check if processing result requires review queue
+ * 
+ * Returns only canonical reason codes:
+ * - MISSING_FIELD: Critical ROI is missing (cannot extract required field)
+ * - LOW_CONFIDENCE: Extraction confidence too low OR image QA failed
  */
 export function requiresReviewQueue(trace: RoiProcessingTrace): {
   required: boolean;
   reasonCodes: string[];
 } {
-  const reasonCodes: string[] = [];
+  const reasonCodes: Set<string> = new Set();
 
-  // Check for missing critical ROIs
+  // Check for missing critical ROIs → MISSING_FIELD (canonical)
   const missingCritical = getMissingCriticalRois(trace.roiConfig);
   if (missingCritical.length > 0) {
-    reasonCodes.push('MISSING_CRITICAL_ROI');
+    reasonCodes.add('MISSING_FIELD');
   }
 
-  // Check for low confidence critical fields
+  // Check for low confidence critical fields → LOW_CONFIDENCE (canonical)
   for (const result of trace.results) {
     if (isCriticalRoiField(result.fieldId)) {
       if (!result.extracted || result.confidence < DEFAULT_PERFORMANCE_CAPS.minConfidenceThreshold) {
-        reasonCodes.push('LOW_CONFIDENCE');
+        reasonCodes.add('LOW_CONFIDENCE');
         break;
       }
     }
   }
 
-  // Check for failed image QA
+  // Check for failed image QA → LOW_CONFIDENCE (canonical)
   for (const result of trace.results) {
     if (result.imageQaResult && !result.imageQaResult.passed) {
-      reasonCodes.push('IMAGE_QA_FAILED');
+      reasonCodes.add('LOW_CONFIDENCE');
       break;
     }
   }
 
+  // Return sorted array for deterministic output
+  const sortedCodes = Array.from(reasonCodes).sort();
+
   return {
-    required: reasonCodes.length > 0,
-    reasonCodes,
+    required: sortedCodes.length > 0,
+    reasonCodes: sortedCodes,
   };
 }

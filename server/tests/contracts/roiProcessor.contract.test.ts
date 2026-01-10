@@ -309,7 +309,7 @@ describe('ROI Processor - PR-J Contract Tests', () => {
       expect(review.reasonCodes).toEqual([]);
     });
 
-    it('should require review when critical ROIs missing', () => {
+    it('should require review when critical ROIs missing (canonical: MISSING_FIELD)', () => {
       const trace = processWithRoi(
         1,
         'test document',
@@ -321,10 +321,11 @@ describe('ROI Processor - PR-J Contract Tests', () => {
       const review = requiresReviewQueue(trace);
       
       expect(review.required).toBe(true);
-      expect(review.reasonCodes).toContain('MISSING_CRITICAL_ROI');
+      // Canonical mapping: MISSING_CRITICAL_ROI → MISSING_FIELD
+      expect(review.reasonCodes).toContain('MISSING_FIELD');
     });
 
-    it('should require review when ROI config is null', () => {
+    it('should require review when ROI config is null (canonical: MISSING_FIELD)', () => {
       const trace = processWithRoi(
         1,
         'test document',
@@ -336,7 +337,8 @@ describe('ROI Processor - PR-J Contract Tests', () => {
       const review = requiresReviewQueue(trace);
       
       expect(review.required).toBe(true);
-      expect(review.reasonCodes).toContain('MISSING_CRITICAL_ROI');
+      // Canonical mapping: MISSING_CRITICAL_ROI → MISSING_FIELD
+      expect(review.reasonCodes).toContain('MISSING_FIELD');
     });
   });
 
@@ -354,6 +356,64 @@ describe('ROI Processor - PR-J Contract Tests', () => {
       const trace = processWithRoi(1, 'test', 100, fullRoiConfig, fields);
       
       expect(trace.results.map(r => r.fieldId)).toEqual(fields);
+    });
+
+    it('should return sorted reason codes for deterministic output', () => {
+      const trace = processWithRoi(1, 'test', 100, null, ['jobReference']);
+      const review = requiresReviewQueue(trace);
+      
+      // Verify codes are sorted alphabetically
+      const sorted = [...review.reasonCodes].sort();
+      expect(review.reasonCodes).toEqual(sorted);
+    });
+  });
+
+  describe('Canonical Reason Code Guard', () => {
+    // Canonical reason codes from parity/runner/types.ts
+    const CANONICAL_REASON_CODES = [
+      'VALID',
+      'MISSING_FIELD',
+      'INVALID_FORMAT',
+      'OUT_OF_POLICY',
+      'LOW_CONFIDENCE',
+      'CONFLICT',
+    ];
+
+    it('should only return canonical reason codes (missing ROI case)', () => {
+      const trace = processWithRoi(1, 'test', 100, null, ['jobReference']);
+      const review = requiresReviewQueue(trace);
+      
+      for (const code of review.reasonCodes) {
+        expect(CANONICAL_REASON_CODES).toContain(code);
+      }
+    });
+
+    it('should only return canonical reason codes (partial ROI case)', () => {
+      const trace = processWithRoi(1, 'test', 100, partialRoiConfig, ['signatureBlock']);
+      const review = requiresReviewQueue(trace);
+      
+      for (const code of review.reasonCodes) {
+        expect(CANONICAL_REASON_CODES).toContain(code);
+      }
+    });
+
+    it('should never return non-canonical codes like MISSING_CRITICAL_ROI', () => {
+      const trace = processWithRoi(1, 'test', 100, null, ['jobReference']);
+      const review = requiresReviewQueue(trace);
+      
+      expect(review.reasonCodes).not.toContain('MISSING_CRITICAL_ROI');
+      expect(review.reasonCodes).not.toContain('IMAGE_QA_FAILED');
+    });
+
+    it('should never return non-canonical codes like IMAGE_QA_FAILED', () => {
+      const trace = processWithRoi(1, 'test', 100, fullRoiConfig, ['tickboxBlock', 'signatureBlock']);
+      const review = requiresReviewQueue(trace);
+      
+      // Even if image QA is processed, codes should be canonical
+      for (const code of review.reasonCodes) {
+        expect(CANONICAL_REASON_CODES).toContain(code);
+      }
+      expect(review.reasonCodes).not.toContain('IMAGE_QA_FAILED');
     });
   });
 });
