@@ -309,7 +309,7 @@ describe('ROI Processor - PR-J Contract Tests', () => {
       expect(review.reasonCodes).toEqual([]);
     });
 
-    it('should require review when critical ROIs missing (canonical: MISSING_FIELD)', () => {
+    it('should require review when critical ROIs missing (canonical: SPEC_GAP)', () => {
       const trace = processWithRoi(
         1,
         'test document',
@@ -321,11 +321,11 @@ describe('ROI Processor - PR-J Contract Tests', () => {
       const review = requiresReviewQueue(trace);
       
       expect(review.required).toBe(true);
-      // Canonical mapping: MISSING_CRITICAL_ROI → MISSING_FIELD
-      expect(review.reasonCodes).toContain('MISSING_FIELD');
+      // Semantic mapping: MISSING_CRITICAL_ROI → SPEC_GAP (config issue, not document fault)
+      expect(review.reasonCodes).toContain('SPEC_GAP');
     });
 
-    it('should require review when ROI config is null (canonical: MISSING_FIELD)', () => {
+    it('should require review when ROI config is null (canonical: SPEC_GAP)', () => {
       const trace = processWithRoi(
         1,
         'test document',
@@ -337,8 +337,8 @@ describe('ROI Processor - PR-J Contract Tests', () => {
       const review = requiresReviewQueue(trace);
       
       expect(review.required).toBe(true);
-      // Canonical mapping: MISSING_CRITICAL_ROI → MISSING_FIELD
-      expect(review.reasonCodes).toContain('MISSING_FIELD');
+      // Semantic mapping: MISSING_CRITICAL_ROI → SPEC_GAP (config issue, not document fault)
+      expect(review.reasonCodes).toContain('SPEC_GAP');
     });
   });
 
@@ -369,14 +369,19 @@ describe('ROI Processor - PR-J Contract Tests', () => {
   });
 
   describe('Canonical Reason Code Guard', () => {
-    // Canonical reason codes from parity/runner/types.ts
+    // Canonical reason codes from parity/runner/types.ts (PR-P: includes semantic codes)
     const CANONICAL_REASON_CODES = [
+      // Document-level codes
       'VALID',
       'MISSING_FIELD',
       'INVALID_FORMAT',
       'OUT_OF_POLICY',
       'LOW_CONFIDENCE',
       'CONFLICT',
+      // System/Config-level codes (PR-P semantic correction)
+      'SPEC_GAP',
+      'OCR_FAILURE',
+      'PIPELINE_ERROR',
     ];
 
     it('should only return canonical reason codes (missing ROI case)', () => {
@@ -386,6 +391,8 @@ describe('ROI Processor - PR-J Contract Tests', () => {
       for (const code of review.reasonCodes) {
         expect(CANONICAL_REASON_CODES).toContain(code);
       }
+      // Missing ROI should use SPEC_GAP (config issue)
+      expect(review.reasonCodes).toContain('SPEC_GAP');
     });
 
     it('should only return canonical reason codes (partial ROI case)', () => {
@@ -414,6 +421,15 @@ describe('ROI Processor - PR-J Contract Tests', () => {
         expect(CANONICAL_REASON_CODES).toContain(code);
       }
       expect(review.reasonCodes).not.toContain('IMAGE_QA_FAILED');
+    });
+
+    it('should use SPEC_GAP for config issues (not MISSING_FIELD)', () => {
+      const trace = processWithRoi(1, 'test', 100, null, ['jobReference']);
+      const review = requiresReviewQueue(trace);
+      
+      // SPEC_GAP = config issue, MISSING_FIELD = document issue
+      expect(review.reasonCodes).toContain('SPEC_GAP');
+      expect(review.reasonCodes).not.toContain('MISSING_FIELD');
     });
   });
 });

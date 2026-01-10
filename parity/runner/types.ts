@@ -6,14 +6,32 @@
 
 /**
  * Canonical reason codes - the only valid codes in the system
+ * 
+ * Document-level codes (attributed to document/engineer):
+ * - VALID: Field/document passed validation
+ * - MISSING_FIELD: Required field not present in document
+ * - INVALID_FORMAT: Field format is incorrect
+ * - OUT_OF_POLICY: Value outside acceptable policy range
+ * - LOW_CONFIDENCE: Extraction confidence below threshold
+ * - CONFLICT: Conflicting information detected
+ * 
+ * System/Config-level codes (attributed to system, not document):
+ * - SPEC_GAP: Template spec or ROI configuration incomplete
+ * - OCR_FAILURE: OCR or image QA processing failed
+ * - PIPELINE_ERROR: System/infrastructure processing error
  */
 export const CANONICAL_REASON_CODES = [
+  // Document-level (attributed to document/engineer)
   'VALID',
   'MISSING_FIELD',
   'INVALID_FORMAT',
   'OUT_OF_POLICY',
   'LOW_CONFIDENCE',
   'CONFLICT',
+  // System/Config-level (attributed to system, not document)
+  'SPEC_GAP',
+  'OCR_FAILURE',
+  'PIPELINE_ERROR',
 ] as const;
 
 export type CanonicalReasonCode = typeof CANONICAL_REASON_CODES[number];

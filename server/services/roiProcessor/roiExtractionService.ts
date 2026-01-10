@@ -279,23 +279,26 @@ export function processWithRoi(
 /**
  * Canonical reason codes (from parity/runner/types.ts)
  * 
- * Mapping:
- * - MISSING_CRITICAL_ROI → MISSING_FIELD (critical ROI absence = missing required field data)
- * - IMAGE_QA_FAILED → LOW_CONFIDENCE (image QA failure = cannot confidently verify)
- * - LOW_CONFIDENCE → LOW_CONFIDENCE (already canonical)
+ * PR-P Semantic Correction for Analytics:
+ * - MISSING_CRITICAL_ROI → SPEC_GAP (config issue, not document fault)
+ * - IMAGE_QA_FAILED → OCR_FAILURE (processing failure, not document fault)
+ * - LOW_CONFIDENCE → LOW_CONFIDENCE (document extraction issue)
+ * 
+ * This ensures analytics won't misattribute system/config faults to documents/engineers.
  */
 export const CANONICAL_REASON_CODE_MAP = {
-  MISSING_CRITICAL_ROI: 'MISSING_FIELD',
-  IMAGE_QA_FAILED: 'LOW_CONFIDENCE',
-  LOW_CONFIDENCE: 'LOW_CONFIDENCE',
+  MISSING_CRITICAL_ROI: 'SPEC_GAP',    // Config issue - ROI not defined
+  IMAGE_QA_FAILED: 'OCR_FAILURE',       // Processing failure - image QA failed
+  LOW_CONFIDENCE: 'LOW_CONFIDENCE',     // Document issue - extraction uncertain
 } as const;
 
 /**
  * Check if processing result requires review queue
  * 
- * Returns only canonical reason codes:
- * - MISSING_FIELD: Critical ROI is missing (cannot extract required field)
- * - LOW_CONFIDENCE: Extraction confidence too low OR image QA failed
+ * Returns semantically correct canonical reason codes:
+ * - SPEC_GAP: Template ROI configuration incomplete (system issue)
+ * - OCR_FAILURE: Image QA processing failed (system issue)
+ * - LOW_CONFIDENCE: Extraction confidence too low (document issue)
  */
 export function requiresReviewQueue(trace: RoiProcessingTrace): {
   required: boolean;
@@ -303,13 +306,13 @@ export function requiresReviewQueue(trace: RoiProcessingTrace): {
 } {
   const reasonCodes: Set<string> = new Set();
 
-  // Check for missing critical ROIs → MISSING_FIELD (canonical)
+  // Check for missing critical ROIs → SPEC_GAP (config/system issue)
   const missingCritical = getMissingCriticalRois(trace.roiConfig);
   if (missingCritical.length > 0) {
-    reasonCodes.add('MISSING_FIELD');
+    reasonCodes.add('SPEC_GAP');
   }
 
-  // Check for low confidence critical fields → LOW_CONFIDENCE (canonical)
+  // Check for low confidence critical fields → LOW_CONFIDENCE (document issue)
   for (const result of trace.results) {
     if (isCriticalRoiField(result.fieldId)) {
       if (!result.extracted || result.confidence < DEFAULT_PERFORMANCE_CAPS.minConfidenceThreshold) {
@@ -319,10 +322,10 @@ export function requiresReviewQueue(trace: RoiProcessingTrace): {
     }
   }
 
-  // Check for failed image QA → LOW_CONFIDENCE (canonical)
+  // Check for failed image QA → OCR_FAILURE (processing issue)
   for (const result of trace.results) {
     if (result.imageQaResult && !result.imageQaResult.passed) {
-      reasonCodes.add('LOW_CONFIDENCE');
+      reasonCodes.add('OCR_FAILURE');
       break;
     }
   }

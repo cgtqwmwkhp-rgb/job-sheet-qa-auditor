@@ -60,6 +60,9 @@
     "INVALID_FORMAT",
     "OUT_OF_POLICY",
     "LOW_CONFIDENCE",
-    "CONFLICT"
+    "CONFLICT",
+    "SPEC_GAP",
+    "OCR_FAILURE",
+    "PIPELINE_ERROR"
   ]
 }
