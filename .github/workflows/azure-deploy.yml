@@ -56,6 +56,14 @@ on:
           - staging
           - production
         default: staging
+      staging_url_override:
+        description: 'Staging URL override (leave empty to auto-detect)'
+        required: false
+        type: string
+      production_url_override:
+        description: 'Production URL override (leave empty to auto-detect)'
+        required: false
+        type: string
       skip_verification:
         description: 'Skip release verification (NOT recommended)'
         required: false
