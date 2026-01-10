@@ -51,6 +51,17 @@ export interface ExtractionCandidate {
 }
 
 /**
+ * Extraction status - PASS means successful extraction, no reason code needed
+ */
+export type ExtractionStatus = 'PASS' | 'FAIL' | 'REVIEW_QUEUE';
+
+/**
+ * Failure reason codes - only present when status is not PASS
+ * Note: VALID is NOT a reason code. Use status=PASS instead.
+ */
+export type FailureReasonCode = 'MISSING_FIELD' | 'LOW_CONFIDENCE' | 'CONFLICT';
+
+/**
  * Field extraction result
  */
 export interface FieldExtractionResult {
@@ -60,7 +71,8 @@ export interface FieldExtractionResult {
   confidence: number;
   candidates: ExtractionCandidate[];
   selectedCandidate: number; // Index of selected candidate, -1 if none
-  reasonCode: 'VALID' | 'MISSING_FIELD' | 'LOW_CONFIDENCE' | 'CONFLICT';
+  status: ExtractionStatus;
+  reasonCode: FailureReasonCode | null; // null when status is PASS
   validationNotes: string[];
 }
 
@@ -325,18 +337,31 @@ function extractCandidates(
 }
 
 /**
- * Select best candidate and determine reason code
+ * Selection result with status and optional reason code
+ */
+interface SelectionResult {
+  selectedIndex: number;
+  status: ExtractionStatus;
+  reasonCode: FailureReasonCode | null; // null when status is PASS
+  notes: string[];
+}
+
+/**
+ * Select best candidate and determine status/reason code
+ * 
+ * IMPORTANT: When status is PASS, reasonCode MUST be null.
+ * reasonCode is only set when status is FAIL or REVIEW_QUEUE.
  */
 function selectCandidate(
   fieldId: CriticalFieldType,
   candidates: ExtractionCandidate[]
-): { selectedIndex: number; reasonCode: FieldExtractionResult['reasonCode']; notes: string[] } {
+): SelectionResult {
   const strategy = EXTRACTION_STRATEGIES[fieldId];
   const notes: string[] = [];
   
   if (candidates.length === 0) {
     notes.push('No candidates found');
-    return { selectedIndex: -1, reasonCode: 'MISSING_FIELD', notes };
+    return { selectedIndex: -1, status: 'FAIL', reasonCode: 'MISSING_FIELD', notes };
   }
   
   const topCandidate = candidates[0];
@@ -344,7 +369,7 @@ function selectCandidate(
   // Check confidence threshold first
   if (topCandidate.confidence < strategy.minConfidence) {
     notes.push(`Confidence ${topCandidate.confidence.toFixed(2)} below threshold ${strategy.minConfidence}`);
-    return { selectedIndex: 0, reasonCode: 'LOW_CONFIDENCE', notes };
+    return { selectedIndex: 0, status: 'REVIEW_QUEUE', reasonCode: 'LOW_CONFIDENCE', notes };
   }
   
   // Check for conflicts: only consider it a conflict if there are multiple high-confidence
@@ -359,14 +384,15 @@ function selectCandidate(
     
     if (confidenceGap < 0.1) {
       notes.push(`Conflict: ${uniqueValues.size} different values with similar confidence (gap: ${confidenceGap.toFixed(2)})`);
-      return { selectedIndex: 0, reasonCode: 'CONFLICT', notes };
+      return { selectedIndex: 0, status: 'REVIEW_QUEUE', reasonCode: 'CONFLICT', notes };
     } else {
       notes.push(`Resolved conflict: top candidate has ${confidenceGap.toFixed(2)} confidence advantage`);
     }
   }
   
   notes.push(`Selected with confidence ${topCandidate.confidence.toFixed(2)}`);
-  return { selectedIndex: 0, reasonCode: 'VALID', notes };
+  // PASS status - reasonCode must be null
+  return { selectedIndex: 0, status: 'PASS', reasonCode: null, notes };
 }
 
 /**
@@ -378,16 +404,17 @@ export function extractField(
   roiText?: string
 ): FieldExtractionResult {
   const candidates = extractCandidates(fieldId, text, roiText);
-  const { selectedIndex, reasonCode, notes } = selectCandidate(fieldId, candidates);
+  const { selectedIndex, status, reasonCode, notes } = selectCandidate(fieldId, candidates);
   
   return {
     fieldId,
-    extracted: selectedIndex >= 0 && reasonCode === 'VALID',
+    extracted: status === 'PASS',
     value: selectedIndex >= 0 ? candidates[selectedIndex].value : null,
     confidence: selectedIndex >= 0 ? candidates[selectedIndex].confidence : 0,
     candidates,
     selectedCandidate: selectedIndex,
-    reasonCode,
+    status,
+    reasonCode, // null when status is PASS
     validationNotes: notes,
   };
 }

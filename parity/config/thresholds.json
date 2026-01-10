@@ -55,7 +55,6 @@
     "changeLogRequired": true
   },
   "canonicalReasonCodes": [
-    "VALID",
     "MISSING_FIELD",
     "INVALID_FORMAT",
     "OUT_OF_POLICY",
@@ -64,5 +63,14 @@
     "SPEC_GAP",
     "OCR_FAILURE",
     "PIPELINE_ERROR"
-  ]
+  ],
+  "canonicalStatuses": [
+    "PASS",
+    "FAIL",
+    "REVIEW_QUEUE"
+  ],
+  "semanticRules": {
+    "PASS_REQUIRES_NULL_REASON_CODE": true,
+    "description": "When status is PASS, reasonCode must be null/absent. VALID is NOT a reason code."
+  }
 }

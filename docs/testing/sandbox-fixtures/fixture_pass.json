@@ -10,9 +10,12 @@
     "serviceDate": "2026-01-15",
     "technicianId": "TECH-SANDBOX-01",
     "workDescription": "Sandbox test maintenance inspection",
-    "partsUsed": ["PART-TEST-A", "PART-TEST-B"],
-    "laborHours": 2.0,
-    "totalCost": 400.00,
+    "partsUsed": [
+      "PART-TEST-A",
+      "PART-TEST-B"
+    ],
+    "laborHours": 2,
+    "totalCost": 400,
     "customerSignature": true,
     "technicianSignature": true
   },
@@ -25,7 +28,7 @@
       "confidence": 0.98,
       "pageNumber": 1,
       "severity": "S0",
-      "reasonCode": "VALID"
+      "reasonCode": null
     },
     {
       "ruleId": "R002",
@@ -35,7 +38,7 @@
       "confidence": 0.95,
       "pageNumber": 1,
       "severity": "S0",
-      "reasonCode": "VALID"
+      "reasonCode": null
     },
     {
       "ruleId": "R003",
@@ -45,7 +48,7 @@
       "confidence": 0.99,
       "pageNumber": 1,
       "severity": "S1",
-      "reasonCode": "VALID"
+      "reasonCode": null
     },
     {
       "ruleId": "R004",
@@ -55,7 +58,7 @@
       "confidence": 0.97,
       "pageNumber": 1,
       "severity": "S1",
-      "reasonCode": "VALID"
+      "reasonCode": null
     },
     {
       "ruleId": "R005",
@@ -65,7 +68,7 @@
       "confidence": 0.92,
       "pageNumber": 1,
       "severity": "S0",
-      "reasonCode": "VALID"
+      "reasonCode": null
     },
     {
       "ruleId": "R006",
@@ -75,17 +78,17 @@
       "confidence": 0.94,
       "pageNumber": 1,
       "severity": "S0",
-      "reasonCode": "VALID"
+      "reasonCode": null
     },
     {
       "ruleId": "R007",
       "field": "totalCost",
       "status": "passed",
-      "value": 400.00,
+      "value": 400,
       "confidence": 0.96,
       "pageNumber": 1,
       "severity": "S1",
-      "reasonCode": "VALID"
+      "reasonCode": null
     }
   ],
   "findings": []

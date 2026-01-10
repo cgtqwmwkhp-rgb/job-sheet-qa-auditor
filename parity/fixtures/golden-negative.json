@@ -32,7 +32,6 @@
           "confidence": 0.98,
           "pageNumber": 1,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Job Number: JS-2026-002",
             "boundingBox": null
@@ -46,7 +45,6 @@
           "confidence": 0.96,
           "pageNumber": 1,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Customer: CUSTOMER_B",
             "boundingBox": null
@@ -60,7 +58,6 @@
           "confidence": 0.99,
           "pageNumber": 1,
           "severity": "S1",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Date: 2026-01-16",
             "boundingBox": null
@@ -74,7 +71,6 @@
           "confidence": 0.97,
           "pageNumber": 1,
           "severity": "S1",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Technician: TECH-015",
             "boundingBox": null
@@ -88,7 +84,6 @@
           "confidence": 0.94,
           "pageNumber": 1,
           "severity": "S2",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Work: Emergency repair",
             "boundingBox": null
@@ -117,7 +112,6 @@
           "confidence": 0.99,
           "pageNumber": 2,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "",
             "boundingBox": null
@@ -193,7 +187,6 @@
           "confidence": 0.95,
           "pageNumber": 1,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Customer: CUSTOMER_D",
             "boundingBox": null
@@ -207,7 +200,6 @@
           "confidence": 0.99,
           "pageNumber": 1,
           "severity": "S1",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Date: 2026-01-18",
             "boundingBox": null
@@ -221,7 +213,6 @@
           "confidence": 0.97,
           "pageNumber": 1,
           "severity": "S1",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Technician: TECH-022",
             "boundingBox": null
@@ -235,7 +226,6 @@
           "confidence": 0.92,
           "pageNumber": 1,
           "severity": "S2",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Work: Preventive maintenance",
             "boundingBox": null
@@ -249,7 +239,6 @@
           "confidence": 0.99,
           "pageNumber": 2,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "",
             "boundingBox": null
@@ -263,7 +252,6 @@
           "confidence": 0.99,
           "pageNumber": 2,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "",
             "boundingBox": null
@@ -326,7 +314,6 @@
           "confidence": 0.98,
           "pageNumber": 1,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Job Number: JS-2026-005",
             "boundingBox": null
@@ -340,7 +327,6 @@
           "confidence": 0.95,
           "pageNumber": 1,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Customer: CUSTOMER_E",
             "boundingBox": null
@@ -354,7 +340,6 @@
           "confidence": 0.99,
           "pageNumber": 1,
           "severity": "S1",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Date: 2026-01-19",
             "boundingBox": null
@@ -368,7 +353,6 @@
           "confidence": 0.97,
           "pageNumber": 1,
           "severity": "S1",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Technician: TECH-033",
             "boundingBox": null
@@ -382,7 +366,6 @@
           "confidence": 0.92,
           "pageNumber": 1,
           "severity": "S2",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Work: Major overhaul",
             "boundingBox": null
@@ -396,7 +379,6 @@
           "confidence": 0.99,
           "pageNumber": 2,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "",
             "boundingBox": null
@@ -410,7 +392,6 @@
           "confidence": 0.99,
           "pageNumber": 2,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "",
             "boundingBox": null
@@ -484,7 +465,6 @@
           "confidence": 0.98,
           "pageNumber": 1,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Job Number: JS-2026-006",
             "boundingBox": null
@@ -498,7 +478,6 @@
           "confidence": 0.95,
           "pageNumber": 1,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Customer: CUSTOMER_F",
             "boundingBox": null
@@ -527,7 +506,6 @@
           "confidence": 0.97,
           "pageNumber": 1,
           "severity": "S1",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Technician: TECH-044",
             "boundingBox": null
@@ -541,7 +519,6 @@
           "confidence": 0.92,
           "pageNumber": 1,
           "severity": "S2",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Work: Scheduled inspection",
             "boundingBox": null
@@ -555,7 +532,6 @@
           "confidence": 0.99,
           "pageNumber": 2,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "",
             "boundingBox": null
@@ -569,7 +545,6 @@
           "confidence": 0.99,
           "pageNumber": 2,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "",
             "boundingBox": null
@@ -630,7 +605,6 @@
           "confidence": 0.98,
           "pageNumber": 1,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Job Number: JS-2026-007",
             "boundingBox": null
@@ -644,7 +618,6 @@
           "confidence": 0.95,
           "pageNumber": 1,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Customer: CUSTOMER_G",
             "boundingBox": null
@@ -658,7 +631,6 @@
           "confidence": 0.99,
           "pageNumber": 1,
           "severity": "S1",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Date: 2026-01-20",
             "boundingBox": null
@@ -687,7 +659,6 @@
           "confidence": 0.92,
           "pageNumber": 1,
           "severity": "S2",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Work: Repair and calibration",
             "boundingBox": null
@@ -701,7 +672,6 @@
           "confidence": 0.99,
           "pageNumber": 2,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "",
             "boundingBox": null
@@ -715,7 +685,6 @@
           "confidence": 0.99,
           "pageNumber": 2,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "",
             "boundingBox": null
@@ -806,7 +775,6 @@
           "confidence": 0.99,
           "pageNumber": 1,
           "severity": "S1",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Date: 2026-01-21",
             "boundingBox": null
@@ -820,7 +788,6 @@
           "confidence": 0.97,
           "pageNumber": 1,
           "severity": "S1",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Technician: TECH-077",
             "boundingBox": null
@@ -834,7 +801,6 @@
           "confidence": 0.92,
           "pageNumber": 1,
           "severity": "S2",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "Work: Complex repair",
             "boundingBox": null
@@ -863,7 +829,6 @@
           "confidence": 0.99,
           "pageNumber": 2,
           "severity": "S0",
-          "reasonCode": "VALID",
           "evidence": {
             "snippet": "",
             "boundingBox": null

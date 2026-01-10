@@ -10,9 +10,11 @@
     "serviceDate": "2026-01-16",
     "technicianId": "TECH-SANDBOX-02",
     "workDescription": "Sandbox test repair work",
-    "partsUsed": ["PART-TEST-C"],
+    "partsUsed": [
+      "PART-TEST-C"
+    ],
     "laborHours": 1.5,
-    "totalCost": 275.00,
+    "totalCost": 275,
     "customerSignature": false,
     "technicianSignature": true
   },
@@ -25,7 +27,7 @@
       "confidence": 0.98,
       "pageNumber": 1,
       "severity": "S0",
-      "reasonCode": "VALID"
+      "reasonCode": null
     },
     {
       "ruleId": "R002",
@@ -35,7 +37,7 @@
       "confidence": 0.95,
       "pageNumber": 1,
       "severity": "S0",
-      "reasonCode": "VALID"
+      "reasonCode": null
     },
     {
       "ruleId": "R003",
@@ -45,7 +47,7 @@
       "confidence": 0.99,
       "pageNumber": 1,
       "severity": "S1",
-      "reasonCode": "VALID"
+      "reasonCode": null
     },
     {
       "ruleId": "R004",
@@ -55,7 +57,7 @@
       "confidence": 0.97,
       "pageNumber": 1,
       "severity": "S1",
-      "reasonCode": "VALID"
+      "reasonCode": null
     },
     {
       "ruleId": "R005",
@@ -76,17 +78,17 @@
       "confidence": 0.94,
       "pageNumber": 1,
       "severity": "S0",
-      "reasonCode": "VALID"
+      "reasonCode": null
     },
     {
       "ruleId": "R007",
       "field": "totalCost",
       "status": "passed",
-      "value": 275.00,
+      "value": 275,
       "confidence": 0.96,
       "pageNumber": 1,
       "severity": "S1",
-      "reasonCode": "VALID"
+      "reasonCode": null
     }
   ],
   "findings": [

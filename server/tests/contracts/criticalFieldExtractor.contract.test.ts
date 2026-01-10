@@ -28,7 +28,8 @@ describe('Critical Field Extraction Engine', () => {
         expect(result.fieldId).toBe('jobReference');
         expect(result.extracted).toBe(true);
         expect(result.value).toBe('JOB-12345');
-        expect(result.reasonCode).toBe('VALID');
+        expect(result.status).toBe('PASS');
+        expect(result.reasonCode).toBeNull(); // No reason code when PASS
         expect(result.candidates.length).toBeGreaterThan(0);
       });
 
@@ -46,6 +47,7 @@ describe('Critical Field Extraction Engine', () => {
         
         expect(result.extracted).toBe(false);
         expect(result.value).toBeNull();
+        expect(result.status).toBe('FAIL');
         expect(result.reasonCode).toBe('MISSING_FIELD');
         expect(result.candidates).toHaveLength(0);
       });
@@ -58,7 +60,8 @@ describe('Critical Field Extraction Engine', () => {
         
         expect(result.extracted).toBe(true);
         expect(result.value).toBe('ASSET-001');
-        expect(result.reasonCode).toBe('VALID');
+        expect(result.status).toBe('PASS');
+        expect(result.reasonCode).toBeNull();
       });
 
       it('should extract equipment ID format', () => {
@@ -77,7 +80,8 @@ describe('Critical Field Extraction Engine', () => {
         
         expect(result.extracted).toBe(true);
         expect(result.value).toBe('2024-03-15');
-        expect(result.reasonCode).toBe('VALID');
+        expect(result.status).toBe('PASS');
+        expect(result.reasonCode).toBeNull();
       });
 
       it('should extract date in DD-MM-YYYY format', () => {
@@ -262,19 +266,33 @@ describe('Critical Field Extraction Engine', () => {
         expect(field.confidence).toBeDefined();
         expect(field.candidates).toBeDefined();
         expect(field.selectedCandidate).toBeDefined();
-        expect(field.reasonCode).toBeDefined();
+        expect(field.status).toBeDefined();
+        // reasonCode can be null (when status is PASS)
+        expect('reasonCode' in field).toBe(true);
         expect(field.validationNotes).toBeDefined();
       }
     });
 
-    it('should only use canonical reason codes', () => {
+    it('should only use canonical failure reason codes (VALID is NOT a reason code)', () => {
       const text = 'No useful content';
       const trace = extractAllCriticalFields('doc-codes', text);
       
-      const validCodes = ['VALID', 'MISSING_FIELD', 'LOW_CONFIDENCE', 'CONFLICT'];
+      // VALID is NOT a reason code - it's a status (PASS)
+      // reasonCode should be null when status is PASS
+      const validFailureReasonCodes = ['MISSING_FIELD', 'LOW_CONFIDENCE', 'CONFLICT'];
       
       for (const field of trace.fields) {
-        expect(validCodes).toContain(field.reasonCode);
+        if (field.status === 'PASS') {
+          // When PASS, reasonCode must be null
+          expect(field.reasonCode).toBeNull();
+        } else {
+          // When not PASS, reasonCode must be a valid failure code
+          expect(field.reasonCode).not.toBeNull();
+          expect(validFailureReasonCodes).toContain(field.reasonCode);
+        }
+        
+        // DRIFT GUARD: Ensure VALID is never used as a reasonCode
+        expect(field.reasonCode).not.toBe('VALID');
       }
     });
   });

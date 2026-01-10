@@ -113,17 +113,23 @@ describe('Stage 10: Reporting UX Contract Tests', () => {
 
     it('should calculate reason code distribution', () => {
       const byReasonCode: Record<string, number> = {};
+      let passedCount = 0;
       
       goldenDataset.documents.forEach(doc => {
         doc.validatedFields.forEach(f => {
-          byReasonCode[f.reasonCode] = (byReasonCode[f.reasonCode] || 0) + 1;
+          if (f.reasonCode) {
+            byReasonCode[f.reasonCode] = (byReasonCode[f.reasonCode] || 0) + 1;
+          } else if (f.status === 'passed') {
+            // Passed fields have no reason code (VALID is a status, not a reason code)
+            passedCount++;
+          }
         });
       });
       
-      // Should have VALID reason code
-      expect(byReasonCode['VALID']).toBeGreaterThan(0);
+      // PR-5: Should have passed fields (no reason code when passed)
+      expect(passedCount).toBeGreaterThan(0);
       
-      // All reason codes should be documented
+      // All reason codes should be documented (only check defined codes)
       Object.keys(byReasonCode).forEach(code => {
         expect(goldenDataset.reasonCodes[code]).toBeDefined();
       });
@@ -224,13 +230,15 @@ describe('Stage 10: Reporting UX Contract Tests', () => {
         expectedResult: doc.expectedResult,
         passed: doc.validatedFields.filter(f => f.status === 'passed').length,
         failed: doc.validatedFields.filter(f => f.status === 'failed').length,
+        needsReview: doc.validatedFields.filter(f => f.status === 'needs_review').length,
         total: doc.validatedFields.length,
         findings: doc.findings.length,
       }));
       
       expect(docResults.length).toBe(goldenDataset.documents.length);
       docResults.forEach(doc => {
-        expect(doc.passed + doc.failed).toBe(doc.total);
+        // Total should equal passed + failed + needs_review
+        expect(doc.passed + doc.failed + doc.needsReview).toBe(doc.total);
       });
     });
   });

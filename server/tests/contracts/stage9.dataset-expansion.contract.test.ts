@@ -90,11 +90,20 @@ describe('Stage 9: Dataset Expansion Contract Tests', () => {
   });
 
   describe('Reason Code Coverage', () => {
-    it('should cover VALID reason code', () => {
+    it('passed fields should have no reason code (VALID is a status, not a reason code)', () => {
+      // PR-5: VALID is a STATUS (PASS), not a reason code
+      // When a field passes, reasonCode should be absent/undefined
+      const passedFieldsWithReasonCode = goldenDataset.documents.flatMap(d =>
+        d.validatedFields.filter(f => f.status === 'passed' && f.reasonCode !== undefined)
+      );
+      expect(passedFieldsWithReasonCode).toHaveLength(0);
+    });
+
+    it('DRIFT GUARD: no field should have reasonCode="VALID"', () => {
       const hasValid = goldenDataset.documents.some(d =>
         d.validatedFields.some(f => f.reasonCode === 'VALID')
       );
-      expect(hasValid).toBe(true);
+      expect(hasValid).toBe(false);
     });
 
     it('should cover MISSING_FIELD reason code', () => {
@@ -142,7 +151,10 @@ describe('Stage 9: Dataset Expansion Contract Tests', () => {
     it('should have all reason codes documented', () => {
       const allReasonCodes = new Set<string>();
       goldenDataset.documents.forEach(d => {
-        d.validatedFields.forEach(f => allReasonCodes.add(f.reasonCode));
+        d.validatedFields.forEach(f => {
+          // Only add defined reason codes (passed fields have no reasonCode)
+          if (f.reasonCode) allReasonCodes.add(f.reasonCode);
+        });
       });
       
       for (const code of allReasonCodes) {

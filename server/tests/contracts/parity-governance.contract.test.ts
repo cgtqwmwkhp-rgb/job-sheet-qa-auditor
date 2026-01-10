@@ -76,22 +76,32 @@ describe('Parity Governance v2 Contract Tests', () => {
   });
 
   describe('Canonical Reason Codes', () => {
-    it('only allows canonical reason codes', () => {
-      // PR-P: Added semantic codes for analytics correctness
-      const validCodes = [
-        // Document-level codes
-        'VALID', 'MISSING_FIELD', 'INVALID_FORMAT', 'OUT_OF_POLICY', 'LOW_CONFIDENCE', 'CONFLICT',
+    it('only allows canonical FAILURE reason codes (VALID is NOT a reason code)', () => {
+      // PR-5: VALID is a STATUS (PASS), not a reason code
+      // When status is PASS, reasonCode must be null/absent
+      const validFailureReasonCodes = [
+        // Field-level failure codes
+        'MISSING_FIELD', 'INVALID_FORMAT', 'OUT_OF_POLICY', 'LOW_CONFIDENCE', 'CONFLICT',
         // System/Config-level codes (PR-P)
         'SPEC_GAP', 'OCR_FAILURE', 'PIPELINE_ERROR',
       ];
       
-      expect(CANONICAL_REASON_CODES).toEqual(validCodes);
+      expect(CANONICAL_REASON_CODES).toEqual(validFailureReasonCodes);
     });
 
-    it('isCanonicalReasonCode returns true for valid codes', () => {
-      expect(isCanonicalReasonCode('VALID')).toBe(true);
+    it('DRIFT GUARD: VALID must never appear in canonical reason codes', () => {
+      // This is the critical drift guard - VALID is a STATUS, not a reason code
+      expect(CANONICAL_REASON_CODES).not.toContain('VALID');
+    });
+
+    it('isCanonicalReasonCode returns true for valid failure codes', () => {
       expect(isCanonicalReasonCode('MISSING_FIELD')).toBe(true);
       expect(isCanonicalReasonCode('OUT_OF_POLICY')).toBe(true);
+      expect(isCanonicalReasonCode('LOW_CONFIDENCE')).toBe(true);
+    });
+
+    it('isCanonicalReasonCode returns false for VALID (status, not reason code)', () => {
+      expect(isCanonicalReasonCode('VALID')).toBe(false);
     });
 
     it('isCanonicalReasonCode returns false for invalid codes', () => {

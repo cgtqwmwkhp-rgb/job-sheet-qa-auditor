@@ -5,10 +5,12 @@
  */
 
 /**
- * Canonical reason codes - the only valid codes in the system
+ * Canonical FAILURE reason codes - explains WHY something failed
+ * 
+ * IMPORTANT: VALID is NOT a reason code. It is a STATUS (PASS).
+ * When status is PASS, reasonCode must be null/absent.
  * 
  * Document-level codes (attributed to document/engineer):
- * - VALID: Field/document passed validation
  * - MISSING_FIELD: Required field not present in document
  * - INVALID_FORMAT: Field format is incorrect
  * - OUT_OF_POLICY: Value outside acceptable policy range
@@ -22,7 +24,6 @@
  */
 export const CANONICAL_REASON_CODES = [
   // Document-level (attributed to document/engineer)
-  'VALID',
   'MISSING_FIELD',
   'INVALID_FORMAT',
   'OUT_OF_POLICY',
@@ -33,6 +34,15 @@ export const CANONICAL_REASON_CODES = [
   'OCR_FAILURE',
   'PIPELINE_ERROR',
 ] as const;
+
+/**
+ * Canonical status values
+ * - PASS: Validation succeeded (reasonCode must be null)
+ * - FAIL: Validation failed (reasonCode required)
+ * - REVIEW_QUEUE: Needs manual review (reasonCode required)
+ */
+export const CANONICAL_STATUSES = ['PASS', 'FAIL', 'REVIEW_QUEUE'] as const;
+export type CanonicalStatus = typeof CANONICAL_STATUSES[number];
 
 export type CanonicalReasonCode = typeof CANONICAL_REASON_CODES[number];
 
