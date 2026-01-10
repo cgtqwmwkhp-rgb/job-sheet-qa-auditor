@@ -183,3 +183,80 @@ describe("systemRouter.version", () => {
     ]);
   });
 });
+
+describe("systemRouter.platformConfig", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("should return safety flags", async () => {
+    process.env.ENABLE_PURGE_EXECUTION = "false";
+    process.env.ENABLE_SCHEDULER = "false";
+    process.env.ENABLE_GEMINI_INSIGHTS = "true";
+
+    const { systemRouter } = await import("./systemRouter");
+    // platformConfig requires admin context - mock it
+    const caller = systemRouter.createCaller({ user: { id: 1, role: "admin" } });
+    const result = await caller.platformConfig();
+
+    expect(result.safetyFlags.enablePurgeExecution).toBe(false);
+    expect(result.safetyFlags.enableScheduler).toBe(false);
+    expect(result.safetyFlags.enableGeminiInsights).toBe(true);
+  });
+
+  it("should redact secrets - only show presence", async () => {
+    process.env.MISTRAL_API_KEY = "secret-key-123";
+    process.env.GEMINI_API_KEY = "another-secret";
+    process.env.DATABASE_URL = "mysql://user:password@localhost:3306/db";
+
+    const { systemRouter } = await import("./systemRouter");
+    const caller = systemRouter.createCaller({ user: { id: 1, role: "admin" } });
+    const result = await caller.platformConfig();
+
+    // Should indicate presence but not expose values
+    expect(result.apiKeysConfigured.mistral).toBe(true);
+    expect(result.apiKeysConfigured.gemini).toBe(true);
+    expect(result.databaseConfig.configured).toBe(true);
+
+    // Should not contain actual secrets
+    const responseString = JSON.stringify(result);
+    expect(responseString).not.toContain("secret-key-123");
+    expect(responseString).not.toContain("another-secret");
+    expect(responseString).not.toContain("password");
+  });
+
+  it("should return deterministic config hash", async () => {
+    process.env.ENABLE_PURGE_EXECUTION = "false";
+    process.env.STORAGE_PROVIDER = "azure";
+    process.env.APP_ENV = "staging";
+
+    const { systemRouter } = await import("./systemRouter");
+    const caller = systemRouter.createCaller({ user: { id: 1, role: "admin" } });
+    
+    const result1 = await caller.platformConfig();
+    const result2 = await caller.platformConfig();
+
+    // Hash should be deterministic
+    expect(result1.configHash).toBe(result2.configHash);
+  });
+
+  it("should include version info", async () => {
+    process.env.GIT_SHA = "abc123def";
+    process.env.PLATFORM_VERSION = "main";
+    process.env.APP_ENV = "staging";
+
+    const { systemRouter } = await import("./systemRouter");
+    const caller = systemRouter.createCaller({ user: { id: 1, role: "admin" } });
+    const result = await caller.platformConfig();
+
+    expect(result.versionInfo.gitShaShort).toBe("abc123d");
+    expect(result.versionInfo.environment).toBe("staging");
+  });
+});

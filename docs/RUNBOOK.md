@@ -9,10 +9,99 @@ This runbook provides procedures for common operational tasks and incident respo
 ## Table of Contents
 
 1. [Daily Operations](#daily-operations)
-2. [Incident Response](#incident-response)
-3. [Common Issues & Resolutions](#common-issues--resolutions)
-4. [Maintenance Procedures](#maintenance-procedures)
-5. [Escalation Matrix](#escalation-matrix)
+2. [Config Drift Detection](#config-drift-detection)
+3. [Incident Response](#incident-response)
+4. [Common Issues & Resolutions](#common-issues--resolutions)
+5. [Maintenance Procedures](#maintenance-procedures)
+6. [Escalation Matrix](#escalation-matrix)
+
+---
+
+## Config Drift Detection
+
+### PR-3: Platform Config Endpoint
+
+Use the admin-only `/api/trpc/system.platformConfig` endpoint to detect configuration drift between environments.
+
+#### Quick Check Commands
+
+```bash
+# Staging config check (requires admin auth token)
+curl -sf "https://jobsheet-qa-staging.graywater-15013590.uksouth.azurecontainerapps.io/api/trpc/system.platformConfig" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" | jq .
+
+# Production config check
+curl -sf "https://jobsheet-qa-production.<domain>/api/trpc/system.platformConfig" \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" | jq .
+```
+
+#### Expected Response Structure
+
+```json
+{
+  "result": {
+    "data": {
+      "json": {
+        "timestamp": "2026-01-10T21:00:00.000Z",
+        "safetyFlags": {
+          "enablePurgeExecution": false,
+          "enableScheduler": false,
+          "enableGeminiInsights": true
+        },
+        "storageConfig": {
+          "provider": "azure",
+          "containerName": "jobsheets-staging",
+          "connectionStringConfigured": true
+        },
+        "databaseConfig": {
+          "configured": true,
+          "host": "jobsheet-mysql-0ec48b.mysql.database.azure.com"
+        },
+        "apiKeysConfigured": {
+          "mistral": true,
+          "gemini": true,
+          "oauth": false
+        },
+        "versionInfo": {
+          "gitSha": "abc123...",
+          "gitShaShort": "abc123d",
+          "platformVersion": "main",
+          "buildTime": "2026-01-10T...",
+          "environment": "staging",
+          "nodeEnv": "production"
+        },
+        "configHash": "a1b2c3d4"
+      }
+    }
+  }
+}
+```
+
+#### Critical Safety Checks
+
+| Flag | Expected Value | Action if Different |
+|------|----------------|---------------------|
+| `enablePurgeExecution` | `false` | 🚨 CRITICAL - Disable immediately |
+| `enableScheduler` | `false` (staging) | Verify intentional |
+| `environment` | `staging` or `production` | Check APP_ENV |
+
+#### Drift Detection
+
+Compare `configHash` between staging and production:
+- Same hash = configs aligned
+- Different hash = investigate differences
+
+```bash
+# Compare staging vs production
+STAGING_HASH=$(curl -sf "$STAGING_URL/api/trpc/system.platformConfig" -H "..." | jq -r '.result.data.json.configHash')
+PROD_HASH=$(curl -sf "$PROD_URL/api/trpc/system.platformConfig" -H "..." | jq -r '.result.data.json.configHash')
+
+if [ "$STAGING_HASH" != "$PROD_HASH" ]; then
+  echo "⚠️  Config drift detected!"
+else
+  echo "✅ Configs aligned"
+fi
+```
 
 ---
 
