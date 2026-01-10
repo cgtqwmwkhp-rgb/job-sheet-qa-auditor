@@ -279,6 +279,28 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<User> {
+    // Dev bypass: return mock user for local development when OAuth not configured
+    if (ENV.devBypassAuth) {
+      authLogger.debug("Dev bypass enabled - using mock user");
+      const devUser = await db.getUserByOpenId("dev-user-local");
+      if (devUser) {
+        return devUser;
+      }
+      // Create dev user if doesn't exist
+      await db.upsertUser({
+        openId: "dev-user-local",
+        name: "Local Developer",
+        email: "dev@local.test",
+        loginMethod: "dev-bypass",
+        lastSignedIn: new Date(),
+      });
+      const newDevUser = await db.getUserByOpenId("dev-user-local");
+      if (newDevUser) {
+        return newDevUser;
+      }
+      throw ForbiddenError("Failed to create dev user");
+    }
+
     // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);

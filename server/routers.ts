@@ -8,9 +8,11 @@ import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
 import { processJobSheet } from "./services/documentProcessor";
 import { validateMistralApiKey } from "./services/ocr";
+import { templateRouter } from "./routers/templateRouter";
 
 export const appRouter = router({
   system: systemRouter,
+  templates: templateRouter,
   
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
