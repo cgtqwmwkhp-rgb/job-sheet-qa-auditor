@@ -88,44 +88,65 @@ This document describes how to deploy Job Sheet QA Auditor to Azure Container Ap
 | `OAUTH_SERVER_URL` | OAuth server for authentication |
 | `VITE_OAUTH_PORTAL_URL` | OAuth portal URL |
 
-## GitHub Secrets Required
+## GitHub Configuration
 
-Configure these in your repository's Settings → Secrets → Actions:
+### Repository Secrets
 
-### Azure Authentication
+Configure these in **Settings → Secrets and variables → Actions → Secrets**:
 
-| Secret | Description | How to Get |
-|--------|-------------|------------|
-| `AZURE_CREDENTIALS` | Service Principal JSON | `az ad sp create-for-rbac --sdk-auth` |
+| Secret | Required | Description | Example |
+|--------|----------|-------------|---------|
+| `AZURE_CREDENTIALS` | ✅ | Service Principal JSON | `{"clientId":..., "clientSecret":...}` |
+| `ACR_LOGIN_SERVER` | ✅ | ACR login server | `myregistry.azurecr.io` |
+| `ACR_USERNAME` | ✅ | ACR admin username | `myregistry` |
+| `ACR_PASSWORD` | ✅ | ACR admin password | (from Azure Portal → ACR → Access keys) |
+| `AZURE_RESOURCE_GROUP` | ✅ | Resource group name | `rg-jobsheet-qa` |
+| `STAGING_CONTAINER_APP` | ✅ | Staging app name | `jobsheet-qa-staging` |
+| `PRODUCTION_CONTAINER_APP` | ❌ | Production app name | `jobsheet-qa-prod` |
+| `DATABASE_URL` | ✅ | MySQL connection string | `mysql://user:pass@host:3306/db?ssl=...` |
+| `AZURE_STORAGE_CONNECTION_STRING` | ✅ | Blob storage connection | `DefaultEndpointsProtocol=https;...` |
 
-### Container Registry
+### GitHub Environment Variables
 
-| Secret | Description | How to Get |
-|--------|-------------|------------|
-| `ACR_LOGIN_SERVER` | e.g., `myregistry.azurecr.io` | Azure Portal → ACR → Login server |
-| `ACR_USERNAME` | Admin username | Azure Portal → ACR → Access keys |
-| `ACR_PASSWORD` | Admin password | Azure Portal → ACR → Access keys |
+Configure these in **Settings → Environments → [staging/production] → Environment variables**:
 
-### Container Apps
+| Variable | Staging Value | Production Value | Description |
+|----------|---------------|------------------|-------------|
+| `STORAGE_PROVIDER` | `azure` | `azure` | Storage backend type |
+| `AZURE_STORAGE_CONTAINER_NAME` | `jobsheets-staging` | `jobsheets` | Blob container name |
+| `ENABLE_PURGE_EXECUTION` | `false` | `false` | Disable destructive ops |
+| `ENABLE_SCHEDULER` | `false` | `true` | Background scheduler |
 
-| Secret | Description |
-|--------|-------------|
-| `AZURE_RESOURCE_GROUP` | Resource group name |
-| `STAGING_CONTAINER_APP` | Staging Container App name |
-| `PRODUCTION_CONTAINER_APP` | Production Container App name |
+### Quick Setup Checklist
 
-### Database
+```bash
+# 1. Create Service Principal for GitHub Actions
+az ad sp create-for-rbac \
+  --name "github-actions-jobsheet-qa" \
+  --role Contributor \
+  --scopes /subscriptions/<subscription-id>/resourceGroups/<resource-group> \
+  --sdk-auth
 
-| Secret | Description |
-|--------|-------------|
-| `DATABASE_URL_STAGING` | MySQL connection string for staging |
-| `DATABASE_URL_PRODUCTION` | MySQL connection string for production |
+# 2. Get ACR credentials
+az acr credential show --name <acr-name>
 
-### Storage (Optional)
+# 3. Get Storage connection string
+az storage account show-connection-string --name <storage-account> -o tsv
 
-| Secret | Description |
-|--------|-------------|
-| `AZURE_STORAGE_CONNECTION_STRING` | Blob storage connection string |
+# 4. Get MySQL connection string
+# Format: mysql://username:password@hostname:3306/database?ssl={"rejectUnauthorized":true}
+```
+
+### Secrets Verification Script
+
+Run this to verify all required secrets are available:
+
+```bash
+# In GitHub Actions or locally with gh CLI
+gh secret list --json name | jq -r '.[] | .name' | while read secret; do
+  echo "✅ $secret"
+done
+```
 
 ## Deployment Workflow
 
@@ -201,29 +222,102 @@ After deployment, the workflow automatically runs release verification:
 
 ### Container Won't Start
 
-1. Check logs:
+1. Check system logs for startup errors:
    ```bash
-   az containerapp logs show --name <app> --resource-group <rg>
+   az containerapp logs show --name <app> --resource-group <rg> --type system --tail 50
    ```
 
-2. Verify environment variables:
+2. Check console logs for application errors:
+   ```bash
+   az containerapp logs show --name <app> --resource-group <rg> --type console --tail 50
+   ```
+
+3. Verify environment variables:
    ```bash
    az containerapp show --name <app> --resource-group <rg> --query "properties.template.containers[0].env"
    ```
 
-3. Check `/readyz` endpoint for specific failures
+4. Check `/readyz` endpoint for specific failures
+
+### Image Pull Failed (ImagePullUnauthorized)
+
+This is the most common deployment issue. The Container App cannot pull the image from ACR.
+
+**Solution 1: Configure ACR credentials on Container App**
+```bash
+az containerapp registry set \
+  --name <container-app> \
+  --resource-group <resource-group> \
+  --server <acr>.azurecr.io \
+  --username <acr-username> \
+  --password "<acr-password>"
+```
+
+**Solution 2: Use Managed Identity (Recommended for production)**
+```bash
+# Enable system-assigned identity
+az containerapp identity assign --name <app> --resource-group <rg> --system-assigned
+
+# Get the identity principal ID
+PRINCIPAL_ID=$(az containerapp show --name <app> --resource-group <rg> --query identity.principalId -o tsv)
+
+# Grant AcrPull role
+az role assignment create \
+  --role AcrPull \
+  --assignee-object-id $PRINCIPAL_ID \
+  --assignee-principal-type ServicePrincipal \
+  --scope $(az acr show --name <acr> --query id -o tsv)
+
+# Configure registry to use managed identity
+az containerapp registry set \
+  --name <app> \
+  --resource-group <rg> \
+  --server <acr>.azurecr.io \
+  --identity system
+```
+
+### Image Tag Not Found
+
+The workflow builds images with short SHA tags (7 characters). Ensure you're deploying with the correct tag:
+
+```bash
+# List available tags
+az acr repository show-tags --name <acr> --repository job-sheet-qa-auditor
+
+# Deploy with correct tag
+az containerapp update --name <app> --resource-group <rg> --image <acr>.azurecr.io/job-sheet-qa-auditor:latest
+```
 
 ### Database Connection Failed
 
-1. Verify `DATABASE_URL` is correctly formatted
-2. Check MySQL server firewall allows Container Apps
+1. Verify `DATABASE_URL` is correctly formatted:
+   ```
+   mysql://user:password@host:3306/database?ssl={"rejectUnauthorized":true}
+   ```
+2. Check MySQL server firewall allows Azure services
 3. Verify SSL settings in connection string
 
 ### Storage Health Check Failed
 
 1. Verify `STORAGE_PROVIDER=azure` is set
-2. Check `AZURE_STORAGE_CONNECTION_STRING` is valid
-3. Verify container exists in storage account
+2. Verify `AZURE_STORAGE_CONNECTION_STRING` is set as a secret
+3. Verify `@azure/storage-blob` is in package.json dependencies
+4. Verify container exists in storage account:
+   ```bash
+   az storage container list --connection-string "<connection-string>" --query "[].name"
+   ```
+
+### Startup Probe Failed
+
+The default probe expects the app to respond on port 3000 within 30 seconds.
+
+1. Check if the app is listening on the correct port
+2. Increase startup probe timeout if needed:
+   ```bash
+   az containerapp update --name <app> --resource-group <rg> \
+     --startup-probe-timeout 60 \
+     --startup-probe-initial-delay 10
+   ```
 
 ## Security Considerations
 
