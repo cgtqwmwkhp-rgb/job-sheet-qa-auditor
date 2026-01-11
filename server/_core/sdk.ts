@@ -279,6 +279,38 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<User> {
+    // Azure Easy Auth: Check for Azure AD authentication headers
+    const azureClientPrincipal = req.headers['x-ms-client-principal'] as string | undefined;
+    if (azureClientPrincipal) {
+      try {
+        const decoded = Buffer.from(azureClientPrincipal, 'base64').toString('utf8');
+        const principal = JSON.parse(decoded);
+        const userId = principal.userId || principal.nameIdentifier || principal.userDetails;
+        const email = principal.userDetails || principal.userId;
+        const name = principal.name || principal.userDetails?.split('@')[0] || 'Azure User';
+        
+        authLogger.debug("Azure Easy Auth - user authenticated via Azure AD", { userId, email });
+        
+        // Find or create user from Azure auth
+        let user = await db.getUserByOpenId(`azure-${userId}`);
+        if (!user) {
+          await db.upsertUser({
+            openId: `azure-${userId}`,
+            name: name,
+            email: email,
+            loginMethod: "azure-easy-auth",
+            lastSignedIn: new Date(),
+          });
+          user = await db.getUserByOpenId(`azure-${userId}`);
+        }
+        if (user) {
+          return user;
+        }
+      } catch (e) {
+        authLogger.warn("Failed to parse Azure Easy Auth header", { error: e });
+      }
+    }
+
     // Dev bypass: return mock user for local development when OAuth not configured
     if (ENV.devBypassAuth) {
       authLogger.debug("Dev bypass enabled - using mock user");
