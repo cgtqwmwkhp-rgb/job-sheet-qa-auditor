@@ -113,7 +113,7 @@ function checkDeployJobsHaveEnvironment(filePath: string): ValidationResult[] {
         }
       }
       // Stop if we hit another job definition (2-space indent followed by word-colon)
-      if (i > lineNumber && /^  \w[\w-]*:/.test(line)) {
+      if (i > lineNumber && /^ {2}\w[\w-]*:/.test(line)) {
         break;
       }
     }
