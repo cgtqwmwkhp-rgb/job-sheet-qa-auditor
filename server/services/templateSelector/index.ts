@@ -7,3 +7,4 @@
 
 export * from './selectorService';
 export * from './signalExtractors';
+export * from './selectionFixtures';
