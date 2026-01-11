@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Environment Contract",
+  "description": "Source of truth for GitHub Environment variables required by deployment workflows",
+  "version": "1.0.0",
+  "lastUpdated": "2026-01-11",
+  
+  "environments": {
+    "staging": {
+      "description": "Staging environment for pre-production testing",
+      "githubEnvironment": "staging",
+      "variables": {
+        "AZURE_RESOURCE_GROUP": {
+          "type": "vars",
+          "description": "Azure Resource Group containing the staging Container App",
+          "required": true,
+          "example": "rg-jobsheet-qa"
+        },
+        "CONTAINER_APP_NAME": {
+          "type": "vars",
+          "description": "Name of the staging Azure Container App",
+          "required": true,
+          "example": "ca-job-sheet-qa-auditor-staging"
+        },
+        "STAGING_URL": {
+          "type": "vars",
+          "description": "Public URL of the staging application",
+          "required": true,
+          "pattern": "^https://",
+          "example": "https://ca-job-sheet-qa-auditor-staging.graywater-15013590.uksouth.azurecontainerapps.io"
+        }
+      }
+    },
+    "production": {
+      "description": "Production environment for live workloads",
+      "githubEnvironment": "production",
+      "variables": {
+        "AZURE_RESOURCE_GROUP": {
+          "type": "vars",
+          "description": "Azure Resource Group containing the production Container App",
+          "required": true,
+          "example": "plantex-assist"
+        },
+        "CONTAINER_APP_NAME": {
+          "type": "vars",
+          "description": "Name of the production Azure Container App",
+          "required": true,
+          "example": "plantex-assist"
+        },
+        "PRODUCTION_URL": {
+          "type": "vars",
+          "description": "Public URL of the production application",
+          "required": true,
+          "pattern": "^https://",
+          "example": "https://plantex-assist.graywater-15013590.uksouth.azurecontainerapps.io"
+        }
+      }
+    }
+  },
+  
+  "sharedSecrets": {
+    "description": "Repository-level secrets used by both environments (sensitive credentials)",
+    "secrets": {
+      "AZURE_CREDENTIALS": {
+        "type": "secrets",
+        "description": "Azure Service Principal credentials JSON",
+        "required": true
+      },
+      "ACR_LOGIN_SERVER": {
+        "type": "secrets",
+        "description": "Azure Container Registry server URL",
+        "required": true
+      },
+      "ACR_USERNAME": {
+        "type": "secrets",
+        "description": "Azure Container Registry username",
+        "required": true
+      },
+      "ACR_PASSWORD": {
+        "type": "secrets",
+        "description": "Azure Container Registry password",
+        "required": true
+      },
+      "AZURE_STORAGE_CONNECTION_STRING": {
+        "type": "secrets",
+        "description": "Azure Blob Storage connection string",
+        "required": false
+      },
+      "DATABASE_URL": {
+        "type": "secrets",
+        "description": "Database connection string",
+        "required": false
+      }
+    }
+  },
+  
+  "deprecatedSecrets": {
+    "description": "These secrets should NOT be used - use environment-scoped vars instead",
+    "secrets": [
+      "AZURE_RESOURCE_GROUP",
+      "STAGING_CONTAINER_APP",
+      "PRODUCTION_CONTAINER_APP"
+    ]
+  },
+  
+  "validation": {
+    "rules": [
+      {
+        "id": "no-shared-resource-group",
+        "description": "Workflows must not reference secrets.AZURE_RESOURCE_GROUP",
+        "pattern": "secrets\\.AZURE_RESOURCE_GROUP",
+        "severity": "error"
+      },
+      {
+        "id": "no-shared-container-app",
+        "description": "Workflows must not reference secrets.*_CONTAINER_APP",
+        "pattern": "secrets\\.(STAGING|PRODUCTION)_CONTAINER_APP",
+        "severity": "error"
+      },
+      {
+        "id": "deploy-jobs-require-environment",
+        "description": "Deploy jobs must declare environment: staging or production",
+        "severity": "error"
+      },
+      {
+        "id": "url-must-be-https",
+        "description": "Environment URLs must start with https://",
+        "pattern": "^https://",
+        "severity": "error"
+      }
+    ]
+  }
+}

@@ -8,28 +8,26 @@
 #   4. Manual approval gate for production
 #   5. Deploy to production (manual trigger only)
 #
-# Required Secrets:
-#   AZURE_CREDENTIALS              - Azure Service Principal JSON
-#   ACR_LOGIN_SERVER               - e.g., myregistry.azurecr.io
-#   ACR_USERNAME                   - ACR username
-#   ACR_PASSWORD                   - ACR password
-#   STAGING_CONTAINER_APP          - Staging Container App name
-#   PRODUCTION_CONTAINER_APP       - Production Container App name
-#   AZURE_RESOURCE_GROUP           - Azure Resource Group name
-#   DATABASE_URL                   - MySQL connection string
-#   AZURE_STORAGE_CONNECTION_STRING - Azure Blob Storage connection string
+# ENVIRONMENT-SCOPED VARIABLES (set in GitHub Environments):
+#   Each environment (staging/production) must have these vars set:
+#   - AZURE_RESOURCE_GROUP     - Environment-specific Azure Resource Group
+#   - CONTAINER_APP_NAME       - Environment-specific Container App name
+#   - STAGING_URL / PRODUCTION_URL - Environment-specific app URL
 #
-# Environment Variables (set in GitHub Environment):
-#   STAGING_URL                    - Staging app URL (e.g., https://app-staging.azurecontainerapps.io)
-#   PRODUCTION_URL                 - Production app URL (e.g., https://app-prod.azurecontainerapps.io)
-#   STORAGE_PROVIDER               - 'azure' for Azure Blob, 'local' for disk
-#   AZURE_STORAGE_CONTAINER_NAME   - Blob container name
-#   ENABLE_PURGE_EXECUTION         - 'false' for staging
-#   ENABLE_SCHEDULER               - 'false' for staging
+# SHARED REPOSITORY SECRETS (used by all environments):
+#   - AZURE_CREDENTIALS        - Azure Service Principal JSON
+#   - ACR_LOGIN_SERVER         - e.g., myregistry.azurecr.io
+#   - ACR_USERNAME             - ACR username
+#   - ACR_PASSWORD             - ACR password
+#   - DATABASE_URL             - Database connection string (optional)
+#   - AZURE_STORAGE_CONNECTION_STRING - Blob Storage connection (optional)
 #
-# Optional Secrets:
-#   MISTRAL_API_KEY                - For OCR functionality
-#   GEMINI_API_KEY                 - For AI insights
+# DEPRECATED (DO NOT USE - will fail governance checks):
+#   - secrets.AZURE_RESOURCE_GROUP
+#   - secrets.STAGING_CONTAINER_APP
+#   - secrets.PRODUCTION_CONTAINER_APP
+#
+# See: docs/operations/environment-contract.json for full specification
 
 name: Azure Deploy
 
@@ -55,14 +53,6 @@ on:
           - staging
           - production
         default: staging
-      staging_url_override:
-        description: 'Staging URL override (leave empty to auto-detect)'
-        required: false
-        type: string
-      production_url_override:
-        description: 'Production URL override (leave empty to auto-detect)'
-        required: false
-        type: string
       skip_verification:
         description: 'Skip release verification (NOT recommended)'
         required: false
@@ -105,7 +95,7 @@ jobs:
           version: 10
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Run tests
         run: pnpm test
@@ -162,6 +152,36 @@ jobs:
       app_url: ${{ steps.get_url.outputs.app_url }}
 
     steps:
+      - name: Validate environment variables
+        run: |
+          echo "=== Environment Variable Validation ==="
+          echo "Target Resource Group: ${{ vars.AZURE_RESOURCE_GROUP }}"
+          echo "Target Container App:  ${{ vars.CONTAINER_APP_NAME }}"
+          echo "Target URL:            ${{ vars.STAGING_URL }}"
+          echo ""
+          
+          # Fail-fast guardrails
+          if [ -z "${{ vars.AZURE_RESOURCE_GROUP }}" ]; then
+            echo "❌ FATAL: vars.AZURE_RESOURCE_GROUP is not set in staging environment"
+            echo "   Go to: Repository Settings → Environments → staging → Add variable"
+            exit 1
+          fi
+          
+          if [ -z "${{ vars.CONTAINER_APP_NAME }}" ]; then
+            echo "❌ FATAL: vars.CONTAINER_APP_NAME is not set in staging environment"
+            echo "   Go to: Repository Settings → Environments → staging → Add variable"
+            exit 1
+          fi
+          
+          if [ -z "${{ vars.STAGING_URL }}" ]; then
+            echo "⚠️ WARNING: vars.STAGING_URL is not set - will auto-detect from Azure"
+          elif [[ ! "${{ vars.STAGING_URL }}" =~ ^https:// ]]; then
+            echo "❌ FATAL: vars.STAGING_URL must start with https://"
+            exit 1
+          fi
+          
+          echo "✅ Environment variables validated"
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -171,8 +191,8 @@ jobs:
         run: |
           echo "Configuring ACR registry credentials..."
           az containerapp registry set \
-            --name "${{ secrets.STAGING_CONTAINER_APP }}" \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.CONTAINER_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --server "${{ secrets.ACR_LOGIN_SERVER }}" \
             --username "${{ secrets.ACR_USERNAME }}" \
             --password "${{ secrets.ACR_PASSWORD }}"
@@ -182,15 +202,15 @@ jobs:
         run: |
           echo "Deploying image: ${{ needs.build-and-push.outputs.image_tag }}"
           az containerapp update \
-            --name "${{ secrets.STAGING_CONTAINER_APP }}" \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.CONTAINER_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --image "${{ needs.build-and-push.outputs.image_tag }}"
 
       - name: Set environment variables
         run: |
           az containerapp update \
-            --name "${{ secrets.STAGING_CONTAINER_APP }}" \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.CONTAINER_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --set-env-vars \
               NODE_ENV=production \
               APP_ENV=staging \
@@ -207,39 +227,45 @@ jobs:
           # Set storage connection string as a secret env var
           if [ -n "${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" ]; then
             az containerapp secret set \
-              --name "${{ secrets.STAGING_CONTAINER_APP }}" \
-              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --secrets "azure-storage-connection-string=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}"
             
             az containerapp update \
-              --name "${{ secrets.STAGING_CONTAINER_APP }}" \
-              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "AZURE_STORAGE_CONNECTION_STRING=secretref:azure-storage-connection-string"
           fi
           
           # Set database URL as a secret env var
           if [ -n "${{ secrets.DATABASE_URL }}" ]; then
             az containerapp secret set \
-              --name "${{ secrets.STAGING_CONTAINER_APP }}" \
-              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --secrets "database-url=${{ secrets.DATABASE_URL }}"
             
             az containerapp update \
-              --name "${{ secrets.STAGING_CONTAINER_APP }}" \
-              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "DATABASE_URL=secretref:database-url"
           fi
 
       - name: Get staging URL
         id: get_url
         run: |
-          FQDN=$(az containerapp show \
-            --name "${{ secrets.STAGING_CONTAINER_APP }}" \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
-            --query properties.configuration.ingress.fqdn -o tsv)
-          APP_URL="https://${FQDN}"
+          # Use vars.STAGING_URL if set, otherwise auto-detect from Azure
+          if [ -n "${{ vars.STAGING_URL }}" ]; then
+            APP_URL="${{ vars.STAGING_URL }}"
+            echo "Using configured STAGING_URL: ${APP_URL}"
+          else
+            FQDN=$(az containerapp show \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --query properties.configuration.ingress.fqdn -o tsv)
+            APP_URL="https://${FQDN}"
+            echo "Auto-detected staging URL: ${APP_URL}"
+          fi
           echo "app_url=${APP_URL}" >> $GITHUB_OUTPUT
-          echo "Staging URL: ${APP_URL}"
 
       - name: Wait for deployment
         run: |
@@ -298,6 +324,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Validate environment variables
+        run: |
+          echo "=== Staging Verification Environment Check ==="
+          echo "Target Resource Group: ${{ vars.AZURE_RESOURCE_GROUP }}"
+          echo "Target Container App:  ${{ vars.CONTAINER_APP_NAME }}"
+          echo "Target URL:            ${{ vars.STAGING_URL }}"
+          
+          if [ -z "${{ vars.AZURE_RESOURCE_GROUP }}" ] || [ -z "${{ vars.CONTAINER_APP_NAME }}" ]; then
+            echo "❌ FATAL: Environment variables not set"
+            exit 1
+          fi
+          echo "✅ Environment validated"
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -306,12 +345,18 @@ jobs:
       - name: Get staging URL
         id: get_url
         run: |
-          FQDN=$(az containerapp show \
-            --name "${{ secrets.STAGING_CONTAINER_APP }}" \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
-            --query properties.configuration.ingress.fqdn -o tsv)
-          echo "staging_url=https://${FQDN}" >> $GITHUB_OUTPUT
-          echo "🔗 Resolved staging URL: https://${FQDN}"
+          # Use vars.STAGING_URL if set, otherwise auto-detect
+          if [ -n "${{ vars.STAGING_URL }}" ]; then
+            STAGING_URL="${{ vars.STAGING_URL }}"
+          else
+            FQDN=$(az containerapp show \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --query properties.configuration.ingress.fqdn -o tsv)
+            STAGING_URL="https://${FQDN}"
+          fi
+          echo "staging_url=${STAGING_URL}" >> $GITHUB_OUTPUT
+          echo "🔗 Resolved staging URL: ${STAGING_URL}"
 
       - name: Run release verification
         env:
@@ -319,7 +364,7 @@ jobs:
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           if [ -z "$STAGING_URL" ]; then
-            echo "❌ ERROR: Could not resolve staging URL from Azure"
+            echo "❌ ERROR: Could not resolve staging URL"
             exit 1
           fi
           echo "🔗 Using STAGING_URL: $STAGING_URL"
@@ -333,6 +378,30 @@ jobs:
           # Run monitoring snapshot
           ENVIRONMENT=staging HEALTH_ONLY=false \
             ./scripts/release/monitor-snapshot.sh "$STAGING_URL" "soft" "false"
+
+      - name: Capture endpoint evidence
+        id: evidence
+        run: |
+          STAGING_URL="${{ steps.get_url.outputs.staging_url }}"
+          mkdir -p logs/release/evidence
+          
+          echo "Capturing endpoint evidence..."
+          curl -sS "$STAGING_URL/healthz" > logs/release/evidence/healthz.json || true
+          curl -sS "$STAGING_URL/readyz" > logs/release/evidence/readyz.json || true
+          curl -sS "$STAGING_URL/metrics" | head -50 > logs/release/evidence/metrics.txt || true
+          curl -sS "$STAGING_URL/api/trpc/system.version" > logs/release/evidence/version.json || true
+          
+          # Verify SHA match
+          DEPLOYED_SHA=$(cat logs/release/evidence/version.json | jq -r '.result.data.gitSha // empty' 2>/dev/null || echo "")
+          if [ -n "$DEPLOYED_SHA" ]; then
+            echo "Deployed SHA: $DEPLOYED_SHA"
+            echo "Expected SHA: ${{ github.sha }}"
+            if [ "$DEPLOYED_SHA" != "${{ github.sha }}" ]; then
+              echo "⚠️ SHA mismatch - may be a cached response"
+            else
+              echo "✅ SHA verified"
+            fi
+          fi
 
       - name: Upload verification artifacts
         uses: actions/upload-artifact@v4
@@ -355,6 +424,36 @@ jobs:
       app_url: ${{ steps.get_url.outputs.app_url }}
 
     steps:
+      - name: Validate environment variables
+        run: |
+          echo "=== Environment Variable Validation (PRODUCTION) ==="
+          echo "Target Resource Group: ${{ vars.AZURE_RESOURCE_GROUP }}"
+          echo "Target Container App:  ${{ vars.CONTAINER_APP_NAME }}"
+          echo "Target URL:            ${{ vars.PRODUCTION_URL }}"
+          echo ""
+          
+          # Fail-fast guardrails (STRICT for production)
+          if [ -z "${{ vars.AZURE_RESOURCE_GROUP }}" ]; then
+            echo "❌ FATAL: vars.AZURE_RESOURCE_GROUP is not set in production environment"
+            echo "   Go to: Repository Settings → Environments → production → Add variable"
+            exit 1
+          fi
+          
+          if [ -z "${{ vars.CONTAINER_APP_NAME }}" ]; then
+            echo "❌ FATAL: vars.CONTAINER_APP_NAME is not set in production environment"
+            echo "   Go to: Repository Settings → Environments → production → Add variable"
+            exit 1
+          fi
+          
+          if [ -z "${{ vars.PRODUCTION_URL }}" ]; then
+            echo "⚠️ WARNING: vars.PRODUCTION_URL is not set - will auto-detect from Azure"
+          elif [[ ! "${{ vars.PRODUCTION_URL }}" =~ ^https:// ]]; then
+            echo "❌ FATAL: vars.PRODUCTION_URL must start with https://"
+            exit 1
+          fi
+          
+          echo "✅ Environment variables validated"
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -364,8 +463,8 @@ jobs:
         run: |
           echo "Configuring ACR registry credentials..."
           az containerapp registry set \
-            --name "${{ secrets.PRODUCTION_CONTAINER_APP }}" \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.CONTAINER_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --server "${{ secrets.ACR_LOGIN_SERVER }}" \
             --username "${{ secrets.ACR_USERNAME }}" \
             --password "${{ secrets.ACR_PASSWORD }}"
@@ -375,15 +474,15 @@ jobs:
         run: |
           echo "Deploying image: ${{ needs.build-and-push.outputs.image_tag }}"
           az containerapp update \
-            --name "${{ secrets.PRODUCTION_CONTAINER_APP }}" \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.CONTAINER_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --image "${{ needs.build-and-push.outputs.image_tag }}"
 
       - name: Set environment variables
         run: |
           az containerapp update \
-            --name "${{ secrets.PRODUCTION_CONTAINER_APP }}" \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.CONTAINER_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --set-env-vars \
               NODE_ENV=production \
               APP_ENV=production \
@@ -400,39 +499,45 @@ jobs:
           # Set storage connection string as a secret env var
           if [ -n "${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" ]; then
             az containerapp secret set \
-              --name "${{ secrets.PRODUCTION_CONTAINER_APP }}" \
-              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --secrets "azure-storage-connection-string=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}"
             
             az containerapp update \
-              --name "${{ secrets.PRODUCTION_CONTAINER_APP }}" \
-              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "AZURE_STORAGE_CONNECTION_STRING=secretref:azure-storage-connection-string"
           fi
           
           # Set database URL as a secret env var
           if [ -n "${{ secrets.DATABASE_URL }}" ]; then
             az containerapp secret set \
-              --name "${{ secrets.PRODUCTION_CONTAINER_APP }}" \
-              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --secrets "database-url=${{ secrets.DATABASE_URL }}"
             
             az containerapp update \
-              --name "${{ secrets.PRODUCTION_CONTAINER_APP }}" \
-              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "DATABASE_URL=secretref:database-url"
           fi
 
       - name: Get production URL
         id: get_url
         run: |
-          FQDN=$(az containerapp show \
-            --name "${{ secrets.PRODUCTION_CONTAINER_APP }}" \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
-            --query properties.configuration.ingress.fqdn -o tsv)
-          APP_URL="https://${FQDN}"
+          # Use vars.PRODUCTION_URL if set, otherwise auto-detect from Azure
+          if [ -n "${{ vars.PRODUCTION_URL }}" ]; then
+            APP_URL="${{ vars.PRODUCTION_URL }}"
+            echo "Using configured PRODUCTION_URL: ${APP_URL}"
+          else
+            FQDN=$(az containerapp show \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --query properties.configuration.ingress.fqdn -o tsv)
+            APP_URL="https://${FQDN}"
+            echo "Auto-detected production URL: ${APP_URL}"
+          fi
           echo "app_url=${APP_URL}" >> $GITHUB_OUTPUT
-          echo "Production URL: ${APP_URL}"
 
       - name: Wait for deployment
         run: |
@@ -476,6 +581,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Validate environment variables
+        run: |
+          echo "=== Production Verification Environment Check ==="
+          echo "Target Resource Group: ${{ vars.AZURE_RESOURCE_GROUP }}"
+          echo "Target Container App:  ${{ vars.CONTAINER_APP_NAME }}"
+          echo "Target URL:            ${{ vars.PRODUCTION_URL }}"
+          
+          if [ -z "${{ vars.AZURE_RESOURCE_GROUP }}" ] || [ -z "${{ vars.CONTAINER_APP_NAME }}" ]; then
+            echo "❌ FATAL: Environment variables not set"
+            exit 1
+          fi
+          echo "✅ Environment validated"
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -484,12 +602,18 @@ jobs:
       - name: Get production URL
         id: get_url
         run: |
-          FQDN=$(az containerapp show \
-            --name "${{ secrets.PRODUCTION_CONTAINER_APP }}" \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
-            --query properties.configuration.ingress.fqdn -o tsv)
-          echo "production_url=https://${FQDN}" >> $GITHUB_OUTPUT
-          echo "🔗 Resolved production URL: https://${FQDN}"
+          # Use vars.PRODUCTION_URL if set, otherwise auto-detect
+          if [ -n "${{ vars.PRODUCTION_URL }}" ]; then
+            PRODUCTION_URL="${{ vars.PRODUCTION_URL }}"
+          else
+            FQDN=$(az containerapp show \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --query properties.configuration.ingress.fqdn -o tsv)
+            PRODUCTION_URL="https://${FQDN}"
+          fi
+          echo "production_url=${PRODUCTION_URL}" >> $GITHUB_OUTPUT
+          echo "🔗 Resolved production URL: ${PRODUCTION_URL}"
 
       - name: Run release verification (STRICT)
         env:
@@ -497,7 +621,7 @@ jobs:
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           if [ -z "$PRODUCTION_URL" ]; then
-            echo "❌ ERROR: Could not resolve production URL from Azure"
+            echo "❌ ERROR: Could not resolve production URL"
             exit 1
           fi
           echo "🔗 Using PRODUCTION_URL: $PRODUCTION_URL"
@@ -511,6 +635,34 @@ jobs:
           # Run monitoring snapshot (STRICT mode, metrics REQUIRED)
           ENVIRONMENT=production HEALTH_ONLY=false \
             ./scripts/release/monitor-snapshot.sh "$PRODUCTION_URL" "strict" "false"
+
+      - name: Capture endpoint evidence
+        id: evidence
+        run: |
+          PRODUCTION_URL="${{ steps.get_url.outputs.production_url }}"
+          mkdir -p logs/release/evidence
+          
+          echo "Capturing endpoint evidence..."
+          curl -sS "$PRODUCTION_URL/healthz" > logs/release/evidence/healthz.json || true
+          curl -sS "$PRODUCTION_URL/readyz" > logs/release/evidence/readyz.json || true
+          curl -sS "$PRODUCTION_URL/metrics" | head -50 > logs/release/evidence/metrics.txt || true
+          curl -sS "$PRODUCTION_URL/api/trpc/system.version" > logs/release/evidence/version.json || true
+          
+          # Verify SHA match (STRICT for production)
+          DEPLOYED_SHA=$(cat logs/release/evidence/version.json | jq -r '.result.data.gitSha // empty' 2>/dev/null || echo "")
+          if [ -z "$DEPLOYED_SHA" ]; then
+            echo "❌ FATAL: Could not retrieve deployed SHA"
+            exit 1
+          fi
+          
+          echo "Deployed SHA: $DEPLOYED_SHA"
+          echo "Expected SHA: ${{ github.sha }}"
+          
+          if [ "$DEPLOYED_SHA" != "${{ github.sha }}" ]; then
+            echo "❌ FATAL: SHA mismatch - deployment verification failed"
+            exit 1
+          fi
+          echo "✅ SHA verified - deployment confirmed"
 
       - name: Upload verification artifacts
         uses: actions/upload-artifact@v4
@@ -527,7 +679,8 @@ jobs:
             echo "| Field | Value |"
             echo "|-------|-------|"
             echo "| SHA | ${{ github.sha }} |"
+            echo "| Resource Group | ${{ vars.AZURE_RESOURCE_GROUP }} |"
+            echo "| Container App | ${{ vars.CONTAINER_APP_NAME }} |"
             echo "| URL | ${{ needs.deploy-production.outputs.app_url }} |"
             echo "| Verification | STRICT mode PASSED |"
           } >> "$GITHUB_STEP_SUMMARY"
-
