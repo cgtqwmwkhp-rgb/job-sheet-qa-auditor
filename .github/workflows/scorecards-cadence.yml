@@ -1,0 +1,164 @@
+# FEEDBACK SCORECARDS WORKFLOW
+# Generates scorecards and fix packs on weekly and monthly cadence.
+#
+# Schedules:
+# - Weekly: Sunday at 8:00 AM UTC
+# - Monthly: 1st of month at 8:00 AM UTC
+#
+# Does NOT require secrets for PR CI (uses local mode).
+# Exports are PII-redacted by default.
+
+name: Feedback Scorecards (Cadence)
+
+on:
+  # Weekly schedule
+  schedule:
+    - cron: '0 8 * * 0'  # 8:00 AM UTC on Sundays (weekly)
+    - cron: '0 8 1 * *'  # 8:00 AM UTC on 1st of month (monthly)
+  
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      period:
+        description: 'Report period'
+        required: false
+        type: choice
+        options:
+          - daily
+          - weekly
+          - monthly
+        default: weekly
+      redact_pii:
+        description: 'Redact PII in exports'
+        required: false
+        type: boolean
+        default: true
+      export_format:
+        description: 'Export format'
+        required: false
+        type: choice
+        options:
+          - json
+          - csv
+        default: json
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  generate-scorecards:
+    name: Generate Scorecards & Fix Packs
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Determine period
+        id: period
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PERIOD="${{ github.event.inputs.period }}"
+          elif [ "$(date +%d)" = "01" ]; then
+            # First of month = monthly
+            PERIOD="monthly"
+          else
+            # Sunday = weekly
+            PERIOD="weekly"
+          fi
+          echo "period=$PERIOD" >> $GITHUB_OUTPUT
+          echo "Period: $PERIOD"
+      
+      - name: Generate feedback report
+        run: |
+          PERIOD="${{ steps.period.outputs.period }}"
+          REDACT="${{ github.event.inputs.redact_pii || 'true' }}"
+          FORMAT="${{ github.event.inputs.export_format || 'json' }}"
+          
+          # Run the feedback generator script
+          npx tsx -e "
+            const { generateFeedbackReport, exportFeedbackReport } = require('./server/services/feedback/generator');
+            const fs = require('fs');
+            
+            const report = generateFeedbackReport('${PERIOD}', {
+              redactPii: ${REDACT},
+              includeDetails: true,
+              format: '${FORMAT}',
+              period: '${PERIOD}'
+            });
+            
+            // Save report
+            const outputDir = 'scripts/feedback/reports';
+            fs.mkdirSync(outputDir, { recursive: true });
+            fs.writeFileSync(\`\${outputDir}/feedback-\${report.reportId}.json\`, JSON.stringify(report, null, 2));
+            fs.writeFileSync(\`\${outputDir}/latest.json\`, JSON.stringify(report, null, 2));
+            
+            // Export in requested format
+            const exported = exportFeedbackReport(report, {
+              redactPii: ${REDACT},
+              includeDetails: true,
+              format: '${FORMAT}',
+              period: '${PERIOD}'
+            });
+            fs.writeFileSync(\`\${outputDir}/export.${FORMAT}\`, exported);
+            
+            console.log('Report generated:', report.reportId);
+            console.log('Period:', '${PERIOD}');
+            console.log('Engineers:', report.summary.totalEngineers);
+            console.log('Customers:', report.summary.totalCustomers);
+            console.log('Fix Pack Issues:', report.summary.totalFixPackIssues);
+            console.log('Critical Issues:', report.summary.criticalIssues);
+          "
+      
+      - name: Upload feedback report
+        uses: actions/upload-artifact@v4
+        with:
+          name: feedback-${{ steps.period.outputs.period }}-${{ github.run_id }}
+          path: scripts/feedback/reports/
+          retention-days: 90
+      
+      - name: Summary
+        run: |
+          echo "## Feedback Scorecards Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Period:** ${{ steps.period.outputs.period }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f scripts/feedback/reports/latest.json ]; then
+            echo "### Summary" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            
+            ENGINEERS=$(cat scripts/feedback/reports/latest.json | jq '.summary.totalEngineers')
+            CUSTOMERS=$(cat scripts/feedback/reports/latest.json | jq '.summary.totalCustomers')
+            TEMPLATES=$(cat scripts/feedback/reports/latest.json | jq '.summary.totalTemplates')
+            FIX_ISSUES=$(cat scripts/feedback/reports/latest.json | jq '.summary.totalFixPackIssues')
+            CRITICAL=$(cat scripts/feedback/reports/latest.json | jq '.summary.criticalIssues')
+            
+            echo "| Engineer Scorecards | $ENGINEERS |" >> $GITHUB_STEP_SUMMARY
+            echo "| Customer Scorecards | $CUSTOMERS |" >> $GITHUB_STEP_SUMMARY
+            echo "| Template Scorecards | $TEMPLATES |" >> $GITHUB_STEP_SUMMARY
+            echo "| Fix Pack Issues | $FIX_ISSUES |" >> $GITHUB_STEP_SUMMARY
+            echo "| Critical Issues | $CRITICAL |" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "$CRITICAL" -gt 0 ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ **$CRITICAL critical issues require attention**" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
