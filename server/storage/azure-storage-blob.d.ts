@@ -56,5 +56,27 @@ declare module '@azure/storage-blob' {
   export class StorageSharedKeyCredential {
     constructor(accountName: string, accountKey: string);
   }
+
+  export interface BlobSASSignatureValues {
+    containerName: string;
+    blobName: string;
+    permissions: BlobSASPermissions;
+    startsOn?: Date;
+    expiresOn: Date;
+  }
+
+  export class BlobSASPermissions {
+    static parse(permissions: string): BlobSASPermissions;
+    read: boolean;
+    write: boolean;
+    delete: boolean;
+  }
+
+  export function generateBlobSASQueryParameters(
+    options: BlobSASSignatureValues,
+    credential: StorageSharedKeyCredential
+  ): {
+    toString(): string;
+  };
 }
 
