@@ -2,12 +2,14 @@
  * Template Selector Service
  * 
  * PR-B: Deterministic template selection based on document content.
+ * PR-2: Multi-signal template recognition (tokens + layout + ROI + plausibility)
  * 
  * CRITICAL RULES:
  * - LOW confidence (<50): NO auto-select, REVIEW_QUEUE required
  * - MEDIUM (50-79) with gap <10 from runner-up: NO auto-select, REVIEW_QUEUE required
  * - HIGH (>=80): Auto-processing allowed
  * - Deterministic ordering: score desc, then templateId asc
+ * - NO silent guess on ambiguity (block with explicit reason)
  */
 
 import type {
@@ -15,12 +17,26 @@ import type {
   ConfidenceBand,
   SelectionScore,
   SelectionResult,
+  RoiConfig,
+  SpecJson,
 } from '../templateRegistry/types';
 import {
   getActiveTemplates,
   getActiveVersion,
 } from '../templateRegistry/registryService';
 import { createSelectionTraceInMemory, type SelectionTraceArtifact } from '../templateRegistry/selectionTraceWriter';
+import {
+  extractTokenSignal,
+  extractLayoutSignal,
+  extractRoiSignal,
+  extractPlausibilitySignal,
+  combineSignals,
+  type SignalResult,
+  type MultiSignalResult,
+  type DocumentMetadata,
+  type MultiSignalConfig,
+  DEFAULT_SIGNAL_WEIGHTS,
+} from './signalExtractors';
 
 /**
  * Extended selection result with trace
@@ -28,6 +44,40 @@ import { createSelectionTraceInMemory, type SelectionTraceArtifact } from '../te
 export interface SelectionResultWithTrace extends SelectionResult {
   /** Selection trace artifact (always present) */
   trace: SelectionTraceArtifact;
+}
+
+/**
+ * PR-2: Extended selection score with multi-signal data
+ */
+export interface MultiSignalSelectionScore extends SelectionScore {
+  /** Multi-signal analysis result */
+  multiSignal?: MultiSignalResult;
+}
+
+/**
+ * PR-2: Extended selection result with multi-signal data
+ */
+export interface MultiSignalSelectionResult extends SelectionResult {
+  /** Whether multi-signal mode was used */
+  multiSignalEnabled: boolean;
+  /** Signal breakdown for top candidate */
+  signalBreakdown?: MultiSignalResult;
+  /** Candidates with multi-signal data */
+  multiSignalCandidates?: MultiSignalSelectionScore[];
+}
+
+/**
+ * PR-2: Input for multi-signal selection
+ */
+export interface MultiSignalInput {
+  /** Document text (required) */
+  documentText: string;
+  /** Page texts for ROI analysis */
+  pageTexts?: string[];
+  /** Document metadata for layout analysis */
+  metadata?: DocumentMetadata;
+  /** Custom signal weights */
+  signalWeights?: Partial<MultiSignalConfig>;
 }
 
 /**
@@ -318,4 +368,228 @@ export function selectTemplateWithTrace(
     ...result,
     trace,
   };
+}
+
+// ============================================================================
+// PR-2: MULTI-SIGNAL TEMPLATE RECOGNITION
+// ============================================================================
+
+/**
+ * PR-2: Select template using multi-signal recognition
+ * 
+ * Uses 4 signal types:
+ * 1. Token signals - keyword matching
+ * 2. Layout signals - page count, sections, form type
+ * 3. ROI signals - expected regions present
+ * 4. Plausibility signals - field patterns found
+ * 
+ * @param input - Multi-signal input with document data
+ * @param matchMetadata - Optional client/asset/work type matching
+ * @returns Multi-signal selection result
+ */
+export function selectTemplateMultiSignal(
+  input: MultiSignalInput,
+  matchMetadata?: { client?: string; assetType?: string; workType?: string }
+): MultiSignalSelectionResult {
+  const documentTokens = new Set(tokenizeText(input.documentText));
+  const activeTemplates = getActiveTemplates();
+  const pageTexts = input.pageTexts ?? [input.documentText];
+  
+  // No active templates available
+  if (activeTemplates.length === 0) {
+    return {
+      selected: false,
+      confidenceBand: 'LOW',
+      topScore: 0,
+      runnerUpScore: 0,
+      scoreGap: 0,
+      candidates: [],
+      matchedTokens: [],
+      autoProcessingAllowed: false,
+      blockReason: 'No active templates available',
+      multiSignalEnabled: true,
+    };
+  }
+  
+  // Calculate multi-signal scores for all active templates
+  const candidates: MultiSignalSelectionScore[] = [];
+  
+  for (const template of activeTemplates) {
+    const version = getActiveVersion(template.id);
+    if (!version) continue;
+    
+    const selectionConfig = version.selectionConfigJson as SelectionConfig;
+    const roiConfig = version.roiJson as RoiConfig | null;
+    const specJson = version.specJson as SpecJson;
+    
+    // Extract all signals
+    const signals: SignalResult[] = [];
+    
+    // 1. Token signal
+    const tokenSignal = extractTokenSignal(
+      documentTokens,
+      selectionConfig,
+      selectionConfig.tokenWeights ?? {}
+    );
+    signals.push(tokenSignal);
+    
+    // 2. Layout signal (if metadata provided)
+    if (input.metadata) {
+      const layoutSignal = extractLayoutSignal(input.metadata, {
+        minPages: 1,
+        maxPages: 10, // Default expectations
+        formType: 'printed',
+      });
+      signals.push(layoutSignal);
+    }
+    
+    // 3. ROI signal (if ROI config exists)
+    const roiSignal = extractRoiSignal(
+      input.documentText,
+      pageTexts,
+      roiConfig ?? undefined
+    );
+    signals.push(roiSignal);
+    
+    // 4. Plausibility signal (based on spec fields)
+    const expectedFields = specJson.fields.map(f => ({
+      field: f.field,
+      type: f.type,
+      pattern: specJson.rules.find(r => r.field === f.field)?.pattern,
+    }));
+    const plausibilitySignal = extractPlausibilitySignal(
+      input.documentText,
+      expectedFields
+    );
+    signals.push(plausibilitySignal);
+    
+    // Combine signals
+    const multiSignal = combineSignals(signals, input.signalWeights);
+    
+    // Apply metadata boosting
+    let adjustedScore = multiSignal.combinedScore;
+    if (matchMetadata) {
+      if (matchMetadata.client && template.client === matchMetadata.client) {
+        adjustedScore = Math.min(100, adjustedScore + 10);
+      }
+      if (matchMetadata.assetType && template.assetType === matchMetadata.assetType) {
+        adjustedScore = Math.min(100, adjustedScore + 5);
+      }
+      if (matchMetadata.workType && template.workType === matchMetadata.workType) {
+        adjustedScore = Math.min(100, adjustedScore + 5);
+      }
+    }
+    
+    candidates.push({
+      templateId: template.id,
+      versionId: version.id,
+      templateSlug: template.templateId,
+      score: adjustedScore,
+      matchedTokens: tokenSignal.evidence.matched,
+      missingRequired: tokenSignal.evidence.missing,
+      confidence: multiSignal.confidence,
+      multiSignal,
+    });
+  }
+  
+  // Sort deterministically: score desc, then templateId asc
+  candidates.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.templateSlug.localeCompare(b.templateSlug);
+  });
+  
+  // Get top and runner-up
+  const topCandidate = candidates[0];
+  const runnerUp = candidates[1];
+  
+  const topScore = topCandidate?.score ?? 0;
+  const runnerUpScore = runnerUp?.score ?? 0;
+  const scoreGap = topScore - runnerUpScore;
+  const confidenceBand = getConfidenceBand(topScore);
+  
+  // Determine if auto-processing is allowed (strict rules)
+  let autoProcessingAllowed = false;
+  let blockReason: string | undefined;
+  
+  if (confidenceBand === 'HIGH') {
+    autoProcessingAllowed = true;
+  } else if (confidenceBand === 'MEDIUM') {
+    if (scoreGap >= MEDIUM_CONFIDENCE_MIN_GAP) {
+      autoProcessingAllowed = true;
+    } else {
+      // PR-2: Enhanced ambiguity detection
+      blockReason = buildAmbiguityBlockReason(topCandidate, runnerUp, scoreGap);
+    }
+  } else {
+    // PR-2: Enhanced low confidence detection
+    blockReason = buildLowConfidenceBlockReason(topCandidate);
+  }
+  
+  return {
+    selected: autoProcessingAllowed && topCandidate !== undefined,
+    templateId: topCandidate?.templateId,
+    versionId: topCandidate?.versionId,
+    confidenceBand,
+    topScore,
+    runnerUpScore,
+    scoreGap,
+    candidates: candidates.map(c => ({
+      templateId: c.templateId,
+      versionId: c.versionId,
+      templateSlug: c.templateSlug,
+      score: c.score,
+      matchedTokens: c.matchedTokens,
+      missingRequired: c.missingRequired,
+      confidence: c.confidence,
+    })),
+    matchedTokens: topCandidate?.matchedTokens ?? [],
+    autoProcessingAllowed,
+    blockReason,
+    multiSignalEnabled: true,
+    signalBreakdown: topCandidate?.multiSignal,
+    multiSignalCandidates: candidates,
+  };
+}
+
+/**
+ * Build detailed ambiguity block reason
+ */
+function buildAmbiguityBlockReason(
+  top: MultiSignalSelectionScore | undefined,
+  runnerUp: MultiSignalSelectionScore | undefined,
+  gap: number
+): string {
+  if (!top || !runnerUp) {
+    return `MEDIUM confidence with insufficient candidates`;
+  }
+  
+  const weakSignals = top.multiSignal?.combinedEvidence.weakSignals ?? [];
+  const weakSignalNote = weakSignals.length > 0
+    ? ` Weak signals: ${weakSignals.join(', ')}.`
+    : '';
+  
+  return `AMBIGUITY_BLOCK: Score gap ${gap} < ${MEDIUM_CONFIDENCE_MIN_GAP} between ` +
+         `"${top.templateSlug}" (${top.score}) and "${runnerUp.templateSlug}" (${runnerUp.score}).${weakSignalNote}`;
+}
+
+/**
+ * Build detailed low confidence block reason
+ */
+function buildLowConfidenceBlockReason(
+  top: MultiSignalSelectionScore | undefined
+): string {
+  if (!top) {
+    return `LOW_CONFIDENCE_BLOCK: No candidates scored above threshold`;
+  }
+  
+  const signals = top.multiSignal?.signals ?? [];
+  const lowSignals = signals.filter(s => s.confidence === 'LOW');
+  
+  if (lowSignals.length > 0) {
+    const lowDetails = lowSignals.map(s => `${s.type}:${s.score}`).join(', ');
+    return `LOW_CONFIDENCE_BLOCK: Top candidate "${top.templateSlug}" scored ${top.score}. ` +
+           `Low signals: [${lowDetails}]`;
+  }
+  
+  return `LOW_CONFIDENCE_BLOCK: Top candidate "${top.templateSlug}" scored ${top.score} < 50`;
 }
