@@ -3,29 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, CheckCircle2, Clock, FileText, TrendingUp, Loader2 } from "lucide-react";
 import { SmartTip } from "@/components/SmartTip";
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+// Chart components available when real analytics data is implemented
+// import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AuditTimeline } from "@/components/AuditTimeline";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Static chart data (will be replaced with real data in future)
-const activityData = [
-  { name: "Mon", passed: 145, failed: 12 },
-  { name: "Tue", passed: 132, failed: 8 },
-  { name: "Wed", passed: 156, failed: 15 },
-  { name: "Thu", passed: 165, failed: 10 },
-  { name: "Fri", passed: 148, failed: 14 },
-  { name: "Sat", passed: 85, failed: 4 },
-  { name: "Sun", passed: 65, failed: 2 },
-];
-
-const defectTypes = [
-  { name: "Missing Signature", value: 35, color: "#EF4444" },
-  { name: "Unclear Photo", value: 25, color: "#F97316" },
-  { name: "Missing Serial #", value: 20, color: "#EAB308" },
-  { name: "Incorrect Date", value: 15, color: "#3B82F6" },
-  { name: "Other", value: 5, color: "#64748B" },
-];
+// Chart data will be populated from real analytics
+// Empty arrays show "No data yet" state
 
 export default function Dashboard() {
   // Use real tRPC data
@@ -56,43 +41,31 @@ export default function Dashboard() {
     {
       title: "Total Audits",
       value: statsLoading ? "..." : (statsData?.totalAudits ?? 0).toLocaleString(),
-      change: "+12.5%",
-      trend: "up" as const,
       icon: FileText,
       color: "text-blue-500",
     },
     {
       title: "Pass Rate",
       value: statsLoading ? "..." : `${statsData?.passRate ?? 0}%`,
-      change: "+2.1%",
-      trend: "up" as const,
       icon: CheckCircle2,
       color: "text-brand-lime",
     },
     {
       title: "Hold Queue",
       value: statsLoading ? "..." : (statsData?.reviewQueue ?? 0).toString(),
-      change: "-5",
-      trend: "down" as const,
       icon: Clock,
       color: "text-orange-500",
     },
     {
       title: "Critical Issues",
       value: statsLoading ? "..." : (statsData?.criticalIssues ?? 0).toString(),
-      change: "+2",
-      trend: "up" as const,
       icon: AlertTriangle,
       color: "text-destructive",
     },
   ];
 
-  // Mock recent activity for timeline
-  const recentActivity = [
-    { id: 1, type: "audit" as const, message: "New job sheet uploaded", time: "2 mins ago" },
-    { id: 2, type: "review" as const, message: "Dispute submitted for review", time: "15 mins ago" },
-    { id: 3, type: "system" as const, message: "System health check passed", time: "1 hour ago" },
-  ];
+  // Activity timeline will be populated from real audit log data
+  const recentActivity: { id: number; type: "audit" | "review" | "system"; message: string; time: string }[] = [];
 
   return (
     <DashboardLayout>
@@ -139,13 +112,6 @@ export default function Dashboard() {
                     stat.value
                   )}
                 </div>
-                <p className="text-xs font-medium mt-2 flex items-center gap-1.5">
-                  <span className={`flex items-center px-1.5 py-0.5 rounded ${stat.trend === "up" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                    {stat.trend === "up" ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingUp className="h-3 w-3 mr-1 rotate-180" />}
-                    {stat.change}
-                  </span>
-                  <span className="text-muted-foreground">vs last month</span>
-                </p>
               </CardContent>
             </Card>
           ))}
@@ -162,33 +128,12 @@ export default function Dashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={activityData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                    <XAxis 
-                      dataKey="name" 
-                      stroke="#64748B" 
-                      fontSize={12} 
-                      tickLine={false} 
-                      axisLine={false} 
-                    />
-                    <YAxis 
-                      stroke="#64748B" 
-                      fontSize={12} 
-                      tickLine={false} 
-                      axisLine={false} 
-                      tickFormatter={(value) => `${value}`} 
-                    />
-                    <Tooltip 
-                      cursor={{ fill: 'rgba(0,0,0,0.05)' }}
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                    />
-                    <Legend />
-                    <Bar dataKey="passed" name="Passed" fill="#BEDA41" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="failed" name="Failed" fill="#EF4444" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="h-[300px] flex items-center justify-center">
+                <div className="text-center text-muted-foreground">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No audit activity data yet.</p>
+                  <p className="text-sm">Process job sheets to see activity trends.</p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -202,26 +147,12 @@ export default function Dashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={defectTypes}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {defectTypes.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend layout="vertical" verticalAlign="middle" align="right" />
-                  </PieChart>
-                </ResponsiveContainer>
+              <div className="h-[300px] flex items-center justify-center">
+                <div className="text-center text-muted-foreground">
+                  <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No defect data yet.</p>
+                  <p className="text-sm">Defect breakdown will appear after audits complete.</p>
+                </div>
               </div>
             </CardContent>
           </Card>
