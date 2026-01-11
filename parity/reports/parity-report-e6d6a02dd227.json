@@ -1,0 +1,128 @@
+{
+  "runId": "e6d6a02dd227",
+  "status": "pass",
+  "summary": {
+    "totalDocuments": 3,
+    "same": 3,
+    "improved": 0,
+    "worse": 0,
+    "totalFields": 21,
+    "fieldsSame": 21,
+    "fieldsImproved": 0,
+    "fieldsWorse": 0
+  },
+  "documents": [
+    {
+      "documentId": "doc-001",
+      "documentName": "Standard Job Sheet - Complete",
+      "status": "same",
+      "expectedResult": "pass",
+      "actualResult": "pass",
+      "fieldComparisons": [
+        {
+          "field": "jobNumber",
+          "status": "same"
+        },
+        {
+          "field": "customerName",
+          "status": "same"
+        },
+        {
+          "field": "serviceDate",
+          "status": "same"
+        },
+        {
+          "field": "technicianId",
+          "status": "same"
+        },
+        {
+          "field": "workDescription",
+          "status": "same"
+        },
+        {
+          "field": "customerSignature",
+          "status": "same"
+        },
+        {
+          "field": "technicianSignature",
+          "status": "same"
+        }
+      ]
+    },
+    {
+      "documentId": "doc-002",
+      "documentName": "Job Sheet - Missing Signature",
+      "status": "same",
+      "expectedResult": "fail",
+      "actualResult": "fail",
+      "fieldComparisons": [
+        {
+          "field": "jobNumber",
+          "status": "same"
+        },
+        {
+          "field": "customerName",
+          "status": "same"
+        },
+        {
+          "field": "serviceDate",
+          "status": "same"
+        },
+        {
+          "field": "technicianId",
+          "status": "same"
+        },
+        {
+          "field": "workDescription",
+          "status": "same"
+        },
+        {
+          "field": "customerSignature",
+          "status": "same"
+        },
+        {
+          "field": "technicianSignature",
+          "status": "same"
+        }
+      ]
+    },
+    {
+      "documentId": "doc-004",
+      "documentName": "Job Sheet - Invalid Format",
+      "status": "same",
+      "expectedResult": "fail",
+      "actualResult": "fail",
+      "fieldComparisons": [
+        {
+          "field": "jobNumber",
+          "status": "same"
+        },
+        {
+          "field": "customerName",
+          "status": "same"
+        },
+        {
+          "field": "serviceDate",
+          "status": "same"
+        },
+        {
+          "field": "technicianId",
+          "status": "same"
+        },
+        {
+          "field": "workDescription",
+          "status": "same"
+        },
+        {
+          "field": "customerSignature",
+          "status": "same"
+        },
+        {
+          "field": "technicianSignature",
+          "status": "same"
+        }
+      ]
+    }
+  ],
+  "violations": []
+}
