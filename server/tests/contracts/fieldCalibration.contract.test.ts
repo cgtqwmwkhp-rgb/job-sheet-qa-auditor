@@ -320,7 +320,8 @@ describe('Field Calibration', () => {
       const g001 = results.find(r => r.guardrailId === 'G001');
       
       expect(g001?.passed).toBe(false);
-      expect(g001?.severity).toBe('blocking');
+      expect(g001?.severity).toBe('S0'); // Hardened to S0-S3
+      expect(g001?.legacySeverity).toBe('blocking');
     });
 
     it('G002: should fail when critical fields have low confidence', () => {

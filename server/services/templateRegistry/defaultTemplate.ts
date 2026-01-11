@@ -286,21 +286,53 @@ export const DEFAULT_ROI_CONFIG: RoiConfig = {
 export type SsotMode = 'strict' | 'permissive';
 
 /**
+ * HARDENING: Environments where SSOT is ALWAYS strict (fail-closed)
+ * 
+ * In these environments, TEMPLATE_SSOT_MODE env var is IGNORED.
+ * This prevents accidental permissive mode in staging/production.
+ */
+const FAIL_CLOSED_ENVIRONMENTS = new Set(['production', 'staging']);
+
+/**
  * Get SSOT mode from environment
  * 
- * Priority:
- * 1. TEMPLATE_SSOT_MODE env var (explicit override)
- * 2. APP_ENV/NODE_ENV based default (strict for prod/staging, permissive for dev)
+ * HARDENING (Phase A): Fail-closed enforcement
+ * - In production/staging: ALWAYS strict (env var ignored)
+ * - In other environments: respects TEMPLATE_SSOT_MODE
+ * 
+ * This is a security measure to prevent template bypass in prod/staging.
  */
 export function getSsotMode(): SsotMode {
-  // Check for explicit override first
+  const env = process.env.APP_ENV ?? process.env.NODE_ENV;
+  
+  // FAIL-CLOSED: In production/staging, ALWAYS strict - no override allowed
+  if (FAIL_CLOSED_ENVIRONMENTS.has(env ?? '')) {
+    // Log warning if someone tried to override
+    const modeOverride = process.env.TEMPLATE_SSOT_MODE;
+    if (modeOverride === 'permissive') {
+      console.warn(
+        `[SSOT] WARNING: TEMPLATE_SSOT_MODE=permissive ignored in ${env}. ` +
+        `Fail-closed enforcement is mandatory in staging/production.`
+      );
+    }
+    return 'strict';
+  }
+  
+  // In non-production environments, allow override
   const modeOverride = process.env.TEMPLATE_SSOT_MODE;
   if (modeOverride === 'strict') return 'strict';
   if (modeOverride === 'permissive') return 'permissive';
   
-  // Default based on environment
+  // Default for development: permissive
+  return 'permissive';
+}
+
+/**
+ * Check if we're in a fail-closed environment
+ */
+export function isFailClosedEnvironment(): boolean {
   const env = process.env.APP_ENV ?? process.env.NODE_ENV;
-  return env === 'production' || env === 'staging' ? 'strict' : 'permissive';
+  return FAIL_CLOSED_ENVIRONMENTS.has(env ?? '');
 }
 
 /**

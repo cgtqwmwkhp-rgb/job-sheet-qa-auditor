@@ -70,6 +70,12 @@ export interface MultiSignalConfig {
 }
 
 /**
+ * Signal weights version - increment when weights change
+ * This enables tracking weight changes across deployments
+ */
+export const SIGNAL_WEIGHTS_VERSION = '1.0.0';
+
+/**
  * Default signal weights
  */
 export const DEFAULT_SIGNAL_WEIGHTS: MultiSignalConfig = {
@@ -78,6 +84,28 @@ export const DEFAULT_SIGNAL_WEIGHTS: MultiSignalConfig = {
   roiWeight: 0.25,
   plausibilityWeight: 0.15,
 };
+
+/**
+ * Versioned signal weights for traceability
+ */
+export interface VersionedSignalWeights extends MultiSignalConfig {
+  version: string;
+  effectiveAt: string;
+}
+
+/**
+ * Get versioned signal weights for audit trail
+ */
+export function getVersionedWeights(
+  customWeights?: Partial<MultiSignalConfig>
+): VersionedSignalWeights {
+  return {
+    ...DEFAULT_SIGNAL_WEIGHTS,
+    ...customWeights,
+    version: SIGNAL_WEIGHTS_VERSION,
+    effectiveAt: new Date().toISOString(),
+  };
+}
 
 /**
  * Combined multi-signal result
@@ -95,6 +123,8 @@ export interface MultiSignalResult {
     highConfidenceSignals: number;
     weakSignals: string[];
   };
+  /** Versioned weights used for this result (Phase B) */
+  weightsUsed: VersionedSignalWeights;
 }
 
 // ============================================================================
@@ -470,6 +500,9 @@ export function combineSignals(
   signals: SignalResult[],
   customWeights?: Partial<MultiSignalConfig>
 ): MultiSignalResult {
+  // Get versioned weights for traceability
+  const versionedWeights = getVersionedWeights(customWeights);
+  
   if (signals.length === 0) {
     return {
       combinedScore: 0,
@@ -480,6 +513,7 @@ export function combineSignals(
         highConfidenceSignals: 0,
         weakSignals: [],
       },
+      weightsUsed: versionedWeights,
     };
   }
   
@@ -534,6 +568,7 @@ export function combineSignals(
       highConfidenceSignals,
       weakSignals,
     },
+    weightsUsed: versionedWeights,
   };
 }
 

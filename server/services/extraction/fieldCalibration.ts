@@ -427,18 +427,63 @@ export function assessExtractionQuality(
 // ============================================================================
 
 /**
- * Guardrail check result
+ * Guardrail severity aligned to S0-S3 scale
+ * 
+ * Phase C: Severity mapping for deterministic stop behavior:
+ * - S0: Blocker - MUST stop processing immediately
+ * - S1: Critical - MUST send to REVIEW_QUEUE
+ * - S2: Major - MAY continue but flag for attention
+ * - S3: Minor - Log and continue
+ */
+export type GuardrailSeverity = 'S0' | 'S1' | 'S2' | 'S3';
+
+/**
+ * Guardrail check result with S0-S3 severity
  */
 export interface GuardrailResult {
   passed: boolean;
   guardrailId: string;
   description: string;
-  severity: 'blocking' | 'warning';
+  /** S0-S3 severity (aligned with finding severity) */
+  severity: GuardrailSeverity;
+  /** Legacy severity for backward compatibility */
+  legacySeverity: 'blocking' | 'warning';
   details?: string;
+  /** Deterministic stop behavior */
+  stopBehavior: 'STOP_IMMEDIATELY' | 'REVIEW_QUEUE' | 'CONTINUE_FLAGGED' | 'CONTINUE';
+}
+
+/**
+ * Map S0-S3 severity to stop behavior
+ */
+export function getSeverityStopBehavior(
+  severity: GuardrailSeverity
+): GuardrailResult['stopBehavior'] {
+  switch (severity) {
+    case 'S0':
+      return 'STOP_IMMEDIATELY';
+    case 'S1':
+      return 'REVIEW_QUEUE';
+    case 'S2':
+      return 'CONTINUE_FLAGGED';
+    case 'S3':
+      return 'CONTINUE';
+    default:
+      return 'CONTINUE_FLAGGED';
+  }
+}
+
+/**
+ * Get legacy severity from S0-S3
+ */
+function getLegacySeverity(severity: GuardrailSeverity): 'blocking' | 'warning' {
+  return severity === 'S0' || severity === 'S1' ? 'blocking' : 'warning';
 }
 
 /**
  * Run all guardrails on extraction results
+ * 
+ * Phase C: Each guardrail now has S0-S3 severity and deterministic stop behavior
  */
 export function runExtractionGuardrails(
   extractedFields: ExtractedFieldForCalibration[],
@@ -447,16 +492,22 @@ export function runExtractionGuardrails(
   const results: GuardrailResult[] = [];
   
   // Guardrail 1: At least one field must be extracted
+  // Severity: S0 (Blocker) - cannot proceed without any data
   const extractedCount = extractedFields.filter(f => f.extracted).length;
+  const g001Passed = extractedCount > 0;
+  const g001Severity: GuardrailSeverity = 'S0';
   results.push({
     guardrailId: 'G001',
     description: 'At least one field must be extracted',
-    passed: extractedCount > 0,
-    severity: 'blocking',
+    passed: g001Passed,
+    severity: g001Severity,
+    legacySeverity: getLegacySeverity(g001Severity),
+    stopBehavior: g001Passed ? 'CONTINUE' : getSeverityStopBehavior(g001Severity),
     details: `${extractedCount} fields extracted`,
   });
   
   // Guardrail 2: Critical fields must have minimum confidence
+  // Severity: S1 (Critical) - needs review queue
   const criticalFields = extractedFields.filter(f => {
     const cal = profile.fieldCalibrations.get(f.fieldId);
     return cal?.isCritical;
@@ -465,17 +516,22 @@ export function runExtractionGuardrails(
     const cal = profile.fieldCalibrations.get(f.fieldId);
     return f.extracted && f.confidence < (cal?.reviewThreshold ?? 50);
   });
+  const g002Passed = criticalWithLowConfidence.length === 0;
+  const g002Severity: GuardrailSeverity = 'S1';
   results.push({
     guardrailId: 'G002',
     description: 'Critical fields must have acceptable confidence',
-    passed: criticalWithLowConfidence.length === 0,
-    severity: 'blocking',
+    passed: g002Passed,
+    severity: g002Severity,
+    legacySeverity: getLegacySeverity(g002Severity),
+    stopBehavior: g002Passed ? 'CONTINUE' : getSeverityStopBehavior(g002Severity),
     details: criticalWithLowConfidence.length > 0 
       ? `${criticalWithLowConfidence.length} critical fields with low confidence`
       : undefined,
   });
   
   // Guardrail 3: No conflicting extractions
+  // Severity: S2 (Major) - flag but may continue
   const valuesByField = new Map<string, string[]>();
   for (const f of extractedFields) {
     if (f.extracted && f.value) {
@@ -486,27 +542,83 @@ export function runExtractionGuardrails(
   }
   const conflicts = Array.from(valuesByField.entries())
     .filter(([_, values]) => new Set(values).size > 1);
+  const g003Passed = conflicts.length === 0;
+  const g003Severity: GuardrailSeverity = 'S2';
   results.push({
     guardrailId: 'G003',
     description: 'No conflicting field values',
-    passed: conflicts.length === 0,
-    severity: 'warning',
+    passed: g003Passed,
+    severity: g003Severity,
+    legacySeverity: getLegacySeverity(g003Severity),
+    stopBehavior: g003Passed ? 'CONTINUE' : getSeverityStopBehavior(g003Severity),
     details: conflicts.length > 0 
       ? `Conflicts in: ${conflicts.map(([id]) => id).join(', ')}`
       : undefined,
   });
   
   // Guardrail 4: Anomaly score within threshold
+  // Severity: S2 (Major) if anomaly detected
   const anomalyScore = calculateAnomalyScore(extractedFields, profile);
+  const g004Passed = anomalyScore <= profile.anomalyThresholds.anomalyScoreThreshold;
+  const g004Severity: GuardrailSeverity = 'S2';
   results.push({
     guardrailId: 'G004',
     description: 'Document anomaly score within threshold',
-    passed: anomalyScore <= profile.anomalyThresholds.anomalyScoreThreshold,
-    severity: 'warning',
+    passed: g004Passed,
+    severity: g004Severity,
+    legacySeverity: getLegacySeverity(g004Severity),
+    stopBehavior: g004Passed ? 'CONTINUE' : getSeverityStopBehavior(g004Severity),
     details: `Anomaly score: ${anomalyScore.toFixed(2)}`,
   });
   
   return results;
+}
+
+/**
+ * Evaluate guardrail results and determine overall stop behavior
+ * 
+ * Phase C: Deterministic stop behavior based on worst-case severity
+ */
+export function evaluateGuardrailResults(
+  results: GuardrailResult[]
+): {
+  shouldStop: boolean;
+  stopReason?: string;
+  overallBehavior: GuardrailResult['stopBehavior'];
+  failedGuardrails: GuardrailResult[];
+} {
+  const failedGuardrails = results.filter(r => !r.passed);
+  
+  if (failedGuardrails.length === 0) {
+    return {
+      shouldStop: false,
+      overallBehavior: 'CONTINUE',
+      failedGuardrails: [],
+    };
+  }
+  
+  // Determine worst-case behavior (priority order)
+  const behaviors = failedGuardrails.map(r => r.stopBehavior);
+  let overallBehavior: GuardrailResult['stopBehavior'] = 'CONTINUE';
+  
+  if (behaviors.includes('STOP_IMMEDIATELY')) {
+    overallBehavior = 'STOP_IMMEDIATELY';
+  } else if (behaviors.includes('REVIEW_QUEUE')) {
+    overallBehavior = 'REVIEW_QUEUE';
+  } else if (behaviors.includes('CONTINUE_FLAGGED')) {
+    overallBehavior = 'CONTINUE_FLAGGED';
+  }
+  
+  const shouldStop = overallBehavior === 'STOP_IMMEDIATELY' || overallBehavior === 'REVIEW_QUEUE';
+  
+  return {
+    shouldStop,
+    stopReason: shouldStop
+      ? `Guardrail(s) failed: ${failedGuardrails.map(g => g.guardrailId).join(', ')}`
+      : undefined,
+    overallBehavior,
+    failedGuardrails,
+  };
 }
 
 /**

@@ -145,16 +145,30 @@ describe('SSOT Enforcement', () => {
       expect(getSsotMode()).toBe('strict');
     });
 
-    it('should allow explicit override via TEMPLATE_SSOT_MODE', () => {
+    it('should IGNORE permissive override in production (fail-closed)', () => {
       process.env.APP_ENV = 'production';
       process.env.TEMPLATE_SSOT_MODE = 'permissive';
-      expect(getSsotMode()).toBe('permissive');
+      // HARDENING: permissive is IGNORED in production
+      expect(getSsotMode()).toBe('strict');
+    });
+
+    it('should IGNORE permissive override in staging (fail-closed)', () => {
+      process.env.APP_ENV = 'staging';
+      process.env.TEMPLATE_SSOT_MODE = 'permissive';
+      // HARDENING: permissive is IGNORED in staging
+      expect(getSsotMode()).toBe('strict');
     });
 
     it('should allow strict mode in development via override', () => {
       process.env.NODE_ENV = 'development';
       process.env.TEMPLATE_SSOT_MODE = 'strict';
       expect(getSsotMode()).toBe('strict');
+    });
+
+    it('should allow permissive override only in development', () => {
+      process.env.APP_ENV = 'development';
+      process.env.TEMPLATE_SSOT_MODE = 'permissive';
+      expect(getSsotMode()).toBe('permissive');
     });
   });
 
