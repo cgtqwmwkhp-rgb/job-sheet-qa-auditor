@@ -77,7 +77,7 @@ export const systemRouter = router({
       configured: Boolean(process.env.DATABASE_URL),
       // Extract host only for drift detection (no credentials)
       host: process.env.DATABASE_URL
-        ? process.env.DATABASE_URL.match(/@([^:\/]+)/)?.[1] || "(hidden)"
+        ? process.env.DATABASE_URL.match(/@([^:/]+)/)?.[1] || "(hidden)"
         : "(not configured)",
     };
 

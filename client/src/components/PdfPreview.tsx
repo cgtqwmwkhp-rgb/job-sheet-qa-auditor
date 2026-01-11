@@ -133,28 +133,40 @@ export function PdfPreview({
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    let cancelled = false;
 
     const loadDocument = async () => {
+      // Set loading state inside async function to avoid cascading renders
+      if (!cancelled) {
+        setLoading(true);
+        setError(null);
+      }
       try {
         const source = typeof pdfSource === 'string' 
           ? pdfSource 
           : { data: pdfSource };
         
         const doc = await pdfjsLib.getDocument(source).promise;
-        setPdfDoc(doc);
-        setTotalPages(doc.numPages);
-        onPagesLoaded?.(doc.numPages);
-        setLoading(false);
+        if (!cancelled) {
+          setPdfDoc(doc);
+          setTotalPages(doc.numPages);
+          onPagesLoaded?.(doc.numPages);
+          setLoading(false);
+        }
       } catch (err) {
-        console.error('PDF load error:', err);
-        setError('Failed to load PDF');
-        setLoading(false);
+        if (!cancelled) {
+          console.error('PDF load error:', err);
+          setError('Failed to load PDF');
+          setLoading(false);
+        }
       }
     };
 
     loadDocument();
+
+    return () => {
+      cancelled = true;
+    };
   }, [pdfjsLib, pdfSource, onPagesLoaded]);
 
   // Render page when page/zoom changes

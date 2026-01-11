@@ -3,6 +3,8 @@
  * 
  * Manages template lifecycle: creation, versioning, and retrieval.
  * Provides deterministic hashing for version integrity.
+ * 
+ * PR-1: SSOT Enforcement - The registry is the ONLY source of truth for templates.
  */
 
 import { createHash } from 'crypto';
@@ -16,6 +18,16 @@ import type {
 } from './types';
 import { checkActivationPreconditions, formatActivationError } from './activationGates';
 import { checkFixturesForActivation, hasFixturePack } from './fixtureRunner';
+import {
+  DEFAULT_TEMPLATE_ID,
+  DEFAULT_TEMPLATE_NAME,
+  DEFAULT_SPEC_JSON,
+  DEFAULT_SELECTION_CONFIG,
+  DEFAULT_ROI_CONFIG,
+  getSsotMode,
+  type SsotMode,
+  type SsotValidationResult,
+} from './defaultTemplate';
 
 // In-memory store for no-secrets CI (production would use DB)
 interface TemplateRecord {
@@ -401,4 +413,119 @@ export function getRegistryStats(): { templates: number; versions: number } {
     templates: templateStore.size,
     versions: versionStore.size,
   };
+}
+
+// ============================================================================
+// PR-1: SSOT ENFORCEMENT
+// ============================================================================
+
+/**
+ * Check if the default template exists in the registry
+ */
+export function hasDefaultTemplate(): boolean {
+  return getTemplateBySlug(DEFAULT_TEMPLATE_ID) !== null;
+}
+
+/**
+ * Initialize the default template if it doesn't exist
+ * 
+ * This is called in permissive mode to ensure there's always a fallback.
+ * In strict mode, this should NOT be called - templates must be explicitly created.
+ * 
+ * @returns The default template version ID, or null if already exists
+ */
+export function initializeDefaultTemplate(createdBy: number = 0): number | null {
+  // Check if default template already exists
+  if (hasDefaultTemplate()) {
+    return null;
+  }
+  
+  // Create the default template
+  const template = createTemplate({
+    templateId: DEFAULT_TEMPLATE_ID,
+    name: DEFAULT_TEMPLATE_NAME,
+    description: 'Default job sheet template (auto-created by SSOT system)',
+    category: 'maintenance',
+    tags: ['default', 'ssot', 'auto-created'],
+    createdBy,
+  });
+  
+  // Create the default version
+  const version = uploadTemplateVersion({
+    templateId: template.id,
+    version: '1.0.0',
+    specJson: DEFAULT_SPEC_JSON,
+    selectionConfigJson: DEFAULT_SELECTION_CONFIG,
+    roiJson: DEFAULT_ROI_CONFIG,
+    changeNotes: 'Initial version - migrated from legacy getDefaultGoldSpec()',
+    createdBy,
+  });
+  
+  // Activate it (skip preconditions for the default template)
+  activateVersion(version.id, { skipPreconditions: true, skipFixtures: true });
+  
+  return version.id;
+}
+
+/**
+ * Validate SSOT requirements
+ * 
+ * In strict mode: At least one active template must exist
+ * In permissive mode: Auto-initializes default template if needed
+ */
+export function validateSsotRequirements(): SsotValidationResult {
+  const mode = getSsotMode();
+  const activeTemplates = getActiveTemplates();
+  const hasActive = activeTemplates.length > 0;
+  const hasDefault = hasDefaultTemplate();
+  
+  if (mode === 'strict') {
+    // Strict mode: require at least one active template
+    if (!hasActive) {
+      return {
+        valid: false,
+        mode,
+        hasActiveTemplates: false,
+        hasDefaultTemplate: hasDefault,
+        error: 'SSOT_VIOLATION: No active templates in strict mode. ' +
+               'Either activate a template or set TEMPLATE_SSOT_MODE=permissive.',
+      };
+    }
+  } else {
+    // Permissive mode: auto-initialize if needed
+    if (!hasActive) {
+      initializeDefaultTemplate();
+    }
+  }
+  
+  return {
+    valid: true,
+    mode,
+    hasActiveTemplates: getActiveTemplates().length > 0,
+    hasDefaultTemplate: hasDefaultTemplate(),
+  };
+}
+
+/**
+ * Get the default template version (if it exists and is active)
+ * 
+ * @returns The active version of the default template, or null
+ */
+export function getDefaultTemplateVersion(): VersionRecord | null {
+  const template = getTemplateBySlug(DEFAULT_TEMPLATE_ID);
+  if (!template) return null;
+  return getActiveVersion(template.id);
+}
+
+/**
+ * Ensure templates are ready for processing
+ * 
+ * This is the main entry point for SSOT validation before processing.
+ * Throws an error if SSOT requirements are not met.
+ */
+export function ensureTemplatesReady(): void {
+  const validation = validateSsotRequirements();
+  if (!validation.valid) {
+    throw new Error(validation.error ?? 'SSOT validation failed');
+  }
 }

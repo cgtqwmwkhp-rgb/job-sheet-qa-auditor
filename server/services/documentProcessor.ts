@@ -2,17 +2,28 @@
  * Document Processor Service
  * Orchestrates the full document processing pipeline:
  * 1. Mistral OCR for text extraction
- * 2. Template selection (PR-B) or legacy goldSpecId
+ * 2. Template selection (SSOT - templates only)
  * 3. Gemini 2.5 for analysis against Gold Standard
  * 4. Result storage and audit trail
  * 
- * BACKWARD COMPATIBLE: Supports both template-based and legacy goldSpecId paths.
+ * PR-1: SSOT ENFORCEMENT
+ * - No legacy goldSpecId path (deprecated)
+ * - No hardcoded fallback specs
+ * - All processing uses template registry
+ * - Pipeline fails explicitly if no template matches
  */
 
 import { extractTextFromDocument, OCRResult } from './ocr';
-import { analyzeJobSheet, AnalysisResult, GoldSpec, getDefaultGoldSpec } from './analyzer';
+import { analyzeJobSheet, AnalysisResult, GoldSpec } from './analyzer';
 import { selectTemplate, createSelectionTraceArtifact } from './templateSelector';
-import { getTemplateVersion, getActiveTemplates, type SelectionResult } from './templateRegistry';
+import {
+  getTemplateVersion,
+  getActiveTemplates,
+  ensureTemplatesReady,
+  getDefaultTemplateVersion,
+  type SelectionResult,
+} from './templateRegistry';
+import { specJsonToGoldSpec } from './templateRegistry/defaultTemplate';
 import * as db from '../db';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -35,11 +46,17 @@ export interface ProcessingResult {
 export interface ProcessingOptions {
   /** Explicit template version ID (preferred - bypasses selection) */
   templateVersionId?: number;
-  /** Legacy gold spec ID (backward compatible) */
+  /** 
+   * @deprecated Legacy gold spec ID - REMOVED in SSOT enforcement
+   * This option is ignored; use templateVersionId instead.
+   */
   goldSpecId?: number;
   /** User ID for audit trail */
   userId?: number;
-  /** Force use of legacy path even if templates exist */
+  /** 
+   * @deprecated Force use of legacy path - REMOVED in SSOT enforcement
+   * This option is ignored; templates are always used.
+   */
   useLegacyPath?: boolean;
 }
 
@@ -145,12 +162,58 @@ export async function processJobSheetWithOptions(
     .map(page => `--- Page ${page.pageNumber} ---\n${page.markdown}`)
     .join('\n\n');
 
-  // Stage 1.5: Template Selection (PR-B)
+  // =========================================================================
+  // Stage 1.5: Template Selection (PR-1 SSOT Enforcement)
+  // 
+  // SSOT RULES:
+  // - Templates are the ONLY source of truth (no hardcoded fallback)
+  // - If no templates exist, pipeline fails explicitly
+  // - Legacy goldSpecId/useLegacyPath options are IGNORED
+  // =========================================================================
+  const selectionStartTime = Date.now();
   let spec: GoldSpec;
   let usedTemplateVersionId: number | undefined;
   
+  // SSOT: Ensure templates are ready before processing
+  try {
+    ensureTemplatesReady();
+  } catch (error) {
+    // SSOT violation - no templates available
+    const errorMsg = error instanceof Error ? error.message : 'SSOT validation failed';
+    console.error(`[DocumentProcessor] SSOT violation: ${errorMsg}`);
+    
+    try {
+      await db.updateJobSheetStatus(jobSheetId, 'failed');
+    } catch (dbError) {
+      console.warn('[DocumentProcessor] Could not update job sheet status:', dbError);
+    }
+    
+    stages.push({
+      stage: 'Template Selection',
+      status: 'failed',
+      durationMs: Date.now() - selectionStartTime,
+      error: errorMsg,
+    });
+    
+    return {
+      success: false,
+      jobSheetId,
+      ocrResult,
+      processingStages: stages,
+      totalDurationMs: Date.now() - startTime,
+    };
+  }
+  
+  // Log deprecation warning if legacy options are used
+  if (options.goldSpecId || options.useLegacyPath) {
+    console.warn(
+      '[DocumentProcessor] DEPRECATED: goldSpecId/useLegacyPath options are ignored. ' +
+      'Use templateVersionId instead. Pipeline will use template selection.'
+    );
+  }
+  
   if (options.templateVersionId) {
-    // Explicit template version provided
+    // Explicit template version provided - use directly
     const version = getTemplateVersion(options.templateVersionId);
     if (version) {
       spec = convertSpecJsonToGoldSpec(version.specJson);
@@ -158,95 +221,105 @@ export async function processJobSheetWithOptions(
       stages.push({
         stage: 'Template Selection',
         status: 'success',
-        durationMs: 0,
-      });
-    } else {
-      // Template version not found, fall back to default
-      console.warn(`[DocumentProcessor] Template version ${options.templateVersionId} not found, using default spec`);
-      spec = getDefaultGoldSpec();
-      stages.push({
-        stage: 'Template Selection',
-        status: 'failed',
-        durationMs: 0,
-        error: `Template version ${options.templateVersionId} not found`,
-      });
-    }
-  } else if (options.goldSpecId || options.useLegacyPath) {
-    // Legacy path - use default gold spec
-    spec = getDefaultGoldSpec();
-    stages.push({
-      stage: 'Template Selection',
-      status: 'skipped',
-      durationMs: 0,
-    });
-  } else {
-    // Attempt template selection from extracted text
-    const selectionStartTime = Date.now();
-    const activeTemplates = getActiveTemplates();
-    
-    if (activeTemplates.length === 0) {
-      // No active templates - use legacy path
-      spec = getDefaultGoldSpec();
-      stages.push({
-        stage: 'Template Selection',
-        status: 'skipped',
         durationMs: Date.now() - selectionStartTime,
       });
     } else {
-      // Run template selection
-      selectionResult = selectTemplate(extractedText);
+      // Template version not found - fail explicitly (no fallback)
+      const errorMsg = `Template version ${options.templateVersionId} not found`;
+      console.error(`[DocumentProcessor] ${errorMsg}`);
       
-      if (!selectionResult.autoProcessingAllowed) {
-        // CRITICAL: LOW or ambiguous MEDIUM confidence - STOP and send to REVIEW_QUEUE
-        console.log(`[DocumentProcessor] Template selection blocked: ${selectionResult.blockReason}`);
-        
-        try {
-          await db.updateJobSheetStatus(jobSheetId, 'review_queue');
-        } catch (error) {
-          console.warn('[DocumentProcessor] Could not update job sheet status:', error);
-        }
-        
-        stages.push({
-          stage: 'Template Selection',
-          status: 'failed',
-          durationMs: Date.now() - selectionStartTime,
-          error: selectionResult.blockReason,
-        });
-        
-        // Create selection trace for audit
-        const trace = createSelectionTraceArtifact(jobSheetId, selectionResult);
-        
-        // Return early - DO NOT auto-process on LOW/ambiguous confidence
-        return {
-          success: false,
-          jobSheetId,
-          ocrResult,
-          selectionResult,
-          processingStages: stages,
-          totalDurationMs: Date.now() - startTime,
-        };
+      try {
+        await db.updateJobSheetStatus(jobSheetId, 'failed');
+      } catch (dbError) {
+        console.warn('[DocumentProcessor] Could not update job sheet status:', dbError);
       }
       
-      // HIGH or clear MEDIUM confidence - proceed with selected template
-      const version = getTemplateVersion(selectionResult.versionId!);
-      if (version) {
-        spec = convertSpecJsonToGoldSpec(version.specJson);
-        usedTemplateVersionId = version.id;
-        stages.push({
-          stage: 'Template Selection',
-          status: 'success',
-          durationMs: Date.now() - selectionStartTime,
-        });
-      } else {
-        // Shouldn't happen, but fall back to default
-        spec = getDefaultGoldSpec();
-        stages.push({
-          stage: 'Template Selection',
-          status: 'failed',
-          durationMs: Date.now() - selectionStartTime,
-          error: 'Selected template version not found',
-        });
+      stages.push({
+        stage: 'Template Selection',
+        status: 'failed',
+        durationMs: Date.now() - selectionStartTime,
+        error: errorMsg,
+      });
+      
+      return {
+        success: false,
+        jobSheetId,
+        ocrResult,
+        processingStages: stages,
+        totalDurationMs: Date.now() - startTime,
+      };
+    }
+  } else {
+    // Auto-select template from extracted text
+    selectionResult = selectTemplate(extractedText);
+    
+    if (!selectionResult.autoProcessingAllowed) {
+      // CRITICAL: LOW or ambiguous MEDIUM confidence - STOP and send to REVIEW_QUEUE
+      console.log(`[DocumentProcessor] Template selection blocked: ${selectionResult.blockReason}`);
+      
+      try {
+        await db.updateJobSheetStatus(jobSheetId, 'review_queue');
+      } catch (error) {
+        console.warn('[DocumentProcessor] Could not update job sheet status:', error);
       }
+      
+      stages.push({
+        stage: 'Template Selection',
+        status: 'failed',
+        durationMs: Date.now() - selectionStartTime,
+        error: selectionResult.blockReason,
+      });
+      
+      // Create selection trace for audit
+      const trace = createSelectionTraceArtifact(jobSheetId, selectionResult);
+      
+      // Return early - DO NOT auto-process on LOW/ambiguous confidence
+      return {
+        success: false,
+        jobSheetId,
+        ocrResult,
+        selectionResult,
+        processingStages: stages,
+        totalDurationMs: Date.now() - startTime,
+      };
+    }
+    
+    // HIGH or clear MEDIUM confidence - proceed with selected template
+    const version = getTemplateVersion(selectionResult.versionId!);
+    if (version) {
+      spec = convertSpecJsonToGoldSpec(version.specJson);
+      usedTemplateVersionId = version.id;
+      stages.push({
+        stage: 'Template Selection',
+        status: 'success',
+        durationMs: Date.now() - selectionStartTime,
+      });
+    } else {
+      // Template version should exist at this point - fail explicitly
+      const errorMsg = `Selected template version ${selectionResult.versionId} not found`;
+      console.error(`[DocumentProcessor] ${errorMsg}`);
+      
+      try {
+        await db.updateJobSheetStatus(jobSheetId, 'failed');
+      } catch (dbError) {
+        console.warn('[DocumentProcessor] Could not update job sheet status:', dbError);
+      }
+      
+      stages.push({
+        stage: 'Template Selection',
+        status: 'failed',
+        durationMs: Date.now() - selectionStartTime,
+        error: errorMsg,
+      });
+      
+      return {
+        success: false,
+        jobSheetId,
+        ocrResult,
+        selectionResult,
+        processingStages: stages,
+        totalDurationMs: Date.now() - startTime,
+      };
     }
   }
 
