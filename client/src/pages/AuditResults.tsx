@@ -46,51 +46,7 @@ interface AuditData {
   findings: Finding[];
 }
 
-// Mock data for demo
-const mockAuditData: AuditData = {
-  id: "JS-2024-001",
-  status: "failed",
-  score: "C",
-  technician: "John Doe",
-  date: "2024-01-15",
-  documentUrl: "https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf",
-  findings: [
-    {
-      id: 1,
-      field: "Customer Signature",
-      status: "missing",
-      severity: "critical",
-      message: "Customer signature is required but not detected.",
-      confidence: 0.98,
-      box: { page: 1, x: 10, y: 80, width: 30, height: 5, color: "#ef4444", label: "Missing Signature" }
-    },
-    {
-      id: 2,
-      field: "Date of Service",
-      status: "passed",
-      value: "15/01/2024",
-      confidence: 0.99,
-      box: { page: 1, x: 70, y: 15, width: 20, height: 3, color: "#22c55e", label: "Date" }
-    },
-    {
-      id: 3,
-      field: "Serial Number",
-      status: "warning",
-      value: "SN-12345-??",
-      message: "Serial number is partially obscured.",
-      confidence: 0.75,
-      box: { page: 1, x: 40, y: 30, width: 25, height: 4, color: "#f97316", label: "Serial #" }
-    },
-    {
-      id: 4,
-      field: "Work Description",
-      status: "passed",
-      value: "Routine maintenance performed. Replaced filters.",
-      confidence: 0.95,
-      box: { page: 1, x: 10, y: 40, width: 80, height: 20, color: "#22c55e", label: "Description" }
-    },
-  ],
-};
+// No mock data - only show real audit results
 
 export default function AuditResults() {
   const [_location] = useLocation();
@@ -126,22 +82,38 @@ export default function AuditResults() {
     );
   }
 
-  // Convert real job sheet data to AuditData format if available
-  let auditData: AuditData;
-  if (jobSheetData && numericId > 0) {
-    auditData = {
-      id: jobSheetData.referenceNumber || `JS-${jobSheetData.id}`,
-      status: jobSheetData.status === 'completed' ? 'passed' : jobSheetData.status === 'failed' ? 'failed' : 'pending',
-      score: jobSheetData.status === 'completed' ? 'A' : jobSheetData.status === 'failed' ? 'F' : '-',
-      date: new Date(jobSheetData.createdAt).toLocaleDateString(),
-      technician: `User ${jobSheetData.uploadedBy}`,
-      documentUrl: jobSheetData.fileUrl,
-      findings: [], // Would be populated from audit results in a real implementation
-    };
-  } else {
-    // Use mock data for demo
-    auditData = mockAuditData;
+  // If no ID provided or job sheet not found, show empty state
+  if (!numericId || !jobSheetData) {
+    return (
+      <DashboardLayout>
+        <div className="h-[calc(100vh-8rem)] flex flex-col items-center justify-center">
+          <AlertCircle className="h-16 w-16 text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold mb-2">No Audit Selected</h2>
+          <p className="text-muted-foreground text-center max-w-md">
+            Select an audit from the Audit Results list to view details, or upload a job sheet first.
+          </p>
+          <Button 
+            variant="outline" 
+            className="mt-4"
+            onClick={() => window.location.href = '/audits'}
+          >
+            View All Audits
+          </Button>
+        </div>
+      </DashboardLayout>
+    );
   }
+
+  // Convert real job sheet data to AuditData format
+  const auditData: AuditData = {
+    id: jobSheetData.referenceNumber || `JS-${jobSheetData.id}`,
+    status: jobSheetData.status === 'completed' ? 'passed' : jobSheetData.status === 'failed' ? 'failed' : 'pending',
+    score: jobSheetData.status === 'completed' ? 'A' : jobSheetData.status === 'failed' ? 'F' : '-',
+    date: new Date(jobSheetData.createdAt).toLocaleDateString(),
+    technician: `User ${jobSheetData.uploadedBy}`,
+    documentUrl: jobSheetData.fileUrl,
+    findings: [], // Would be populated from audit results
+  };
 
   return <AuditResultsContent auditData={auditData} />;
 }
