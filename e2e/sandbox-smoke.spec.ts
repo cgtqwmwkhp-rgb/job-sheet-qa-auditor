@@ -21,6 +21,11 @@ import { test, expect } from '@playwright/test';
 import { setupDemoLogin, closeModalIfPresent } from './helpers/demo-login';
 import * as path from 'path';
 import * as fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Fixture paths (relative to project root)
 const FIXTURE_DIR = 'docs/testing/sandbox-fixtures';
@@ -161,9 +166,17 @@ test.describe('Sandbox Fixture Tests', () => {
 
   test('Fixture files exist and are valid JSON', async () => {
     // Verify fixture files exist
-    const passFixturePath = path.resolve(process.cwd(), FIXTURE_PASS);
-    const failFixturePath = path.resolve(process.cwd(), FIXTURE_FAIL);
+    // Use __dirname-relative path for consistent resolution in both local and CI environments
+    const projectRoot = path.resolve(__dirname, '..');
+    const passFixturePath = path.resolve(projectRoot, FIXTURE_PASS);
+    const failFixturePath = path.resolve(projectRoot, FIXTURE_FAIL);
     
+    // Provide helpful error message if fixtures not found
+    if (!fs.existsSync(passFixturePath)) {
+      console.error(`Fixture not found at: ${passFixturePath}`);
+      console.error(`__dirname: ${__dirname}`);
+      console.error(`projectRoot: ${projectRoot}`);
+    }
     expect(fs.existsSync(passFixturePath)).toBe(true);
     expect(fs.existsSync(failFixturePath)).toBe(true);
     
@@ -182,19 +195,30 @@ test.describe('Sandbox Fixture Tests', () => {
     expect(failFixture.validatedFields).toBeDefined();
     expect(failFixture.findings.length).toBeGreaterThan(0);
     
-    // Verify canonical reason codes
+    // Canonical reason codes (aligned with golden-dataset.schema.json)
+    // Note: null is valid for passed fields (VALID is a status, not a reason code)
     const validReasonCodes = new Set([
-      'VALID', 'MISSING_FIELD', 'UNREADABLE_FIELD', 'LOW_CONFIDENCE',
-      'INVALID_FORMAT', 'CONFLICT', 'OUT_OF_POLICY', 'INCOMPLETE_EVIDENCE',
-      'OCR_FAILURE', 'PIPELINE_ERROR', 'SPEC_GAP', 'SECURITY_RISK'
+      'MISSING_FIELD', 'INVALID_FORMAT', 'OUT_OF_RANGE', 'OUT_OF_POLICY',
+      'CONFLICT', 'LOW_CONFIDENCE', 'SPEC_GAP', 'OCR_FAILURE', 'PIPELINE_ERROR'
     ]);
     
+    // Check reason codes for each field
     for (const field of passFixture.validatedFields) {
-      expect(validReasonCodes.has(field.reasonCode)).toBe(true);
+      // Passed fields should have null reasonCode
+      if (field.status === 'passed') {
+        expect(field.reasonCode).toBeNull();
+      } else {
+        expect(validReasonCodes.has(field.reasonCode)).toBe(true);
+      }
     }
     
     for (const field of failFixture.validatedFields) {
-      expect(validReasonCodes.has(field.reasonCode)).toBe(true);
+      // Passed fields should have null reasonCode, failed fields should have valid code
+      if (field.status === 'passed') {
+        expect(field.reasonCode).toBeNull();
+      } else {
+        expect(validReasonCodes.has(field.reasonCode)).toBe(true);
+      }
     }
     
     for (const finding of failFixture.findings) {
@@ -205,7 +229,8 @@ test.describe('Sandbox Fixture Tests', () => {
   });
 
   test('Pass fixture has 0 issues in validatedFields', async () => {
-    const passFixturePath = path.resolve(process.cwd(), FIXTURE_PASS);
+    const projectRoot = path.resolve(__dirname, '..');
+    const passFixturePath = path.resolve(projectRoot, FIXTURE_PASS);
     const passFixture = JSON.parse(fs.readFileSync(passFixturePath, 'utf-8'));
     
     const failedFields = passFixture.validatedFields.filter(
@@ -219,7 +244,8 @@ test.describe('Sandbox Fixture Tests', () => {
   });
 
   test('Fail fixture has >0 issues in validatedFields', async () => {
-    const failFixturePath = path.resolve(process.cwd(), FIXTURE_FAIL);
+    const projectRoot = path.resolve(__dirname, '..');
+    const failFixturePath = path.resolve(projectRoot, FIXTURE_FAIL);
     const failFixture = JSON.parse(fs.readFileSync(failFixturePath, 'utf-8'));
     
     const failedFields = failFixture.validatedFields.filter(
@@ -239,7 +265,8 @@ test.describe('Sandbox Fixture Tests', () => {
   });
 
   test('Fixtures have consistent validatedFields and findings', async () => {
-    const failFixturePath = path.resolve(process.cwd(), FIXTURE_FAIL);
+    const projectRoot = path.resolve(__dirname, '..');
+    const failFixturePath = path.resolve(projectRoot, FIXTURE_FAIL);
     const failFixture = JSON.parse(fs.readFileSync(failFixturePath, 'utf-8'));
     
     // Every failed validatedField should have a corresponding finding
