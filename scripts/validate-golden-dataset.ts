@@ -134,7 +134,8 @@ function checkCanonicalValues(dataPath: string): ValidationResult {
         result.valid = false;
         result.errors.push(`Document ${doc.id}, field ${field.field}: invalid severity "${field.severity}"`);
       }
-      if (!validReasonCodes.includes(field.reasonCode)) {
+      // reasonCode is null for passed fields (PASS has no reason code)
+      if (field.reasonCode !== null && !validReasonCodes.includes(field.reasonCode)) {
         result.valid = false;
         result.errors.push(`Document ${doc.id}, field ${field.field}: invalid reasonCode "${field.reasonCode}"`);
       }

@@ -37,7 +37,8 @@
           "evidence": {
             "snippet": "Job Number: JS-2026-001",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R002",
@@ -50,7 +51,8 @@
           "evidence": {
             "snippet": "Customer: CUSTOMER_A",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R003",
@@ -63,7 +65,8 @@
           "evidence": {
             "snippet": "Date: 2026-01-15",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R004",
@@ -76,7 +79,8 @@
           "evidence": {
             "snippet": "Technician: TECH-042",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R005",
@@ -89,7 +93,8 @@
           "evidence": {
             "snippet": "Work: Quarterly maintenance inspection",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R006",
@@ -102,7 +107,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R007",
@@ -115,7 +121,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         }
       ],
       "findings": []
@@ -151,7 +158,8 @@
           "evidence": {
             "snippet": "Job Number: JS-2026-002",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R002",
@@ -164,7 +172,8 @@
           "evidence": {
             "snippet": "Customer: CUSTOMER_B",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R003",
@@ -177,7 +186,8 @@
           "evidence": {
             "snippet": "Date: 2026-01-16",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R004",
@@ -190,7 +200,8 @@
           "evidence": {
             "snippet": "Technician: TECH-015",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R005",
@@ -203,7 +214,8 @@
           "evidence": {
             "snippet": "Work: Emergency repair",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R006",
@@ -231,7 +243,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         }
       ],
       "findings": [
@@ -314,7 +327,8 @@
           "evidence": {
             "snippet": "Date: 2026-01-17",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R004",
@@ -327,7 +341,8 @@
           "evidence": {
             "snippet": "Technician: TECH-008",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R005",
@@ -355,7 +370,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R007",
@@ -368,7 +384,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         }
       ],
       "findings": []
@@ -419,7 +436,8 @@
           "evidence": {
             "snippet": "Customer: CUSTOMER_D",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R003",
@@ -432,7 +450,8 @@
           "evidence": {
             "snippet": "Date: 2026-01-18",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R004",
@@ -445,7 +464,8 @@
           "evidence": {
             "snippet": "Technician: TECH-022",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R005",
@@ -458,7 +478,8 @@
           "evidence": {
             "snippet": "Work: Preventive maintenance",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R006",
@@ -471,7 +492,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R007",
@@ -484,7 +506,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         }
       ],
       "findings": [
@@ -538,7 +561,8 @@
           "evidence": {
             "snippet": "Job Number: JS-2026-005",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R002",
@@ -551,7 +575,8 @@
           "evidence": {
             "snippet": "Customer: CUSTOMER_E",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R003",
@@ -564,7 +589,8 @@
           "evidence": {
             "snippet": "Date: 2026-01-19",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R004",
@@ -577,7 +603,8 @@
           "evidence": {
             "snippet": "Technician: TECH-033",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R005",
@@ -590,7 +617,8 @@
           "evidence": {
             "snippet": "Work: Major overhaul",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R006",
@@ -603,7 +631,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R007",
@@ -616,7 +645,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R008",
@@ -681,7 +711,8 @@
           "evidence": {
             "snippet": "Job Number: JS-2026-006",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R002",
@@ -694,7 +725,8 @@
           "evidence": {
             "snippet": "Customer: CUSTOMER_F",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R003",
@@ -722,7 +754,8 @@
           "evidence": {
             "snippet": "Technician: TECH-044",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R005",
@@ -735,7 +768,8 @@
           "evidence": {
             "snippet": "Work: Scheduled inspection",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R006",
@@ -748,7 +782,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R007",
@@ -761,7 +796,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         }
       ],
       "findings": [
@@ -813,7 +849,8 @@
           "evidence": {
             "snippet": "Job Number: JS-2026-007",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R002",
@@ -826,7 +863,8 @@
           "evidence": {
             "snippet": "Customer: CUSTOMER_G",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R003",
@@ -839,7 +877,8 @@
           "evidence": {
             "snippet": "Date: 2026-01-20",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R004",
@@ -867,7 +906,8 @@
           "evidence": {
             "snippet": "Work: Repair and calibration",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R006",
@@ -880,7 +920,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R007",
@@ -893,7 +934,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         }
       ],
       "findings": [
@@ -975,7 +1017,8 @@
           "evidence": {
             "snippet": "Date: 2026-01-21",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R004",
@@ -988,7 +1031,8 @@
           "evidence": {
             "snippet": "Technician: TECH-077",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R005",
@@ -1001,7 +1045,8 @@
           "evidence": {
             "snippet": "Work: Complex repair",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R006",
@@ -1029,7 +1074,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         }
       ],
       "findings": [
@@ -1115,7 +1161,8 @@
           "evidence": {
             "snippet": "Job Number: JS-2026-009",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R002",
@@ -1128,7 +1175,8 @@
           "evidence": {
             "snippet": "Customer: CUSTOMER_I",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R003",
@@ -1141,7 +1189,8 @@
           "evidence": {
             "snippet": "Date: 2026-01-22",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R004",
@@ -1154,7 +1203,8 @@
           "evidence": {
             "snippet": "Technician: TECH-088",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R005",
@@ -1167,7 +1217,8 @@
           "evidence": {
             "snippet": "Work: Full system replacement",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R006",
@@ -1180,7 +1231,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         },
         {
           "ruleId": "R007",
@@ -1193,7 +1245,8 @@
           "evidence": {
             "snippet": "",
             "boundingBox": null
-          }
+          },
+          "reasonCode": null
         }
       ],
       "findings": []

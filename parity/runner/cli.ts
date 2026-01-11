@@ -23,7 +23,22 @@ const PARITY_ROOT = join(__dirname, '..');
 const POSITIVE_FIXTURES_PATH = join(PARITY_ROOT, 'fixtures', 'golden-positive.json');
 const NEGATIVE_FIXTURES_PATH = join(PARITY_ROOT, 'fixtures', 'golden-negative.json');
 const LEGACY_FIXTURES_PATH = join(PARITY_ROOT, 'fixtures', 'golden-dataset.json');
+const THRESHOLDS_PATH = join(PARITY_ROOT, 'config', 'thresholds.json');
 const REPORTS_PATH = join(PARITY_ROOT, 'reports');
+
+interface ThresholdsConfig {
+  ci: {
+    prSubsetDocIds: string[];
+  };
+}
+
+/**
+ * Load thresholds config
+ */
+function loadThresholds(): ThresholdsConfig {
+  const content = readFileSync(THRESHOLDS_PATH, 'utf-8');
+  return JSON.parse(content);
+}
 
 type RunMode = 'subset' | 'full' | 'positive' | 'negative';
 
@@ -123,22 +138,58 @@ async function main(): Promise<void> {
   }
 
   if (mode === 'subset') {
-    // Subset mode: use first document from each suite
-    runner.loadGoldenDataset(LEGACY_FIXTURES_PATH);
+    // Subset mode: use prSubsetDocIds from thresholds.json
+    const thresholds = loadThresholds();
+    const subsetDocIds = new Set(thresholds.ci.prSubsetDocIds);
+    
+    console.log(`📋 Subset mode: testing ${subsetDocIds.size} documents: ${Array.from(subsetDocIds).join(', ')}`);
+    
     const legacy = loadDataset(LEGACY_FIXTURES_PATH);
-    const subsetDocs = legacy.documents.slice(0, 3); // First 3 docs
+    
+    // Filter to only include subset documents
+    const subsetDocs = legacy.documents.filter(d => subsetDocIds.has(d.id));
+    
+    if (subsetDocs.length === 0) {
+      console.error('❌ No documents found matching prSubsetDocIds');
+      process.exit(1);
+    }
+    
+    console.log(`✅ Found ${subsetDocs.length} documents in subset`);
+    
+    // Create a subset-only dataset for the runner
+    const subsetDataset: GoldenDataset = {
+      ...legacy,
+      documents: subsetDocs,
+    };
+    
+    // Create a new runner with subset dataset only
+    const subsetRunner = createParityRunner({
+      maxWorseDocuments: 0,
+      maxWorseFields: 0,
+      minSamePercentage: 100,
+    });
+    
+    // Manually set the datasets with only subset documents
+    // Use positive/negative split based on expectedResult
+    const positiveSubset = subsetDocs.filter(d => d.expectedResult === 'pass');
+    const negativeSubset = subsetDocs.filter(d => d.expectedResult === 'fail');
+    
+    // Generate mock actual results for subset only
     const actualResults = generateMockActualResults(subsetDocs);
     
-    const report = runner.runParity(actualResults);
-    const reportPath = runner.saveReport(report, REPORTS_PATH);
+    // Run parity with proper subset (create temporary dataset files or use internal methods)
+    // For simplicity, we directly compare expected vs actual
+    const report = runSubsetParity(subsetDocs, actualResults, legacy.version);
+    
+    const reportPath = join(REPORTS_PATH, `parity-report-${report.runId}.json`);
+    writeFileSync(reportPath, JSON.stringify(report, null, 2));
     console.log(`📄 Report saved: ${reportPath}`);
     
     const latestPath = join(REPORTS_PATH, 'latest.json');
     writeFileSync(latestPath, JSON.stringify(report, null, 2));
     
-    const summary = runner.generateSummaryMarkdown(report);
     const summaryPath = join(REPORTS_PATH, 'latest-summary.md');
-    writeFileSync(summaryPath, summary);
+    writeFileSync(summaryPath, generateSubsetSummary(report));
     
     printLegacyResults(report);
     return;
@@ -218,6 +269,125 @@ async function main(): Promise<void> {
     console.log('');
     console.log('✅ Negative suite passed!');
   }
+}
+
+/**
+ * Run subset parity comparison directly (bypassing full dataset loading)
+ */
+function runSubsetParity(
+  expectedDocs: GoldenDocument[],
+  actualDocs: GoldenDocument[],
+  goldenVersion: string
+): { runId: string; status: string; summary: { totalDocuments: number; same: number; improved: number; worse: number; totalFields: number; fieldsSame: number; fieldsImproved: number; fieldsWorse: number }; documents: unknown[]; violations: string[] } {
+  const runId = Math.random().toString(16).slice(2, 14);
+  const documentComparisons: { documentId: string; documentName: string; status: string; expectedResult: string; actualResult: string | null; fieldComparisons: unknown[] }[] = [];
+  
+  let same = 0, improved = 0, worse = 0;
+  let fieldsSame = 0, fieldsImproved = 0, fieldsWorse = 0;
+  
+  for (const expected of expectedDocs) {
+    const actual = actualDocs.find(d => d.id === expected.id);
+    
+    if (!actual) {
+      worse++;
+      fieldsWorse += expected.validatedFields.length;
+      documentComparisons.push({
+        documentId: expected.id,
+        documentName: expected.name,
+        status: 'missing',
+        expectedResult: expected.expectedResult,
+        actualResult: null,
+        fieldComparisons: expected.validatedFields.map(f => ({
+          field: f.field,
+          status: 'missing',
+        })),
+      });
+      continue;
+    }
+    
+    // Compare fields
+    let docFieldsSame = 0;
+    const fieldComps: { field: string; status: string }[] = [];
+    
+    for (const expField of expected.validatedFields) {
+      const actField = actual.validatedFields.find(f => f.ruleId === expField.ruleId);
+      
+      if (!actField) {
+        fieldsWorse++;
+        fieldComps.push({ field: expField.field, status: 'missing' });
+      } else if (expField.status === actField.status && expField.value === actField.value) {
+        fieldsSame++;
+        docFieldsSame++;
+        fieldComps.push({ field: expField.field, status: 'same' });
+      } else {
+        fieldsWorse++;
+        fieldComps.push({ field: expField.field, status: 'worse' });
+      }
+    }
+    
+    // Determine doc status
+    if (docFieldsSame === expected.validatedFields.length) {
+      same++;
+      documentComparisons.push({
+        documentId: expected.id,
+        documentName: expected.name,
+        status: 'same',
+        expectedResult: expected.expectedResult,
+        actualResult: actual.expectedResult,
+        fieldComparisons: fieldComps,
+      });
+    } else {
+      worse++;
+      documentComparisons.push({
+        documentId: expected.id,
+        documentName: expected.name,
+        status: 'worse',
+        expectedResult: expected.expectedResult,
+        actualResult: actual.expectedResult,
+        fieldComparisons: fieldComps,
+      });
+    }
+  }
+  
+  const totalDocs = expectedDocs.length;
+  const totalFields = expectedDocs.reduce((sum, d) => sum + d.validatedFields.length, 0);
+  const samePercent = totalDocs > 0 ? (same / totalDocs) * 100 : 0;
+  
+  const violations: string[] = [];
+  if (worse > 0) violations.push(`Worse documents (${worse}) exceeds threshold (0)`);
+  if (fieldsWorse > 0) violations.push(`Worse fields (${fieldsWorse}) exceeds threshold (0)`);
+  if (samePercent < 100) violations.push(`Same percentage (${samePercent.toFixed(1)}%) below threshold (100%)`);
+  
+  return {
+    runId,
+    status: violations.length === 0 ? 'pass' : 'fail',
+    summary: {
+      totalDocuments: totalDocs,
+      same,
+      improved,
+      worse,
+      totalFields,
+      fieldsSame,
+      fieldsImproved,
+      fieldsWorse,
+    },
+    documents: documentComparisons,
+    violations,
+  };
+}
+
+/**
+ * Generate subset summary markdown
+ */
+function generateSubsetSummary(report: { status: string; summary: { same: number; worse: number; fieldsSame: number; fieldsWorse: number } }): string {
+  return `# Parity Subset Report
+
+**Status**: ${report.status.toUpperCase()}
+
+## Summary
+- Documents: ${report.summary.same} same, ${report.summary.worse} worse
+- Fields: ${report.summary.fieldsSame} same, ${report.summary.fieldsWorse} worse
+`;
 }
 
 function printCombinedResults(report: CombinedParityReport): void {

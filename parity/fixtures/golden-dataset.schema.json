@@ -46,7 +46,8 @@
       "additionalProperties": {
         "type": "string"
       },
-      "required": ["VALID", "MISSING_FIELD", "INVALID_FORMAT", "OUT_OF_RANGE", "OUT_OF_POLICY", "CONFLICT", "LOW_CONFIDENCE"]
+      "required": ["MISSING_FIELD", "INVALID_FORMAT", "OUT_OF_RANGE", "OUT_OF_POLICY", "CONFLICT", "LOW_CONFIDENCE"],
+      "description": "Canonical reason codes - VALID is NOT a reason code (it's a status)"
     },
     "severityLevels": {
       "type": "object",
@@ -63,14 +64,19 @@
       "description": "Canonical severity levels: S0=Critical, S1=Major, S2=Minor, S3=Info"
     },
     "reasonCode": {
-      "type": "string",
-      "enum": ["VALID", "MISSING_FIELD", "INVALID_FORMAT", "OUT_OF_RANGE", "OUT_OF_POLICY", "CONFLICT", "LOW_CONFIDENCE"],
-      "description": "Canonical reason codes"
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": ["MISSING_FIELD", "INVALID_FORMAT", "OUT_OF_RANGE", "OUT_OF_POLICY", "CONFLICT", "LOW_CONFIDENCE", "SPEC_GAP", "OCR_FAILURE", "PIPELINE_ERROR"]
+        },
+        { "type": "null" }
+      ],
+      "description": "Canonical reason codes - null when status=passed (VALID is NOT a reason code)"
     },
     "status": {
       "type": "string",
-      "enum": ["passed", "failed", "skipped", "error"],
-      "description": "Validation status"
+      "enum": ["passed", "failed", "needs_review", "skipped", "error"],
+      "description": "Validation status - passed/failed/needs_review"
     },
     "evidence": {
       "type": "object",
@@ -100,7 +106,8 @@
     },
     "validatedField": {
       "type": "object",
-      "required": ["ruleId", "field", "status", "severity", "reasonCode", "evidence"],
+      "required": ["ruleId", "field", "status", "severity", "evidence"],
+      "description": "reasonCode is optional - null/absent when status=passed",
       "properties": {
         "ruleId": {
           "type": "string",

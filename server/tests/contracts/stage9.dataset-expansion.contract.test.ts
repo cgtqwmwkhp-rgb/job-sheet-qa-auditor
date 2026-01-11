@@ -92,9 +92,9 @@ describe('Stage 9: Dataset Expansion Contract Tests', () => {
   describe('Reason Code Coverage', () => {
     it('passed fields should have no reason code (VALID is a status, not a reason code)', () => {
       // PR-5: VALID is a STATUS (PASS), not a reason code
-      // When a field passes, reasonCode should be absent/undefined
+      // When a field passes, reasonCode should be absent/undefined/null
       const passedFieldsWithReasonCode = goldenDataset.documents.flatMap(d =>
-        d.validatedFields.filter(f => f.status === 'passed' && f.reasonCode !== undefined)
+        d.validatedFields.filter(f => f.status === 'passed' && f.reasonCode !== undefined && f.reasonCode !== null)
       );
       expect(passedFieldsWithReasonCode).toHaveLength(0);
     });
