@@ -24,6 +24,11 @@ export async function setupVite(app: Express, server: Server) {
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
 
+    // Don't intercept Azure Easy Auth routes
+    if (url.startsWith('/.auth')) {
+      return next();
+    }
+
     try {
       const clientTemplate = path.resolve(
         import.meta.dirname,
@@ -61,7 +66,12 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
+  // Skip .auth routes - these are handled by Azure Easy Auth middleware
+  app.use("*", (req, res, next) => {
+    // Don't intercept Azure Easy Auth routes
+    if (req.originalUrl.startsWith('/.auth')) {
+      return next();
+    }
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
