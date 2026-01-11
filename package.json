@@ -30,7 +30,9 @@
     "parity:provenance": "npx tsx scripts/parity/generate-provenance.ts",
     "baseline:create": "npx tsx scripts/parity/create-baseline.ts",
     "baseline:compare": "npx tsx scripts/parity/compare-to-baseline.ts",
-    "baseline:list": "npx tsx scripts/parity/list-baselines.ts"
+    "baseline:list": "npx tsx scripts/parity/list-baselines.ts",
+    "drift:check": "npx tsx scripts/drift/run-drift-check.ts",
+    "drift:baseline": "npx tsx scripts/drift/run-drift-check.ts --create-baseline"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
