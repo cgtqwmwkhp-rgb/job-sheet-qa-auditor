@@ -288,16 +288,34 @@ jobs:
           fi
           echo "✅ /healthz returned 200"
           
-          # Test readyz (required for full health)
+          # Test readyz (REQUIRED - deployment fails if unhealthy)
           HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/readyz" --max-time 30)
           READYZ_BODY=$(curl -sS "$APP_URL/readyz" --max-time 30)
-          echo "📋 /readyz response: $READYZ_BODY"
-          if [[ "$HTTP_CODE" != "200" ]]; then
-            echo "⚠️ /readyz returned $HTTP_CODE (storage may not be configured)"
-            # Don't fail on readyz for staging - storage config may be pending
-          else
-            echo "✅ /readyz returned 200"
+          echo "📋 /readyz response:"
+          echo "$READYZ_BODY" | jq . 2>/dev/null || echo "$READYZ_BODY"
+          
+          # Parse status from response
+          READYZ_STATUS=$(echo "$READYZ_BODY" | jq -r '.status // "unknown"' 2>/dev/null || echo "unknown")
+          
+          if [[ "$HTTP_CODE" != "200" ]] || [[ "$READYZ_STATUS" != "ok" ]]; then
+            echo ""
+            echo "❌ /readyz FAILED - deployment cannot proceed"
+            echo "   HTTP Code: $HTTP_CODE"
+            echo "   Status: $READYZ_STATUS"
+            echo ""
+            # Show individual check failures
+            DB_STATUS=$(echo "$READYZ_BODY" | jq -r '.checks.database.status // "unknown"' 2>/dev/null)
+            DB_ERROR=$(echo "$READYZ_BODY" | jq -r '.checks.database.error // "none"' 2>/dev/null)
+            STORAGE_STATUS=$(echo "$READYZ_BODY" | jq -r '.checks.storage.status // "unknown"' 2>/dev/null)
+            STORAGE_ERROR=$(echo "$READYZ_BODY" | jq -r '.checks.storage.error // "none"' 2>/dev/null)
+            
+            echo "   Database:  $DB_STATUS (error: $DB_ERROR)"
+            echo "   Storage:   $STORAGE_STATUS (error: $STORAGE_ERROR)"
+            echo ""
+            echo "Fix: Check Container App env vars and secrets configuration"
+            exit 1
           fi
+          echo "✅ /readyz returned 200 with status: ok"
           
           # Test metrics (required per ADR-003)
           HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/metrics" --max-time 30)
