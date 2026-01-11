@@ -251,6 +251,32 @@ jobs:
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "DATABASE_URL=secretref:database-url"
           fi
+          
+          # Set AI API keys (Mistral OCR + Gemini Analysis)
+          if [ -n "${{ secrets.MISTRAL_API_KEY }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "mistral-api-key=${{ secrets.MISTRAL_API_KEY }}"
+            
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "MISTRAL_API_KEY=secretref:mistral-api-key"
+          fi
+          
+          if [ -n "${{ secrets.GEMINI_API_KEY }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "gemini-api-key=${{ secrets.GEMINI_API_KEY }}"
+            
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "GEMINI_API_KEY=secretref:gemini-api-key" \
+                "ENABLE_GEMINI_INSIGHTS=true"
+          fi
 
       - name: Get staging URL
         id: get_url
@@ -542,6 +568,32 @@ jobs:
               --name "${{ vars.CONTAINER_APP_NAME }}" \
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "DATABASE_URL=secretref:database-url"
+          fi
+          
+          # Set AI API keys (Mistral OCR + Gemini Analysis)
+          if [ -n "${{ secrets.MISTRAL_API_KEY }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "mistral-api-key=${{ secrets.MISTRAL_API_KEY }}"
+            
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "MISTRAL_API_KEY=secretref:mistral-api-key"
+          fi
+          
+          if [ -n "${{ secrets.GEMINI_API_KEY }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "gemini-api-key=${{ secrets.GEMINI_API_KEY }}"
+            
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "GEMINI_API_KEY=secretref:gemini-api-key" \
+                "ENABLE_GEMINI_INSIGHTS=true"
           fi
 
       - name: Get production URL
