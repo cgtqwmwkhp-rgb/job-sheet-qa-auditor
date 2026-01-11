@@ -1,0 +1,110 @@
+{
+  "version": "1.0.0",
+  "runId": "drift-mk9lssui-ybyntl",
+  "timestamp": "2026-01-11T10:41:08.106Z",
+  "environment": "local",
+  "currentMetrics": {
+    "ambiguityRate": 0.04,
+    "tokenCollisionRate": 0.02,
+    "overrideRate": 0.14,
+    "averageScanQuality": 0.8970579501048427,
+    "selectionAccuracy": 0.9007508431016911,
+    "fieldAccuracy": 0.9373850362782945,
+    "fusionAgreementRate": 0.8714426561324011,
+    "pass2Rate": 0.21487113907826727
+  },
+  "baseline": null,
+  "alerts": [
+    {
+      "id": "alert-scan-quality-mk9lssui-fipy",
+      "category": "scan_quality",
+      "severity": "warning",
+      "status": "active",
+      "message": "Scan quality degradation detected: 5.3% drop from baseline",
+      "detectedAt": "2026-01-11T10:41:08.106Z",
+      "metric": "scan_quality",
+      "currentValue": 0.8970579501048427,
+      "threshold": 0.8999999999999999,
+      "baselineValue": 0.95,
+      "deviation": -0.05294204989515727,
+      "deviationPercent": -5.572847357384976,
+      "suggestedAction": "Monitor scan quality trends and consider calibration"
+    },
+    {
+      "id": "alert-selection-accuracy-mk9lssui-5ukx",
+      "category": "selection_accuracy",
+      "severity": "warning",
+      "status": "active",
+      "message": "Selection accuracy drop detected: 4.9% below baseline",
+      "detectedAt": "2026-01-11T10:41:08.106Z",
+      "metric": "selection_accuracy",
+      "currentValue": 0.9007508431016911,
+      "threshold": 0.9199999999999999,
+      "baselineValue": 0.95,
+      "deviation": -0.04924915689830889,
+      "deviationPercent": -5.184121778769358,
+      "suggestedAction": "Monitor selection accuracy trends"
+    },
+    {
+      "id": "alert-pass2-escalation-mk9lssui-8d0y",
+      "category": "pass2_escalation",
+      "severity": "warning",
+      "status": "active",
+      "message": "Pass-2 escalation rate elevated: 21.5%",
+      "detectedAt": "2026-01-11T10:41:08.106Z",
+      "metric": "pass2_escalation_rate",
+      "currentValue": 0.21487113907826727,
+      "threshold": 0.2,
+      "baselineValue": 0.1,
+      "deviation": 0.11487113907826726,
+      "deviationPercent": 114.87113907826725,
+      "suggestedAction": "Investigate why more documents require interpreter escalation"
+    }
+  ],
+  "summary": {
+    "totalAlerts": 3,
+    "criticalAlerts": 0,
+    "warningAlerts": 3,
+    "infoAlerts": 0,
+    "categories": [
+      "scan_quality",
+      "selection_accuracy",
+      "pass2_escalation"
+    ]
+  },
+  "requiresImmediateAction": false,
+  "thresholds": {
+    "ambiguityRate": {
+      "warning": 0.1,
+      "critical": 0.2
+    },
+    "tokenCollisionRate": {
+      "warning": 0.05,
+      "critical": 0.15
+    },
+    "overrideRate": {
+      "warning": 0.15,
+      "critical": 0.3
+    },
+    "scanQualityDrop": {
+      "warning": 0.05,
+      "critical": 0.1
+    },
+    "selectionAccuracyDrop": {
+      "warning": 0.03,
+      "critical": 0.05
+    },
+    "fieldAccuracyDrop": {
+      "warning": 0.05,
+      "critical": 0.1
+    },
+    "fusionDisagreementRate": {
+      "warning": 0.15,
+      "critical": 0.25
+    },
+    "pass2EscalationRate": {
+      "warning": 0.2,
+      "critical": 0.35
+    }
+  }
+}
