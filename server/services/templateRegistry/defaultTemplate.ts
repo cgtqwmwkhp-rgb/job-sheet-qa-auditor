@@ -214,35 +214,39 @@ export const DEFAULT_SPEC_JSON: SpecJson = {
 
 /**
  * Default selection configuration
- * Broad matching to serve as catch-all for job sheets
+ * ULTRA-permissive catch-all for all job sheet variants
+ * This template should ALWAYS match to ensure processing proceeds
  */
 export const DEFAULT_SELECTION_CONFIG: SelectionConfig = {
   requiredTokensAll: [], // No strict requirements - this is the fallback
-  requiredTokensAny: [
-    'job',
-    'sheet',
-    'service',
-    'maintenance',
-    'work',
-    'order',
-    'report',
-  ],
+  requiredTokensAny: [], // Empty - acts as universal catch-all
   optionalTokens: [
-    'technician',
-    'engineer',
-    'customer',
-    'signature',
-    'date',
-    'serial',
-    'asset',
-    'equipment',
+    // Job/work related
+    'job', 'sheet', 'card', 'repair', 'service', 'maintenance', 'work', 'order', 'report',
+    'task', 'inspection', 'check', 'visit', 'call', 'ticket', 'invoice', 'form',
+    // Personnel
+    'technician', 'engineer', 'customer', 'client', 'operator', 'contractor',
+    // Documentation
+    'signature', 'signed', 'date', 'time', 'reference', 'number', 'id',
+    // Equipment
+    'serial', 'asset', 'equipment', 'unit', 'machine', 'system', 'plant',
+    // Status
+    'complete', 'completed', 'done', 'passed', 'failed', 'pending',
+    // Parts
+    'parts', 'materials', 'used', 'replaced', 'fitted',
   ],
   formCodeRegex: undefined,
   tokenWeights: {
-    'job': 3,
-    'sheet': 3,
-    'service': 2,
-    'maintenance': 2,
+    'job': 5,
+    'sheet': 5,
+    'card': 5,
+    'repair': 5,
+    'service': 4,
+    'maintenance': 4,
+    'work': 3,
+    'order': 3,
+    'signature': 3,
+    'date': 2,
   },
 };
 
