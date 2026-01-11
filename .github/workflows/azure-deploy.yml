@@ -346,7 +346,8 @@ jobs:
     name: Deploy to Production
     needs: [build-and-push, verify-staging]
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'production' }}
+    # Allow production deploy when staging is skipped (direct production trigger) or when it passed
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'production' && !failure() && !cancelled() }}
     environment:
       name: production
       url: ${{ steps.get_url.outputs.app_url }}
@@ -467,7 +468,8 @@ jobs:
     name: Verify Production
     needs: [build-and-push, deploy-production]
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'production' && !inputs.skip_verification }}
+    # Allow verification when deploy succeeds (using needs context to check deploy-production result)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'production' && !inputs.skip_verification && needs.deploy-production.result == 'success' }}
     environment: production
 
     steps:
