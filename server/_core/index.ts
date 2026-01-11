@@ -9,6 +9,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleHealthz, handleReadyz } from "./health";
 import { handleMetrics } from "./metrics";
+import { initializeDefaultTemplate, hasDefaultTemplate } from "../services/templateRegistry";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -35,6 +36,18 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Initialize default template for document processing
+  // This ensures SSOT compliance even in strict mode (production)
+  if (!hasDefaultTemplate()) {
+    console.log("[Templates] Initializing default template for SSOT compliance...");
+    const versionId = initializeDefaultTemplate();
+    if (versionId) {
+      console.log(`[Templates] Default template initialized (version ID: ${versionId})`);
+    }
+  } else {
+    console.log("[Templates] Default template already exists");
+  }
 
   // Health check endpoints (before auth, before static files)
   // These must be accessible without authentication for container orchestration
