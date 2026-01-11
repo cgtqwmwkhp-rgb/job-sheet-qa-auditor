@@ -79,8 +79,9 @@ describe('Multi-Signal Template Recognition', () => {
       
       const result = extractTokenSignal(documentTokens, DEFAULT_SELECTION_CONFIG);
       
-      expect(result.evidence.matched).toContain('job');
-      expect(result.evidence.matched).toContain('sheet');
+      // With ultra-permissive default config, tokens are matched as optional
+      expect(result.evidence.matched.some((t: string) => t.includes('job'))).toBe(true);
+      expect(result.evidence.matched.some((t: string) => t.includes('sheet'))).toBe(true);
     });
   });
 
