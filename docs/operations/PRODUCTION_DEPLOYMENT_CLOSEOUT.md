@@ -1,7 +1,8 @@
 # Production Deployment Closeout - Job Sheet QA Auditor
 
-**Date:** 2026-01-11
-**Status:** ✅ PRODUCTION LIVE
+**Date:** 2026-01-11  
+**Updated:** 2026-01-11 (Database Connected)  
+**Status:** ✅ PRODUCTION LIVE - FULL STACK (Database + Storage)
 
 ---
 
@@ -22,10 +23,13 @@ Created dedicated production Container App for job-sheet-qa-auditor, separate fr
 
 ### Database (MySQL)
 
-| Database | Server | Purpose |
-|----------|--------|---------|
-| `jobsheet_qa_staging` | ai-scheduler-mysql-prod | Staging (not connected - demo mode) |
-| `jobsheet_qa_production` | ai-scheduler-mysql-prod | Production (not connected - demo mode) |
+| Database | Server | Purpose | Status |
+|----------|--------|---------|--------|
+| `jobsheet_qa_staging` | ai-scheduler-mysql-prod | Staging | ✅ Connected |
+| `jobsheet_qa_production` | ai-scheduler-mysql-prod | Production | ✅ Connected |
+
+**Database Connection Configured:** 2026-01-11  
+**Migration Applied:** `drizzle/0003_regular_venus.sql` (12 tables)
 
 ### Blob Storage
 
@@ -79,12 +83,12 @@ Created dedicated production Container App for job-sheet-qa-auditor, separate fr
 }
 ```
 
-### /readyz
+### /readyz (Updated with DB Connected)
 
 ```json
 {
   "status": "ok",
-  "timestamp": "2026-01-11T16:22:35.710Z",
+  "timestamp": "2026-01-11T18:46:17.878Z",
   "checks": {
     "database": {
       "status": "ok",
@@ -101,6 +105,8 @@ Created dedicated production Container App for job-sheet-qa-auditor, separate fr
   }
 }
 ```
+
+> **Note:** Database now connected to `jobsheet_qa_production` on `ai-scheduler-mysql-prod`.
 
 ### /metrics (Prometheus format)
 
@@ -159,14 +165,72 @@ PLATFORM_VERSION                 main
 
 ---
 
-## Known Limitations
+## Database Configuration (Updated 2026-01-11)
 
-1. **Demo Mode Active:** Both staging and production are running without DATABASE_URL (demo mode). Database operations will return empty results.
+### Connection Details
 
-2. **Database Ready:** MySQL databases `jobsheet_qa_staging` and `jobsheet_qa_production` are provisioned but not connected. To enable:
-   - Get MySQL admin password
-   - Construct connection string: `mysql://aisched_admin:PASSWORD@ai-scheduler-mysql-prod.mysql.database.azure.com:3306/jobsheet_qa_production`
-   - Set as Container App secret
+| Environment | Database | User | Status |
+|-------------|----------|------|--------|
+| Staging | `jobsheet_qa_staging` | `jobsheet_staging` | ✅ Connected |
+| Production | `jobsheet_qa_production` | `jobsheet_prod` | ✅ Connected |
+
+**MySQL Server:** `ai-scheduler-mysql-prod.mysql.database.azure.com`  
+**SSL:** Required (`rejectUnauthorized: true`)
+
+### Verification Evidence (2026-01-11T18:46Z)
+
+**Staging /readyz:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-01-11T18:46:16.394Z",
+  "checks": {
+    "database": {
+      "status": "ok",
+      "latencyMs": 137
+    },
+    "storage": {
+      "status": "ok"
+    }
+  }
+}
+```
+
+**Production /readyz:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-01-11T18:46:17.878Z",
+  "checks": {
+    "database": {
+      "status": "ok",
+      "latencyMs": 0
+    },
+    "storage": {
+      "status": "ok"
+    }
+  }
+}
+```
+
+### Migration Evidence
+
+**Staging:**
+```
+[✓] Your SQL migration file ➜ drizzle/0003_regular_venus.sql 🚀
+[✓] migrations applied successfully!
+```
+
+**Production:**
+```
+No schema changes, nothing to migrate 😴
+[✓] migrations applied successfully!
+```
+
+**Tables Created (12):**
+- audit_findings, audit_results, disputes, gold_specs
+- job_sheets, processing_settings, selection_traces
+- system_audit_log, template_versions, templates, users, waivers
 
 ---
 
@@ -190,6 +254,8 @@ PLATFORM_VERSION                 main
 | /metrics Prometheus | ✅ | ✅ |
 | system.version correct SHA | ✅ | ✅ |
 | GitHub Env vars configured | ✅ | ✅ |
+| **Database connected** | ✅ 137ms | ✅ 0ms |
+| **Migrations applied** | ✅ | ✅ |
 
 ---
 
@@ -204,3 +270,27 @@ PLATFORM_VERSION                 main
 ---
 
 **PRODUCTION IS LIVE** ✅
+
+---
+
+## Appendix: Database Wiring Steps (2026-01-11)
+
+Completed by Azure Ops Engineer:
+
+1. **Created DB users** (Azure Cloud Shell → MySQL):
+   - `jobsheet_staging@%` → grants on `jobsheet_qa_staging.*`
+   - `jobsheet_prod@%` → grants on `jobsheet_qa_production.*`
+
+2. **Set Container App secrets** (az containerapp secret set):
+   - `plantex-assist-staging`: DATABASE_URL → staging connection string
+   - `jobsheet-qa-production`: DATABASE_URL → production connection string
+
+3. **Restarted apps** (az containerapp revision restart):
+   - Both apps restarted to pick up new secrets
+
+4. **Ran migrations** (pnpm db:push):
+   - Staging: Applied `0003_regular_venus.sql` (12 tables)
+   - Production: No schema changes needed
+
+5. **Verified /readyz**:
+   - Both environments: `database.status: ok`
