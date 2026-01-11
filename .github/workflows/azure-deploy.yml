@@ -298,14 +298,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get staging URL
+        id: get_url
+        run: |
+          FQDN=$(az containerapp show \
+            --name "${{ secrets.STAGING_CONTAINER_APP }}" \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          echo "staging_url=https://${FQDN}" >> $GITHUB_OUTPUT
+          echo "🔗 Resolved staging URL: https://${FQDN}"
+
       - name: Run release verification
         env:
-          # Use vars.STAGING_URL as primary (not masked), fall back to job output
-          STAGING_URL: ${{ vars.STAGING_URL || needs.deploy-staging.outputs.app_url }}
+          STAGING_URL: ${{ steps.get_url.outputs.staging_url }}
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           if [ -z "$STAGING_URL" ]; then
-            echo "❌ ERROR: STAGING_URL is empty. Set vars.STAGING_URL in GitHub Environment 'staging'"
+            echo "❌ ERROR: Could not resolve staging URL from Azure"
             exit 1
           fi
           echo "🔗 Using STAGING_URL: $STAGING_URL"
@@ -460,14 +474,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get production URL
+        id: get_url
+        run: |
+          FQDN=$(az containerapp show \
+            --name "${{ secrets.PRODUCTION_CONTAINER_APP }}" \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          echo "production_url=https://${FQDN}" >> $GITHUB_OUTPUT
+          echo "🔗 Resolved production URL: https://${FQDN}"
+
       - name: Run release verification (STRICT)
         env:
-          # Use vars.PRODUCTION_URL as primary (not masked), fall back to job output
-          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || needs.deploy-production.outputs.app_url }}
+          PRODUCTION_URL: ${{ steps.get_url.outputs.production_url }}
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           if [ -z "$PRODUCTION_URL" ]; then
-            echo "❌ ERROR: PRODUCTION_URL is empty. Set vars.PRODUCTION_URL in GitHub Environment 'production'"
+            echo "❌ ERROR: Could not resolve production URL from Azure"
             exit 1
           fi
           echo "🔗 Using PRODUCTION_URL: $PRODUCTION_URL"
