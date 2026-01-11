@@ -348,12 +348,16 @@ export function FeedbackCockpit() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {['eng-001', 'eng-002', 'eng-003'].map((id, i) => (
+                  {[
+                    { id: 'eng-001', passRate: 94.2 },
+                    { id: 'eng-002', passRate: 89.7 },
+                    { id: 'eng-003', passRate: 86.1 },
+                  ].map((eng, i) => (
                     <div key={i} className="flex items-center justify-between p-2 border rounded">
-                      <span className="font-medium">Engineer {id}</span>
+                      <span className="font-medium">Engineer {eng.id}</span>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">
-                          {(85 + Math.random() * 12).toFixed(1)}% pass rate
+                          {eng.passRate.toFixed(1)}% pass rate
                         </span>
                         {i === 0 ? (
                           <CheckCircle className="h-4 w-4 text-green-500" />
@@ -378,12 +382,16 @@ export function FeedbackCockpit() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {['template-a', 'template-b', 'template-c'].map((id, i) => (
+                  {[
+                    { id: 'template-a', accuracy: 96.3 },
+                    { id: 'template-b', accuracy: 94.1 },
+                    { id: 'template-c', accuracy: 92.8 },
+                  ].map((tmpl, i) => (
                     <div key={i} className="flex items-center justify-between p-2 border rounded">
-                      <span className="font-medium">Template {id.split('-')[1].toUpperCase()}</span>
+                      <span className="font-medium">Template {tmpl.id.split('-')[1].toUpperCase()}</span>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">
-                          {(90 + Math.random() * 8).toFixed(1)}% accuracy
+                          {tmpl.accuracy.toFixed(1)}% accuracy
                         </span>
                         <CheckCircle className="h-4 w-4 text-green-500" />
                       </div>
