@@ -292,6 +292,7 @@ jobs:
     needs: [build-and-push, deploy-staging]
     runs-on: ubuntu-latest
     if: ${{ !inputs.skip_verification }}
+    environment: staging
 
     steps:
       - name: Checkout code
@@ -453,6 +454,7 @@ jobs:
     needs: [build-and-push, deploy-production]
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'production' && !inputs.skip_verification }}
+    environment: production
 
     steps:
       - name: Checkout code
