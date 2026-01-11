@@ -1,0 +1,1141 @@
+{
+  "version": "1.0.0",
+  "runId": "eval-mk9lh83l-pzq3je",
+  "timestamp": "2026-01-11T10:32:08.001Z",
+  "environment": "local",
+  "documentSummary": {
+    "total": 9,
+    "fixtures": 9,
+    "sampledProduction": 0,
+    "synthetic": 0
+  },
+  "selectionMetrics": {
+    "totalDocuments": 9,
+    "correctSelections": 8,
+    "incorrectSelections": 1,
+    "ambiguousSelections": 1,
+    "accuracy": 0.8888888888888888,
+    "ambiguityRate": 0.1111111111111111,
+    "byTemplateId": {
+      "default-template": {
+        "total": 9,
+        "correct": 8,
+        "accuracy": 0.8888888888888888
+      }
+    },
+    "byAssetType": {}
+  },
+  "criticalFieldMetrics": {
+    "totalFields": 64,
+    "correctFields": 58,
+    "incorrectFields": 6,
+    "missingFields": 6,
+    "accuracy": 0.90625,
+    "bySeverity": {
+      "S0": {
+        "total": 36,
+        "correct": 30,
+        "accuracy": 0.8333333333333334
+      },
+      "S1": {
+        "total": 19,
+        "correct": 19,
+        "accuracy": 1
+      },
+      "S2": {
+        "total": 9,
+        "correct": 9,
+        "accuracy": 1
+      },
+      "S3": {
+        "total": 0,
+        "correct": 0,
+        "accuracy": 0
+      }
+    },
+    "byField": {
+      "jobNumber": {
+        "total": 9,
+        "correct": 8,
+        "accuracy": 0.8888888888888888
+      },
+      "customerName": {
+        "total": 9,
+        "correct": 7,
+        "accuracy": 0.7777777777777778
+      },
+      "serviceDate": {
+        "total": 9,
+        "correct": 9,
+        "accuracy": 1
+      },
+      "technicianId": {
+        "total": 9,
+        "correct": 9,
+        "accuracy": 1
+      },
+      "workDescription": {
+        "total": 9,
+        "correct": 9,
+        "accuracy": 1
+      },
+      "customerSignature": {
+        "total": 9,
+        "correct": 8,
+        "accuracy": 0.8888888888888888
+      },
+      "technicianSignature": {
+        "total": 9,
+        "correct": 7,
+        "accuracy": 0.7777777777777778
+      },
+      "laborHours": {
+        "total": 1,
+        "correct": 1,
+        "accuracy": 1
+      }
+    },
+    "criticalOnlyAccuracy": 0.8909090909090909
+  },
+  "fusionMetrics": {
+    "totalComparisons": 27,
+    "agreements": 26,
+    "disagreements": 1,
+    "agreementRate": 0.9629629629629629,
+    "ocrPreferred": 1,
+    "imageQaPreferred": 0,
+    "mergedDecisions": 26,
+    "conflictResolutions": 0,
+    "byField": {
+      "R001": {
+        "total": 9,
+        "agreements": 8,
+        "agreementRate": 0.8888888888888888
+      },
+      "R002": {
+        "total": 9,
+        "agreements": 9,
+        "agreementRate": 1
+      },
+      "R003": {
+        "total": 9,
+        "agreements": 9,
+        "agreementRate": 1
+      }
+    }
+  },
+  "pass2Metrics": {
+    "totalDocuments": 9,
+    "pass2Triggered": 2,
+    "pass2Rate": 0.2222222222222222,
+    "triggerReasons": {
+      "low_confidence": 2
+    },
+    "byTemplateId": {
+      "default-template": {
+        "total": 9,
+        "triggered": 2,
+        "rate": 0.2222222222222222
+      }
+    },
+    "interpreterUsage": {
+      "gemini": 2,
+      "claude": 0,
+      "escalatedToClaude": 0
+    }
+  },
+  "overallScore": 0.8934006734006734,
+  "trends": [],
+  "documentResults": [
+    {
+      "documentId": "doc-001",
+      "documentName": "Standard Job Sheet - Complete",
+      "source": "fixture",
+      "selection": {
+        "expectedTemplateId": "default-template",
+        "actualTemplateId": "default-template",
+        "isCorrect": true,
+        "confidence": 0.9978299637284371,
+        "runnerUpDelta": 0.12130485044782055,
+        "isAmbiguous": false
+      },
+      "fields": [
+        {
+          "fieldId": "R001",
+          "fieldName": "jobNumber",
+          "expectedValue": "JS-2026-001",
+          "actualValue": "JS-2026-001",
+          "isCorrect": true,
+          "confidence": 0.98,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R002",
+          "fieldName": "customerName",
+          "expectedValue": "CUSTOMER_A",
+          "actualValue": "CUSTOMER_A",
+          "isCorrect": true,
+          "confidence": 0.95,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R003",
+          "fieldName": "serviceDate",
+          "expectedValue": "2026-01-15",
+          "actualValue": "2026-01-15",
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R004",
+          "fieldName": "technicianId",
+          "expectedValue": "TECH-042",
+          "actualValue": "TECH-042",
+          "isCorrect": true,
+          "confidence": 0.97,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R005",
+          "fieldName": "workDescription",
+          "expectedValue": "Quarterly maintenance inspection",
+          "actualValue": "Quarterly maintenance inspection",
+          "isCorrect": true,
+          "confidence": 0.92,
+          "severity": "S2"
+        },
+        {
+          "fieldId": "R006",
+          "fieldName": "customerSignature",
+          "expectedValue": true,
+          "actualValue": true,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R007",
+          "fieldName": "technicianSignature",
+          "expectedValue": true,
+          "actualValue": true,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        }
+      ],
+      "fusionResults": [
+        {
+          "fieldId": "R001",
+          "ocrValue": "JS-2026-001",
+          "imageQaValue": "JS-2026-001",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R002",
+          "ocrValue": "CUSTOMER_A",
+          "imageQaValue": "CUSTOMER_A",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R003",
+          "ocrValue": "2026-01-15",
+          "imageQaValue": "2026-01-15",
+          "agreed": true,
+          "decision": "merged"
+        }
+      ],
+      "pass2": {
+        "triggered": false,
+        "escalated": false
+      },
+      "overallResult": "pass",
+      "expectedResult": "pass",
+      "matchesExpectation": true
+    },
+    {
+      "documentId": "doc-002",
+      "documentName": "Job Sheet - Missing Signature",
+      "source": "fixture",
+      "selection": {
+        "expectedTemplateId": "default-template",
+        "actualTemplateId": "default-template",
+        "isCorrect": true,
+        "confidence": 0.9013321093461717,
+        "runnerUpDelta": 0.2570937766423641,
+        "isAmbiguous": false
+      },
+      "fields": [
+        {
+          "fieldId": "R001",
+          "fieldName": "jobNumber",
+          "expectedValue": "JS-2026-002",
+          "actualValue": "JS-2026-002",
+          "isCorrect": true,
+          "confidence": 0.98,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R002",
+          "fieldName": "customerName",
+          "expectedValue": "CUSTOMER_B",
+          "actualValue": "CUSTOMER_B",
+          "isCorrect": true,
+          "confidence": 0.96,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R003",
+          "fieldName": "serviceDate",
+          "expectedValue": "2026-01-16",
+          "actualValue": "2026-01-16",
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R004",
+          "fieldName": "technicianId",
+          "expectedValue": "TECH-015",
+          "actualValue": "TECH-015",
+          "isCorrect": true,
+          "confidence": 0.97,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R005",
+          "fieldName": "workDescription",
+          "expectedValue": "Emergency repair",
+          "actualValue": "Emergency repair",
+          "isCorrect": true,
+          "confidence": 0.94,
+          "severity": "S2"
+        },
+        {
+          "fieldId": "R006",
+          "fieldName": "customerSignature",
+          "expectedValue": false,
+          "actualValue": false,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R007",
+          "fieldName": "technicianSignature",
+          "expectedValue": true,
+          "actualValue": true,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        }
+      ],
+      "fusionResults": [
+        {
+          "fieldId": "R001",
+          "ocrValue": "JS-2026-002",
+          "imageQaValue": "JS-2026-002",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R002",
+          "ocrValue": "CUSTOMER_B",
+          "imageQaValue": "CUSTOMER_B",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R003",
+          "ocrValue": "2026-01-16",
+          "imageQaValue": "2026-01-16",
+          "agreed": true,
+          "decision": "merged"
+        }
+      ],
+      "pass2": {
+        "triggered": false,
+        "escalated": false
+      },
+      "overallResult": "pass",
+      "expectedResult": "fail",
+      "matchesExpectation": false
+    },
+    {
+      "documentId": "doc-003",
+      "documentName": "Job Sheet - Low Confidence OCR",
+      "source": "fixture",
+      "selection": {
+        "expectedTemplateId": "default-template",
+        "actualTemplateId": "default-template",
+        "isCorrect": true,
+        "confidence": 0.8878158541603397,
+        "runnerUpDelta": 0.10451937045866784,
+        "isAmbiguous": false
+      },
+      "fields": [
+        {
+          "fieldId": "R001",
+          "fieldName": "jobNumber",
+          "expectedValue": "JS-2026-003",
+          "actualValue": null,
+          "isCorrect": false,
+          "confidence": 0.65,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R002",
+          "fieldName": "customerName",
+          "expectedValue": "CUSTOMER_C",
+          "actualValue": null,
+          "isCorrect": false,
+          "confidence": 0.7,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R003",
+          "fieldName": "serviceDate",
+          "expectedValue": "2026-01-17",
+          "actualValue": "2026-01-17",
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R004",
+          "fieldName": "technicianId",
+          "expectedValue": "TECH-008",
+          "actualValue": "TECH-008",
+          "isCorrect": true,
+          "confidence": 0.97,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R005",
+          "fieldName": "workDescription",
+          "expectedValue": "Installation",
+          "actualValue": "Installation",
+          "isCorrect": true,
+          "confidence": 0.6,
+          "severity": "S2"
+        },
+        {
+          "fieldId": "R006",
+          "fieldName": "customerSignature",
+          "expectedValue": true,
+          "actualValue": true,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R007",
+          "fieldName": "technicianSignature",
+          "expectedValue": true,
+          "actualValue": null,
+          "isCorrect": false,
+          "confidence": 0.99,
+          "severity": "S0"
+        }
+      ],
+      "fusionResults": [
+        {
+          "fieldId": "R001",
+          "ocrValue": "JS-2026-003",
+          "imageQaValue": "JS-2026-003",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R002",
+          "ocrValue": "CUSTOMER_C",
+          "imageQaValue": "CUSTOMER_C",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R003",
+          "ocrValue": "2026-01-17",
+          "imageQaValue": "2026-01-17",
+          "agreed": true,
+          "decision": "merged"
+        }
+      ],
+      "pass2": {
+        "triggered": false,
+        "escalated": false
+      },
+      "overallResult": "fail",
+      "expectedResult": "pass",
+      "matchesExpectation": false
+    },
+    {
+      "documentId": "doc-004",
+      "documentName": "Job Sheet - Invalid Format",
+      "source": "fixture",
+      "selection": {
+        "expectedTemplateId": "default-template",
+        "actualTemplateId": "default-template",
+        "isCorrect": true,
+        "confidence": 0.8648875512692146,
+        "runnerUpDelta": 0.31339800571765075,
+        "isAmbiguous": false
+      },
+      "fields": [
+        {
+          "fieldId": "R001",
+          "fieldName": "jobNumber",
+          "expectedValue": "JOB-2026-001",
+          "actualValue": "JOB-2026-001",
+          "isCorrect": true,
+          "confidence": 0.98,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R002",
+          "fieldName": "customerName",
+          "expectedValue": "CUSTOMER_D",
+          "actualValue": "CUSTOMER_D",
+          "isCorrect": true,
+          "confidence": 0.95,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R003",
+          "fieldName": "serviceDate",
+          "expectedValue": "2026-01-18",
+          "actualValue": "2026-01-18",
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R004",
+          "fieldName": "technicianId",
+          "expectedValue": "TECH-022",
+          "actualValue": "TECH-022",
+          "isCorrect": true,
+          "confidence": 0.97,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R005",
+          "fieldName": "workDescription",
+          "expectedValue": "Preventive maintenance",
+          "actualValue": "Preventive maintenance",
+          "isCorrect": true,
+          "confidence": 0.92,
+          "severity": "S2"
+        },
+        {
+          "fieldId": "R006",
+          "fieldName": "customerSignature",
+          "expectedValue": true,
+          "actualValue": true,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R007",
+          "fieldName": "technicianSignature",
+          "expectedValue": true,
+          "actualValue": true,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        }
+      ],
+      "fusionResults": [
+        {
+          "fieldId": "R001",
+          "ocrValue": "JOB-2026-001",
+          "imageQaValue": "JOB-2026-001",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R002",
+          "ocrValue": "CUSTOMER_D",
+          "imageQaValue": "CUSTOMER_D",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R003",
+          "ocrValue": "2026-01-18",
+          "imageQaValue": "2026-01-18",
+          "agreed": true,
+          "decision": "merged"
+        }
+      ],
+      "pass2": {
+        "triggered": true,
+        "reason": "low_confidence",
+        "interpreter": "gemini",
+        "escalated": false
+      },
+      "overallResult": "pass",
+      "expectedResult": "fail",
+      "matchesExpectation": false
+    },
+    {
+      "documentId": "doc-005",
+      "documentName": "Job Sheet - Out of Range",
+      "source": "fixture",
+      "selection": {
+        "expectedTemplateId": "default-template",
+        "actualTemplateId": "default-template",
+        "isCorrect": true,
+        "confidence": 0.9320314607863316,
+        "runnerUpDelta": 0.1719499880791518,
+        "isAmbiguous": false
+      },
+      "fields": [
+        {
+          "fieldId": "R001",
+          "fieldName": "jobNumber",
+          "expectedValue": "JS-2026-005",
+          "actualValue": "JS-2026-005",
+          "isCorrect": true,
+          "confidence": 0.98,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R002",
+          "fieldName": "customerName",
+          "expectedValue": "CUSTOMER_E",
+          "actualValue": "CUSTOMER_E",
+          "isCorrect": true,
+          "confidence": 0.95,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R003",
+          "fieldName": "serviceDate",
+          "expectedValue": "2026-01-19",
+          "actualValue": "2026-01-19",
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R004",
+          "fieldName": "technicianId",
+          "expectedValue": "TECH-033",
+          "actualValue": "TECH-033",
+          "isCorrect": true,
+          "confidence": 0.97,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R005",
+          "fieldName": "workDescription",
+          "expectedValue": "Major overhaul",
+          "actualValue": "Major overhaul",
+          "isCorrect": true,
+          "confidence": 0.92,
+          "severity": "S2"
+        },
+        {
+          "fieldId": "R006",
+          "fieldName": "customerSignature",
+          "expectedValue": true,
+          "actualValue": true,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R007",
+          "fieldName": "technicianSignature",
+          "expectedValue": true,
+          "actualValue": true,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R008",
+          "fieldName": "laborHours",
+          "expectedValue": 25,
+          "actualValue": 25,
+          "isCorrect": true,
+          "confidence": 0.98,
+          "severity": "S1"
+        }
+      ],
+      "fusionResults": [
+        {
+          "fieldId": "R001",
+          "ocrValue": "JS-2026-005",
+          "imageQaValue": "different",
+          "agreed": false,
+          "decision": "ocr"
+        },
+        {
+          "fieldId": "R002",
+          "ocrValue": "CUSTOMER_E",
+          "imageQaValue": "CUSTOMER_E",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R003",
+          "ocrValue": "2026-01-19",
+          "imageQaValue": "2026-01-19",
+          "agreed": true,
+          "decision": "merged"
+        }
+      ],
+      "pass2": {
+        "triggered": false,
+        "escalated": false
+      },
+      "overallResult": "pass",
+      "expectedResult": "fail",
+      "matchesExpectation": false
+    },
+    {
+      "documentId": "doc-006",
+      "documentName": "Job Sheet - Out of Policy",
+      "source": "fixture",
+      "selection": {
+        "expectedTemplateId": "default-template",
+        "actualTemplateId": "wrong-template",
+        "isCorrect": false,
+        "confidence": 0.8594555459427049,
+        "runnerUpDelta": 0.21591340584606583,
+        "isAmbiguous": false
+      },
+      "fields": [
+        {
+          "fieldId": "R001",
+          "fieldName": "jobNumber",
+          "expectedValue": "JS-2026-006",
+          "actualValue": "JS-2026-006",
+          "isCorrect": true,
+          "confidence": 0.98,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R002",
+          "fieldName": "customerName",
+          "expectedValue": "CUSTOMER_F",
+          "actualValue": "CUSTOMER_F",
+          "isCorrect": true,
+          "confidence": 0.95,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R003",
+          "fieldName": "serviceDate",
+          "expectedValue": "2027-06-15",
+          "actualValue": "2027-06-15",
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R004",
+          "fieldName": "technicianId",
+          "expectedValue": "TECH-044",
+          "actualValue": "TECH-044",
+          "isCorrect": true,
+          "confidence": 0.97,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R005",
+          "fieldName": "workDescription",
+          "expectedValue": "Scheduled inspection",
+          "actualValue": "Scheduled inspection",
+          "isCorrect": true,
+          "confidence": 0.92,
+          "severity": "S2"
+        },
+        {
+          "fieldId": "R006",
+          "fieldName": "customerSignature",
+          "expectedValue": true,
+          "actualValue": true,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R007",
+          "fieldName": "technicianSignature",
+          "expectedValue": true,
+          "actualValue": null,
+          "isCorrect": false,
+          "confidence": 0.99,
+          "severity": "S0"
+        }
+      ],
+      "fusionResults": [
+        {
+          "fieldId": "R001",
+          "ocrValue": "JS-2026-006",
+          "imageQaValue": "JS-2026-006",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R002",
+          "ocrValue": "CUSTOMER_F",
+          "imageQaValue": "CUSTOMER_F",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R003",
+          "ocrValue": "2027-06-15",
+          "imageQaValue": "2027-06-15",
+          "agreed": true,
+          "decision": "merged"
+        }
+      ],
+      "pass2": {
+        "triggered": false,
+        "escalated": false
+      },
+      "overallResult": "fail",
+      "expectedResult": "fail",
+      "matchesExpectation": true
+    },
+    {
+      "documentId": "doc-007",
+      "documentName": "Job Sheet - Conflicting Values",
+      "source": "fixture",
+      "selection": {
+        "expectedTemplateId": "default-template",
+        "actualTemplateId": "default-template",
+        "isCorrect": true,
+        "confidence": 0.9883321351312655,
+        "runnerUpDelta": 0.3643180586243129,
+        "isAmbiguous": false
+      },
+      "fields": [
+        {
+          "fieldId": "R001",
+          "fieldName": "jobNumber",
+          "expectedValue": "JS-2026-007",
+          "actualValue": "JS-2026-007",
+          "isCorrect": true,
+          "confidence": 0.98,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R002",
+          "fieldName": "customerName",
+          "expectedValue": "CUSTOMER_G",
+          "actualValue": "CUSTOMER_G",
+          "isCorrect": true,
+          "confidence": 0.95,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R003",
+          "fieldName": "serviceDate",
+          "expectedValue": "2026-01-20",
+          "actualValue": "2026-01-20",
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R004",
+          "fieldName": "technicianId",
+          "expectedValue": "TECH-055",
+          "actualValue": "TECH-055",
+          "isCorrect": true,
+          "confidence": 0.85,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R005",
+          "fieldName": "workDescription",
+          "expectedValue": "Repair and calibration",
+          "actualValue": "Repair and calibration",
+          "isCorrect": true,
+          "confidence": 0.92,
+          "severity": "S2"
+        },
+        {
+          "fieldId": "R006",
+          "fieldName": "customerSignature",
+          "expectedValue": true,
+          "actualValue": true,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R007",
+          "fieldName": "technicianSignature",
+          "expectedValue": true,
+          "actualValue": true,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        }
+      ],
+      "fusionResults": [
+        {
+          "fieldId": "R001",
+          "ocrValue": "JS-2026-007",
+          "imageQaValue": "JS-2026-007",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R002",
+          "ocrValue": "CUSTOMER_G",
+          "imageQaValue": "CUSTOMER_G",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R003",
+          "ocrValue": "2026-01-20",
+          "imageQaValue": "2026-01-20",
+          "agreed": true,
+          "decision": "merged"
+        }
+      ],
+      "pass2": {
+        "triggered": false,
+        "escalated": false
+      },
+      "overallResult": "pass",
+      "expectedResult": "fail",
+      "matchesExpectation": false
+    },
+    {
+      "documentId": "doc-008",
+      "documentName": "Job Sheet - Multiple Failures",
+      "source": "fixture",
+      "selection": {
+        "expectedTemplateId": "default-template",
+        "actualTemplateId": "default-template",
+        "isCorrect": true,
+        "confidence": 0.9450008536646846,
+        "runnerUpDelta": 0.27731401561713054,
+        "isAmbiguous": false
+      },
+      "fields": [
+        {
+          "fieldId": "R001",
+          "fieldName": "jobNumber",
+          "expectedValue": "INVALID",
+          "actualValue": "INVALID",
+          "isCorrect": true,
+          "confidence": 0.98,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R002",
+          "fieldName": "customerName",
+          "expectedValue": "",
+          "actualValue": null,
+          "isCorrect": false,
+          "confidence": 0.95,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R003",
+          "fieldName": "serviceDate",
+          "expectedValue": "2026-01-21",
+          "actualValue": "2026-01-21",
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R004",
+          "fieldName": "technicianId",
+          "expectedValue": "TECH-077",
+          "actualValue": "TECH-077",
+          "isCorrect": true,
+          "confidence": 0.97,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R005",
+          "fieldName": "workDescription",
+          "expectedValue": "Complex repair",
+          "actualValue": "Complex repair",
+          "isCorrect": true,
+          "confidence": 0.92,
+          "severity": "S2"
+        },
+        {
+          "fieldId": "R006",
+          "fieldName": "customerSignature",
+          "expectedValue": false,
+          "actualValue": false,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R007",
+          "fieldName": "technicianSignature",
+          "expectedValue": true,
+          "actualValue": true,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        }
+      ],
+      "fusionResults": [
+        {
+          "fieldId": "R001",
+          "ocrValue": "INVALID",
+          "imageQaValue": "INVALID",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R002",
+          "ocrValue": "",
+          "imageQaValue": "",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R003",
+          "ocrValue": "2026-01-21",
+          "imageQaValue": "2026-01-21",
+          "agreed": true,
+          "decision": "merged"
+        }
+      ],
+      "pass2": {
+        "triggered": true,
+        "reason": "low_confidence",
+        "interpreter": "gemini",
+        "escalated": false
+      },
+      "overallResult": "fail",
+      "expectedResult": "fail",
+      "matchesExpectation": true
+    },
+    {
+      "documentId": "doc-009",
+      "documentName": "Job Sheet - Table Heavy",
+      "source": "fixture",
+      "selection": {
+        "expectedTemplateId": "default-template",
+        "actualTemplateId": "default-template",
+        "isCorrect": true,
+        "confidence": 0.9834003786150876,
+        "runnerUpDelta": 0.26402998687463125,
+        "isAmbiguous": true
+      },
+      "fields": [
+        {
+          "fieldId": "R001",
+          "fieldName": "jobNumber",
+          "expectedValue": "JS-2026-009",
+          "actualValue": "JS-2026-009",
+          "isCorrect": true,
+          "confidence": 0.98,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R002",
+          "fieldName": "customerName",
+          "expectedValue": "CUSTOMER_I",
+          "actualValue": "CUSTOMER_I",
+          "isCorrect": true,
+          "confidence": 0.95,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R003",
+          "fieldName": "serviceDate",
+          "expectedValue": "2026-01-22",
+          "actualValue": "2026-01-22",
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R004",
+          "fieldName": "technicianId",
+          "expectedValue": "TECH-088",
+          "actualValue": "TECH-088",
+          "isCorrect": true,
+          "confidence": 0.97,
+          "severity": "S1"
+        },
+        {
+          "fieldId": "R005",
+          "fieldName": "workDescription",
+          "expectedValue": "Full system replacement",
+          "actualValue": "Full system replacement",
+          "isCorrect": true,
+          "confidence": 0.92,
+          "severity": "S2"
+        },
+        {
+          "fieldId": "R006",
+          "fieldName": "customerSignature",
+          "expectedValue": true,
+          "actualValue": null,
+          "isCorrect": false,
+          "confidence": 0.99,
+          "severity": "S0"
+        },
+        {
+          "fieldId": "R007",
+          "fieldName": "technicianSignature",
+          "expectedValue": true,
+          "actualValue": true,
+          "isCorrect": true,
+          "confidence": 0.99,
+          "severity": "S0"
+        }
+      ],
+      "fusionResults": [
+        {
+          "fieldId": "R001",
+          "ocrValue": "JS-2026-009",
+          "imageQaValue": "JS-2026-009",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R002",
+          "ocrValue": "CUSTOMER_I",
+          "imageQaValue": "CUSTOMER_I",
+          "agreed": true,
+          "decision": "merged"
+        },
+        {
+          "fieldId": "R003",
+          "ocrValue": "2026-01-22",
+          "imageQaValue": "2026-01-22",
+          "agreed": true,
+          "decision": "merged"
+        }
+      ],
+      "pass2": {
+        "triggered": false,
+        "escalated": false
+      },
+      "overallResult": "fail",
+      "expectedResult": "pass",
+      "matchesExpectation": false
+    }
+  ],
+  "metadata": {
+    "goldenDatasetVersion": "2.1.0",
+    "evaluatorVersion": "1.0.0",
+    "configHash": "default"
+  }
+}
