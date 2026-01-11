@@ -21,6 +21,11 @@ import { test, expect } from '@playwright/test';
 import { setupDemoLogin, closeModalIfPresent } from './helpers/demo-login';
 import * as path from 'path';
 import * as fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Fixture paths (relative to project root)
 const FIXTURE_DIR = 'docs/testing/sandbox-fixtures';
