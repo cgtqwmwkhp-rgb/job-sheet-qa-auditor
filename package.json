@@ -34,7 +34,9 @@
     "eval:run": "npx tsx scripts/eval/run-eval.ts",
     "eval:quick": "npx tsx scripts/eval/run-eval.ts --mode fixtures",
     "drift:check": "npx tsx scripts/drift/run-drift-check.ts",
-    "drift:baseline": "npx tsx scripts/drift/run-drift-check.ts --create-baseline"
+    "drift:baseline": "npx tsx scripts/drift/run-drift-check.ts --create-baseline",
+    "governance:check": "npx tsx scripts/governance/check-environment-contract.ts",
+    "local-ci:governance": "pnpm governance:check"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
