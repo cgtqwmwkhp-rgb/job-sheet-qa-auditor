@@ -283,7 +283,16 @@ export function selectTemplate(
   let autoProcessingAllowed = false;
   let blockReason: string | undefined;
   
-  if (confidenceBand === 'HIGH') {
+  // SPECIAL CASE: Single template mode (catch-all)
+  // When only one template exists (default), always allow processing
+  // This ensures the system works out-of-the-box before custom templates are added
+  const isSingleTemplateMode = candidates.length === 1 && topCandidate?.templateSlug === 'default-job-sheet';
+  
+  if (isSingleTemplateMode) {
+    // Default catch-all template - always allow processing
+    autoProcessingAllowed = true;
+    console.log(`[TemplateSelector] Single template mode: using default catch-all (score: ${topScore})`);
+  } else if (confidenceBand === 'HIGH') {
     autoProcessingAllowed = true;
   } else if (confidenceBand === 'MEDIUM') {
     if (scoreGap >= MEDIUM_CONFIDENCE_MIN_GAP) {
