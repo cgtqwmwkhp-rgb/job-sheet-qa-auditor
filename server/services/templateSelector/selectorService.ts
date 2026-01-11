@@ -286,7 +286,7 @@ export function selectTemplate(
   // SPECIAL CASE: Single template mode (catch-all)
   // When only one template exists (default), always allow processing
   // This ensures the system works out-of-the-box before custom templates are added
-  const isSingleTemplateMode = candidates.length === 1 && topCandidate?.templateSlug === 'default-job-sheet';
+  const isSingleTemplateMode = candidates.length === 1 && topCandidate?.templateSlug === 'standard-maintenance-v1';
   
   if (isSingleTemplateMode) {
     // Default catch-all template - always allow processing
