@@ -123,6 +123,3 @@ export function resetStorageAdapter(): void {
 // Re-export types
 export type { StorageAdapter, StorageResult, StorageProvider, StorageConfig } from './types';
 
-// Re-export legacy Forge functions for backwards compatibility
-export { storagePut, storageGet } from './legacyForge';
-
