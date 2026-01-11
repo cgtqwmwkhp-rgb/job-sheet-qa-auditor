@@ -57,12 +57,12 @@ on:
         type: boolean
         default: false
       staging_url:
-        description: 'Staging environment URL'
+        description: 'Staging environment URL (leave empty to use vars.STAGING_URL)'
         required: false
         type: string
         default: ''
       production_url:
-        description: 'Production environment URL'
+        description: 'Production environment URL (leave empty to use vars.PRODUCTION_URL)'
         required: false
         type: string
         default: ''
@@ -171,11 +171,27 @@ jobs:
   verify-staging:
     if: ${{ inputs.verify_staging == true }}
     runs-on: ubuntu-latest
+    environment: staging
     outputs:
       deployed_sha: ${{ steps.smoke.outputs.deployed_sha }}
       smoke_status: ${{ steps.smoke.outputs.status }}
       monitor_status: ${{ steps.monitor.outputs.status }}
     steps:
+      - name: Resolve staging URL
+        id: resolve_url
+        run: |
+          # Use input if provided, otherwise use environment variable
+          RESOLVED_URL="${{ inputs.staging_url }}"
+          if [ -z "$RESOLVED_URL" ]; then
+            RESOLVED_URL="${{ vars.STAGING_URL }}"
+          fi
+          if [ -z "$RESOLVED_URL" ]; then
+            echo "❌ ERROR: No staging URL provided and vars.STAGING_URL not set"
+            exit 1
+          fi
+          echo "staging_url=$RESOLVED_URL" >> $GITHUB_OUTPUT
+          echo "✅ Resolved staging URL: $RESOLVED_URL"
+
       - name: Log CI context
         env:
           REPO_CONTEXT: "job-sheet-qa-auditor (TypeScript/Node)"
@@ -188,7 +204,7 @@ jobs:
           echo "  REF:         ${{ github.ref }}"
           echo "  EVENT:       ${{ github.event_name }}"
           echo "  ENVIRONMENT: staging"
-          echo "  TARGET:      ${{ inputs.staging_url }}"
+          echo "  TARGET:      ${{ steps.resolve_url.outputs.staging_url }}"
           echo "  MODE:        soft (staging always soft)"
           echo "=================================================="
 
@@ -199,7 +215,7 @@ jobs:
         run: |
           chmod +x scripts/release/smoke-check.sh
           set +e
-          ./scripts/release/smoke-check.sh "${{ inputs.staging_url }}" "${{ inputs.expected_git_sha }}" "soft"
+          ./scripts/release/smoke-check.sh "${{ steps.resolve_url.outputs.staging_url }}" "${{ inputs.expected_git_sha }}" "soft"
           EXIT_CODE=$?
           set -e
           
@@ -233,7 +249,7 @@ jobs:
         run: |
           chmod +x scripts/release/monitor-snapshot.sh
           set +e
-          ./scripts/release/monitor-snapshot.sh "${{ inputs.staging_url }}" "soft" "false"
+          ./scripts/release/monitor-snapshot.sh "${{ steps.resolve_url.outputs.staging_url }}" "soft" "false"
           EXIT_CODE=$?
           set -e
           
@@ -256,7 +272,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Target URL | ${{ inputs.staging_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Target URL | ${{ steps.resolve_url.outputs.staging_url }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Expected SHA | ${{ inputs.expected_git_sha || 'Not specified' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deployed SHA | ${{ steps.smoke.outputs.deployed_sha }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Mode | soft |" >> $GITHUB_STEP_SUMMARY
@@ -270,6 +286,7 @@ jobs:
     if: ${{ inputs.verify_production == true }}
     needs: [verify-staging]
     runs-on: ubuntu-latest
+    environment: production
     outputs:
       deployed_sha: ${{ steps.smoke.outputs.deployed_sha }}
       smoke_status: ${{ steps.smoke.outputs.status }}
@@ -284,6 +301,21 @@ jobs:
           fi
           echo "✅ Staging passed. Proceeding to production verification."
 
+      - name: Resolve production URL
+        id: resolve_url
+        run: |
+          # Use input if provided, otherwise use environment variable
+          RESOLVED_URL="${{ inputs.production_url }}"
+          if [ -z "$RESOLVED_URL" ]; then
+            RESOLVED_URL="${{ vars.PRODUCTION_URL }}"
+          fi
+          if [ -z "$RESOLVED_URL" ]; then
+            echo "❌ ERROR: No production URL provided and vars.PRODUCTION_URL not set"
+            exit 1
+          fi
+          echo "production_url=$RESOLVED_URL" >> $GITHUB_OUTPUT
+          echo "✅ Resolved production URL: $RESOLVED_URL"
+
       - name: Log CI context
         env:
           REPO_CONTEXT: "job-sheet-qa-auditor (TypeScript/Node)"
@@ -296,7 +328,7 @@ jobs:
           echo "  REF:         ${{ github.ref }}"
           echo "  EVENT:       ${{ github.event_name }}"
           echo "  ENVIRONMENT: production"
-          echo "  TARGET:      ${{ inputs.production_url }}"
+          echo "  TARGET:      ${{ steps.resolve_url.outputs.production_url }}"
           echo "  MODE:        strict (production always strict)"
           echo "=================================================="
 
@@ -307,7 +339,7 @@ jobs:
         run: |
           chmod +x scripts/release/smoke-check.sh
           set +e
-          ./scripts/release/smoke-check.sh "${{ inputs.production_url }}" "${{ inputs.expected_git_sha }}" "strict"
+          ./scripts/release/smoke-check.sh "${{ steps.resolve_url.outputs.production_url }}" "${{ inputs.expected_git_sha }}" "strict"
           EXIT_CODE=$?
           set -e
           
@@ -341,7 +373,7 @@ jobs:
         run: |
           chmod +x scripts/release/monitor-snapshot.sh
           set +e
-          ./scripts/release/monitor-snapshot.sh "${{ inputs.production_url }}" "strict" "false"
+          ./scripts/release/monitor-snapshot.sh "${{ steps.resolve_url.outputs.production_url }}" "strict" "false"
           EXIT_CODE=$?
           set -e
           
@@ -365,7 +397,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Target URL | ${{ inputs.production_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Target URL | ${{ steps.resolve_url.outputs.production_url }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Expected SHA | ${{ inputs.expected_git_sha || 'Not specified' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deployed SHA | ${{ steps.smoke.outputs.deployed_sha }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Mode | strict |" >> $GITHUB_STEP_SUMMARY

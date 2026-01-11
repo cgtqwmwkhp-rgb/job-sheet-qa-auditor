@@ -20,6 +20,8 @@
 #   AZURE_STORAGE_CONNECTION_STRING - Azure Blob Storage connection string
 #
 # Environment Variables (set in GitHub Environment):
+#   STAGING_URL                    - Staging app URL (e.g., https://app-staging.azurecontainerapps.io)
+#   PRODUCTION_URL                 - Production app URL (e.g., https://app-prod.azurecontainerapps.io)
 #   STORAGE_PROVIDER               - 'azure' for Azure Blob, 'local' for disk
 #   AZURE_STORAGE_CONTAINER_NAME   - Blob container name
 #   ENABLE_PURGE_EXECUTION         - 'false' for staging
@@ -297,9 +299,16 @@ jobs:
 
       - name: Run release verification
         env:
-          STAGING_URL: ${{ needs.deploy-staging.outputs.app_url }}
+          # Use vars.STAGING_URL as primary (not masked), fall back to job output
+          STAGING_URL: ${{ vars.STAGING_URL || needs.deploy-staging.outputs.app_url }}
           EXPECTED_SHA: ${{ github.sha }}
         run: |
+          if [ -z "$STAGING_URL" ]; then
+            echo "❌ ERROR: STAGING_URL is empty. Set vars.STAGING_URL in GitHub Environment 'staging'"
+            exit 1
+          fi
+          echo "🔗 Using STAGING_URL: $STAGING_URL"
+          
           chmod +x scripts/release/smoke-check.sh
           chmod +x scripts/release/monitor-snapshot.sh
           
@@ -451,9 +460,16 @@ jobs:
 
       - name: Run release verification (STRICT)
         env:
-          PRODUCTION_URL: ${{ needs.deploy-production.outputs.app_url }}
+          # Use vars.PRODUCTION_URL as primary (not masked), fall back to job output
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || needs.deploy-production.outputs.app_url }}
           EXPECTED_SHA: ${{ github.sha }}
         run: |
+          if [ -z "$PRODUCTION_URL" ]; then
+            echo "❌ ERROR: PRODUCTION_URL is empty. Set vars.PRODUCTION_URL in GitHub Environment 'production'"
+            exit 1
+          fi
+          echo "🔗 Using PRODUCTION_URL: $PRODUCTION_URL"
+          
           chmod +x scripts/release/smoke-check.sh
           chmod +x scripts/release/monitor-snapshot.sh
           
