@@ -3,7 +3,7 @@
   "schemaVersion": "1.0.0",
   "description": "Golden dataset for parity testing - Expanded with 9 documents covering all edge cases",
   "createdAt": "2026-01-04T00:00:00.000Z",
-  "contentHash": "sha256:29af32b17e931b43353108e37d12a4a49efe9883ed9ba279883d6b8103147ad8",
+  "contentHash": "sha256:9da88a5a4c6573c4ccba6bcdea82b5efceb9d01fef34b92c1fb23bbe9a56ed8f",
   "documents": [
     {
       "id": "doc-001",

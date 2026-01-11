@@ -282,8 +282,10 @@ function runSubsetParity(
   const runId = Math.random().toString(16).slice(2, 14);
   const documentComparisons: { documentId: string; documentName: string; status: string; expectedResult: string; actualResult: string | null; fieldComparisons: unknown[] }[] = [];
   
-  let same = 0, improved = 0, worse = 0;
-  let fieldsSame = 0, fieldsImproved = 0, fieldsWorse = 0;
+  let same = 0, worse = 0;
+  const improved = 0;
+  let fieldsSame = 0, fieldsWorse = 0;
+  const fieldsImproved = 0;
   
   for (const expected of expectedDocs) {
     const actual = actualDocs.find(d => d.id === expected.id);

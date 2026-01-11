@@ -424,13 +424,14 @@ export function extractPlausibilitySignal(
     
     // Check for field-specific patterns
     switch (field.type) {
-      case 'date':
+      case 'date': {
         // Look for date patterns
-        const datePattern = /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/;
+        const datePattern = /\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}/;
         if (datePattern.test(documentText)) {
           found = true;
         }
         break;
+      }
         
       case 'pattern':
       case 'regex':
@@ -448,7 +449,7 @@ export function extractPlausibilitySignal(
         break;
         
       case 'string':
-      case 'required':
+      case 'required': {
         // Look for field name mentions
         const fieldPatterns = getFieldPatterns(field.field);
         for (const pattern of fieldPatterns) {
@@ -458,6 +459,7 @@ export function extractPlausibilitySignal(
           }
         }
         break;
+      }
     }
     
     if (found) {

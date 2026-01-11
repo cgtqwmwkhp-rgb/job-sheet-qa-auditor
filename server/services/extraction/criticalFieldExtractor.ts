@@ -137,9 +137,9 @@ const EXTRACTION_STRATEGIES: Record<CriticalFieldType, ExtractionStrategy> = {
   },
   date: {
     patterns: [
-      /date[:.\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
-      /(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/,
-      /(\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/,
+      /date[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
+      /(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/,
+      /(\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2})/,
       /(\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{2,4})/i,
     ],
     validators: [
@@ -156,10 +156,10 @@ const EXTRACTION_STRATEGIES: Record<CriticalFieldType, ExtractionStrategy> = {
   },
   expiryDate: {
     patterns: [
-      /expir(?:y|es|ation)\s*(?:date)?[:.\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
-      /valid\s*(?:until|to)[:.\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
-      /next\s*(?:service|inspection)[:.\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
-      /due\s*(?:date)?[:.\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
+      /expir(?:y|es|ation)\s*(?:date)?[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
+      /valid\s*(?:until|to)[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
+      /next\s*(?:service|inspection)[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
+      /due\s*(?:date)?[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
     ],
     validators: [
       (v) => {
@@ -215,7 +215,7 @@ function parseDate(value: string): ParsedDate | null {
   const cleanValue = value.trim();
   
   // Try ISO format first: YYYY-MM-DD
-  const isoMatch = cleanValue.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+  const isoMatch = cleanValue.match(/^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})$/);
   if (isoMatch) {
     const year = parseInt(isoMatch[1]);
     const month = parseInt(isoMatch[2]);
@@ -226,7 +226,7 @@ function parseDate(value: string): ParsedDate | null {
   }
   
   // Try DD/MM/YYYY or DD-MM-YYYY (UK format)
-  const ukMatch = cleanValue.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  const ukMatch = cleanValue.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
   if (ukMatch) {
     let year = parseInt(ukMatch[3]);
     if (year < 100) year += 2000;

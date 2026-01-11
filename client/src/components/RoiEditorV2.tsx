@@ -225,10 +225,10 @@ export function RoiEditorV2({
   /**
    * Snap value to grid
    */
-  const snapValue = (value: number): number => {
+  const snapValue = useCallback((value: number): number => {
     if (!snapToGrid) return value;
     return Math.round(value / gridSize) * gridSize;
-  };
+  }, [snapToGrid, gridSize]);
 
   /**
    * Handle mouse down on canvas
@@ -242,7 +242,7 @@ export function RoiEditorV2({
 
     setIsDrawing(true);
     setDrawStart({ x, y });
-  }, [readOnly, snapToGrid]);
+  }, [readOnly, snapValue]);
 
   /**
    * Handle mouse up on canvas
@@ -280,7 +280,7 @@ export function RoiEditorV2({
 
     setIsDrawing(false);
     setDrawStart(null);
-  }, [isDrawing, drawStart, currentTool, snapToGrid]);
+  }, [isDrawing, drawStart, currentTool, snapValue]);
 
   /**
    * Delete a region
