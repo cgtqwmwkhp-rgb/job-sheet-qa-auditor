@@ -56,25 +56,32 @@ async function checkAzureAuth(): Promise<User | null> {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Default to admin user immediately - Azure SSO handles authentication
-  const [user, setUser] = useState<User | null>(() => ({
-    id: 'azure_user',
-    name: 'Azure User',
-    email: 'user@plantexpand.com',
-    role: 'admin',
-    avatar: undefined
-  }));
-  const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch actual user details from Azure auth if available
+  // Check Azure SSO authentication on mount
   useEffect(() => {
     let mounted = true;
+    
     checkAzureAuth().then((azureUser) => {
       if (!mounted) return;
+      
       if (azureUser) {
+        // User is authenticated via Azure SSO
         setUser(azureUser);
+        setIsLoading(false);
+      } else {
+        // Not authenticated - redirect to Azure SSO login
+        // Check if we're already on the login callback to prevent redirect loop
+        if (!window.location.pathname.startsWith('/.auth/')) {
+          console.log('[Auth] No Azure session, redirecting to SSO login...');
+          window.location.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(window.location.pathname);
+        } else {
+          setIsLoading(false);
+        }
       }
     });
+    
     return () => { mounted = false; };
   }, []);
 
