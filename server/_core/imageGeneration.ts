@@ -15,7 +15,7 @@
  *     }]
  *   });
  */
-import { storagePut } from "server/storage";
+import { getStorageAdapter } from "server/storage";
 import { ENV } from "./env";
 
 export type GenerateImageOptions = {
@@ -80,8 +80,9 @@ export async function generateImage(
   const base64Data = result.image.b64Json;
   const buffer = Buffer.from(base64Data, "base64");
 
-  // Save to S3
-  const { url } = await storagePut(
+  // Save to storage
+  const storage = getStorageAdapter();
+  const { url } = await storage.put(
     `generated/${Date.now()}.png`,
     buffer,
     result.image.mimeType

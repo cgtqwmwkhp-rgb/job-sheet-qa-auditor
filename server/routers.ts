@@ -4,7 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
-import { storagePut } from "./storage";
+import { getStorageAdapter } from "./storage";
 import { nanoid } from "nanoid";
 import { processJobSheet } from "./services/documentProcessor";
 import { validateMistralApiKey } from "./services/ocr";
@@ -67,11 +67,13 @@ export const appRouter = router({
         technicianId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        // Decode base64 and upload to S3
+        // Decode base64 and upload to storage
         const buffer = Buffer.from(input.fileBase64, 'base64');
         const fileKey = `job-sheets/${ctx.user.id}/${nanoid()}-${input.fileName}`;
         
-        const { url } = await storagePut(fileKey, buffer, input.fileType);
+        // Use the storage adapter (azure, local, etc.) based on STORAGE_PROVIDER
+        const storage = getStorageAdapter();
+        const { url } = await storage.put(fileKey, buffer, input.fileType);
         
         // Create job sheet record
         const result = await db.createJobSheet({
