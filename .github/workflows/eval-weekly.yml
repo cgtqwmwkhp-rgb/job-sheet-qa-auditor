@@ -1,0 +1,123 @@
+# WEEKLY EVALUATION HARNESS WORKFLOW
+# Runs evaluation harness weekly to measure accuracy metrics.
+#
+# Schedule: Weekly on Sunday at 7:00 AM UTC
+# Manual trigger: workflow_dispatch with mode selection
+#
+# Does NOT require secrets for PR CI (runs in fixtures mode).
+
+name: Evaluation Harness (Weekly)
+
+on:
+  # Weekly schedule
+  schedule:
+    - cron: '0 7 * * 0'  # 7:00 AM UTC on Sundays
+  
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Evaluation mode'
+        required: false
+        type: choice
+        options:
+          - fixtures
+          - full
+          - quick
+        default: fixtures
+      compare_run:
+        description: 'Run ID to compare against (optional)'
+        required: false
+        type: string
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  evaluation:
+    name: Run Evaluation Harness
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Run evaluation
+        id: eval
+        run: |
+          MODE="${{ github.event.inputs.mode || 'fixtures' }}"
+          COMPARE="${{ github.event.inputs.compare_run }}"
+          
+          if [ -n "$COMPARE" ]; then
+            pnpm eval:run --mode "$MODE" --compare "$COMPARE"
+          else
+            pnpm eval:run --mode "$MODE"
+          fi
+        env:
+          EVAL_ENVIRONMENT: ${{ github.event.inputs.environment || 'local' }}
+      
+      - name: Upload evaluation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report-${{ github.run_id }}
+          path: scripts/eval/reports/latest.json
+          retention-days: 90
+      
+      - name: Check score threshold
+        run: |
+          if [ -f scripts/eval/reports/latest.json ]; then
+            SCORE=$(cat scripts/eval/reports/latest.json | jq '.overallScore // 0')
+            echo "Overall score: $SCORE"
+            
+            # Alert if score below 80%
+            THRESHOLD=0.80
+            if (( $(echo "$SCORE < $THRESHOLD" | bc -l) )); then
+              echo "::warning::Overall score $SCORE is below threshold $THRESHOLD"
+            fi
+          fi
+      
+      - name: Summary
+        run: |
+          echo "## Evaluation Harness Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f scripts/eval/reports/latest.json ]; then
+            echo "**Run ID:** $(cat scripts/eval/reports/latest.json | jq -r '.runId')" >> $GITHUB_STEP_SUMMARY
+            echo "**Timestamp:** $(cat scripts/eval/reports/latest.json | jq -r '.timestamp')" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            echo "### Metrics" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            
+            SELECTION=$(cat scripts/eval/reports/latest.json | jq '.selectionMetrics.accuracy * 100 | floor / 100')
+            FIELD=$(cat scripts/eval/reports/latest.json | jq '.criticalFieldMetrics.criticalOnlyAccuracy * 100 | floor / 100')
+            FUSION=$(cat scripts/eval/reports/latest.json | jq '.fusionMetrics.agreementRate * 100 | floor / 100')
+            PASS2=$(cat scripts/eval/reports/latest.json | jq '.pass2Metrics.pass2Rate * 100 | floor / 100')
+            OVERALL=$(cat scripts/eval/reports/latest.json | jq '.overallScore * 100 | floor / 100')
+            
+            echo "| Selection Accuracy | ${SELECTION}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Critical Field Accuracy | ${FIELD}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Fusion Agreement | ${FUSION}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Pass-2 Rate | ${PASS2}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Overall Score** | **${OVERALL}%** |" >> $GITHUB_STEP_SUMMARY
+            
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Trends" >> $GITHUB_STEP_SUMMARY
+            cat scripts/eval/reports/latest.json | jq -r '.trends[] | "- \(.metric): \(.trend) (\(.delta | . * 100 | floor / 100)%)"' >> $GITHUB_STEP_SUMMARY || echo "No trend data" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No evaluation report generated" >> $GITHUB_STEP_SUMMARY
+          fi
