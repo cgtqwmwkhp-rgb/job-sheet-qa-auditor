@@ -99,26 +99,32 @@ function getInitialUser(): User | null {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Use lazy initializer to avoid useEffect setState pattern
   const [user, setUser] = useState<User | null>(getInitialUser);
-  // Start loading if no user - we'll check Azure auth
-  const [isLoading, setIsLoading] = useState(() => !getInitialUser());
+  // Start loading only if no user from localStorage - we'll check Azure auth
+  const initialUser = getInitialUser();
+  const [isLoading, setIsLoading] = useState(!initialUser);
+  const [authChecked, setAuthChecked] = useState(!!initialUser);
 
   // Check for Azure Easy Auth on mount
   useEffect(() => {
-    // If already logged in via localStorage, skip Azure check
-    if (user) {
-      setIsLoading(false);
+    // If already checked (user from localStorage), skip
+    if (authChecked) {
       return;
     }
 
     // Check if Azure Easy Auth is active
+    let mounted = true;
     checkAzureAuth().then((azureUser) => {
+      if (!mounted) return;
       if (azureUser) {
         setUser(azureUser);
         localStorage.setItem('demo_user_role', 'admin');
       }
       setIsLoading(false);
+      setAuthChecked(true);
     });
-  }, []);
+
+    return () => { mounted = false; };
+  }, [authChecked]);
 
   const login = (role: UserRole) => {
     const newUser = MOCK_USERS[role];
