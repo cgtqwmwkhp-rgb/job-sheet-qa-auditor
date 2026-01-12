@@ -10,6 +10,7 @@ import { serveStatic, setupVite } from "./vite";
 import { handleHealthz, handleReadyz } from "./health";
 import { handleMetrics } from "./metrics";
 import { initializeDefaultTemplate, hasDefaultTemplate } from "../services/templateRegistry";
+import { pdfProxyRouter } from "./pdfProxy";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -60,6 +61,11 @@ async function startServer() {
 
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  
+  // PDF proxy endpoint (before tRPC, requires auth)
+  // Provides same-origin PDF streaming to avoid CORS issues with Azure Blob
+  app.use("/api/documents", pdfProxyRouter);
+  
   // tRPC API
   app.use(
     "/api/trpc",

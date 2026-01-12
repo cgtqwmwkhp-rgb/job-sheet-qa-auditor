@@ -233,7 +233,10 @@ export default function AuditResults() {
     findings,
   };
 
-  return <AuditResultsContent auditData={auditData} documentUrl={jobSheetData.fileUrl} jobSheetId={numericId} />;
+  // Use the PDF proxy endpoint for same-origin loading (avoids CORS issues)
+  const pdfProxyUrl = `/api/documents/${numericId}/pdf`;
+  
+  return <AuditResultsContent auditData={auditData} documentUrl={pdfProxyUrl} jobSheetId={numericId} />;
 }
 
 function AuditResultsContent({ auditData, documentUrl, jobSheetId }: { auditData: AuditData; documentUrl?: string; jobSheetId: number }) {
@@ -574,31 +577,16 @@ function FindingsList({ findings, activeBoxId, onFindingClick, onReportIssue }: 
   );
 }
 
-// PDF View Button - fetches fresh SAS URL
+// PDF View Button - uses same-origin proxy endpoint
 function ViewPdfButton({ jobSheetId, auditId }: { jobSheetId: number; auditId: string }) {
-  const [isLoading, setIsLoading] = useState(false);
-  const utils = trpc.useUtils();
-  
-  const handleClick = async () => {
+  const handleClick = () => {
     if (!jobSheetId) {
       toast.error('No job sheet ID available');
       return;
     }
     
-    setIsLoading(true);
-    try {
-      const result = await utils.jobSheets.getFileUrl.fetch({ id: jobSheetId });
-      if (result?.url) {
-        window.open(result.url, '_blank');
-      } else {
-        toast.error('Could not get file URL');
-      }
-    } catch (error) {
-      console.error('Failed to get PDF URL:', error);
-      toast.error('Failed to load PDF');
-    } finally {
-      setIsLoading(false);
-    }
+    // Use the same-origin PDF proxy endpoint
+    window.open(`/api/documents/${jobSheetId}/pdf`, '_blank');
   };
   
   return (
@@ -606,62 +594,39 @@ function ViewPdfButton({ jobSheetId, auditId }: { jobSheetId: number; auditId: s
       variant="outline" 
       size="sm"
       onClick={handleClick}
-      disabled={isLoading || !jobSheetId}
+      disabled={!jobSheetId}
     >
-      {isLoading ? (
-        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-      ) : (
-        <Eye className="w-4 h-4 mr-2" />
-      )}
+      <Eye className="w-4 h-4 mr-2" />
       View PDF
     </Button>
   );
 }
 
-// PDF Download Button - fetches fresh SAS URL and triggers download
+// PDF Download Button - uses same-origin proxy with download flag
 function DownloadPdfButton({ jobSheetId, auditId }: { jobSheetId: number; auditId: string }) {
-  const [isLoading, setIsLoading] = useState(false);
-  const utils = trpc.useUtils();
-  
-  const handleClick = async () => {
+  const handleClick = () => {
     if (!jobSheetId) {
       toast.error('No job sheet ID available');
       return;
     }
     
-    setIsLoading(true);
-    try {
-      const result = await utils.jobSheets.getFileUrl.fetch({ id: jobSheetId });
-      if (result?.url) {
-        const link = document.createElement('a');
-        link.href = result.url;
-        link.download = result.fileName || `${auditId}-document.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success('Download started');
-      } else {
-        toast.error('Could not get file URL');
-      }
-    } catch (error) {
-      console.error('Failed to download PDF:', error);
-      toast.error('Failed to download PDF');
-    } finally {
-      setIsLoading(false);
-    }
+    // Use the same-origin PDF proxy endpoint with download flag
+    const link = document.createElement('a');
+    link.href = `/api/documents/${jobSheetId}/pdf?download=1`;
+    link.download = `${auditId}-document.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Download started');
   };
   
   return (
     <Button 
       size="sm"
       onClick={handleClick}
-      disabled={isLoading || !jobSheetId}
+      disabled={!jobSheetId}
     >
-      {isLoading ? (
-        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-      ) : (
-        <Download className="w-4 h-4 mr-2" />
-      )}
+      <Download className="w-4 h-4 mr-2" />
       Download
     </Button>
   );
