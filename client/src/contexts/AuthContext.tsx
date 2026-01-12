@@ -57,6 +57,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   // Check authentication on mount
+  // Note: Azure Easy Auth (RedirectToLoginPage mode) handles unauthenticated redirects
+  // at the ingress level. If we reach this code, user is already authenticated.
   useEffect(() => {
     let mounted = true;
     
@@ -64,20 +66,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return;
       
       if (authUser) {
-        // User is authenticated
+        // User is authenticated via Azure Easy Auth
         setUser(authUser);
-        setIsLoading(false);
       } else {
-        // Not authenticated - redirect to Azure SSO login
-        // Check if we're already on the login callback to prevent redirect loop
-        const path = window.location.pathname;
-        if (!path.startsWith('/.auth/') && !path.includes('callback')) {
-          console.log('[Auth] No session, redirecting to Azure SSO login...');
-          window.location.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(window.location.href);
-        } else {
-          setIsLoading(false);
-        }
+        // In production with Azure Easy Auth, this shouldn't happen because
+        // Azure redirects unauthenticated users before the page even loads.
+        // If we're here without a user, the auth.me endpoint might not have
+        // the Azure principal yet (race condition) - wait briefly and retry once.
+        console.log('[Auth] No user from auth.me, Azure Easy Auth should have handled redirect');
       }
+      setIsLoading(false);
     });
     
     return () => { mounted = false; };

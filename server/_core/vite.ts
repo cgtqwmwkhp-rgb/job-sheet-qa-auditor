@@ -63,7 +63,22 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // Serve hashed assets with immutable cache (1 year)
+  // Vite generates hashed filenames, so they can be cached forever
+  app.use('/assets', express.static(path.join(distPath, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+  }));
+
+  // Serve other static files with standard caching
+  app.use(express.static(distPath, {
+    // Don't cache index.html to ensure fresh deploys are picked up
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      }
+    }
+  }));
 
   // fall through to index.html if the file doesn't exist
   // Skip .auth routes - these are handled by Azure Easy Auth middleware
@@ -72,6 +87,8 @@ export function serveStatic(app: Express) {
     if (req.originalUrl.startsWith('/.auth')) {
       return next();
     }
+    // Set cache headers for SPA fallback
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
