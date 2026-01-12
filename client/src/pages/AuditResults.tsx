@@ -233,10 +233,10 @@ export default function AuditResults() {
     findings,
   };
 
-  return <AuditResultsContent auditData={auditData} documentUrl={jobSheetData.fileUrl} />;
+  return <AuditResultsContent auditData={auditData} documentUrl={jobSheetData.fileUrl} jobSheetId={numericId} />;
 }
 
-function AuditResultsContent({ auditData, documentUrl }: { auditData: AuditData; documentUrl?: string }) {
+function AuditResultsContent({ auditData, documentUrl, jobSheetId }: { auditData: AuditData; documentUrl?: string; jobSheetId: number }) {
   const [activeBoxId, setActiveBoxId] = useState<string | number | null>(null);
   const [annotationOpen, setAnnotationOpen] = useState(false);
   const [newBox, setNewBox] = useState<ViewerBoundingBox | null>(null);
@@ -339,30 +339,8 @@ function AuditResultsContent({ auditData, documentUrl }: { auditData: AuditData;
               <Flag className="w-4 h-4 mr-2" />
               Flag for Review
             </Button>
-            {documentUrl && (
-              <>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => window.open(documentUrl, '_blank')}
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  View PDF
-                </Button>
-                <Button 
-                  size="sm"
-                  onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = documentUrl;
-                    link.download = `${auditData.id}-report.pdf`;
-                    link.click();
-                  }}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
-              </>
-            )}
+            <ViewPdfButton jobSheetId={jobSheetId} auditId={auditData.id} />
+            <DownloadPdfButton jobSheetId={jobSheetId} auditId={auditData.id} />
           </div>
         </div>
 
@@ -593,5 +571,98 @@ function FindingsList({ findings, activeBoxId, onFindingClick, onReportIssue }: 
         ))}
       </div>
     </ScrollArea>
+  );
+}
+
+// PDF View Button - fetches fresh SAS URL
+function ViewPdfButton({ jobSheetId, auditId }: { jobSheetId: number; auditId: string }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const utils = trpc.useUtils();
+  
+  const handleClick = async () => {
+    if (!jobSheetId) {
+      toast.error('No job sheet ID available');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const result = await utils.jobSheets.getFileUrl.fetch({ id: jobSheetId });
+      if (result?.url) {
+        window.open(result.url, '_blank');
+      } else {
+        toast.error('Could not get file URL');
+      }
+    } catch (error) {
+      console.error('Failed to get PDF URL:', error);
+      toast.error('Failed to load PDF');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  return (
+    <Button 
+      variant="outline" 
+      size="sm"
+      onClick={handleClick}
+      disabled={isLoading || !jobSheetId}
+    >
+      {isLoading ? (
+        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+      ) : (
+        <Eye className="w-4 h-4 mr-2" />
+      )}
+      View PDF
+    </Button>
+  );
+}
+
+// PDF Download Button - fetches fresh SAS URL and triggers download
+function DownloadPdfButton({ jobSheetId, auditId }: { jobSheetId: number; auditId: string }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const utils = trpc.useUtils();
+  
+  const handleClick = async () => {
+    if (!jobSheetId) {
+      toast.error('No job sheet ID available');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const result = await utils.jobSheets.getFileUrl.fetch({ id: jobSheetId });
+      if (result?.url) {
+        const link = document.createElement('a');
+        link.href = result.url;
+        link.download = result.fileName || `${auditId}-document.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success('Download started');
+      } else {
+        toast.error('Could not get file URL');
+      }
+    } catch (error) {
+      console.error('Failed to download PDF:', error);
+      toast.error('Failed to download PDF');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  return (
+    <Button 
+      size="sm"
+      onClick={handleClick}
+      disabled={isLoading || !jobSheetId}
+    >
+      {isLoading ? (
+        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+      ) : (
+        <Download className="w-4 h-4 mr-2" />
+      )}
+      Download
+    </Button>
   );
 }
