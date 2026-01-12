@@ -70,12 +70,34 @@ export function serveStatic(app: Express) {
     immutable: true,
   }));
 
-  // Serve other static files with standard caching
+  // Serve other static files with appropriate caching
   app.use(express.static(distPath, {
-    // Don't cache index.html to ensure fresh deploys are picked up
     setHeaders: (res, filePath) => {
+      const fileName = path.basename(filePath);
+      
+      // index.html: never cache to ensure fresh deploys
       if (filePath.endsWith('index.html')) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        return;
+      }
+      
+      // Service workers and manifest: no-cache (revalidate each time)
+      if (fileName.endsWith('.webmanifest') || 
+          fileName === 'sw.js' || 
+          fileName === 'registerSW.js' ||
+          fileName.startsWith('workbox-') ||
+          fileName === 'firebase-messaging-sw.js') {
+        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+        return;
+      }
+      
+      // PWA icons and images: cache for 1 day
+      if (fileName.endsWith('.png') || 
+          fileName.endsWith('.jpg') || 
+          fileName.endsWith('.ico') ||
+          fileName.endsWith('.svg')) {
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return;
       }
     }
   }));

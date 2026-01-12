@@ -14,29 +14,32 @@ const plugins = [
   vitePluginManusRuntime(),
   VitePWA({
     registerType: 'autoUpdate',
-    includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
-      manifest: {
-        name: 'Job Sheet QA Auditor',
-        short_name: 'JobQA',
-        description: 'Enterprise Job Sheet QA Auditor',
-        theme_color: '#ffffff',
-        icons: [
-          {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          }
-        ]
-      },
-      workbox: {
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024 // 4MB
-      }
-    })
+    includeAssets: ['favicon.svg'],
+    manifest: {
+      name: 'Job Sheet QA Auditor',
+      short_name: 'JobQA',
+      description: 'Enterprise Job Sheet QA Auditor',
+      theme_color: '#4F46E5',
+      background_color: '#ffffff',
+      icons: [
+        {
+          src: 'pwa-192x192.svg',
+          sizes: '192x192',
+          type: 'image/svg+xml',
+          purpose: 'any'
+        },
+        {
+          src: 'pwa-512x512.svg',
+          sizes: '512x512',
+          type: 'image/svg+xml',
+          purpose: 'any maskable'
+        }
+      ]
+    },
+    workbox: {
+      maximumFileSizeToCacheInBytes: 4 * 1024 * 1024 // 4MB
+    }
+  })
 ];
 
 export default defineConfig({
