@@ -281,6 +281,14 @@ class SDKServer {
   async authenticateRequest(req: Request): Promise<User> {
     // Azure Easy Auth: Check for Azure AD authentication headers
     const azureClientPrincipal = req.headers['x-ms-client-principal'] as string | undefined;
+    
+    // Debug logging for Azure auth
+    authLogger.debug("Checking authentication", {
+      hasAzurePrincipal: !!azureClientPrincipal,
+      hasCookie: !!req.headers.cookie,
+      path: req.path
+    });
+    
     if (azureClientPrincipal) {
       try {
         const decoded = Buffer.from(azureClientPrincipal, 'base64').toString('utf8');

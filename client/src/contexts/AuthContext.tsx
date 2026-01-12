@@ -21,30 +21,27 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
- * Check if user is authenticated via Azure Easy Auth.
- * Azure Container Apps with Easy Auth set the X-MS-CLIENT-PRINCIPAL header
- * and provide user info at /.auth/me
+ * Check if user is authenticated via backend tRPC auth.me endpoint.
+ * The backend handles Azure Easy Auth headers (X-MS-CLIENT-PRINCIPAL).
  */
-async function checkAzureAuth(): Promise<User | null> {
+async function checkAuth(): Promise<User | null> {
   try {
-    const response = await fetch('/.auth/me', { credentials: 'include' });
+    // Call the backend auth.me endpoint which handles Azure Easy Auth
+    const response = await fetch('/api/trpc/auth.me', { 
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
     if (!response.ok) return null;
     
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      // Not JSON response, Azure Easy Auth not configured
-      return null;
-    }
-    
     const data = await response.json();
-    // Azure Easy Auth can return different formats
-    const clientPrincipal = data?.clientPrincipal || (Array.isArray(data) ? data[0] : null);
+    const user = data?.result?.data;
     
-    if (clientPrincipal?.userDetails) {
+    if (user?.id || user?.openId) {
       return {
-        id: clientPrincipal.userId || clientPrincipal.userDetails,
-        name: clientPrincipal.userDetails,
-        email: clientPrincipal.userDetails,
+        id: user.id?.toString() || user.openId,
+        name: user.name || 'User',
+        email: user.email || '',
         role: 'admin',
         avatar: undefined
       };
@@ -59,23 +56,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check Azure SSO authentication on mount
+  // Check authentication on mount
   useEffect(() => {
     let mounted = true;
     
-    checkAzureAuth().then((azureUser) => {
+    checkAuth().then((authUser) => {
       if (!mounted) return;
       
-      if (azureUser) {
-        // User is authenticated via Azure SSO
-        setUser(azureUser);
+      if (authUser) {
+        // User is authenticated
+        setUser(authUser);
         setIsLoading(false);
       } else {
         // Not authenticated - redirect to Azure SSO login
         // Check if we're already on the login callback to prevent redirect loop
-        if (!window.location.pathname.startsWith('/.auth/')) {
-          console.log('[Auth] No Azure session, redirecting to SSO login...');
-          window.location.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(window.location.pathname);
+        const path = window.location.pathname;
+        if (!path.startsWith('/.auth/') && !path.includes('callback')) {
+          console.log('[Auth] No session, redirecting to Azure SSO login...');
+          window.location.href = '/.auth/login/aad?post_login_redirect_uri=' + encodeURIComponent(window.location.href);
         } else {
           setIsLoading(false);
         }
