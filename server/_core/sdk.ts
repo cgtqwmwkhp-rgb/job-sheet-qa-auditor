@@ -282,8 +282,8 @@ class SDKServer {
     // Azure Easy Auth: Check for Azure AD authentication headers
     const azureClientPrincipal = req.headers['x-ms-client-principal'] as string | undefined;
     
-    // Debug logging for Azure auth
-    authLogger.debug("Checking authentication", {
+    // Log Azure auth status (info level so it appears in production)
+    authLogger.info("Checking authentication", {
       hasAzurePrincipal: !!azureClientPrincipal,
       hasCookie: !!req.headers.cookie,
       path: req.path
