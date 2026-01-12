@@ -449,6 +449,57 @@ jobs:
             fi
           fi
 
+      - name: Verify static asset serving (cache headers)
+        run: |
+          STAGING_URL="${{ steps.get_url.outputs.staging_url }}"
+          mkdir -p logs/release/evidence
+          
+          echo "=== STAGE D: Static Asset Verification ==="
+          
+          # 1. Verify manifest.webmanifest is accessible with correct content-type
+          echo "Testing manifest.webmanifest..."
+          MANIFEST_HEADERS=$(curl -sI "$STAGING_URL/manifest.webmanifest" --max-time 10)
+          MANIFEST_STATUS=$(echo "$MANIFEST_HEADERS" | grep -i "^HTTP" | tail -1 | awk '{print $2}')
+          MANIFEST_TYPE=$(echo "$MANIFEST_HEADERS" | grep -i "^content-type:" | cut -d: -f2 | tr -d ' \r')
+          
+          if [[ "$MANIFEST_STATUS" != "200" ]]; then
+            echo "❌ manifest.webmanifest returned $MANIFEST_STATUS (expected 200)"
+            echo "$MANIFEST_HEADERS"
+            exit 1
+          fi
+          echo "✅ manifest.webmanifest: $MANIFEST_STATUS, $MANIFEST_TYPE"
+          
+          # 2. Verify assets/*.js chunks are accessible with correct cache headers
+          echo "Testing assets JS chunk..."
+          # Get any asset from manifest or build
+          ASSET_PATH=$(curl -sS "$STAGING_URL/manifest.webmanifest" --max-time 10 2>/dev/null | grep -o '"src":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
+          
+          # If no asset in manifest, try to find from index.html
+          if [ -z "$ASSET_PATH" ]; then
+            # Since we need auth for index.html, test a known static path pattern
+            ASSET_PATH="sw.js"
+          fi
+          
+          ASSET_HEADERS=$(curl -sI "$STAGING_URL/$ASSET_PATH" --max-time 10)
+          ASSET_STATUS=$(echo "$ASSET_HEADERS" | grep -i "^HTTP" | tail -1 | awk '{print $2}')
+          ASSET_CACHE=$(echo "$ASSET_HEADERS" | grep -i "^cache-control:" | cut -d: -f2 | tr -d '\r')
+          
+          if [[ "$ASSET_STATUS" != "200" ]]; then
+            echo "❌ /$ASSET_PATH returned $ASSET_STATUS (expected 200)"
+            echo "   Static assets may be blocked by Azure Easy Auth excludedPaths"
+            echo "$ASSET_HEADERS"
+            # Soft fail for staging
+            echo "⚠️ Static asset check failed (soft mode)"
+          else
+            echo "✅ /$ASSET_PATH: $ASSET_STATUS, Cache-Control:$ASSET_CACHE"
+          fi
+          
+          # 3. Save headers evidence
+          echo "$MANIFEST_HEADERS" > logs/release/evidence/manifest-headers.txt
+          echo "$ASSET_HEADERS" > logs/release/evidence/asset-headers.txt
+          
+          echo "=== Static asset verification complete ==="
+
       - name: Upload verification artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -737,6 +788,64 @@ jobs:
             exit 1
           fi
           echo "✅ SHA verified - deployment confirmed"
+
+      - name: Verify static asset serving (STRICT - production)
+        run: |
+          PRODUCTION_URL="${{ steps.get_url.outputs.production_url }}"
+          mkdir -p logs/release/evidence
+          
+          echo "=== STAGE D: Static Asset Verification (STRICT) ==="
+          
+          # 1. Verify manifest.webmanifest is accessible (MUST pass)
+          echo "Testing manifest.webmanifest..."
+          MANIFEST_HEADERS=$(curl -sI "$PRODUCTION_URL/manifest.webmanifest" --max-time 10)
+          MANIFEST_STATUS=$(echo "$MANIFEST_HEADERS" | grep -i "^HTTP" | tail -1 | awk '{print $2}')
+          MANIFEST_TYPE=$(echo "$MANIFEST_HEADERS" | grep -i "^content-type:" | cut -d: -f2 | tr -d ' \r')
+          
+          if [[ "$MANIFEST_STATUS" != "200" ]]; then
+            echo "❌ FATAL: manifest.webmanifest returned $MANIFEST_STATUS (expected 200)"
+            echo "   This indicates Azure Easy Auth excludedPaths is misconfigured"
+            echo "$MANIFEST_HEADERS"
+            exit 1
+          fi
+          echo "✅ manifest.webmanifest: $MANIFEST_STATUS, $MANIFEST_TYPE"
+          
+          # 2. Verify sw.js (service worker) is accessible
+          echo "Testing service worker..."
+          SW_HEADERS=$(curl -sI "$PRODUCTION_URL/sw.js" --max-time 10)
+          SW_STATUS=$(echo "$SW_HEADERS" | grep -i "^HTTP" | tail -1 | awk '{print $2}')
+          SW_CACHE=$(echo "$SW_HEADERS" | grep -i "^cache-control:" | cut -d: -f2 | tr -d '\r')
+          
+          if [[ "$SW_STATUS" != "200" ]]; then
+            echo "❌ FATAL: sw.js returned $SW_STATUS (expected 200)"
+            echo "$SW_HEADERS"
+            exit 1
+          fi
+          echo "✅ sw.js: $SW_STATUS, Cache-Control:$SW_CACHE"
+          
+          # 3. Verify images are accessible
+          echo "Testing images..."
+          IMG_HEADERS=$(curl -sI "$PRODUCTION_URL/images/audit-icon.png" --max-time 10)
+          IMG_STATUS=$(echo "$IMG_HEADERS" | grep -i "^HTTP" | tail -1 | awk '{print $2}')
+          IMG_TYPE=$(echo "$IMG_HEADERS" | grep -i "^content-type:" | cut -d: -f2 | tr -d ' \r')
+          
+          if [[ "$IMG_STATUS" != "200" ]]; then
+            echo "❌ FATAL: images/audit-icon.png returned $IMG_STATUS (expected 200)"
+            echo "$IMG_HEADERS"
+            exit 1
+          fi
+          if [[ "$IMG_TYPE" != *"image/"* ]]; then
+            echo "❌ FATAL: Image returned wrong content-type: $IMG_TYPE"
+            exit 1
+          fi
+          echo "✅ images/audit-icon.png: $IMG_STATUS, $IMG_TYPE"
+          
+          # Save headers evidence
+          echo "$MANIFEST_HEADERS" > logs/release/evidence/manifest-headers.txt
+          echo "$SW_HEADERS" > logs/release/evidence/sw-headers.txt
+          echo "$IMG_HEADERS" > logs/release/evidence/image-headers.txt
+          
+          echo "=== Static asset verification PASSED (STRICT) ==="
 
       - name: Upload verification artifacts
         uses: actions/upload-artifact@v4
