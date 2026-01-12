@@ -85,40 +85,67 @@ describe('Analyzer Fallback Contract', () => {
   });
 
   describe('Rule-Based Analysis', () => {
-    it('should detect missing required fields', async () => {
+    it('should track field detection', async () => {
       const analyzerPath = path.resolve(__dirname, '../../services/analyzer.ts');
       const analyzerContent = fs.readFileSync(analyzerPath, 'utf-8');
       
-      // Verify MISSING_FIELD detection exists
-      expect(analyzerContent).toContain("reasonCode: 'MISSING_FIELD'");
-      expect(analyzerContent).toContain('rule.required && !fieldFound');
+      // Verify field tracking
+      expect(analyzerContent).toContain('fieldsDetected');
+      expect(analyzerContent).toContain('fieldsExpected');
     });
 
-    it('should detect invalid format', async () => {
+    it('should use LOW_CONFIDENCE for uncertain findings', async () => {
       const analyzerPath = path.resolve(__dirname, '../../services/analyzer.ts');
       const analyzerContent = fs.readFileSync(analyzerPath, 'utf-8');
       
-      // Verify INVALID_FORMAT detection exists
-      expect(analyzerContent).toContain("reasonCode: 'INVALID_FORMAT'");
-      expect(analyzerContent).toContain('!patternMatches');
+      // Rule-based should use LOW_CONFIDENCE, not MISSING_FIELD (which implies certainty)
+      expect(analyzerContent).toContain("reasonCode: 'LOW_CONFIDENCE'");
+      expect(analyzerContent).toContain("severity: 'S3'"); // Minor severity
     });
 
-    it('should calculate score based on passed rules', async () => {
+    it('should PASS documents with content (lenient fallback)', async () => {
       const analyzerPath = path.resolve(__dirname, '../../services/analyzer.ts');
       const analyzerContent = fs.readFileSync(analyzerPath, 'utf-8');
       
-      // Verify score calculation
-      expect(analyzerContent).toContain('passedRules / totalRules');
+      // Verify lenient PASS logic
+      expect(analyzerContent).toContain('ALWAYS PASS if document has content');
+      expect(analyzerContent).toContain("overallResult = 'PASS'");
     });
 
-    it('should determine PASS/FAIL/REVIEW_QUEUE based on score', async () => {
+    it('should FAIL only empty documents', async () => {
       const analyzerPath = path.resolve(__dirname, '../../services/analyzer.ts');
       const analyzerContent = fs.readFileSync(analyzerPath, 'utf-8');
       
-      // Verify result determination - check for assignments in the fallback function
-      expect(analyzerContent).toContain("= 'PASS'");
-      expect(analyzerContent).toContain("= 'FAIL'");
-      expect(analyzerContent).toContain("= 'REVIEW_QUEUE'");
+      // Verify FAIL is only for empty/broken documents
+      expect(analyzerContent).toContain('Empty or near-empty document');
+      expect(analyzerContent).toContain("overallResult = 'FAIL'");
+      expect(analyzerContent).toContain('wordCount < 10');
+    });
+
+    it('should NEVER return REVIEW_QUEUE from rule-based fallback', async () => {
+      const analyzerPath = path.resolve(__dirname, '../../services/analyzer.ts');
+      const analyzerContent = fs.readFileSync(analyzerPath, 'utf-8');
+      
+      // The performRuleBasedAnalysis function should not contain REVIEW_QUEUE assignment
+      // Search for the function and ensure it only has PASS or FAIL
+      const functionMatch = analyzerContent.match(/function performRuleBasedAnalysis[\s\S]*?^}/m);
+      if (functionMatch) {
+        const functionBody = functionMatch[0];
+        // Count REVIEW_QUEUE assignments in the function (should be 0)
+        const reviewQueueAssignments = (functionBody.match(/overallResult\s*=\s*'REVIEW_QUEUE'/g) || []).length;
+        expect(reviewQueueAssignments).toBe(0);
+      }
+      
+      // Also verify the design comment
+      expect(analyzerContent).toContain('NEVER return REVIEW_QUEUE');
+    });
+
+    it('should log the rule-based result', async () => {
+      const analyzerPath = path.resolve(__dirname, '../../services/analyzer.ts');
+      const analyzerContent = fs.readFileSync(analyzerPath, 'utf-8');
+      
+      // Verify logging exists
+      expect(analyzerContent).toContain('[Analyzer] Rule-based result:');
     });
   });
 
