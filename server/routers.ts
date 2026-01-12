@@ -57,6 +57,26 @@ export const appRouter = router({
         return db.getJobSheetById(input.id);
       }),
 
+    // Get a fresh SAS URL for viewing/downloading the file
+    getFileUrl: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const jobSheet = await db.getJobSheetById(input.id);
+        if (!jobSheet) {
+          throw new Error('Job sheet not found');
+        }
+        
+        // If we have a fileKey, generate a fresh SAS URL
+        if (jobSheet.fileKey) {
+          const storage = getStorageAdapter();
+          const { url } = await storage.get(jobSheet.fileKey);
+          return { url, fileName: jobSheet.fileName, fileType: jobSheet.fileType };
+        }
+        
+        // Fall back to stored URL (may be expired for Azure)
+        return { url: jobSheet.fileUrl, fileName: jobSheet.fileName, fileType: jobSheet.fileType };
+      }),
+
     upload: protectedProcedure
       .input(z.object({
         fileName: z.string(),
