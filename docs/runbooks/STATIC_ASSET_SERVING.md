@@ -157,3 +157,38 @@ See `.github/workflows/azure-deploy.yml`:
 - `vite.config.ts` - PWA configuration
 - `client/index.html` - Favicon and meta tags
 - `server/tests/contracts/cacheHeaders.contract.test.ts` - Unit tests
+
+---
+
+# AI Processing Configuration
+
+## Required vs Optional Keys
+
+| Environment Variable | Required | Purpose |
+|---------------------|----------|---------|
+| `MISTRAL_API_KEY` | ✅ Yes | OCR text extraction |
+| `BUILT_IN_FORGE_API_KEY` | ❌ No | AI analysis (LLM insights) |
+| `GEMINI_API_KEY` | ❌ No | Alternative AI analysis |
+
+## Graceful Degradation
+
+If `BUILT_IN_FORGE_API_KEY` is not configured:
+1. OCR extraction still works (Mistral)
+2. Analyzer uses **rule-based fallback** instead of AI
+3. Results are marked with `model: 'rule-based-fallback'`
+4. Processing completes with PASS/FAIL/REVIEW_QUEUE based on rule matching
+5. Summary indicates "AI analysis unavailable"
+
+## Verification
+
+To verify processing works without AI keys:
+
+```bash
+# Check backend logs for rule-based fallback
+az containerapp logs show --name jobsheet-qa-production --resource-group plantex-assist --tail 50 | grep "rule-based"
+```
+
+Expected log when AI key missing:
+```
+[Analyzer] LLM not configured - using rule-based analysis (no AI insights)
+```

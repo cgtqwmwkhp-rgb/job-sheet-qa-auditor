@@ -214,9 +214,27 @@ const resolveApiUrl = () =>
     ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
     : "https://forge.manus.im/v1/chat/completions";
 
+/**
+ * Custom error for missing LLM API key configuration.
+ * This allows callers to gracefully degrade when LLM is not available.
+ */
+export class LLMNotConfiguredError extends Error {
+  constructor() {
+    super("LLM API key not configured (BUILT_IN_FORGE_API_KEY)");
+    this.name = "LLMNotConfiguredError";
+  }
+}
+
+/**
+ * Check if LLM is configured and available
+ */
+export function isLLMConfigured(): boolean {
+  return Boolean(ENV.forgeApiKey && ENV.forgeApiKey.trim().length > 0);
+}
+
 const assertApiKey = () => {
   if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+    throw new LLMNotConfiguredError();
   }
 };
 
