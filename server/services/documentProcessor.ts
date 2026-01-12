@@ -367,6 +367,13 @@ export async function processJobSheetWithOptions(
         ? 'review_queue'
         : 'completed';
 
+    console.log(`[DocumentProcessor] Setting final status`, {
+      jobSheetId,
+      analyzerResult: analysisResult.overallResult,
+      finalStatus,
+      score: analysisResult.score,
+    });
+
     // Update job sheet status
     await db.updateJobSheetStatus(jobSheetId, finalStatus);
 
