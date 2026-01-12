@@ -1,12 +1,16 @@
 import { trpc } from "@/lib/trpc";
 import { UNAUTHED_ERR_MSG } from '@shared/const';
+// Note: getLoginUrl removed - Azure Easy Auth handles redirects at ingress level
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
-import { getLoginUrl } from "./const";
+import { initAnalytics } from "./analytics";
 import "./index.css";
+
+// Initialize analytics if configured
+initAnalytics();
 
 const queryClient = new QueryClient();
 
@@ -18,7 +22,15 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  window.location.href = getLoginUrl();
+  // Azure Easy Auth handles redirects at ingress level.
+  // A 401 in production means the auth cookie expired - reload to trigger Azure redirect.
+  // In dev mode, show error in console (no Azure Easy Auth available).
+  if (import.meta.env.PROD) {
+    console.log('[Auth] Session expired, reloading to trigger Azure SSO redirect...');
+    window.location.reload();
+  } else {
+    console.warn('[Auth] Unauthorized - set up local dev auth or use staging for SSO testing');
+  }
 };
 
 queryClient.getQueryCache().subscribe(event => {
