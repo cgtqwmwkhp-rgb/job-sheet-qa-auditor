@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, CheckCircle2, Download, Eye, Flag, MessageSquare, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Download, Eye, Flag, MessageSquare, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -49,7 +49,7 @@ interface AuditData {
 // No mock data - only show real audit results
 
 export default function AuditResults() {
-  const [_location] = useLocation();
+  const [, setLocation] = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
   const idParam = searchParams.get("id");
   
@@ -59,6 +59,9 @@ export default function AuditResults() {
     { id: numericId },
     { enabled: numericId > 0 }
   );
+  
+  // Fetch all job sheets for the list view
+  const { data: allJobSheets, isLoading: listLoading } = trpc.jobSheets.list.useQuery({ limit: 50 });
 
   // If loading real data
   if (isLoading && numericId > 0) {
@@ -82,43 +85,158 @@ export default function AuditResults() {
     );
   }
 
-  // If no ID provided or job sheet not found, show empty state
+  // If no ID provided or job sheet not found, show the list of audits
   if (!numericId || !jobSheetData) {
     return (
       <DashboardLayout>
-        <div className="h-[calc(100vh-8rem)] flex flex-col items-center justify-center">
-          <AlertCircle className="h-16 w-16 text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold mb-2">No Audit Selected</h2>
-          <p className="text-muted-foreground text-center max-w-md">
-            Select an audit from the Audit Results list to view details, or upload a job sheet first.
-          </p>
-          <Button 
-            variant="outline" 
-            className="mt-4"
-            onClick={() => window.location.href = '/audits'}
-          >
-            View All Audits
-          </Button>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-heading font-bold tracking-tight">Audit Results</h1>
+            <p className="text-muted-foreground mt-1">
+              Select an audit to view details, findings, and generated reports.
+            </p>
+          </div>
+          
+          {listLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : !allJobSheets || allJobSheets.length === 0 ? (
+            <Card className="p-12">
+              <div className="flex flex-col items-center justify-center text-center">
+                <AlertCircle className="h-16 w-16 text-muted-foreground mb-4" />
+                <h2 className="text-xl font-semibold mb-2">No Audits Yet</h2>
+                <p className="text-muted-foreground max-w-md mb-4">
+                  Upload your first job sheet to get started with auditing.
+                </p>
+                <Button onClick={() => setLocation('/upload')}>
+                  Upload Job Sheet
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>All Audits ({allJobSheets.length})</CardTitle>
+              </CardHeader>
+              <ScrollArea className="h-[calc(100vh-16rem)]">
+                <div className="p-4 space-y-3">
+                  {allJobSheets.map((sheet) => (
+                    <div
+                      key={sheet.id}
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => setLocation(`/audits?id=${sheet.id}`)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && setLocation(`/audits?id=${sheet.id}`)}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          sheet.status === 'failed' ? 'bg-red-100 text-red-600' : 
+                          sheet.status === 'review_queue' ? 'bg-orange-100 text-orange-600' :
+                          sheet.status === 'completed' ? 'bg-lime-100 text-lime-700' :
+                          'bg-blue-100 text-blue-600'
+                        }`}>
+                          {sheet.status === 'failed' ? <AlertCircle className="w-5 h-5" /> : 
+                           sheet.status === 'review_queue' ? <Clock className="w-5 h-5" /> :
+                           sheet.status === 'completed' ? <CheckCircle2 className="w-5 h-5" /> :
+                           <Loader2 className="w-5 h-5 animate-spin" />}
+                        </div>
+                        <div>
+                          <p className="font-medium font-mono">{sheet.referenceNumber || `JS-${sheet.id}`}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {sheet.fileName} • {sheet.siteInfo || 'No site info'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className={`font-bold text-sm ${
+                            sheet.status === 'failed' ? 'text-red-600' :
+                            sheet.status === 'review_queue' ? 'text-orange-600' :
+                            sheet.status === 'completed' ? 'text-green-600' :
+                            'text-muted-foreground'
+                          }`}>
+                            {sheet.status.toUpperCase().replace('_', ' ')}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(sheet.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Eye className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </Card>
+          )}
         </div>
       </DashboardLayout>
     );
   }
 
+  // Fetch the audit result for this job sheet
+  const { data: auditResult, isLoading: auditLoading } = trpc.audits.getByJobSheet.useQuery(
+    { jobSheetId: numericId },
+    { enabled: numericId > 0 && !!jobSheetData }
+  );
+  
+  // Fetch findings if we have an audit result
+  const { data: findingsData } = trpc.audits.getFindings.useQuery(
+    { auditResultId: auditResult?.id || 0 },
+    { enabled: !!auditResult?.id }
+  );
+
+  // Show loading while fetching audit result
+  if (auditLoading && jobSheetData) {
+    return (
+      <DashboardLayout>
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-muted-foreground">Loading audit results...</span>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Convert findings to the local Finding type
+  const findings: Finding[] = (findingsData || []).map((f) => ({
+    id: f.id,
+    field: f.fieldName || 'Unknown Field',
+    status: f.severity === 'S0' || f.severity === 'S1' ? 'missing' : 
+            f.severity === 'S2' ? 'warning' : 'passed',
+    severity: f.severity === 'S0' || f.severity === 'S1' ? 'critical' :
+              f.severity === 'S2' ? 'major' : 'minor',
+    value: f.rawSnippet || undefined,
+    message: f.normalisedSnippet || undefined,
+    confidence: parseFloat(f.confidence || '0') / 100,
+    box: f.boundingBox ? {
+      page: f.pageNumber || 1,
+      x: (f.boundingBox as any).x || 0,
+      y: (f.boundingBox as any).y || 0,
+      width: (f.boundingBox as any).width || 0,
+      height: (f.boundingBox as any).height || 0,
+    } : undefined,
+  }));
+
   // Convert real job sheet data to AuditData format
   const auditData: AuditData = {
     id: jobSheetData.referenceNumber || `JS-${jobSheetData.id}`,
-    status: jobSheetData.status === 'completed' ? 'passed' : jobSheetData.status === 'failed' ? 'failed' : 'pending',
-    score: jobSheetData.status === 'completed' ? 'A' : jobSheetData.status === 'failed' ? 'F' : '-',
+    status: auditResult?.result === 'pass' ? 'passed' : 
+            auditResult?.result === 'fail' ? 'failed' : 
+            jobSheetData.status === 'completed' ? 'passed' : 'pending',
+    score: auditResult?.confidenceScore || (jobSheetData.status === 'completed' ? '100' : '-'),
     date: new Date(jobSheetData.createdAt).toLocaleDateString(),
     technician: `User ${jobSheetData.uploadedBy}`,
     documentUrl: jobSheetData.fileUrl,
-    findings: [], // Would be populated from audit results
+    findings,
   };
 
-  return <AuditResultsContent auditData={auditData} />;
+  return <AuditResultsContent auditData={auditData} documentUrl={jobSheetData.fileUrl} />;
 }
 
-function AuditResultsContent({ auditData }: { auditData: AuditData }) {
+function AuditResultsContent({ auditData, documentUrl }: { auditData: AuditData; documentUrl?: string }) {
   const [activeBoxId, setActiveBoxId] = useState<string | number | null>(null);
   const [annotationOpen, setAnnotationOpen] = useState(false);
   const [newBox, setNewBox] = useState<ViewerBoundingBox | null>(null);
@@ -221,10 +339,30 @@ function AuditResultsContent({ auditData }: { auditData: AuditData }) {
               <Flag className="w-4 h-4 mr-2" />
               Flag for Review
             </Button>
-            <Button size="sm">
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
+            {documentUrl && (
+              <>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => window.open(documentUrl, '_blank')}
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  View PDF
+                </Button>
+                <Button 
+                  size="sm"
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = documentUrl;
+                    link.download = `${auditData.id}-report.pdf`;
+                    link.click();
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
