@@ -8,11 +8,13 @@ import { SmartTip } from "@/components/SmartTip";
 import { AuditTimeline } from "@/components/AuditTimeline";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLocation } from "wouter";
 
 // Chart data will be populated from real analytics
 // Empty arrays show "No data yet" state
 
 export default function Dashboard() {
+  const [, setLocation] = useLocation();
   // Use real tRPC data
   const { data: statsData, isLoading: statsLoading } = trpc.stats.dashboard.useQuery();
   const { data: recentJobSheets, isLoading: jobSheetsLoading } = trpc.jobSheets.list.useQuery({ limit: 5 });
@@ -183,7 +185,14 @@ export default function Dashboard() {
                     ) : recentJobSheets && recentJobSheets.length > 0 ? (
                       <div className="space-y-4">
                         {recentJobSheets.map((sheet) => (
-                          <div key={sheet.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                          <div 
+                            key={sheet.id} 
+                            className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                            onClick={() => setLocation(`/audits?id=${sheet.id}`)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => e.key === 'Enter' && setLocation(`/audits?id=${sheet.id}`)}
+                          >
                             <div className="flex items-center gap-4">
                               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                                 sheet.status === 'failed' ? 'bg-red-100 text-red-600' : 
