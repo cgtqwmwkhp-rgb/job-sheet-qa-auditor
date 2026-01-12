@@ -4,7 +4,7 @@
  * Includes enterprise-grade resilience: retry logic, circuit breaker, correlation tracking
  */
 
-import { invokeLLM } from '../_core/llm';
+import { invokeLLM, isLLMConfigured, LLMNotConfiguredError } from '../_core/llm';
 import { withResiliency, geminiCircuitBreaker, CircuitBreakerOpenError } from '../utils/resilience';
 import { getCorrelationId, addContextMetadata } from '../utils/context';
 import { redactFindings } from '../utils/piiRedaction';
@@ -204,6 +204,10 @@ Respond with a JSON object containing:
 
 /**
  * Analyze job sheet text against a Gold Standard specification with resilience
+ * 
+ * GRACEFUL DEGRADATION:
+ * If LLM API key is not configured, this function returns a rule-based analysis
+ * instead of failing. This allows processing to complete without AI insights.
  */
 export async function analyzeJobSheet(
   extractedText: string,
@@ -222,7 +226,26 @@ export async function analyzeJobSheet(
     rulesCount: goldSpec.rules.length,
     pageCount,
     textLength: extractedText.length,
+    llmConfigured: isLLMConfigured(),
   });
+
+  // GRACEFUL DEGRADATION: If LLM is not configured, use rule-based analysis
+  if (!isLLMConfigured()) {
+    console.warn('[Analyzer] LLM not configured - using rule-based analysis (no AI insights)', {
+      correlationId,
+    });
+    
+    const ruleBasedResult = performRuleBasedAnalysis(extractedText, goldSpec, pageCount);
+    const processingTimeMs = Date.now() - startTime;
+    
+    return {
+      ...ruleBasedResult,
+      processingTimeMs,
+      model: 'rule-based-fallback',
+      correlationId,
+      retryAttempts: 0,
+    };
+  }
 
   try {
     const result = await withResiliency(
@@ -497,4 +520,121 @@ export function getAnalyzerCircuitBreakerStatus() {
 export function resetAnalyzerCircuitBreaker() {
   geminiCircuitBreaker.reset();
   console.log('[Analyzer] Circuit breaker manually reset');
+}
+
+/**
+ * Rule-based analysis fallback when LLM is not available.
+ * Performs basic field detection using regex patterns from the Gold Standard.
+ * This provides deterministic results without requiring AI API keys.
+ */
+function performRuleBasedAnalysis(
+  extractedText: string,
+  goldSpec: GoldSpec,
+  pageCount: number
+): Omit<AnalysisResult, 'processingTimeMs' | 'model' | 'correlationId' | 'retryAttempts'> {
+  const findings: Finding[] = [];
+  const extractedFields: Record<string, { value: string; confidence: number; pageNumber: number }> = {};
+  const textLower = extractedText.toLowerCase();
+  
+  let passedRules = 0;
+  let failedRules = 0;
+  
+  for (const rule of goldSpec.rules) {
+    const fieldLower = rule.field.toLowerCase();
+    
+    // Simple field detection: look for the field name in the text
+    const fieldIndex = textLower.indexOf(fieldLower);
+    const fieldFound = fieldIndex !== -1;
+    
+    // Extract value after field name (simple heuristic)
+    let extractedValue = '';
+    if (fieldFound) {
+      const afterField = extractedText.substring(fieldIndex + rule.field.length, fieldIndex + rule.field.length + 100);
+      const match = afterField.match(/[:=]?\s*([^\n\r]+)/);
+      if (match) {
+        extractedValue = match[1].trim().substring(0, 50);
+      }
+    }
+    
+    // Check pattern if specified
+    let patternMatches = true;
+    if (rule.pattern && extractedValue) {
+      try {
+        const regex = new RegExp(rule.pattern);
+        patternMatches = regex.test(extractedValue);
+      } catch {
+        patternMatches = true; // Invalid regex, skip check
+      }
+    }
+    
+    if (rule.required && !fieldFound) {
+      failedRules++;
+      findings.push({
+        ruleId: rule.id,
+        fieldName: rule.field,
+        severity: 'S2',
+        reasonCode: 'MISSING_FIELD',
+        rawSnippet: '',
+        normalisedSnippet: '',
+        confidence: 0,
+        pageNumber: 1,
+        whyItMatters: rule.description,
+        suggestedFix: `Ensure the "${rule.field}" field is present and clearly labeled.`,
+      });
+    } else if (fieldFound && !patternMatches) {
+      failedRules++;
+      findings.push({
+        ruleId: rule.id,
+        fieldName: rule.field,
+        severity: 'S2',
+        reasonCode: 'INVALID_FORMAT',
+        rawSnippet: extractedValue,
+        normalisedSnippet: extractedValue,
+        confidence: 50,
+        pageNumber: 1,
+        whyItMatters: rule.description,
+        suggestedFix: `Ensure "${rule.field}" matches the expected format: ${rule.pattern || rule.format || 'N/A'}`,
+      });
+      extractedFields[rule.field] = {
+        value: extractedValue,
+        confidence: 50,
+        pageNumber: 1,
+      };
+    } else if (fieldFound) {
+      passedRules++;
+      extractedFields[rule.field] = {
+        value: extractedValue || '[detected]',
+        confidence: 70, // Lower confidence for rule-based
+        pageNumber: 1,
+      };
+    } else {
+      passedRules++; // Optional field not found is OK
+    }
+  }
+  
+  const totalRules = goldSpec.rules.length;
+  const score = totalRules > 0 ? Math.round((passedRules / totalRules) * 100) : 100;
+  
+  // Determine result: PASS if score >= 80 and no S0/S1 findings
+  const hasCriticalFindings = findings.some(f => f.severity === 'S0' || f.severity === 'S1');
+  let overallResult: 'PASS' | 'FAIL' | 'REVIEW_QUEUE';
+  
+  if (score >= 80 && !hasCriticalFindings) {
+    overallResult = 'PASS';
+  } else if (score < 50 || hasCriticalFindings) {
+    overallResult = 'FAIL';
+  } else {
+    overallResult = 'REVIEW_QUEUE';
+  }
+  
+  return {
+    success: true,
+    overallResult,
+    score,
+    findings: sortFindings(findings),
+    extractedFields,
+    summary: `Rule-based analysis: ${passedRules}/${totalRules} rules passed. ` +
+      `AI analysis unavailable (LLM API key not configured). ` +
+      `Manual review recommended for comprehensive validation.`,
+  };
 }
