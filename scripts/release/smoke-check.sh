@@ -253,12 +253,13 @@ echo ""
 echo "--- Check 5: PDF Proxy Auth ---"
 PDF_PROXY_STATUS="UNKNOWN"
 PDF_PROXY_HTTP_CODE="000"
+PDF_DURATION_MS=0
 
 # Test with a sample job ID (31) - should return 401 for unauthenticated, not 302
-PDF_START_TIME=$(get_time_ms)
+PDF_START_TIME=$(date +%s%N)
 PDF_PROXY_HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE_URL/api/documents/31/pdf" --max-time 10 2>/dev/null || echo "000")
-PDF_END_TIME=$(get_time_ms)
-PDF_DURATION_MS=$((PDF_END_TIME - PDF_START_TIME))
+PDF_END_TIME=$(date +%s%N)
+PDF_DURATION_MS=$(( (PDF_END_TIME - PDF_START_TIME) / 1000000 ))
 
 if [[ "$PDF_PROXY_HTTP_CODE" == "401" ]]; then
   PDF_PROXY_STATUS="PASS"
