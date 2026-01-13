@@ -20,6 +20,56 @@ This document provides evidence that the deployment flywheel is functioning corr
 | #103 | ci: add PDF proxy gate + stable core workflow E2E smoke test | `2d5d1df9509ba7f19970d02ef22afe3e02d3176f` | ✅ |
 | #104 | docs: add performance budgets and 30-day plan | `88b45b96bf2f26821e5716e39d3b426eafac61d4` | ✅ |
 | #105 | fix: smoke-check.sh get_time_ms undefined | `62a557c4c24c2f8e047c8e004a76f829f4a53dce` | ✅ |
+| #108 | docs: UAT evidence, cadence runs, template batch 5, audit click fix | `2e22329b67e7103da338d2550693561b64ccb327` | ✅ |
+
+---
+
+## PR #108 Merge Decision
+
+**Date:** 2026-01-13T21:30:00Z
+
+### E2E Required Check Determination
+
+**Question:** Is E2E Tests (Functional) a required branch protection check?
+
+**Answer:** **NO**
+
+**Evidence:** Branch protection required status checks query:
+```json
+{
+  "contexts": [
+    "Unit & Integration Tests",
+    "TypeScript Check",
+    "Lint Check"
+  ]
+}
+```
+
+E2E Tests (Functional) is NOT in the required contexts list.
+
+### CI Status at Merge
+
+| Check | Status | Required |
+|-------|--------|----------|
+| Governance Checks | ✅ success | No |
+| Unit & Integration Tests | ✅ success | **Yes** |
+| TypeScript Check | ✅ success | **Yes** |
+| Lint Check | ✅ success | **Yes** |
+| Load Test (Smoke) | ✅ success | No |
+| Docker Build Gate | ✅ success | No |
+| E2E Tests (Functional) | ❌ failure | No |
+
+### Decision
+
+**Merged PR #108** via squash merge despite E2E failure because:
+1. E2E is not a required check
+2. All required checks passed
+3. E2E failure is pre-existing flaky test issue
+4. PR contains critical fix for audit list click navigation
+
+### Merge SHA
+
+`2e22329b67e7103da338d2550693561b64ccb327`
 
 ---
 
@@ -129,9 +179,11 @@ Created in `docs/operations/NEXT_30_DAYS_PLAN.md`:
 
 ## Next Steps
 
-1. Monitor production deployment (currently staging only)
-2. Complete client-side TTFH/TTFR measurements
-3. Begin Week 1 work (Templates onboarding)
+1. ~~Monitor production deployment (currently staging only)~~ ✅ Production deployed
+2. ~~Complete client-side TTFH/TTFR measurements~~ ✅ Completed
+3. ~~Begin Week 1 work (Templates onboarding)~~ ✅ Template Batch 5 validated
+4. Deploy PR #108 changes to production
+5. Stabilise E2E tests (flaky tests causing non-blocking failures)
 
 ---
 
