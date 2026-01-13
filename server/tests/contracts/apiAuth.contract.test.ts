@@ -5,6 +5,7 @@
  * 1. API endpoints return 401 (not redirect) when unauthenticated
  * 2. Protected procedures require authentication
  * 3. Auth context correctly parses Azure Easy Auth headers
+ * 4. PDF proxy enforces RBAC
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -99,6 +100,39 @@ describe('API Authentication Contract', () => {
       // PDF proxy should never issue a redirect
       expect(pdfProxyContent).not.toContain('res.redirect');
       expect(pdfProxyContent).not.toContain('302');
+    });
+
+    it('should implement RBAC access check', () => {
+      expect(pdfProxyContent).toContain('checkRbacAccess');
+    });
+
+    it('should return 403 when RBAC denies access', () => {
+      expect(pdfProxyContent).toContain('res.status(403)');
+      expect(pdfProxyContent).toContain('do not have access');
+    });
+
+    it('should track access denied in metrics', () => {
+      expect(pdfProxyContent).toContain('pdfProxyMetrics.accessDeniedCount');
+    });
+  });
+
+  describe('Observability', () => {
+    const metricsPath = path.resolve(__dirname, '../../_core/metrics.ts');
+    let metricsContent: string;
+
+    beforeAll(() => {
+      metricsContent = fs.readFileSync(metricsPath, 'utf-8');
+    });
+
+    it('should export PDF proxy metrics', () => {
+      expect(metricsContent).toContain('pdf_proxy_range_requests_count');
+      expect(metricsContent).toContain('pdf_proxy_access_denied_count');
+      expect(metricsContent).toContain('pdf_proxy_success_count');
+      expect(metricsContent).toContain('pdf_proxy_error_count');
+    });
+
+    it('should export auth redirect blocked metric', () => {
+      expect(metricsContent).toContain('auth_redirect_blocked_count');
     });
   });
 });
