@@ -10,9 +10,17 @@
 
 import type { Request, Response } from 'express';
 import { formatPrometheusMetrics } from '../services/metrics/parityMetrics';
+import { getPdfProxyMetrics } from './pdfProxy';
 
 // Track server start time for uptime metric
 const SERVER_START_TIME = Date.now();
+
+// Auth redirect blocked counter
+let authRedirectBlockedCount = 0;
+
+export function incrementAuthRedirectBlocked(): void {
+  authRedirectBlockedCount++;
+}
 
 // Simple in-memory request counters (production would use proper metrics library)
 let httpRequestsTotal = 0;
@@ -79,6 +87,30 @@ function formatAppMetrics(): string {
   lines.push('# HELP process_rss_bytes Process RSS in bytes');
   lines.push('# TYPE process_rss_bytes gauge');
   lines.push(`process_rss_bytes ${memUsage.rss}`);
+  
+  // Auth redirect blocked counter
+  lines.push('# HELP auth_redirect_blocked_count Number of auth redirects blocked (returned 401 instead)');
+  lines.push('# TYPE auth_redirect_blocked_count counter');
+  lines.push(`auth_redirect_blocked_count ${authRedirectBlockedCount}`);
+  
+  // PDF Proxy metrics
+  const pdfMetrics = getPdfProxyMetrics();
+  
+  lines.push('# HELP pdf_proxy_range_requests_count Number of Range requests for PDF streaming');
+  lines.push('# TYPE pdf_proxy_range_requests_count counter');
+  lines.push(`pdf_proxy_range_requests_count ${pdfMetrics.rangeRequestsCount}`);
+  
+  lines.push('# HELP pdf_proxy_access_denied_count Number of RBAC access denied responses');
+  lines.push('# TYPE pdf_proxy_access_denied_count counter');
+  lines.push(`pdf_proxy_access_denied_count ${pdfMetrics.accessDeniedCount}`);
+  
+  lines.push('# HELP pdf_proxy_success_count Number of successful PDF streams');
+  lines.push('# TYPE pdf_proxy_success_count counter');
+  lines.push(`pdf_proxy_success_count ${pdfMetrics.successCount}`);
+  
+  lines.push('# HELP pdf_proxy_error_count Number of PDF streaming errors');
+  lines.push('# TYPE pdf_proxy_error_count counter');
+  lines.push(`pdf_proxy_error_count ${pdfMetrics.errorCount}`);
   
   return lines.join('\n') + '\n';
 }
