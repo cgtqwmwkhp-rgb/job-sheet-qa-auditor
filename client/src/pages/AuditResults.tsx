@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertCircle, CheckCircle2, Clock, Download, Eye, Flag, MessageSquare, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,7 @@ import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { perfMark, perfMeasure, PERF_MARKS, PERF_MEASURES, perfClear } from "@/lib/perf";
 
 // Local Finding type for this page
 interface Finding {
@@ -52,6 +53,13 @@ export default function AuditResults() {
   const [, setLocation] = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
   const idParam = searchParams.get("id");
+  
+  // Navigate to audit detail with perf marking
+  const navigateToAudit = (id: number) => {
+    perfClear(); // Clear previous marks
+    perfMark(PERF_MARKS.AUDIT_DETAIL_CLICK);
+    setLocation(`/audits?id=${id}`);
+  };
   
   // Try to fetch from real API if we have a numeric ID
   const numericId = idParam ? parseInt(idParam) : 0;
@@ -125,10 +133,10 @@ export default function AuditResults() {
                     <div
                       key={sheet.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                      onClick={() => setLocation(`/audits?id=${sheet.id}`)}
+                      onClick={() => navigateToAudit(sheet.id)}
                       role="button"
                       tabIndex={0}
-                      onKeyDown={(e) => e.key === 'Enter' && setLocation(`/audits?id=${sheet.id}`)}
+                      onKeyDown={(e) => e.key === 'Enter' && navigateToAudit(sheet.id)}
                     >
                       <div className="flex items-center gap-4">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
@@ -250,6 +258,29 @@ function AuditResultsContent({ auditData, documentUrl, jobSheetId }: { auditData
   const [feedbackType, setFeedbackType] = useState("incorrect");
   const [feedbackComment, setFeedbackComment] = useState("");
   
+  // Lazy PDF loading - only load when user clicks "Show Document"
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  
+  // Performance measurement - mark summary rendered
+  useEffect(() => {
+    perfMark(PERF_MARKS.AUDIT_SUMMARY_RENDERED);
+    perfMeasure(PERF_MEASURES.TTFH, PERF_MARKS.AUDIT_DETAIL_CLICK, PERF_MARKS.AUDIT_SUMMARY_RENDERED);
+  }, []);
+  
+  // Performance measurement - mark findings rendered when we have findings
+  useEffect(() => {
+    if (auditData.findings.length > 0) {
+      perfMark(PERF_MARKS.AUDIT_FINDINGS_FIRST_RENDER);
+      perfMeasure(PERF_MEASURES.TTFR, PERF_MARKS.AUDIT_DETAIL_CLICK, PERF_MARKS.AUDIT_FINDINGS_FIRST_RENDER);
+    }
+  }, [auditData.findings.length]);
+  
+  // Handle PDF view click with perf marking
+  const handleShowPdfViewer = () => {
+    perfMark(PERF_MARKS.PDF_VIEW_CLICK);
+    setShowPdfViewer(true);
+  };
+  
   const createDispute = trpc.disputes.create.useMutation();
 
   const boxes: ViewerBoundingBox[] = auditData.findings
@@ -349,18 +380,46 @@ function AuditResultsContent({ auditData, documentUrl, jobSheetId }: { auditData
 
         {/* Split Screen */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
-          {/* Document Viewer */}
+          {/* Document Viewer - Lazy Loading for Performance */}
           <Card className="flex flex-col h-full overflow-hidden">
             <CardHeader className="py-3 px-4 border-b flex flex-row items-center justify-between shrink-0 bg-muted/30">
               <CardTitle className="text-sm font-medium">Document Preview</CardTitle>
+              {!showPdfViewer && (
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={handleShowPdfViewer}
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  Load Preview
+                </Button>
+              )}
             </CardHeader>
             <div className="flex-1 overflow-hidden">
-              <DocumentViewer
-                url={auditData.documentUrl}
-                boxes={boxes}
-                onBoxClick={handleBoxClick}
-                onBoxCreate={handleBoxCreate}
-              />
+              {showPdfViewer ? (
+                <DocumentViewer
+                  url={documentUrl || ''}
+                  boxes={boxes}
+                  onBoxClick={handleBoxClick}
+                  onBoxCreate={handleBoxCreate}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/20">
+                  <Eye className="w-12 h-12 mb-4 opacity-40" />
+                  <p className="text-sm font-medium mb-2">Document Preview</p>
+                  <p className="text-xs text-center max-w-[200px] mb-4">
+                    Click "Load Preview" above to view the document
+                  </p>
+                  <Button 
+                    variant="secondary" 
+                    size="sm"
+                    onClick={handleShowPdfViewer}
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    Load Preview
+                  </Button>
+                </div>
+              )}
             </div>
           </Card>
 

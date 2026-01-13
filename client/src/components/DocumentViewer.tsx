@@ -1,14 +1,29 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, PenTool, MousePointer2 } from "lucide-react";
+import { perfMark, perfMeasure, PERF_MARKS, PERF_MEASURES } from "@/lib/perf";
 
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
 // Set worker source to CDN to avoid build-time resolution issues
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+/**
+ * Guard: Throw in dev if blob.core.windows.net URL is used
+ * This prevents CORS issues with Azure Blob SAS URLs
+ */
+function assertNoDirectBlobUrl(url: string): void {
+  if (url && url.includes('blob.core.windows.net')) {
+    const errorMsg = '[DocumentViewer] Direct blob.core.windows.net URLs are not allowed. Use the PDF proxy endpoint (/api/documents/:id/pdf) instead.';
+    console.error(errorMsg);
+    if (import.meta.env.DEV) {
+      throw new Error(errorMsg);
+    }
+  }
+}
 
 export interface BoundingBox {
   id: string | number;
@@ -39,6 +54,11 @@ export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [],
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [currentBox, setCurrentBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Guard: prevent direct blob URLs
+  useEffect(() => {
+    assertNoDirectBlobUrl(url);
+  }, [url]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!isDrawing || !containerRef.current) return;
@@ -86,6 +106,10 @@ export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [],
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
+    
+    // Performance: mark PDF first byte received
+    perfMark(PERF_MARKS.PDF_FIRST_BYTE);
+    perfMeasure(PERF_MEASURES.PDF_TTFB, PERF_MARKS.PDF_VIEW_CLICK, PERF_MARKS.PDF_FIRST_BYTE);
   }
 
   const handlePageChange = (newPage: number) => {

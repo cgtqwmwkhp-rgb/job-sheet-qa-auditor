@@ -550,7 +550,7 @@ function performRuleBasedAnalysis(
   
   // Track field detection for informational purposes
   let fieldsDetected = 0;
-  let fieldsExpected = goldSpec.rules.filter(r => r.required).length;
+  const fieldsExpected = goldSpec.rules.filter(r => r.required).length;
   
   for (const rule of goldSpec.rules) {
     const fieldLower = rule.field.toLowerCase();
