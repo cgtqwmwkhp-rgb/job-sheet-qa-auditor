@@ -50,26 +50,49 @@ interface AuditData {
 // No mock data - only show real audit results
 
 export default function AuditResults() {
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   
-  // Parse query params from wouter's location (which includes query string)
-  // wouter's setLocation('/audits?id=39') sets location to '/audits?id=39'
-  const queryString = location.includes('?') ? location.split('?')[1] : '';
-  const searchParams = new URLSearchParams(queryString);
-  const idParam = searchParams.get("id");
+  // Track selected audit ID in state since wouter doesn't include query params in location
+  const [selectedAuditId, setSelectedAuditId] = useState<number | null>(() => {
+    // Initialize from URL on first render
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("id");
+      return id ? parseInt(id) : null;
+    }
+    return null;
+  });
   
-  console.log('[AuditResults] Location:', location, 'idParam:', idParam);
+  console.log('[AuditResults] selectedAuditId:', selectedAuditId);
+  
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("id");
+      setSelectedAuditId(id ? parseInt(id) : null);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+  
+  // Function to go back to list
+  const goBackToList = () => {
+    setSelectedAuditId(null);
+    setLocation('/audits');
+  };
   
   // Navigate to audit detail with perf marking
   const navigateToAudit = (id: number) => {
     console.log('[AuditResults] Navigating to audit:', id);
     perfClear(); // Clear previous marks
     perfMark(PERF_MARKS.AUDIT_DETAIL_CLICK);
-    setLocation(`/audits?id=${id}`);
+    setSelectedAuditId(id); // Update state to trigger re-render
+    setLocation(`/audits?id=${id}`); // Update URL for bookmarkability
   };
   
-  // Try to fetch from real API if we have a numeric ID
-  const numericId = idParam ? parseInt(idParam) : 0;
+  // Try to fetch from real API if we have a selected audit ID
+  const numericId = selectedAuditId ?? 0;
   const { data: jobSheetData, isLoading, error: jobSheetError } = trpc.jobSheets.get.useQuery(
     { id: numericId },
     { enabled: numericId > 0 }
@@ -113,7 +136,7 @@ export default function AuditResults() {
           <AlertCircle className="h-16 w-16 text-destructive mb-4" />
           <h2 className="text-xl font-semibold mb-2">Failed to Load Audit</h2>
           <p className="text-muted-foreground mb-4">{jobSheetError.message}</p>
-          <Button onClick={() => setLocation('/audits')}>Back to List</Button>
+          <Button onClick={goBackToList}>Back to List</Button>
         </div>
       </DashboardLayout>
     );
