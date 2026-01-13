@@ -1,0 +1,397 @@
+{
+  "packVersion": "1.0.0",
+  "exportedAt": "2026-01-13T17:00:00.000Z",
+  "sourceSystem": "batch-5-onboarding",
+  "templates": [
+    {
+      "metadata": {
+        "templateId": "water-treatment-v1",
+        "name": "Water Treatment System Service",
+        "description": "Water treatment and purification system maintenance documentation",
+        "category": "utility",
+        "tags": ["water", "treatment", "utility", "environmental"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Water Treatment Service Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "expiryDate", "label": "Expiry Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true },
+          { "field": "complianceTickboxes", "label": "Compliance Tickboxes", "type": "tickbox_array", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "expiryDate", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R005", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R006", "field": "complianceTickboxes", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["water", "treatment"],
+        "requiredTokensAny": ["service", "maintenance"],
+        "optionalTokens": ["filter", "purification", "dosing"]
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          { "name": "jobReference", "x": 0.05, "y": 0.1, "w": 0.4, "h": 0.05 },
+          { "name": "assetId", "x": 0.5, "y": 0.1, "w": 0.45, "h": 0.05 },
+          { "name": "date", "x": 0.7, "y": 0.02, "w": 0.25, "h": 0.04 },
+          { "name": "expiryDate", "x": 0.7, "y": 0.08, "w": 0.25, "h": 0.04 },
+          { "name": "tickboxBlock", "x": 0.05, "y": 0.25, "w": 0.9, "h": 0.4 },
+          { "name": "signatureBlock", "x": 0, "y": 0.85, "w": 1, "h": 0.15 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "WT-PASS-001",
+          "description": "Complete water treatment service report",
+          "inputText": "Water Treatment System Service Report\nJob Reference: WT-TEST-001\nAsset ID: WT-ASSET-001\nDate: 2026-01-15\nExpiry Date: 2027-01-15\nEngineer Sign Off: Complete\nCompliance: All checks passed\n[X] pH Level Checked\n[X] Chlorine Dosing Verified\n[X] Filter Condition Good",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "WT-PASS-002",
+          "description": "Minimal valid water treatment report",
+          "inputText": "Water Treatment Maintenance Report\nJob Reference: WT-TEST-002\nAsset ID: WT-ASSET-002\nDate: 2026-01-16\nExpiry Date: 2027-01-16\nEngineer Signed\nAll Compliance Checks Complete",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "WT-FAIL-001",
+          "description": "Missing job reference",
+          "inputText": "Water Treatment System Service Report\nAsset ID: WT-ASSET-001\nDate: 2026-01-15\nExpiry Date: 2027-01-15",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["MISSING_FIELD", "CRITICAL_MISSING"],
+          "required": true
+        },
+        {
+          "caseId": "WT-REVIEW-001",
+          "description": "Missing signature - needs review",
+          "inputText": "Water Treatment System Service Report\nJob Reference: WT-TEST-003\nAsset ID: WT-ASSET-003\nDate: 2026-01-15\nExpiry Date: 2027-01-15\n[X] pH Level Checked\n[ ] Signature incomplete",
+          "expectedOutcome": "review_queue",
+          "expectedReasonCodes": ["SIGNATURE_MISSING"],
+          "required": true
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "templateId": "solar-panel-v1",
+        "name": "Solar Panel Inspection Report",
+        "description": "Solar panel installation inspection and maintenance documentation",
+        "category": "renewable",
+        "tags": ["solar", "panel", "renewable", "energy"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Solar Panel Inspection Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "expiryDate", "label": "Expiry Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true },
+          { "field": "complianceTickboxes", "label": "Compliance Tickboxes", "type": "tickbox_array", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "expiryDate", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R005", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R006", "field": "complianceTickboxes", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["solar", "panel"],
+        "requiredTokensAny": ["inspection", "survey"],
+        "optionalTokens": ["inverter", "output", "efficiency"]
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          { "name": "jobReference", "x": 0.05, "y": 0.1, "w": 0.4, "h": 0.05 },
+          { "name": "assetId", "x": 0.5, "y": 0.1, "w": 0.45, "h": 0.05 },
+          { "name": "date", "x": 0.7, "y": 0.02, "w": 0.25, "h": 0.04 },
+          { "name": "expiryDate", "x": 0.7, "y": 0.08, "w": 0.25, "h": 0.04 },
+          { "name": "tickboxBlock", "x": 0.05, "y": 0.25, "w": 0.9, "h": 0.4 },
+          { "name": "signatureBlock", "x": 0, "y": 0.85, "w": 1, "h": 0.15 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "SP-PASS-001",
+          "description": "Complete solar panel inspection report",
+          "inputText": "Solar Panel Inspection Report\nJob Reference: SP-TEST-001\nAsset ID: SP-ASSET-001\nDate: 2026-01-15\nExpiry Date: 2027-01-15\nEngineer Sign Off: Complete\n[X] Panel Condition Checked\n[X] Output Verified\n[X] Wiring Inspected",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "SP-PASS-002",
+          "description": "Solar panel survey report",
+          "inputText": "Solar Panel Survey\nJob Reference: SP-TEST-002\nAsset ID: SP-ASSET-002\nDate: 2026-01-16\nExpiry Date: 2027-01-16\nSigned by Engineer\nAll Checks Complete",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "SP-FAIL-001",
+          "description": "Missing asset ID",
+          "inputText": "Solar Panel Inspection Report\nJob Reference: SP-TEST-003\nDate: 2026-01-15\nExpiry Date: 2027-01-15",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["MISSING_FIELD", "CRITICAL_MISSING"],
+          "required": true
+        },
+        {
+          "caseId": "SP-REVIEW-001",
+          "description": "Low confidence date",
+          "inputText": "Solar Panel Inspection Report\nJob Reference: SP-TEST-004\nAsset ID: SP-ASSET-004\nDate: Jan 15 26\nExpiry Date: unclear\n[X] All checks complete",
+          "expectedOutcome": "review_queue",
+          "expectedReasonCodes": ["LOW_CONFIDENCE"],
+          "required": true
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "templateId": "emergency-lighting-v1",
+        "name": "Emergency Lighting Test Certificate",
+        "description": "Emergency lighting system test and certification documentation",
+        "category": "safety",
+        "tags": ["emergency", "lighting", "safety", "compliance"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Emergency Lighting Test Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "expiryDate", "label": "Expiry Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true },
+          { "field": "complianceTickboxes", "label": "Compliance Tickboxes", "type": "tickbox_array", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "expiryDate", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R005", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R006", "field": "complianceTickboxes", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["emergency", "lighting"],
+        "requiredTokensAny": ["test", "certificate"],
+        "optionalTokens": ["battery", "duration", "lumens"]
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          { "name": "jobReference", "x": 0.05, "y": 0.1, "w": 0.4, "h": 0.05 },
+          { "name": "assetId", "x": 0.5, "y": 0.1, "w": 0.45, "h": 0.05 },
+          { "name": "date", "x": 0.7, "y": 0.02, "w": 0.25, "h": 0.04 },
+          { "name": "expiryDate", "x": 0.7, "y": 0.08, "w": 0.25, "h": 0.04 },
+          { "name": "tickboxBlock", "x": 0.05, "y": 0.25, "w": 0.9, "h": 0.4 },
+          { "name": "signatureBlock", "x": 0, "y": 0.85, "w": 1, "h": 0.15 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "EL-PASS-001",
+          "description": "Complete emergency lighting test certificate",
+          "inputText": "Emergency Lighting Test Certificate\nJob Reference: EL-TEST-001\nAsset ID: EL-ASSET-001\nDate: 2026-01-15\nExpiry Date: 2027-01-15\nEngineer Sign Off: Complete\n[X] 3-Hour Duration Test Passed\n[X] All Luminaires Functional\n[X] Battery Condition Good",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "EL-PASS-002",
+          "description": "Emergency lighting annual test",
+          "inputText": "Emergency Lighting Annual Test\nJob Reference: EL-TEST-002\nAsset ID: EL-ASSET-002\nDate: 2026-01-16\nExpiry Date: 2027-01-16\nSigned\nAll Tests Complete",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "EL-FAIL-001",
+          "description": "Missing expiry date",
+          "inputText": "Emergency Lighting Test Certificate\nJob Reference: EL-TEST-003\nAsset ID: EL-ASSET-003\nDate: 2026-01-15",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["MISSING_FIELD", "CRITICAL_MISSING"],
+          "required": true
+        },
+        {
+          "caseId": "EL-REVIEW-001",
+          "description": "Incomplete tickboxes",
+          "inputText": "Emergency Lighting Test Certificate\nJob Reference: EL-TEST-004\nAsset ID: EL-ASSET-004\nDate: 2026-01-15\nExpiry Date: 2027-01-15\n[X] Duration Test\n[ ] Luminaire Check (not done)\n[X] Battery OK",
+          "expectedOutcome": "review_queue",
+          "expectedReasonCodes": ["TICKBOX_INCOMPLETE"],
+          "required": true
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "templateId": "refrigeration-v1",
+        "name": "Refrigeration System Service",
+        "description": "Commercial refrigeration and cold chain maintenance documentation",
+        "category": "hvac",
+        "tags": ["refrigeration", "cold chain", "hvac", "service"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Refrigeration Service Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "expiryDate", "label": "Expiry Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true },
+          { "field": "complianceTickboxes", "label": "Compliance Tickboxes", "type": "tickbox_array", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "expiryDate", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R005", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R006", "field": "complianceTickboxes", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["refrigeration"],
+        "requiredTokensAny": ["service", "maintenance", "repair"],
+        "optionalTokens": ["compressor", "temperature", "coolant"]
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          { "name": "jobReference", "x": 0.05, "y": 0.1, "w": 0.4, "h": 0.05 },
+          { "name": "assetId", "x": 0.5, "y": 0.1, "w": 0.45, "h": 0.05 },
+          { "name": "date", "x": 0.7, "y": 0.02, "w": 0.25, "h": 0.04 },
+          { "name": "expiryDate", "x": 0.7, "y": 0.08, "w": 0.25, "h": 0.04 },
+          { "name": "tickboxBlock", "x": 0.05, "y": 0.25, "w": 0.9, "h": 0.4 },
+          { "name": "signatureBlock", "x": 0, "y": 0.85, "w": 1, "h": 0.15 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "RF-PASS-001",
+          "description": "Complete refrigeration service report",
+          "inputText": "Refrigeration System Service Report\nJob Reference: RF-TEST-001\nAsset ID: RF-ASSET-001\nDate: 2026-01-15\nExpiry Date: 2027-01-15\nEngineer Sign Off: Complete\n[X] Temperature Verified\n[X] Compressor Checked\n[X] Coolant Level OK",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "RF-PASS-002",
+          "description": "Refrigeration maintenance report",
+          "inputText": "Refrigeration Maintenance\nJob Reference: RF-TEST-002\nAsset ID: RF-ASSET-002\nDate: 2026-01-16\nExpiry Date: 2027-01-16\nSigned\nAll Checks Complete",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "RF-FAIL-001",
+          "description": "Missing engineer sign off",
+          "inputText": "Refrigeration System Service Report\nJob Reference: RF-TEST-003\nAsset ID: RF-ASSET-003\nDate: 2026-01-15\nExpiry Date: 2027-01-15\n[X] Temperature OK",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["SIGNATURE_MISSING", "CRITICAL_MISSING"],
+          "required": true
+        },
+        {
+          "caseId": "RF-REVIEW-001",
+          "description": "Temperature out of range",
+          "inputText": "Refrigeration System Service Report\nJob Reference: RF-TEST-004\nAsset ID: RF-ASSET-004\nDate: 2026-01-15\nExpiry Date: 2027-01-15\nSigned\nTemperature: -2C (WARNING: Outside normal range)",
+          "expectedOutcome": "review_queue",
+          "expectedReasonCodes": ["OUT_OF_RANGE"],
+          "required": true
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "templateId": "ups-battery-v1",
+        "name": "UPS Battery Test Report",
+        "description": "Uninterruptible power supply battery testing and maintenance documentation",
+        "category": "power",
+        "tags": ["ups", "battery", "power", "backup"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "UPS Battery Test Spec",
+        "version": "1.0.0",
+        "fields": [
+          { "field": "jobReference", "label": "Job Reference", "type": "string", "required": true },
+          { "field": "assetId", "label": "Asset ID", "type": "string", "required": true },
+          { "field": "date", "label": "Date", "type": "date", "required": true },
+          { "field": "expiryDate", "label": "Expiry Date", "type": "date", "required": true },
+          { "field": "engineerSignOff", "label": "Engineer Sign Off", "type": "boolean", "required": true },
+          { "field": "complianceTickboxes", "label": "Compliance Tickboxes", "type": "tickbox_array", "required": true }
+        ],
+        "rules": [
+          { "ruleId": "R001", "field": "jobReference", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R002", "field": "assetId", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R003", "field": "date", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R004", "field": "expiryDate", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R005", "field": "engineerSignOff", "description": "Required", "severity": "critical", "type": "required", "enabled": true },
+          { "ruleId": "R006", "field": "complianceTickboxes", "description": "Required", "severity": "critical", "type": "required", "enabled": true }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["ups", "battery"],
+        "requiredTokensAny": ["test", "maintenance"],
+        "optionalTokens": ["runtime", "voltage", "load"]
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          { "name": "jobReference", "x": 0.05, "y": 0.1, "w": 0.4, "h": 0.05 },
+          { "name": "assetId", "x": 0.5, "y": 0.1, "w": 0.45, "h": 0.05 },
+          { "name": "date", "x": 0.7, "y": 0.02, "w": 0.25, "h": 0.04 },
+          { "name": "expiryDate", "x": 0.7, "y": 0.08, "w": 0.25, "h": 0.04 },
+          { "name": "tickboxBlock", "x": 0.05, "y": 0.25, "w": 0.9, "h": 0.4 },
+          { "name": "signatureBlock", "x": 0, "y": 0.85, "w": 1, "h": 0.15 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "UPS-PASS-001",
+          "description": "Complete UPS battery test report",
+          "inputText": "UPS Battery Test Report\nJob Reference: UPS-TEST-001\nAsset ID: UPS-ASSET-001\nDate: 2026-01-15\nExpiry Date: 2027-01-15\nEngineer Sign Off: Complete\n[X] Battery Condition Good\n[X] Runtime Test Passed\n[X] Load Test Complete",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "UPS-PASS-002",
+          "description": "UPS battery maintenance report",
+          "inputText": "UPS Battery Maintenance\nJob Reference: UPS-TEST-002\nAsset ID: UPS-ASSET-002\nDate: 2026-01-16\nExpiry Date: 2027-01-16\nSigned\nAll Tests Complete",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "UPS-FAIL-001",
+          "description": "Missing date",
+          "inputText": "UPS Battery Test Report\nJob Reference: UPS-TEST-003\nAsset ID: UPS-ASSET-003\nExpiry Date: 2027-01-15\n[X] Tests OK",
+          "expectedOutcome": "fail",
+          "expectedReasonCodes": ["MISSING_FIELD", "CRITICAL_MISSING"],
+          "required": true
+        },
+        {
+          "caseId": "UPS-REVIEW-001",
+          "description": "Low battery runtime",
+          "inputText": "UPS Battery Test Report\nJob Reference: UPS-TEST-004\nAsset ID: UPS-ASSET-004\nDate: 2026-01-15\nExpiry Date: 2027-01-15\nSigned\nRuntime: 5 minutes (WARNING: Below recommended 15 minutes)",
+          "expectedOutcome": "review_queue",
+          "expectedReasonCodes": ["OUT_OF_RANGE"],
+          "required": true
+        }
+      ]
+    }
+  ]
+}
