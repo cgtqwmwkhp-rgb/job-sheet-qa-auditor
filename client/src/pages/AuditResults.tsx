@@ -69,6 +69,7 @@ export default function AuditResults() {
   
   // Navigate to audit detail with perf marking
   const navigateToAudit = (id: number) => {
+    console.log('[AuditResults] Navigating to audit:', id);
     perfClear(); // Clear previous marks
     perfMark(PERF_MARKS.AUDIT_DETAIL_CLICK);
     setLocation(`/audits?id=${id}`);
@@ -76,10 +77,15 @@ export default function AuditResults() {
   
   // Try to fetch from real API if we have a numeric ID
   const numericId = idParam ? parseInt(idParam) : 0;
-  const { data: jobSheetData, isLoading } = trpc.jobSheets.get.useQuery(
+  const { data: jobSheetData, isLoading, error: jobSheetError } = trpc.jobSheets.get.useQuery(
     { id: numericId },
     { enabled: numericId > 0 }
   );
+  
+  // Log for debugging
+  if (numericId > 0) {
+    console.log('[AuditResults] Fetching job sheet:', numericId, { isLoading, hasData: !!jobSheetData, error: jobSheetError?.message });
+  }
   
   // Fetch all job sheets for the list view
   const { data: allJobSheets, isLoading: listLoading } = trpc.jobSheets.list.useQuery({ limit: 50 });
@@ -101,6 +107,20 @@ export default function AuditResults() {
           <div className="flex-1 flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // If there's an error fetching the job sheet, show error state
+  if (numericId > 0 && jobSheetError) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center h-[50vh]">
+          <AlertCircle className="h-16 w-16 text-destructive mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Failed to Load Audit</h2>
+          <p className="text-muted-foreground mb-4">{jobSheetError.message}</p>
+          <Button onClick={() => setLocation('/audits')}>Back to List</Button>
         </div>
       </DashboardLayout>
     );
