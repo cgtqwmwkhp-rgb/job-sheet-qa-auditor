@@ -58,6 +58,11 @@ on:
         required: false
         type: boolean
         default: false
+      deploy_sha:
+        description: 'Specific SHA to deploy (7-40 hex chars, defaults to current HEAD)'
+        required: false
+        type: string
+        default: ''
 
 env:
   NODE_VERSION: "22"
@@ -71,18 +76,42 @@ jobs:
     outputs:
       image_tag: ${{ steps.set_tag.outputs.image_tag }}
       short_sha: ${{ steps.set_tag.outputs.short_sha }}
-      git_sha: ${{ github.sha }}
+      deploy_sha: ${{ steps.resolve_sha.outputs.deploy_sha }}
 
     steps:
+      - name: Resolve DEPLOY_SHA
+        id: resolve_sha
+        run: |
+          # Use pinned SHA if provided, otherwise use github.sha
+          INPUT_SHA="${{ inputs.deploy_sha }}"
+          if [ -n "$INPUT_SHA" ]; then
+            # Validate format: 7-40 hex characters
+            if ! echo "$INPUT_SHA" | grep -qE '^[a-fA-F0-9]{7,40}$'; then
+              echo "❌ ERROR: Invalid deploy_sha format. Must be 7-40 hex characters."
+              echo "   Received: $INPUT_SHA"
+              exit 1
+            fi
+            DEPLOY_SHA="$INPUT_SHA"
+            echo "📌 Using PINNED SHA: $DEPLOY_SHA"
+          else
+            DEPLOY_SHA="${{ github.sha }}"
+            echo "🔄 Using CURRENT SHA: $DEPLOY_SHA"
+          fi
+          echo "deploy_sha=${DEPLOY_SHA}" >> $GITHUB_OUTPUT
+
       - name: Log context
         run: |
           echo "  Azure Container Apps Deployment"
-          echo "  SHA:    ${{ github.sha }}"
-          echo "  REF:    ${{ github.ref }}"
-          echo "  EVENT:  ${{ github.event_name }}"
+          echo "  DEPLOY_SHA: ${{ steps.resolve_sha.outputs.deploy_sha }}"
+          echo "  GITHUB_SHA: ${{ github.sha }}"
+          echo "  REF:        ${{ github.ref }}"
+          echo "  EVENT:      ${{ github.event_name }}"
+          echo "  PINNED:     ${{ inputs.deploy_sha != '' }}"
 
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve_sha.outputs.deploy_sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -112,11 +141,14 @@ jobs:
 
       - name: Set image tag
         id: set_tag
+        env:
+          DEPLOY_SHA: ${{ steps.resolve_sha.outputs.deploy_sha }}
         run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
+          SHORT_SHA="${DEPLOY_SHA::7}"
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "image_tag=${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "Using image tag: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}"
+          echo "DEPLOY_SHA: ${DEPLOY_SHA}"
 
       - name: Docker metadata
         id: meta
@@ -135,7 +167,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           build-args: |
-            GIT_SHA=${{ github.sha }}
+            GIT_SHA=${{ steps.resolve_sha.outputs.deploy_sha }}
             PLATFORM_VERSION=${{ github.ref_name }}
             BUILD_TIME=${{ github.event.head_commit.timestamp }}
 
@@ -209,14 +241,17 @@ jobs:
             --image "${IMAGE_TAG}"
 
       - name: Set environment variables
+        env:
+          DEPLOY_SHA: ${{ needs.build-and-push.outputs.deploy_sha }}
         run: |
+          echo "Setting GIT_SHA to DEPLOY_SHA: ${DEPLOY_SHA}"
           az containerapp update \
             --name "${{ vars.CONTAINER_APP_NAME }}" \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --set-env-vars \
               NODE_ENV=production \
               APP_ENV=staging \
-              GIT_SHA="${{ github.sha }}" \
+              GIT_SHA="${DEPLOY_SHA}" \
               PLATFORM_VERSION="${{ github.ref_name }}" \
               BUILD_TIME="${{ github.event.head_commit.timestamp }}" \
               STORAGE_PROVIDER="${{ vars.STORAGE_PROVIDER || 'azure' }}" \
@@ -407,13 +442,14 @@ jobs:
       - name: Run release verification
         env:
           STAGING_URL: ${{ steps.get_url.outputs.staging_url }}
-          EXPECTED_SHA: ${{ github.sha }}
+          EXPECTED_SHA: ${{ needs.build-and-push.outputs.deploy_sha }}
         run: |
           if [ -z "$STAGING_URL" ]; then
             echo "❌ ERROR: Could not resolve staging URL"
             exit 1
           fi
           echo "🔗 Using STAGING_URL: $STAGING_URL"
+          echo "📌 EXPECTED_SHA (DEPLOY_SHA): $EXPECTED_SHA"
           
           chmod +x scripts/release/smoke-check.sh
           chmod +x scripts/release/monitor-snapshot.sh
@@ -441,8 +477,8 @@ jobs:
           DEPLOYED_SHA=$(cat logs/release/evidence/version.json | jq -r '.result.data.gitSha // empty' 2>/dev/null || echo "")
           if [ -n "$DEPLOYED_SHA" ]; then
             echo "Deployed SHA: $DEPLOYED_SHA"
-            echo "Expected SHA: ${{ github.sha }}"
-            if [ "$DEPLOYED_SHA" != "${{ github.sha }}" ]; then
+            echo "Expected SHA: $EXPECTED_SHA"
+            if [ "$DEPLOYED_SHA" != "$EXPECTED_SHA" ]; then
               echo "⚠️ SHA mismatch - may be a cached response"
             else
               echo "✅ SHA verified"
@@ -578,14 +614,17 @@ jobs:
             --image "${IMAGE_TAG}"
 
       - name: Set environment variables
+        env:
+          DEPLOY_SHA: ${{ needs.build-and-push.outputs.deploy_sha }}
         run: |
+          echo "Setting GIT_SHA to DEPLOY_SHA: ${DEPLOY_SHA}"
           az containerapp update \
             --name "${{ vars.CONTAINER_APP_NAME }}" \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --set-env-vars \
               NODE_ENV=production \
               APP_ENV=production \
-              GIT_SHA="${{ github.sha }}" \
+              GIT_SHA="${DEPLOY_SHA}" \
               PLATFORM_VERSION="${{ github.ref_name }}" \
               BUILD_TIME="${{ github.event.head_commit.timestamp }}" \
               STORAGE_PROVIDER="${{ vars.STORAGE_PROVIDER || 'azure' }}" \
@@ -743,13 +782,14 @@ jobs:
       - name: Run release verification (STRICT)
         env:
           PRODUCTION_URL: ${{ steps.get_url.outputs.production_url }}
-          EXPECTED_SHA: ${{ github.sha }}
+          EXPECTED_SHA: ${{ needs.build-and-push.outputs.deploy_sha }}
         run: |
           if [ -z "$PRODUCTION_URL" ]; then
             echo "❌ ERROR: Could not resolve production URL"
             exit 1
           fi
           echo "🔗 Using PRODUCTION_URL: $PRODUCTION_URL"
+          echo "📌 EXPECTED_SHA (DEPLOY_SHA): $EXPECTED_SHA"
           
           chmod +x scripts/release/smoke-check.sh
           chmod +x scripts/release/monitor-snapshot.sh
@@ -781,9 +821,9 @@ jobs:
           fi
           
           echo "Deployed SHA: $DEPLOYED_SHA"
-          echo "Expected SHA: ${{ github.sha }}"
+          echo "Expected SHA: $EXPECTED_SHA"
           
-          if [ "$DEPLOYED_SHA" != "${{ github.sha }}" ]; then
+          if [ "$DEPLOYED_SHA" != "$EXPECTED_SHA" ]; then
             echo "❌ FATAL: SHA mismatch - deployment verification failed"
             exit 1
           fi
@@ -855,13 +895,15 @@ jobs:
           retention-days: 30
 
       - name: Generate deployment summary
+        env:
+          DEPLOY_SHA: ${{ needs.build-and-push.outputs.deploy_sha }}
         run: |
           {
             echo "# Production Deployment Complete ✅"
             echo ""
             echo "| Field | Value |"
             echo "|-------|-------|"
-            echo "| SHA | ${{ github.sha }} |"
+            echo "| DEPLOY_SHA | ${DEPLOY_SHA} |"
             echo "| Resource Group | ${{ vars.AZURE_RESOURCE_GROUP }} |"
             echo "| Container App | ${{ vars.CONTAINER_APP_NAME }} |"
             echo "| URL | ${{ needs.deploy-production.outputs.app_url }} |"
