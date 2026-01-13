@@ -247,6 +247,38 @@ if [[ -n "$EXPECTED_GIT_SHA" && -n "$DEPLOYED_SHA" ]]; then
 fi
 
 # =============================================================================
+# Check 5: PDF Proxy Endpoint (must return 401 for unauth, not redirect)
+# =============================================================================
+echo ""
+echo "--- Check 5: PDF Proxy Auth ---"
+PDF_PROXY_STATUS="UNKNOWN"
+PDF_PROXY_HTTP_CODE="000"
+
+# Test with a sample job ID (31) - should return 401 for unauthenticated, not 302
+PDF_START_TIME=$(get_time_ms)
+PDF_PROXY_HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE_URL/api/documents/31/pdf" --max-time 10 2>/dev/null || echo "000")
+PDF_END_TIME=$(get_time_ms)
+PDF_DURATION_MS=$((PDF_END_TIME - PDF_START_TIME))
+
+if [[ "$PDF_PROXY_HTTP_CODE" == "401" ]]; then
+  PDF_PROXY_STATUS="PASS"
+  log_pass "PDF Proxy Auth - HTTP 401 (correct for unauthenticated) (${PDF_DURATION_MS}ms)"
+elif [[ "$PDF_PROXY_HTTP_CODE" == "302" || "$PDF_PROXY_HTTP_CODE" == "301" ]]; then
+  PDF_PROXY_STATUS="FAIL"
+  log_fail "PDF Proxy Auth - HTTP $PDF_PROXY_HTTP_CODE (redirect not allowed, should be 401)"
+  if [[ "$MODE" == "strict" ]]; then
+    OVERALL_STATUS="FAIL"
+  fi
+else
+  # 404 or other codes might be acceptable in some cases
+  PDF_PROXY_STATUS="WARN"
+  log_warn "PDF Proxy Auth - HTTP $PDF_PROXY_HTTP_CODE (expected 401)"
+  if [[ "$MODE" == "strict" && "$PDF_PROXY_HTTP_CODE" != "404" ]]; then
+    OVERALL_STATUS="FAIL"
+  fi
+fi
+
+# =============================================================================
 # Write Summary JSON
 # =============================================================================
 SUMMARY_FILE="$LOG_DIR/summary.json"
@@ -278,6 +310,12 @@ cat > "$SUMMARY_FILE" << EOF
       "status": "$VERSION_STATUS",
       "httpCode": $VERSION_HTTP_CODE,
       "durationMs": $VERSION_DURATION_MS
+    },
+    {
+      "name": "pdfProxyAuth",
+      "status": "$PDF_PROXY_STATUS",
+      "httpCode": $PDF_PROXY_HTTP_CODE,
+      "durationMs": $PDF_DURATION_MS
     }
   ],
   "warnings": $(printf '%s\n' "${WARNINGS[@]:-}" | jq -R . | jq -s . 2>/dev/null || echo "[]")
@@ -289,13 +327,14 @@ EOF
 # =============================================================================
 echo ""
 echo "--- Summary ---"
-echo "  Homepage:     $HOMEPAGE_STATUS"
-echo "  Health:       $HEALTH_STATUS"
-echo "  Version:      $VERSION_STATUS"
-echo "  Deployed SHA: ${DEPLOYED_SHA:-<not captured>}"
-echo "  SHA Match:    $SHA_MATCH_STATUS"
-echo "  Overall:      $OVERALL_STATUS"
-echo "  Logs:         $LOG_DIR"
+echo "  Homepage:      $HOMEPAGE_STATUS"
+echo "  Health:        $HEALTH_STATUS"
+echo "  Version:       $VERSION_STATUS"
+echo "  PDF Proxy:     $PDF_PROXY_STATUS"
+echo "  Deployed SHA:  ${DEPLOYED_SHA:-<not captured>}"
+echo "  SHA Match:     $SHA_MATCH_STATUS"
+echo "  Overall:       $OVERALL_STATUS"
+echo "  Logs:          $LOG_DIR"
 
 # =============================================================================
 # Exit
