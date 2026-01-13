@@ -106,6 +106,18 @@ export default function AuditResults() {
   // Fetch all job sheets for the list view
   const { data: allJobSheets, isLoading: listLoading } = trpc.jobSheets.list.useQuery({ limit: 50 });
 
+  // Fetch the audit result for this job sheet (always call, use enabled flag)
+  const { data: auditResult, isLoading: auditLoading } = trpc.audits.getByJobSheet.useQuery(
+    { jobSheetId: numericId },
+    { enabled: numericId > 0 && !!jobSheetData }
+  );
+  
+  // Fetch findings if we have an audit result (always call, use enabled flag)
+  const { data: findingsData } = trpc.audits.getFindings.useQuery(
+    { auditResultId: auditResult?.id || 0 },
+    { enabled: !!auditResult?.id }
+  );
+
   // If loading real data
   if (isLoading && numericId > 0) {
     return (
@@ -232,18 +244,6 @@ export default function AuditResults() {
       </DashboardLayout>
     );
   }
-
-  // Fetch the audit result for this job sheet
-  const { data: auditResult, isLoading: auditLoading } = trpc.audits.getByJobSheet.useQuery(
-    { jobSheetId: numericId },
-    { enabled: numericId > 0 && !!jobSheetData }
-  );
-  
-  // Fetch findings if we have an audit result
-  const { data: findingsData } = trpc.audits.getFindings.useQuery(
-    { auditResultId: auditResult?.id || 0 },
-    { enabled: !!auditResult?.id }
-  );
 
   // Show loading while fetching audit result
   if (auditLoading && jobSheetData) {
