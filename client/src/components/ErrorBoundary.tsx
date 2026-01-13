@@ -1,12 +1,11 @@
-import { cn } from "@/lib/utils";
-import { AlertTriangle, RotateCcw, Home } from "lucide-react";
-import { Component, ReactNode, ErrorInfo } from "react";
-import { Button } from "@/components/ui/button";
+import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
-  onError?: (error: Error, errorInfo: ErrorInfo) => void;
 }
 
 interface State {
@@ -15,94 +14,86 @@ interface State {
   errorInfo: ErrorInfo | null;
 }
 
-class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
-  }
+/**
+ * Error Boundary Component
+ * 
+ * Catches React errors and prevents full app crashes.
+ * Handles auth-related errors gracefully by offering reload option.
+ */
+export class ErrorBoundary extends Component<Props, State> {
+  public state: State = {
+    hasError: false,
+    error: null,
+    errorInfo: null,
+  };
 
-  static getDerivedStateFromError(error: Error): Partial<State> {
+  public static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('[ErrorBoundary] Caught error:', error, errorInfo);
     this.setState({ errorInfo });
-    
-    // Call custom error handler if provided
-    if (this.props.onError) {
-      this.props.onError(error, errorInfo);
+
+    // Log error for observability (could send to monitoring service)
+    if (import.meta.env.PROD) {
+      console.error('[ErrorBoundary] Production error logged');
     }
-    
-    // Log error details for debugging
-    this.logError(error, errorInfo);
   }
 
-  private logError(error: Error, errorInfo: ErrorInfo) {
-    const errorReport = {
-      message: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack,
-      timestamp: new Date().toISOString(),
-      url: window.location.href,
-    };
-    console.log('Error report:', JSON.stringify(errorReport, null, 2));
-  }
+  private handleReload = () => {
+    window.location.reload();
+  };
 
-  private handleRetry = () => {
+  private handleReset = () => {
     this.setState({ hasError: false, error: null, errorInfo: null });
   };
 
-  private handleGoHome = () => {
-    window.location.href = '/';
-  };
-
-  render() {
+  public render() {
     if (this.state.hasError) {
-      // Use custom fallback if provided
       if (this.props.fallback) {
         return this.props.fallback;
       }
 
+      const isAuthError = this.state.error?.message?.includes('UNAUTHORIZED') ||
+                          this.state.error?.message?.includes('auth') ||
+                          this.state.error?.message?.includes('401');
+
       return (
-        <div className="flex items-center justify-center min-h-screen p-8 bg-background">
-          <div className="flex flex-col items-center w-full max-w-2xl p-8">
-            <AlertTriangle
-              size={48}
-              className="text-destructive mb-6 flex-shrink-0"
-            />
-
-            <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
-            <p className="text-muted-foreground mb-6 text-center">
-              We're sorry, but something unexpected happened. Please try again.
-            </p>
-
-            <div className="p-4 w-full rounded bg-muted overflow-auto mb-6 max-h-48">
-              <pre className="text-sm text-muted-foreground whitespace-break-spaces">
-                {this.state.error?.message}
-              </pre>
-              {this.state.error?.stack && (
-                <pre className="text-xs text-muted-foreground/70 mt-2 whitespace-break-spaces">
-                  {this.state.error.stack}
-                </pre>
+        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+                <CardTitle>Something went wrong</CardTitle>
+              </div>
+              <CardDescription>
+                {isAuthError
+                  ? 'Your session may have expired. Please sign in again.'
+                  : 'An unexpected error occurred. Please try again.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!import.meta.env.PROD && this.state.error && (
+                <div className="p-3 bg-muted rounded-md">
+                  <p className="text-sm font-mono text-destructive">
+                    {this.state.error.message}
+                  </p>
+                </div>
               )}
-            </div>
-
-            <div className="flex gap-3">
-              <Button onClick={this.handleRetry} variant="default">
-                <RotateCcw size={16} className="mr-2" />
-                Try Again
-              </Button>
-              <Button onClick={this.handleGoHome} variant="outline">
-                <Home size={16} className="mr-2" />
-                Go Home
-              </Button>
-            </div>
-            
-            <p className="text-sm text-muted-foreground mt-6">
-              If this problem persists, please contact support.
-            </p>
-          </div>
+              <div className="flex gap-2">
+                <Button onClick={this.handleReload} className="flex-1">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  {isAuthError ? 'Sign In' : 'Reload Page'}
+                </Button>
+                {!isAuthError && (
+                  <Button variant="outline" onClick={this.handleReset}>
+                    Try Again
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       );
     }
@@ -111,4 +102,21 @@ class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-export default ErrorBoundary;
+/**
+ * Hook to catch async errors in effects/callbacks
+ * Use this when you need error handling in hooks
+ */
+export function useErrorHandler() {
+  const [error, setError] = React.useState<Error | null>(null);
+
+  const handleError = React.useCallback((error: Error) => {
+    console.error('[useErrorHandler]', error);
+    setError(error);
+  }, []);
+
+  const clearError = React.useCallback(() => {
+    setError(null);
+  }, []);
+
+  return { error, handleError, clearError };
+}

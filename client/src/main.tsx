@@ -12,7 +12,34 @@ import "./index.css";
 // Initialize analytics if configured
 initAnalytics();
 
-const queryClient = new QueryClient();
+// Configure QueryClient with auth-resilient defaults
+// Prevents React crashes (error #310) on auth failures
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Don't retry on auth errors
+      retry: (failureCount, error) => {
+        if (error instanceof TRPCClientError) {
+          // Never retry auth errors
+          if (error.data?.code === 'UNAUTHORIZED' || error.message === UNAUTHED_ERR_MSG) {
+            return false;
+          }
+        }
+        return failureCount < 3;
+      },
+      // Don't throw errors in React render - handle via isError
+      throwOnError: false,
+      // Prevent aggressive refetching when unauthed
+      refetchOnWindowFocus: (query) => {
+        // Skip refetch if the query has an auth error
+        return query.state.error === null;
+      },
+    },
+    mutations: {
+      throwOnError: false,
+    },
+  },
+});
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
