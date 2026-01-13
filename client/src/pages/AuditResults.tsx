@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertCircle, CheckCircle2, Clock, Download, Eye, Flag, MessageSquare, Loader2 } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,20 +52,13 @@ interface AuditData {
 export default function AuditResults() {
   const [location, setLocation] = useLocation();
   
-  // Use wouter's location reactively to get query params
-  // This ensures re-renders when URL changes via setLocation
-  const searchParams = new URLSearchParams(
-    typeof window !== 'undefined' ? window.location.search : ''
-  );
+  // Parse query params from wouter's location (which includes query string)
+  // wouter's setLocation('/audits?id=39') sets location to '/audits?id=39'
+  const queryString = location.includes('?') ? location.split('?')[1] : '';
+  const searchParams = new URLSearchParams(queryString);
   const idParam = searchParams.get("id");
   
-  // Force re-read of search params when location changes
-  // (wouter doesn't include query string in location, so we need this)
-  const [, forceUpdate] = useState(0);
-  useEffect(() => {
-    // Re-render when location changes to pick up new query params
-    forceUpdate(n => n + 1);
-  }, [location]);
+  console.log('[AuditResults] Location:', location, 'idParam:', idParam);
   
   // Navigate to audit detail with perf marking
   const navigateToAudit = (id: number) => {
