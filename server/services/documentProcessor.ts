@@ -22,7 +22,10 @@ import {
   ensureTemplatesReady,
   getDefaultTemplateVersion,
   type SelectionResult,
+  FALLBACK_TEMPLATE_ID,
+  isFallbackTemplate,
 } from './templateRegistry';
+import { performHybridAssessment, type HybridAssessmentResult } from './hybridAssessment';
 import { specJsonToGoldSpec } from './templateRegistry/defaultTemplate';
 import * as db from '../db';
 import { v4 as uuidv4 } from 'uuid';
@@ -34,6 +37,10 @@ export interface ProcessingResult {
   ocrResult: OCRResult;
   analysisResult?: AnalysisResult;
   selectionResult?: SelectionResult;
+  /** Hybrid assessment result (for fallback/unknown documents) */
+  hybridAssessment?: HybridAssessmentResult;
+  /** Assessment mode used */
+  assessmentMode?: 'FULL' | 'HYBRID';
   processingStages: {
     stage: string;
     status: 'success' | 'failed' | 'skipped';
@@ -254,34 +261,123 @@ export async function processJobSheetWithOptions(
     selectionResult = selectTemplate(extractedText);
     
     if (!selectionResult.autoProcessingAllowed) {
-      // CRITICAL: LOW or ambiguous MEDIUM confidence - STOP and send to REVIEW_QUEUE
+      // LOW or ambiguous MEDIUM confidence - use HYBRID ASSESSMENT instead of stopping
       console.log(`[DocumentProcessor] Template selection blocked: ${selectionResult.blockReason}`);
+      console.log(`[DocumentProcessor] Using hybrid assessment for fallback processing`);
       
+      stages.push({
+        stage: 'Template Selection',
+        status: 'skipped',
+        durationMs: Date.now() - selectionStartTime,
+        error: selectionResult.blockReason,
+      });
+      
+      // Determine review reason
+      const reviewReason = selectionResult.topScore === 0 
+        ? 'TEMPLATE_NOT_MATCHED' as const
+        : selectionResult.confidenceBand === 'LOW'
+          ? 'LOW_TEMPLATE_CONFIDENCE' as const
+          : 'AMBIGUOUS_SELECTION' as const;
+      
+      // Perform hybrid assessment - NEVER FAIL, always provide partial results
+      const hybridStartTime = Date.now();
+      const pageTexts = ocrResult.pages.map(p => p.markdown);
+      const avgConfidence = ocrResult.pages.length > 0 
+        ? ocrResult.pages.reduce((sum, p) => sum + (p.confidence || 0.7), 0) / ocrResult.pages.length
+        : 0.5;
+      
+      const hybridResult = await performHybridAssessment(
+        extractedText,
+        pageTexts,
+        avgConfidence,
+        reviewReason
+      );
+      
+      stages.push({
+        stage: 'Hybrid Assessment',
+        status: hybridResult.success ? 'success' : 'failed',
+        durationMs: Date.now() - hybridStartTime,
+        error: hybridResult.error,
+      });
+      
+      // Update status to review_queue
       try {
         await db.updateJobSheetStatus(jobSheetId, 'review_queue');
       } catch (error) {
         console.warn('[DocumentProcessor] Could not update job sheet status:', error);
       }
       
-      stages.push({
-        stage: 'Template Selection',
-        status: 'failed',
-        durationMs: Date.now() - selectionStartTime,
-        error: selectionResult.blockReason,
-      });
-      
-      // Create selection trace for audit
-      const trace = createSelectionTraceArtifact(jobSheetId, selectionResult);
-      
-      // Return early - DO NOT auto-process on LOW/ambiguous confidence
-      return {
-        success: false,
-        jobSheetId,
-        ocrResult,
-        selectionResult,
-        processingStages: stages,
-        totalDurationMs: Date.now() - startTime,
-      };
+      // Store partial audit result with hybrid data
+      try {
+        const auditResult = await db.createAuditResult({
+          jobSheetId,
+          goldSpecId: options.goldSpecId || 1,
+          runId,
+          result: 'review_queue',
+          confidenceScore: String(selectionResult.topScore),
+          documentStrategy: 'ocr',
+          ocrEngineVersion: ocrResult.model,
+          pipelineVersion: PIPELINE_VERSION,
+          reportJson: {
+            summary: hybridResult.llmSummary || hybridResult.reviewExplanation,
+            extractedText,
+            extractedFields: Object.fromEntries(
+              hybridResult.extractedFields.map(f => [f.field, {
+                value: f.value,
+                confidence: f.confidence,
+                pageNumber: f.pageNumber,
+              }])
+            ),
+            pageCount: ocrResult.totalPages,
+            processingStages: stages,
+            hybridAssessment: hybridResult,
+            selectionResult,
+          },
+          processingTimeMs: Date.now() - startTime,
+        });
+        
+        // Store hybrid findings as audit findings
+        if (hybridResult.extractedFields.length > 0) {
+          const findingsToInsert = hybridResult.extractedFields.map(field => ({
+            auditResultId: auditResult.id,
+            fieldName: field.field,
+            severity: 'S3' as const, // Minor - just extracted data
+            reasonCode: 'VALID' as const,
+            rawSnippet: field.value,
+            normalisedSnippet: field.value,
+            confidence: String(field.confidence),
+            pageNumber: field.pageNumber,
+          }));
+          await db.createAuditFindings(findingsToInsert);
+        }
+        
+        // Return with hybrid assessment data - SUCCESS with partial results
+        return {
+          success: true, // Changed: always succeed with partial results
+          jobSheetId,
+          auditResultId: auditResult.id,
+          ocrResult,
+          selectionResult,
+          hybridAssessment: hybridResult,
+          assessmentMode: 'HYBRID',
+          processingStages: stages,
+          totalDurationMs: Date.now() - startTime,
+        };
+      } catch (dbError) {
+        console.error('[DocumentProcessor] Failed to store hybrid results:', dbError);
+        
+        // Still return with what we have
+        return {
+          success: true,
+          jobSheetId,
+          ocrResult,
+          selectionResult,
+          hybridAssessment: hybridResult,
+          assessmentMode: 'HYBRID',
+          processingStages: stages,
+          totalDurationMs: Date.now() - startTime,
+        };
+      }
     }
     
     // HIGH or clear MEDIUM confidence - proceed with selected template
@@ -458,6 +554,7 @@ export async function processJobSheetWithOptions(
     ocrResult,
     analysisResult,
     selectionResult,
+    assessmentMode: 'FULL',
     processingStages: stages,
     totalDurationMs: Date.now() - startTime,
   };

@@ -15,3 +15,4 @@ export * from './importPack';
 export * from './roiValidator';
 export * from './activationPolicy';
 export * from './defaultTemplate';
+export * from './fallbackTemplate';
