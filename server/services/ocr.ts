@@ -11,22 +11,32 @@
  * risked leaking OCR text — is retired in favour of the adapter's safe logger.
  */
 
-export type { OCRPage, OCRResult, OCROptions } from './ocrAdapter/types';
-import type { OCRResult, OCROptions } from './ocrAdapter/types';
-import { getOCRAdapter } from './ocrAdapter';
+export type {
+  OCRPage,
+  OCRResult,
+  OCROptions,
+  OCRBlock,
+  OCRBlockType,
+  OCRWordConfidence,
+  OCRConfidenceScores,
+  OCRSignatureRegion,
+  OCRDeepFeaturesSummary,
+} from "./ocrAdapter/types";
+import type { OCRResult, OCROptions } from "./ocrAdapter/types";
+import { getOCRAdapter } from "./ocrAdapter";
 
 /**
  * @deprecated Retained for backwards compatibility only. The Mistral endpoint
  * is now owned by the OCR adapter (`./ocrAdapter/mistralAdapter`).
  */
-export const MISTRAL_OCR_ENDPOINT = 'https://api.mistral.ai/v1/ocr';
+export const MISTRAL_OCR_ENDPOINT = "https://api.mistral.ai/v1/ocr";
 
 /**
  * Extract text from a document URL via the configured OCR adapter.
  */
 export async function extractTextFromDocument(
   documentUrl: string,
-  options: OCROptions = {},
+  options: OCROptions = {}
 ): Promise<OCRResult> {
   return getOCRAdapter().extractFromUrl(documentUrl, options);
 }
@@ -36,8 +46,8 @@ export async function extractTextFromDocument(
  */
 export async function extractTextFromBase64(
   base64Data: string,
-  mimeType: string = 'application/pdf',
-  options: OCROptions = {},
+  mimeType: string = "application/pdf",
+  options: OCROptions = {}
 ): Promise<OCRResult> {
   return getOCRAdapter().extractFromBase64(base64Data, mimeType, options);
 }
@@ -45,6 +55,9 @@ export async function extractTextFromBase64(
 /**
  * Validate that the configured OCR provider's credentials are working.
  */
-export async function validateMistralApiKey(): Promise<{ valid: boolean; error?: string }> {
+export async function validateMistralApiKey(): Promise<{
+  valid: boolean;
+  error?: string;
+}> {
   return getOCRAdapter().validateApiKey();
 }
