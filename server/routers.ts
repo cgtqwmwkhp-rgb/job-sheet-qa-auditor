@@ -15,6 +15,7 @@ import { processJobSheet } from "./services/documentProcessor";
 import { validateMistralApiKey } from "./services/ocr";
 import { templateRouter } from "./routers/templateRouter";
 import { analyticsRouter } from "./routers/analyticsRouter";
+import { auditActionsRouter } from "./routers/auditActionsRouter";
 import { TRPCError } from "@trpc/server";
 import {
   enforceRateLimit,
@@ -47,6 +48,8 @@ export const appRouter = router({
   system: systemRouter,
   templates: templateRouter,
   analytics: analyticsRouter,
+  /** PR-10: waive / override / flag / approve / undo */
+  auditActions: auditActionsRouter,
 
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),

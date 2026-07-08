@@ -1,0 +1,370 @@
+/**
+ * Audit Actions Contract Tests (PR-10)
+ *
+ * Verifies waive / override / flag / approve / undo / bulkApprove
+ * against an in-memory deps mock — no live DB or OCR/LLM.
+ */
+
+import { describe, it, expect, beforeEach } from "vitest";
+import * as fs from "fs";
+import * as path from "path";
+import {
+  applyFindingAction,
+  undoFindingAction,
+  bulkApproveFindings,
+  approveJobSheet,
+  undoJobSheetApprove,
+  mapActionToStatus,
+  canUndo,
+  buildUndoToken,
+  parseUndoToken,
+  type AuditActionDeps,
+  type FindingRecord,
+  type AuditResultRecord,
+  type WaiverRecord,
+} from "../../services/auditActions";
+
+function createMemoryDeps() {
+  const findings = new Map<number, FindingRecord>();
+  const audits = new Map<number, AuditResultRecord>();
+  const waivers = new Map<number, WaiverRecord>();
+  let nextWaiverId = 1;
+  const logs: Array<Record<string, unknown>> = [];
+  const jobSheetStatuses = new Map<number, string>();
+
+  findings.set(1, {
+    id: 1,
+    auditResultId: 10,
+    resolutionStatus: "open",
+  });
+  findings.set(2, {
+    id: 2,
+    auditResultId: 10,
+    resolutionStatus: "open",
+  });
+  audits.set(10, {
+    id: 10,
+    jobSheetId: 100,
+    result: "fail",
+  });
+  jobSheetStatuses.set(100, "completed");
+
+  const deps: AuditActionDeps = {
+    getFinding: async id => findings.get(id),
+    updateFindingResolution: async (id, data) => {
+      const existing = findings.get(id);
+      if (!existing) throw new Error("not found");
+      findings.set(id, {
+        ...existing,
+        resolutionStatus: data.resolutionStatus,
+        resolutionReason: data.resolutionReason,
+        resolvedBy: data.resolvedBy,
+        resolvedAt: data.resolvedAt ?? null,
+        previousResolutionStatus: data.previousResolutionStatus,
+      });
+    },
+    getAuditResult: async id => audits.get(id),
+    updateAuditResultStatus: async (id, result) => {
+      const existing = audits.get(id);
+      if (!existing) throw new Error("not found");
+      audits.set(id, { ...existing, result });
+    },
+    updateJobSheetStatus: async (id, status) => {
+      jobSheetStatuses.set(id, status);
+    },
+    createWaiver: async data => {
+      const id = nextWaiverId++;
+      waivers.set(id, { id, auditFindingId: data.auditFindingId });
+      return { id };
+    },
+    getWaiverByFindingId: async auditFindingId => {
+      return (
+        Array.from(waivers.values()).find(
+          w => w.auditFindingId === auditFindingId
+        ) ?? undefined
+      );
+    },
+    deleteWaiver: async id => {
+      waivers.delete(id);
+    },
+    logAction: async data => {
+      logs.push(data as unknown as Record<string, unknown>);
+    },
+  };
+
+  return { deps, findings, audits, waivers, logs, jobSheetStatuses };
+}
+
+describe("Audit Actions Contract (PR-10)", () => {
+  describe("source structure", () => {
+    it("auditActions service module exists", () => {
+      const indexPath = path.resolve(
+        __dirname,
+        "../../services/auditActions/index.ts"
+      );
+      const typesPath = path.resolve(
+        __dirname,
+        "../../services/auditActions/types.ts"
+      );
+      expect(fs.existsSync(indexPath)).toBe(true);
+      expect(fs.existsSync(typesPath)).toBe(true);
+    });
+
+    it("auditActionsRouter is registered on appRouter", () => {
+      const routersPath = path.resolve(__dirname, "../../routers.ts");
+      const content = fs.readFileSync(routersPath, "utf-8");
+      expect(content).toContain("auditActionsRouter");
+      expect(content).toContain("auditActions:");
+    });
+
+    it("schema includes finding resolutionStatus", () => {
+      const schemaPath = path.resolve(__dirname, "../../../drizzle/schema.ts");
+      const content = fs.readFileSync(schemaPath, "utf-8");
+      expect(content).toContain("resolutionStatus");
+      expect(content).toContain("previousResolutionStatus");
+    });
+
+    it("AuditResults wires Flag and Override handlers", () => {
+      const pagePath = path.resolve(
+        __dirname,
+        "../../../client/src/pages/AuditResults.tsx"
+      );
+      const content = fs.readFileSync(pagePath, "utf-8");
+      expect(content).toContain("auditActions.flag");
+      expect(content).toContain("auditActions.override");
+      expect(content).toContain("handleFlagForReview");
+      expect(content).toContain("onOverride");
+      expect(content).toContain('label: "Undo"');
+    });
+
+    it("HoldQueue wires Approve and Bulk Approve", () => {
+      const pagePath = path.resolve(
+        __dirname,
+        "../../../client/src/pages/HoldQueue.tsx"
+      );
+      const content = fs.readFileSync(pagePath, "utf-8");
+      expect(content).toContain("auditActions.approveJobSheet");
+      expect(content).toContain("handleBulkApprove");
+      expect(content).toContain("handleApprove");
+      expect(content).toContain('label: "Undo"');
+    });
+  });
+
+  describe("helpers", () => {
+    it("maps actions to resolution statuses", () => {
+      expect(mapActionToStatus("waive")).toBe("waived");
+      expect(mapActionToStatus("override")).toBe("overridden");
+      expect(mapActionToStatus("flag")).toBe("flagged");
+      expect(mapActionToStatus("approve")).toBe("approved");
+    });
+
+    it("canUndo is false only for open", () => {
+      expect(canUndo("open")).toBe(false);
+      expect(canUndo("waived")).toBe(true);
+      expect(canUndo("flagged")).toBe(true);
+    });
+
+    it("builds and parses undo tokens", () => {
+      const token = buildUndoToken(42, "open", "overridden");
+      expect(token).toBe("undo:42:open->overridden");
+      expect(parseUndoToken(token)).toEqual({
+        findingId: 42,
+        fromStatus: "open",
+        toStatus: "overridden",
+      });
+      expect(parseUndoToken("bad")).toBeNull();
+    });
+  });
+
+  describe("applyFindingAction", () => {
+    let mem: ReturnType<typeof createMemoryDeps>;
+
+    beforeEach(() => {
+      mem = createMemoryDeps();
+    });
+
+    it("overrides a finding and records previous status", async () => {
+      const result = await applyFindingAction(mem.deps, {
+        findingId: 1,
+        action: "override",
+        reason: "False positive",
+        userId: 7,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.resolutionStatus).toBe("overridden");
+      expect(result.previousResolutionStatus).toBe("open");
+      expect(result.undoToken).toContain("undo:1:");
+      expect(mem.findings.get(1)?.resolutionStatus).toBe("overridden");
+      expect(mem.logs.some(l => l.action === "FINDING_OVERRIDE")).toBe(true);
+    });
+
+    it("waives a finding and creates a waiver", async () => {
+      const result = await applyFindingAction(mem.deps, {
+        findingId: 1,
+        action: "waive",
+        reason: "Approved exception",
+        userId: 7,
+      });
+
+      expect(result.waiverId).toBeDefined();
+      expect(mem.waivers.size).toBe(1);
+      expect(mem.audits.get(10)?.result).toBe("waived");
+      expect(result.auditResultStatus).toBe("waived");
+    });
+
+    it("flags a finding and moves job sheet to review_queue", async () => {
+      const result = await applyFindingAction(mem.deps, {
+        findingId: 1,
+        action: "flag",
+        reason: "Needs human review",
+        userId: 7,
+      });
+
+      expect(result.jobSheetStatus).toBe("review_queue");
+      expect(mem.jobSheetStatuses.get(100)).toBe("review_queue");
+      expect(mem.audits.get(10)?.result).toBe("review_queue");
+    });
+
+    it("approves a finding", async () => {
+      const result = await applyFindingAction(mem.deps, {
+        findingId: 1,
+        action: "approve",
+        reason: "Looks correct",
+        userId: 7,
+      });
+
+      expect(result.resolutionStatus).toBe("approved");
+      expect(mem.findings.get(1)?.resolutionStatus).toBe("approved");
+    });
+
+    it("throws when finding is missing", async () => {
+      await expect(
+        applyFindingAction(mem.deps, {
+          findingId: 999,
+          action: "flag",
+          reason: "x",
+          userId: 1,
+        })
+      ).rejects.toThrow(/not found/i);
+    });
+  });
+
+  describe("undoFindingAction", () => {
+    it("soft-undoes override back to open", async () => {
+      const mem = createMemoryDeps();
+      await applyFindingAction(mem.deps, {
+        findingId: 1,
+        action: "override",
+        reason: "fp",
+        userId: 1,
+      });
+
+      const undone = await undoFindingAction(mem.deps, {
+        findingId: 1,
+        userId: 1,
+      });
+
+      expect(undone.action).toBe("undo");
+      expect(undone.resolutionStatus).toBe("open");
+      expect(mem.findings.get(1)?.resolutionStatus).toBe("open");
+      expect(mem.logs.some(l => l.action === "FINDING_UNDO")).toBe(true);
+    });
+
+    it("undoing waive deletes the waiver", async () => {
+      const mem = createMemoryDeps();
+      await applyFindingAction(mem.deps, {
+        findingId: 1,
+        action: "waive",
+        reason: "exception",
+        userId: 1,
+      });
+      expect(mem.waivers.size).toBe(1);
+
+      const undone = await undoFindingAction(mem.deps, {
+        findingId: 1,
+        userId: 1,
+      });
+
+      expect(undone.deletedWaiverId).toBeDefined();
+      expect(mem.waivers.size).toBe(0);
+    });
+
+    it("throws when nothing to undo", async () => {
+      const mem = createMemoryDeps();
+      await expect(
+        undoFindingAction(mem.deps, { findingId: 1, userId: 1 })
+      ).rejects.toThrow(/no action to undo/i);
+    });
+  });
+
+  describe("bulkApproveFindings", () => {
+    it("approves multiple findings and skips already-approved", async () => {
+      const mem = createMemoryDeps();
+      await applyFindingAction(mem.deps, {
+        findingId: 2,
+        action: "approve",
+        reason: "already",
+        userId: 1,
+      });
+
+      const result = await bulkApproveFindings(mem.deps, {
+        findingIds: [1, 2, 999],
+        reason: "Bulk ok",
+        userId: 1,
+      });
+
+      expect(result.approvedIds).toEqual([1]);
+      expect(result.skippedIds).toContain(2);
+      expect(result.skippedIds).toContain(999);
+      expect(result.undoTokens).toHaveLength(1);
+    });
+  });
+
+  describe("job sheet approve / undo", () => {
+    it("approves job sheet out of review queue", async () => {
+      const mem = createMemoryDeps();
+      const result = await approveJobSheet(mem.deps, {
+        jobSheetId: 100,
+        userId: 1,
+        previousStatus: "review_queue",
+      });
+
+      expect(result.newStatus).toBe("completed");
+      expect(mem.jobSheetStatuses.get(100)).toBe("completed");
+      expect(result.undoToken).toContain("undo-js:100:");
+    });
+
+    it("undoes job sheet approve", async () => {
+      const mem = createMemoryDeps();
+      await approveJobSheet(mem.deps, {
+        jobSheetId: 100,
+        userId: 1,
+        previousStatus: "review_queue",
+      });
+
+      const undone = await undoJobSheetApprove(mem.deps, {
+        jobSheetId: 100,
+        userId: 1,
+        restoreStatus: "review_queue",
+      });
+
+      expect(undone.newStatus).toBe("review_queue");
+      expect(mem.jobSheetStatuses.get(100)).toBe("review_queue");
+    });
+  });
+
+  describe("no live network", () => {
+    it("service source has no fetch / https calls", () => {
+      const indexPath = path.resolve(
+        __dirname,
+        "../../services/auditActions/index.ts"
+      );
+      const content = fs.readFileSync(indexPath, "utf-8");
+      expect(content).not.toMatch(/fetch\s*\(/);
+      expect(content).not.toContain("https://");
+      expect(content).not.toContain("openai");
+      expect(content).not.toContain("mistral");
+    });
+  });
+});

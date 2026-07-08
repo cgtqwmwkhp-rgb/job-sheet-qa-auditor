@@ -91,7 +91,7 @@ export function useStats() {
     // Provide fallback data for demo mode
     placeholderData: {
       totalAudits: 0,
-      passRate: '0',
+      passRate: "0",
       reviewQueue: 0,
       criticalIssues: 0,
     },
@@ -99,19 +99,26 @@ export function useStats() {
 }
 
 // ============ JOB SHEETS ============
-export function useJobSheets(options?: { status?: string; technicianId?: number; limit?: number }) {
+export function useJobSheets(options?: {
+  status?: string;
+  technicianId?: number;
+  limit?: number;
+}) {
   return trpc.jobSheets.list.useQuery(options);
 }
 
 export function useJobSheet(id: number) {
-  return trpc.jobSheets.get.useQuery({ id }, {
-    enabled: !!id && id > 0,
-  });
+  return trpc.jobSheets.get.useQuery(
+    { id },
+    {
+      enabled: !!id && id > 0,
+    }
+  );
 }
 
 export function useUploadJobSheet() {
   const utils = trpc.useUtils();
-  
+
   return trpc.jobSheets.upload.useMutation({
     onSuccess: () => {
       utils.jobSheets.list.invalidate();
@@ -122,7 +129,7 @@ export function useUploadJobSheet() {
 
 export function useUpdateJobSheetStatus() {
   const utils = trpc.useUtils();
-  
+
   return trpc.jobSheets.updateStatus.useMutation({
     onSuccess: () => {
       utils.jobSheets.list.invalidate();
@@ -137,15 +144,21 @@ export function useAuditResults(options?: { result?: string; limit?: number }) {
 }
 
 export function useAuditResultByJobSheet(jobSheetId: number) {
-  return trpc.audits.getByJobSheet.useQuery({ jobSheetId }, {
-    enabled: !!jobSheetId && jobSheetId > 0,
-  });
+  return trpc.audits.getByJobSheet.useQuery(
+    { jobSheetId },
+    {
+      enabled: !!jobSheetId && jobSheetId > 0,
+    }
+  );
 }
 
 export function useAuditFindings(auditResultId: number) {
-  return trpc.audits.getFindings.useQuery({ auditResultId }, {
-    enabled: !!auditResultId && auditResultId > 0,
-  });
+  return trpc.audits.getFindings.useQuery(
+    { auditResultId },
+    {
+      enabled: !!auditResultId && auditResultId > 0,
+    }
+  );
 }
 
 // ============ GOLD SPECS ============
@@ -159,7 +172,7 @@ export function useActiveGoldSpec(specType?: string) {
 
 export function useCreateGoldSpec() {
   const utils = trpc.useUtils();
-  
+
   return trpc.specs.create.useMutation({
     onSuccess: () => {
       utils.specs.list.invalidate();
@@ -174,7 +187,7 @@ export function useDisputes(options?: { status?: string; limit?: number }) {
 
 export function useCreateDispute() {
   const utils = trpc.useUtils();
-  
+
   return trpc.disputes.create.useMutation({
     onSuccess: () => {
       utils.disputes.list.invalidate();
@@ -184,7 +197,7 @@ export function useCreateDispute() {
 
 export function useUpdateDisputeStatus() {
   const utils = trpc.useUtils();
-  
+
   return trpc.disputes.updateStatus.useMutation({
     onSuccess: () => {
       utils.disputes.list.invalidate();
@@ -195,7 +208,7 @@ export function useUpdateDisputeStatus() {
 // ============ WAIVERS ============
 export function useCreateWaiver() {
   const utils = trpc.useUtils();
-  
+
   return trpc.waivers.create.useMutation({
     onSuccess: () => {
       utils.audits.list.invalidate();
@@ -204,8 +217,88 @@ export function useCreateWaiver() {
 }
 
 export function useWaiverByFinding(auditFindingId: number) {
-  return trpc.waivers.getByFinding.useQuery({ auditFindingId }, {
-    enabled: !!auditFindingId && auditFindingId > 0,
+  return trpc.waivers.getByFinding.useQuery(
+    { auditFindingId },
+    {
+      enabled: !!auditFindingId && auditFindingId > 0,
+    }
+  );
+}
+
+// ============ AUDIT ACTIONS (PR-10) ============
+
+export function useWaiveFinding() {
+  const utils = trpc.useUtils();
+  return trpc.auditActions.waive.useMutation({
+    onSuccess: () => {
+      utils.audits.list.invalidate();
+      utils.jobSheets.list.invalidate();
+    },
+  });
+}
+
+export function useOverrideFinding() {
+  const utils = trpc.useUtils();
+  return trpc.auditActions.override.useMutation({
+    onSuccess: () => {
+      utils.audits.list.invalidate();
+    },
+  });
+}
+
+export function useFlagFinding() {
+  const utils = trpc.useUtils();
+  return trpc.auditActions.flag.useMutation({
+    onSuccess: () => {
+      utils.audits.list.invalidate();
+      utils.jobSheets.list.invalidate();
+    },
+  });
+}
+
+export function useApproveFinding() {
+  const utils = trpc.useUtils();
+  return trpc.auditActions.approve.useMutation({
+    onSuccess: () => {
+      utils.audits.list.invalidate();
+    },
+  });
+}
+
+export function useUndoFindingAction() {
+  const utils = trpc.useUtils();
+  return trpc.auditActions.undo.useMutation({
+    onSuccess: () => {
+      utils.audits.list.invalidate();
+      utils.jobSheets.list.invalidate();
+    },
+  });
+}
+
+export function useBulkApproveFindings() {
+  const utils = trpc.useUtils();
+  return trpc.auditActions.bulkApprove.useMutation({
+    onSuccess: () => {
+      utils.audits.list.invalidate();
+    },
+  });
+}
+
+export function useApproveJobSheet() {
+  const utils = trpc.useUtils();
+  return trpc.auditActions.approveJobSheet.useMutation({
+    onSuccess: () => {
+      utils.jobSheets.list.invalidate();
+    },
+  });
+}
+
+export function useUndoJobSheetApprove() {
+  const utils = trpc.useUtils();
+  return trpc.auditActions.undoJobSheetApprove.useMutation({
+    onSuccess: () => {
+      utils.jobSheets.list.invalidate();
+    },
   });
 }
 
@@ -215,13 +308,20 @@ export function useUsers() {
 }
 
 export function useUser(id: number) {
-  return trpc.users.get.useQuery({ id }, {
-    enabled: !!id && id > 0,
-  });
+  return trpc.users.get.useQuery(
+    { id },
+    {
+      enabled: !!id && id > 0,
+    }
+  );
 }
 
 // ============ AUDIT LOG ============
-export function useAuditLog(options?: { userId?: number; entityType?: string; limit?: number }) {
+export function useAuditLog(options?: {
+  userId?: number;
+  entityType?: string;
+  limit?: number;
+}) {
   return trpc.auditLog.list.useQuery(options);
 }
 
@@ -231,7 +331,7 @@ export function useAuditLog(options?: { userId?: number; entityType?: string; li
 export function useSubmitFeedback() {
   // Feedback is now handled through disputes
   const createDispute = useCreateDispute();
-  
+
   return {
     mutate: (data: { findingId: number; type: string; comment: string }) => {
       createDispute.mutate({
@@ -239,7 +339,11 @@ export function useSubmitFeedback() {
         reason: `[${data.type}] ${data.comment}`,
       });
     },
-    mutateAsync: async (data: { findingId: number; type: string; comment: string }) => {
+    mutateAsync: async (data: {
+      findingId: number;
+      type: string;
+      comment: string;
+    }) => {
       return createDispute.mutateAsync({
         auditFindingId: data.findingId,
         reason: `[${data.type}] ${data.comment}`,
@@ -253,16 +357,24 @@ export function useSubmitFeedback() {
 
 export function useResolveDispute() {
   const updateStatus = useUpdateDisputeStatus();
-  
+
   return {
-    mutate: (data: { disputeId: string; status: "approved" | "rejected"; comment?: string }) => {
+    mutate: (data: {
+      disputeId: string;
+      status: "approved" | "rejected";
+      comment?: string;
+    }) => {
       updateStatus.mutate({
         id: parseInt(data.disputeId),
         status: data.status === "approved" ? "accepted" : "rejected",
         reviewNotes: data.comment,
       });
     },
-    mutateAsync: async (data: { disputeId: string; status: "approved" | "rejected"; comment?: string }) => {
+    mutateAsync: async (data: {
+      disputeId: string;
+      status: "approved" | "rejected";
+      comment?: string;
+    }) => {
       return updateStatus.mutateAsync({
         id: parseInt(data.disputeId),
         status: data.status === "approved" ? "accepted" : "rejected",
