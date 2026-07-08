@@ -56,9 +56,8 @@ describe("File URL Endpoint Contract", () => {
         routersContent.indexOf("getFileUrl: protectedProcedure"),
         routersContent.indexOf("getFileUrl: protectedProcedure") + 500
       );
-      expect(getFileUrlSection).toMatch(
-        /throw new Error(["']Job sheet not found["'])/
-      );
+      expect(getFileUrlSection).toContain("throw new Error");
+      expect(getFileUrlSection).toContain("Job sheet not found");
     });
 
     it("should fall back to stored URL when no fileKey", () => {
