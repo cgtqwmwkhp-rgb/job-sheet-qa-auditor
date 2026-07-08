@@ -5,6 +5,7 @@
  * Primary implementation: Mistral OCR (pinned via DEFAULT_OCR_MODEL).
  *
  * PR-2: Optional OCR-4 deep features (blocks, word confidence, signatures).
+ * PR-4: Azure Document Intelligence fallback + optional cross-check sampling.
  */
 
 /**
@@ -131,6 +132,33 @@ export interface OCRDeepFeaturesSummary {
 }
 
 /**
+ * Advisory dual-engine cross-check metadata (PR-4).
+ * Never contains raw OCR text — hashes/scores only.
+ */
+export interface OCRCrossCheckMetadata {
+  sampled: boolean;
+  agreement: boolean;
+  primaryProvider: string;
+  fallbackProvider: string;
+  /** 0–1 similarity of normalized page text (advisory). */
+  similarityScore?: number;
+  pageCountMatch?: boolean;
+  /** Short reason when agreement is false. */
+  disagreementReason?: string;
+}
+
+/**
+ * Failover metadata when primary OCR failed and fallback was used (PR-4).
+ */
+export interface OCRFailoverMetadata {
+  used: boolean;
+  primaryProvider: string;
+  fallbackProvider: string;
+  primaryErrorCode?: string;
+  primaryError?: string;
+}
+
+/**
  * OCR extraction result
  */
 export interface OCRResult {
@@ -138,6 +166,8 @@ export interface OCRResult {
   pages: OCRPage[];
   totalPages: number;
   model: string;
+  /** Provider that produced this result (set on failover / azure path). */
+  provider?: OCRProvider | string;
   correlationId?: string;
   processingTimeMs?: number;
   usageInfo?: {
@@ -149,6 +179,10 @@ export interface OCRResult {
   retryAttempts?: number;
   /** Optional deep-feature summary (no PII / block content). */
   deepFeatures?: OCRDeepFeaturesSummary;
+  /** Optional dual-run cross-check (advisory; canonical pages remain primary). */
+  crossCheck?: OCRCrossCheckMetadata;
+  /** Present when fallback OCR was used after primary failure. */
+  failover?: OCRFailoverMetadata;
 }
 
 /**
@@ -245,7 +279,7 @@ export type OCRAdapterFactory = () => OCRAdapter;
 /**
  * Supported OCR providers
  */
-export type OCRProvider = "mistral" | "mock";
+export type OCRProvider = "mistral" | "mock" | "azure";
 
 /**
  * OCR configuration from environment
@@ -260,6 +294,26 @@ export interface OCRConfig {
   /** Master switch for OCR-4 deep features. */
   deepFeaturesEnabled: boolean;
   confidenceGranularity: "word" | "page" | "none";
+  /**
+   * When true, wrap primary with resilient failover to OCR_FALLBACK_PROVIDER.
+   * Default false — production path unchanged until explicitly enabled.
+   */
+  failoverEnabled: boolean;
+  /** Fallback provider when failover is enabled (default: azure). */
+  fallbackProvider: OCRProvider;
+  /**
+   * Fraction of successful primary runs that also invoke fallback for
+   * advisory cross-check (0–1). Default 0 (off).
+   */
+  crossCheckSampleRate: number;
+  /** Azure Document Intelligence endpoint (unused in CI / mocks-only). */
+  azureEndpoint?: string;
+  /** Azure DI key (unused in CI / mocks-only). */
+  azureKey?: string;
+  /** Azure DI model id, e.g. prebuilt-read. */
+  azureModel: string;
+  /** Azure DI API version. */
+  azureApiVersion: string;
 }
 
 /**
@@ -313,11 +367,47 @@ function resolveConfidenceGranularity(
   return "word";
 }
 
+export const DEFAULT_AZURE_DI_MODEL = "prebuilt-read";
+export const DEFAULT_AZURE_DI_API_VERSION = "2024-11-30";
+
+function resolveBoolEnv(
+  raw: string | undefined,
+  defaultValue: boolean
+): boolean {
+  if (raw === undefined || raw === "") return defaultValue;
+  if (raw === "true" || raw === "1") return true;
+  if (raw === "false" || raw === "0") return false;
+  return defaultValue;
+}
+
+function resolveSampleRate(raw: string | undefined): number {
+  if (raw === undefined || raw === "") return 0;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(1, Math.max(0, n));
+}
+
 /**
  * Get OCR configuration from environment
+ *
+ * PR-4 env (documented; AZURE_DI_* unused in CI / mocks-only overnight):
+ * - OCR_FAILOVER_ENABLED (default false)
+ * - OCR_CROSS_CHECK_SAMPLE_RATE (default 0)
+ * - OCR_FALLBACK_PROVIDER (default azure)
+ * - AZURE_DI_ENDPOINT, AZURE_DI_KEY, AZURE_DI_MODEL, AZURE_DI_API_VERSION
  */
 export function getOCRConfig(): OCRConfig {
   const model = process.env.MISTRAL_OCR_MODEL || DEFAULT_OCR_MODEL;
+  const fallbackRaw = (
+    process.env.OCR_FALLBACK_PROVIDER || "azure"
+  ).toLowerCase() as OCRProvider;
+  const fallbackProvider: OCRProvider =
+    fallbackRaw === "mistral" ||
+    fallbackRaw === "mock" ||
+    fallbackRaw === "azure"
+      ? fallbackRaw
+      : "azure";
+
   return {
     provider: (process.env.OCR_PROVIDER as OCRProvider) || DEFAULT_OCR_PROVIDER,
     model,
@@ -327,20 +417,51 @@ export function getOCRConfig(): OCRConfig {
     maxDelayMs: parseInt(process.env.OCR_MAX_DELAY_MS || "30000", 10),
     deepFeaturesEnabled: resolveDeepFeaturesEnabled(model),
     confidenceGranularity: resolveConfidenceGranularity(),
+    failoverEnabled: resolveBoolEnv(process.env.OCR_FAILOVER_ENABLED, false),
+    fallbackProvider,
+    crossCheckSampleRate: resolveSampleRate(
+      process.env.OCR_CROSS_CHECK_SAMPLE_RATE
+    ),
+    azureEndpoint: process.env.AZURE_DI_ENDPOINT,
+    azureKey: process.env.AZURE_DI_KEY,
+    azureModel: process.env.AZURE_DI_MODEL || DEFAULT_AZURE_DI_MODEL,
+    azureApiVersion:
+      process.env.AZURE_DI_API_VERSION || DEFAULT_AZURE_DI_API_VERSION,
   };
 }
 
 /**
  * Build the engine-version tag stamped on every audit result, e.g.
- * `mistral/mistral-ocr-4-0`. Records both provider and exact model so an
- * audit is always attributable to the engine that produced it. Kept within
- * the 32-character `audit_results.ocrEngineVersion` column budget.
+ * `mistral/mistral-ocr-4-0` or `azure/prebuilt-read`. Records both provider
+ * and exact model so an audit is always attributable to the engine that
+ * produced it. Kept within the 32-character `audit_results.ocrEngineVersion`
+ * column budget.
+ *
+ * When `resultProvider` is set (failover path), it overrides config.provider.
  */
 export function getOCREngineVersion(
   model?: string,
-  config: OCRConfig = getOCRConfig()
+  config: OCRConfig = getOCRConfig(),
+  resultProvider?: string
 ): string {
-  return `${config.provider}/${model ?? config.model}`;
+  const provider = resultProvider || config.provider;
+  return `${provider}/${model ?? config.model}`;
+}
+
+/**
+ * Safe-to-store OCR resilience metadata for reportJson (no raw text).
+ */
+export function ocrResilienceReportFields(
+  result: OCRResult
+): Record<string, unknown> {
+  const fields: Record<string, unknown> = {};
+  if (result.crossCheck) {
+    fields.crossCheck = result.crossCheck;
+  }
+  if (result.failover) {
+    fields.failover = result.failover;
+  }
+  return fields;
 }
 
 /**

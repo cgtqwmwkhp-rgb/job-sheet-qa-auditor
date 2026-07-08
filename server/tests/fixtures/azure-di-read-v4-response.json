@@ -1,0 +1,94 @@
+{
+  "status": "succeeded",
+  "createdDateTime": "2024-01-15T10:00:00Z",
+  "lastUpdatedDateTime": "2024-01-15T10:00:02Z",
+  "analyzeResult": {
+    "apiVersion": "2024-11-30",
+    "modelId": "prebuilt-read",
+    "stringIndexType": "textElements",
+    "content": "Job Sheet\nJob Number: JS-2024-001\nDate: 2024-01-15\nClient: ACME Corp\nWork Description\nRoutine maintenance inspection completed.",
+    "pages": [
+      {
+        "pageNumber": 1,
+        "angle": 0,
+        "width": 8.5,
+        "height": 11,
+        "unit": "inch",
+        "words": [
+          {
+            "content": "Job",
+            "polygon": [1.0, 1.0, 1.5, 1.0, 1.5, 1.3, 1.0, 1.3],
+            "confidence": 0.99
+          },
+          {
+            "content": "Sheet",
+            "polygon": [1.6, 1.0, 2.4, 1.0, 2.4, 1.3, 1.6, 1.3],
+            "confidence": 0.98
+          },
+          {
+            "content": "JS-2024-001",
+            "polygon": [2.5, 2.0, 4.0, 2.0, 4.0, 2.3, 2.5, 2.3],
+            "confidence": 0.95
+          }
+        ],
+        "lines": [
+          {
+            "content": "Job Sheet",
+            "polygon": [1.0, 1.0, 2.4, 1.0, 2.4, 1.3, 1.0, 1.3]
+          },
+          {
+            "content": "Job Number: JS-2024-001",
+            "polygon": [1.0, 2.0, 4.0, 2.0, 4.0, 2.3, 1.0, 2.3]
+          },
+          {
+            "content": "Date: 2024-01-15",
+            "polygon": [1.0, 2.5, 3.0, 2.5, 3.0, 2.8, 1.0, 2.8]
+          },
+          {
+            "content": "Client: ACME Corp",
+            "polygon": [1.0, 3.0, 3.5, 3.0, 3.5, 3.3, 1.0, 3.3]
+          },
+          {
+            "content": "Work Description",
+            "polygon": [1.0, 4.0, 3.0, 4.0, 3.0, 4.3, 1.0, 4.3]
+          },
+          {
+            "content": "Routine maintenance inspection completed.",
+            "polygon": [1.0, 4.5, 5.0, 4.5, 5.0, 4.8, 1.0, 4.8]
+          }
+        ]
+      }
+    ],
+    "paragraphs": [
+      {
+        "content": "Job Sheet",
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [1.0, 1.0, 2.4, 1.0, 2.4, 1.3, 1.0, 1.3]
+          }
+        ]
+      },
+      {
+        "content": "Job Number: JS-2024-001\nDate: 2024-01-15\nClient: ACME Corp",
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [1.0, 2.0, 4.0, 2.0, 4.0, 3.3, 1.0, 3.3]
+          }
+        ]
+      },
+      {
+        "content": "Work Description\nRoutine maintenance inspection completed.",
+        "boundingRegions": [
+          {
+            "pageNumber": 1,
+            "polygon": [1.0, 4.0, 5.0, 4.0, 5.0, 4.8, 1.0, 4.8]
+          }
+        ]
+      }
+    ],
+    "styles": [],
+    "languages": [{ "locale": "en", "confidence": 0.99 }]
+  }
+}

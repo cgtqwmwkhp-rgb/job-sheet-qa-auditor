@@ -14,7 +14,11 @@
  */
 
 import { extractTextFromDocument, OCRResult } from "./ocr";
-import { getOCRConfig, getOCREngineVersion } from "./ocrAdapter/types";
+import {
+  getOCRConfig,
+  getOCREngineVersion,
+  ocrResilienceReportFields,
+} from "./ocrAdapter/types";
 import { analyzeJobSheet, AnalysisResult, GoldSpec } from "./analyzer";
 import {
   selectTemplate,
@@ -223,7 +227,11 @@ export async function processJobSheetWithOptions(
         result: "review_queue",
         confidenceScore: String(Math.round(pageConfidencePrior * 100)),
         documentStrategy: "ocr",
-        ocrEngineVersion: getOCREngineVersion(ocrResult.model),
+        ocrEngineVersion: getOCREngineVersion(
+          ocrResult.model,
+          getOCRConfig(),
+          ocrResult.provider
+        ),
         pipelineVersion: PIPELINE_VERSION,
         reportJson: {
           summary:
@@ -233,6 +241,7 @@ export async function processJobSheetWithOptions(
           ocrConfidenceThreshold: processingSettings.ocrConfidenceThreshold,
           pageCount: ocrResult.totalPages,
           processingStages: stages,
+          ...ocrResilienceReportFields(ocrResult),
         },
         processingTimeMs: Date.now() - startTime,
       });
@@ -430,7 +439,11 @@ export async function processJobSheetWithOptions(
           result: "review_queue",
           confidenceScore: String(selectionResult.topScore),
           documentStrategy: "ocr",
-          ocrEngineVersion: getOCREngineVersion(ocrResult.model),
+          ocrEngineVersion: getOCREngineVersion(
+            ocrResult.model,
+            getOCRConfig(),
+            ocrResult.provider
+          ),
           pipelineVersion: PIPELINE_VERSION,
           reportJson: {
             summary: hybridResult.llmSummary || hybridResult.reviewExplanation,
@@ -447,6 +460,7 @@ export async function processJobSheetWithOptions(
             ),
             pageCount: ocrResult.totalPages,
             processingStages: stages,
+            ...ocrResilienceReportFields(ocrResult),
             hybridAssessment: hybridResult,
             selectionResult,
           },
@@ -647,7 +661,11 @@ export async function processJobSheetWithOptions(
         | "review_queue",
       confidenceScore: String(analysisResult.score),
       documentStrategy: "ocr", // We used OCR
-      ocrEngineVersion: getOCREngineVersion(ocrResult.model),
+      ocrEngineVersion: getOCREngineVersion(
+        ocrResult.model,
+        getOCRConfig(),
+        ocrResult.provider
+      ),
       pipelineVersion: PIPELINE_VERSION,
       reportJson: {
         summary: analysisResult.summary,
@@ -655,6 +673,7 @@ export async function processJobSheetWithOptions(
         extractedFields: analysisResult.extractedFields,
         pageCount: ocrResult.totalPages,
         processingStages: stages,
+        ...ocrResilienceReportFields(ocrResult),
       },
       processingTimeMs: Date.now() - startTime,
     });
