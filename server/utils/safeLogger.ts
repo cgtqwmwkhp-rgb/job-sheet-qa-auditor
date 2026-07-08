@@ -38,6 +38,11 @@ const FORBIDDEN_FIELDS = new Set([
   'base64',
   'base64Data',
   'documentData',
+  // PR-2: OCR-4 deep feature payloads contain document text
+  'blocks',
+  'word_confidence_scores',
+  'wordConfidenceScores',
+  'content',
 ]);
 
 /**
@@ -178,8 +183,12 @@ export function checkLoggingSafety(data: Record<string, unknown>): string[] {
       const fullPath = path ? `${path}.${key}` : key;
       
       if (FORBIDDEN_FIELDS.has(key)) {
-        // Check if the value looks like actual content (not already redacted)
-        if (typeof value === 'string' && !value.includes('[REDACTED')) {
+        // Flag any non-redacted presence of forbidden keys (string, array, or object)
+        if (typeof value === 'string') {
+          if (!value.includes('[REDACTED')) {
+            unsafeFields.push(fullPath);
+          }
+        } else if (value !== undefined && value !== null) {
           unsafeFields.push(fullPath);
         }
       }

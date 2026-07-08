@@ -135,12 +135,21 @@ function extractFieldValue(
 }
 
 /**
+ * Optional OCR-4 deep-feature hints for universal assessment.
+ */
+export interface UniversalAssessmentOcrHints {
+  /** True when OCR-4 returned a signature block on any page. */
+  hasOcrSignature?: boolean;
+}
+
+/**
  * Perform universal assessment on document text
  */
 export function performUniversalAssessment(
   documentText: string,
   pageCount: number,
-  ocrConfidence: number
+  ocrConfidence: number,
+  ocrHints?: UniversalAssessmentOcrHints
 ): UniversalAssessment {
   const jobRef = extractFieldValue(documentText, FIELD_PATTERNS.jobReference);
   const date = extractFieldValue(documentText, FIELD_PATTERNS.date);
@@ -155,7 +164,7 @@ export function performUniversalAssessment(
   return {
     hasJobReference: jobRef.found,
     hasDate: date.found,
-    hasSignature: signature.found,
+    hasSignature: signature.found || !!ocrHints?.hasOcrSignature,
     hasAssetIdentifier: asset.found,
     hasEngineerName: engineer.found,
     hasCustomerName: customer.found,
@@ -237,7 +246,8 @@ export async function performHybridAssessment(
   documentText: string,
   pageTexts: string[],
   ocrConfidence: number,
-  reviewReason: 'TEMPLATE_NOT_MATCHED' | 'LOW_TEMPLATE_CONFIDENCE' | 'AMBIGUOUS_SELECTION'
+  reviewReason: 'TEMPLATE_NOT_MATCHED' | 'LOW_TEMPLATE_CONFIDENCE' | 'AMBIGUOUS_SELECTION',
+  ocrHints?: UniversalAssessmentOcrHints
 ): Promise<HybridAssessmentResult> {
   const startTime = Date.now();
   
@@ -246,7 +256,8 @@ export async function performHybridAssessment(
     const universalAssessment = performUniversalAssessment(
       documentText,
       pageTexts.length,
-      ocrConfidence
+      ocrConfidence,
+      ocrHints
     );
     
     // 2. Field extraction (instant)

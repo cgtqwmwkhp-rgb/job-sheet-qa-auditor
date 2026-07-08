@@ -28,6 +28,11 @@ import {
 } from './templateRegistry';
 import { performHybridAssessment, type HybridAssessmentResult } from './hybridAssessment';
 import { specJsonToGoldSpec } from './templateRegistry/defaultTemplate';
+import {
+  enrichFindingsWithOcrEvidence,
+  computePageConfidencePrior,
+  hasOcrSignatureEvidence,
+} from './ocrFindingEnrichment';
 import * as db from '../db';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -283,16 +288,17 @@ export async function processJobSheetWithOptions(
       // Perform hybrid assessment - NEVER FAIL, always provide partial results
       const hybridStartTime = Date.now();
       const pageTexts = ocrResult.pages.map(p => p.markdown);
-      // Per-page OCR confidence is not yet surfaced by the adapter; wiring
-      // word-level confidence from OCR 4 is scoped for a later PR. Until then,
-      // use a neutral prior (0.7 when text was extracted, 0.5 when no pages).
-      const avgConfidence = ocrResult.pages.length > 0 ? 0.7 : 0.5;
+      // Prefer OCR-4 page confidence when available; otherwise neutral prior.
+      const avgConfidence =
+        computePageConfidencePrior(ocrResult) ??
+        (ocrResult.pages.length > 0 ? 0.7 : 0.5);
       
       const hybridResult = await performHybridAssessment(
         extractedText,
         pageTexts,
         avgConfidence,
-        reviewReason
+        reviewReason,
+        { hasOcrSignature: hasOcrSignatureEvidence(ocrResult) }
       );
       
       stages.push({
@@ -489,9 +495,20 @@ export async function processJobSheetWithOptions(
 
     auditResultId = auditResult.id;
 
-    // Create audit findings
+    // Create audit findings (enrich with OCR-4 bboxes/confidence when available)
     if (analysisResult.findings.length > 0) {
-      const findingsToInsert = analysisResult.findings.map(finding => ({
+      let findingsForInsert = analysisResult.findings;
+      try {
+        findingsForInsert = enrichFindingsWithOcrEvidence(
+          analysisResult.findings,
+          ocrResult
+        );
+      } catch (enrichError) {
+        // Enrichment must NEVER fail the pipeline
+        console.warn('[DocumentProcessor] OCR finding enrichment failed:', enrichError);
+      }
+
+      const findingsToInsert = findingsForInsert.map(finding => ({
         auditResultId: auditResult.id,
         severity: finding.severity as 'S0' | 'S1' | 'S2' | 'S3',
         reasonCode: finding.reasonCode as any,

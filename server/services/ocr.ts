@@ -11,7 +11,17 @@
  * risked leaking OCR text — is retired in favour of the adapter's safe logger.
  */
 
-export type { OCRPage, OCRResult, OCROptions } from './ocrAdapter/types';
+export type {
+  OCRPage,
+  OCRResult,
+  OCROptions,
+  OCRBlock,
+  OCRBlockType,
+  OCRWordConfidence,
+  OCRConfidenceScores,
+  OCRSignatureRegion,
+  OCRDeepFeaturesSummary,
+} from './ocrAdapter/types';
 import type { OCRResult, OCROptions } from './ocrAdapter/types';
 import { getOCRAdapter } from './ocrAdapter';
 

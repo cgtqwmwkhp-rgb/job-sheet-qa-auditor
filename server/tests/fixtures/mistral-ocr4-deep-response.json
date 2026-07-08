@@ -1,0 +1,70 @@
+{
+  "pages": [
+    {
+      "index": 0,
+      "markdown": "# Job Sheet\n\n**Job Number:** JS-2024-001\n**Date:** 2024-01-15\n**Client:** ACME Corp\n\n## Work Description\n\nRoutine maintenance inspection completed.\n\nCustomer Signature:\n",
+      "images": [],
+      "tables": [],
+      "hyperlinks": [],
+      "header": null,
+      "footer": null,
+      "dimensions": {
+        "dpi": 200,
+        "height": 2200,
+        "width": 1700
+      },
+      "blocks": [
+        {
+          "type": "title",
+          "top_left_x": 240,
+          "top_left_y": 180,
+          "bottom_right_x": 800,
+          "bottom_right_y": 260,
+          "content": "Job Sheet"
+        },
+        {
+          "type": "text",
+          "top_left_x": 290,
+          "top_left_y": 400,
+          "bottom_right_x": 900,
+          "bottom_right_y": 460,
+          "content": "Job Number: JS-2024-001"
+        },
+        {
+          "type": "text",
+          "top_left_x": 290,
+          "top_left_y": 500,
+          "bottom_right_x": 900,
+          "bottom_right_y": 560,
+          "content": "Date: 2024-01-15"
+        },
+        {
+          "type": "signature",
+          "top_left_x": 200,
+          "top_left_y": 1800,
+          "bottom_right_x": 900,
+          "bottom_right_y": 2050,
+          "content": ""
+        }
+      ],
+      "confidence_scores": {
+        "average_page_confidence_score": 0.91,
+        "minimum_page_confidence_score": 0.82,
+        "word_confidence_scores": [
+          { "text": "Job", "confidence": 0.99, "start_index": 14 },
+          { "text": " Number", "confidence": 0.98, "start_index": 17 },
+          { "text": ":", "confidence": 0.99, "start_index": 24 },
+          { "text": " JS-2024-001", "confidence": 0.82, "start_index": 25 },
+          { "text": "Date", "confidence": 0.97, "start_index": 42 },
+          { "text": " 2024-01-15", "confidence": 0.95, "start_index": 48 }
+        ]
+      }
+    }
+  ],
+  "model": "mistral-ocr-4-0",
+  "document_annotation": null,
+  "usage_info": {
+    "pages_processed": 1,
+    "doc_size_bytes": 102400
+  }
+}

@@ -9,6 +9,10 @@
 export * from './types';
 export * from './mistralAdapter';
 export * from './mockAdapter';
+export {
+  parseMistralOcrResponse,
+  pixelCornersToPercent,
+} from './parseMistralOcrResponse';
 
 import type { OCRAdapter, OCRProvider } from './types';
 import { getOCRConfig } from './types';

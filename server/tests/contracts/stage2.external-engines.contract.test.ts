@@ -56,6 +56,21 @@ describe('Stage 2: External Engines Integration', () => {
       expect(typeof page.markdown).toBe('string');
     });
 
+    it('deep mock optionally exposes blocks and confidenceScores', async () => {
+      const adapter = getMockAdapter();
+      adapter.setMockResponse('deep');
+      const result = await adapter.extractFromUrl('https://example.com/doc.pdf');
+
+      expect(result.success).toBe(true);
+      const page = result.pages[0];
+      expect(Array.isArray(page.blocks)).toBe(true);
+      expect(page.confidenceScores).toBeDefined();
+      expect(typeof page.confidenceScores!.averagePageConfidence).toBe('number');
+      // Shallow contract still holds
+      expect(page).toHaveProperty('pageNumber');
+      expect(page).toHaveProperty('markdown');
+    });
+
     it('generates provider artifact with redacted metadata', async () => {
       const adapter = getMockAdapter();
       const result = await adapter.extractFromUrl('https://example.com/doc.pdf');
@@ -223,12 +238,16 @@ describe('Stage 2: External Engines Integration', () => {
         correlationId: 'test-123',
         markdown: 'This is OCR extracted text with PII',
         rawText: 'More sensitive content',
+        blocks: [{ type: 'text', content: 'block text' }],
+        word_confidence_scores: [{ text: 'hi', confidence: 1 }],
         pageCount: 5,
       };
 
       const unsafeFields = checkLoggingSafety(unsafeData);
       expect(unsafeFields).toContain('markdown');
       expect(unsafeFields).toContain('rawText');
+      expect(unsafeFields).toContain('blocks');
+      expect(unsafeFields).toContain('word_confidence_scores');
     });
 
     it('safeLogger allows safe fields', () => {
