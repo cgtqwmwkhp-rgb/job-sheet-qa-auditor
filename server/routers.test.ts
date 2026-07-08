@@ -34,16 +34,14 @@ vi.mock("./db", () => ({
     result: "pass",
     runId: "run-123",
   }),
-  getAuditFindingsByResultId: vi
-    .fn()
-    .mockResolvedValue([
-      {
-        id: 1,
-        severity: "S2",
-        reasonCode: "MISSING_FIELD",
-        fieldName: "signature",
-      },
-    ]),
+  getAuditFindingsByResultId: vi.fn().mockResolvedValue([
+    {
+      id: 1,
+      severity: "S2",
+      reasonCode: "MISSING_FIELD",
+      fieldName: "signature",
+    },
+  ]),
   getAllGoldSpecs: vi
     .fn()
     .mockResolvedValue([
