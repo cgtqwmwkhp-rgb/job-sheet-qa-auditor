@@ -4,9 +4,9 @@
  */
 
 export interface RateLimitConfig {
-  windowMs: number;        // Time window in milliseconds
-  maxRequests: number;     // Maximum requests per window
-  keyGenerator?: (req: any) => string;  // Function to generate rate limit key
+  windowMs: number; // Time window in milliseconds
+  maxRequests: number; // Maximum requests per window
+  keyGenerator?: (req: any) => string; // Function to generate rate limit key
   skipFailedRequests?: boolean;
   skipSuccessfulRequests?: boolean;
   message?: string;
@@ -29,9 +29,9 @@ const rateLimitStore: Map<string, RateLimitEntry> = new Map();
 
 // Default configuration
 const DEFAULT_CONFIG: RateLimitConfig = {
-  windowMs: 60 * 1000,  // 1 minute
+  windowMs: 60 * 1000, // 1 minute
   maxRequests: 100,
-  message: 'Too many requests, please try again later.',
+  message: "Too many requests, please try again later.",
 };
 
 // Cleanup interval (every 5 minutes)
@@ -42,7 +42,7 @@ let cleanupTimer: NodeJS.Timeout | null = null;
 
 function startCleanup() {
   if (cleanupTimer) return;
-  
+
   cleanupTimer = setInterval(() => {
     const now = Date.now();
     const entries = Array.from(rateLimitStore.entries());
@@ -115,6 +115,13 @@ export function resetRateLimit(key: string): void {
 }
 
 /**
+ * Clear all rate limit entries (tests / admin reset).
+ */
+export function clearAllRateLimits(): void {
+  rateLimitStore.clear();
+}
+
+/**
  * Get current rate limit status for a key
  */
 export function getRateLimitStatus(
@@ -137,9 +144,10 @@ export function getRateLimitStatus(
     allowed: entry.count < opts.maxRequests,
     remaining: Math.max(0, opts.maxRequests - entry.count),
     resetTime: entry.resetTime,
-    retryAfter: entry.count >= opts.maxRequests 
-      ? Math.ceil((entry.resetTime - now) / 1000) 
-      : undefined,
+    retryAfter:
+      entry.count >= opts.maxRequests
+        ? Math.ceil((entry.resetTime - now) / 1000)
+        : undefined,
   };
 }
 
@@ -154,19 +162,21 @@ export const RATE_LIMITS = {
   upload: {
     windowMs: 60 * 1000,
     maxRequests: 10,
-    message: 'Upload rate limit exceeded. Please wait before uploading more files.',
+    message:
+      "Upload rate limit exceeded. Please wait before uploading more files.",
   },
   // Document processing (expensive operation)
   processing: {
     windowMs: 60 * 1000,
     maxRequests: 5,
-    message: 'Processing rate limit exceeded. Please wait before processing more documents.',
+    message:
+      "Processing rate limit exceeded. Please wait before processing more documents.",
   },
   // Authentication attempts
   auth: {
-    windowMs: 15 * 60 * 1000,  // 15 minutes
+    windowMs: 15 * 60 * 1000, // 15 minutes
     maxRequests: 5,
-    message: 'Too many authentication attempts. Please try again later.',
+    message: "Too many authentication attempts. Please try again later.",
   },
   // Admin operations
   admin: {
@@ -208,7 +218,7 @@ export class RateLimitError extends Error {
 
   constructor(message: string, retryAfter: number, resetTime: number) {
     super(message);
-    this.name = 'RateLimitError';
+    this.name = "RateLimitError";
     this.retryAfter = retryAfter;
     this.resetTime = resetTime;
   }
@@ -222,7 +232,7 @@ export function enforceRateLimit(
   config: Partial<RateLimitConfig> = {}
 ): RateLimitResult {
   const result = checkRateLimit(key, config);
-  
+
   if (!result.allowed) {
     throw new RateLimitError(
       config.message || DEFAULT_CONFIG.message!,
@@ -230,6 +240,6 @@ export function enforceRateLimit(
       result.resetTime
     );
   }
-  
+
   return result;
 }

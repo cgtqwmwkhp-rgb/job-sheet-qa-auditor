@@ -1,15 +1,21 @@
 /**
  * Dead Letter Queue (DLQ) for Failed Processing Jobs
- * Captures failed jobs for manual review and recovery
+ * Captures failed jobs for manual review and recovery.
+ *
+ * PR-3: Write-through to `failed_jobs` when getDb() is available.
+ * In-memory Map remains the primary store for tests / no-DB environments.
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from "uuid";
+import { eq } from "drizzle-orm";
+import { getDb } from "../db";
+import { failedJobs } from "../../drizzle/schema";
 
 export interface FailedJob {
   id: string;
   jobSheetId: number;
   correlationId?: string;
-  stage: 'upload' | 'ocr' | 'analysis' | 'storage';
+  stage: "upload" | "ocr" | "analysis" | "storage";
   error: {
     message: string;
     code?: string;
@@ -31,18 +37,49 @@ export interface DLQStats {
   oldestJob?: Date;
 }
 
-// In-memory DLQ (in production, this would be Redis or a database table)
+// In-memory DLQ (always used; DB is write-through when available)
 const deadLetterQueue: Map<string, FailedJob> = new Map();
 
 // Maximum jobs to keep in DLQ
 const MAX_DLQ_SIZE = 1000;
 
 /**
+ * Persist a failed job to the durable `failed_jobs` table (best-effort).
+ */
+async function persistFailedJob(job: FailedJob): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+
+    await db.insert(failedJobs).values({
+      id: job.id,
+      jobSheetId: job.jobSheetId,
+      correlationId: job.correlationId,
+      stage: job.stage,
+      errorMessage: job.error.message,
+      errorCode: job.error.code,
+      errorStack: job.error.stack,
+      attempts: job.attempts,
+      maxAttempts: job.maxAttempts,
+      lastAttemptAt: job.lastAttemptAt,
+      metadata: job.metadata,
+      recoverable: job.recoverable,
+      createdAt: job.createdAt,
+    });
+  } catch (error) {
+    console.warn(
+      "[DLQ] Failed to persist to database (in-memory retained):",
+      error
+    );
+  }
+}
+
+/**
  * Add a failed job to the dead letter queue
  */
 export function addToDeadLetterQueue(
   jobSheetId: number,
-  stage: FailedJob['stage'],
+  stage: FailedJob["stage"],
   error: Error,
   options: {
     correlationId?: string;
@@ -68,7 +105,7 @@ export function addToDeadLetterQueue(
     error: {
       message: error.message,
       code: (error as any).code,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
     },
     attempts: options.attempts || 1,
     maxAttempts: options.maxAttempts || 3,
@@ -79,6 +116,9 @@ export function addToDeadLetterQueue(
   };
 
   deadLetterQueue.set(failedJob.id, failedJob);
+
+  // Fire-and-forget durable write-through
+  void persistFailedJob(failedJob);
 
   console.error(`[DLQ] Job added: ${failedJob.id}`, {
     jobSheetId,
@@ -95,21 +135,21 @@ export function addToDeadLetterQueue(
  */
 function isRecoverableError(error: Error): boolean {
   const recoverablePatterns = [
-    'ECONNRESET',
-    'ETIMEDOUT',
-    'ENOTFOUND',
-    'rate limit',
-    'timeout',
-    '429',
-    '500',
-    '502',
-    '503',
-    '504',
-    'circuit breaker',
+    "ECONNRESET",
+    "ETIMEDOUT",
+    "ENOTFOUND",
+    "rate limit",
+    "timeout",
+    "429",
+    "500",
+    "502",
+    "503",
+    "504",
+    "circuit breaker",
   ];
 
   const errorString = (error.message + (error as any).code).toLowerCase();
-  return recoverablePatterns.some(pattern => 
+  return recoverablePatterns.some(pattern =>
     errorString.includes(pattern.toLowerCase())
   );
 }
@@ -131,7 +171,7 @@ export function getAllFailedJobs(): FailedJob[] {
 /**
  * Get failed jobs by stage
  */
-export function getFailedJobsByStage(stage: FailedJob['stage']): FailedJob[] {
+export function getFailedJobsByStage(stage: FailedJob["stage"]): FailedJob[] {
   return getAllFailedJobs().filter(job => job.stage === stage);
 }
 
@@ -153,7 +193,24 @@ export function getRecoverableJobs(): FailedJob[] {
  * Remove a job from the DLQ (after successful recovery or manual resolution)
  */
 export function removeFromDeadLetterQueue(id: string): boolean {
-  return deadLetterQueue.delete(id);
+  const removed = deadLetterQueue.delete(id);
+  if (removed) {
+    void markResolvedInDb(id);
+  }
+  return removed;
+}
+
+async function markResolvedInDb(id: string): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    await db
+      .update(failedJobs)
+      .set({ resolvedAt: new Date() })
+      .where(eq(failedJobs.id, id));
+  } catch (error) {
+    console.warn("[DLQ] Failed to mark resolved in database:", error);
+  }
 }
 
 /**
@@ -163,7 +220,7 @@ export function markAsRecovered(id: string): boolean {
   const job = deadLetterQueue.get(id);
   if (job) {
     console.log(`[DLQ] Job recovered: ${id}`, { jobSheetId: job.jobSheetId });
-    return deadLetterQueue.delete(id);
+    return removeFromDeadLetterQueue(id);
   }
   return false;
 }
@@ -176,12 +233,12 @@ export function incrementAttempts(id: string): FailedJob | undefined {
   if (job) {
     job.attempts++;
     job.lastAttemptAt = new Date();
-    
+
     // Mark as unrecoverable if max attempts exceeded
     if (job.attempts >= job.maxAttempts) {
       job.recoverable = false;
     }
-    
+
     return job;
   }
   return undefined;
@@ -192,7 +249,7 @@ export function incrementAttempts(id: string): FailedJob | undefined {
  */
 export function getDLQStats(): DLQStats {
   const jobs = getAllFailedJobs();
-  
+
   const byStage: Record<string, number> = {};
   let recoverable = 0;
   let unrecoverable = 0;
@@ -200,13 +257,13 @@ export function getDLQStats(): DLQStats {
 
   for (const job of jobs) {
     byStage[job.stage] = (byStage[job.stage] || 0) + 1;
-    
+
     if (job.recoverable) {
       recoverable++;
     } else {
       unrecoverable++;
     }
-    
+
     if (!oldestJob || job.createdAt < oldestJob) {
       oldestJob = job.createdAt;
     }
@@ -219,6 +276,13 @@ export function getDLQStats(): DLQStats {
     unrecoverable,
     oldestJob,
   };
+}
+
+/**
+ * Thin alias used by ops/troubleshooting docs.
+ */
+export function getDeadLetterQueueStatus(): DLQStats {
+  return getDLQStats();
 }
 
 /**
@@ -247,7 +311,9 @@ export function clearOldJobs(maxAgeHours: number = 72): number {
   }
 
   if (cleared > 0) {
-    console.log(`[DLQ] Cleared ${cleared} old jobs (older than ${maxAgeHours}h)`);
+    console.log(
+      `[DLQ] Cleared ${cleared} old jobs (older than ${maxAgeHours}h)`
+    );
   }
 
   return cleared;

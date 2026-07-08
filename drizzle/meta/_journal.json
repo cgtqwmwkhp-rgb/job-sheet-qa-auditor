@@ -29,6 +29,13 @@
       "when": 1768157485096,
       "tag": "0003_regular_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1767980000000,
+      "tag": "0004_failed_jobs",
+      "breakpoints": true
     }
   ]
 }
