@@ -3,6 +3,7 @@
 ## Summary of Changes
 
 ### PR-5: Semantic Alignment + Drift Guard
+
 - Replaced "VALID" outcome with `status: 'PASS'`
 - Ensured `reasonCode` is never "VALID" (null when status is PASS)
 - Added drift guard contract test to fail if `reasonCode="VALID"` is emitted
@@ -10,6 +11,7 @@
 - Updated canonical reason codes in parity config
 
 ### PR-6: Pipeline Wiring with Feature Flags
+
 - Created `pipelineIntegration` module
 - Wired `criticalFieldExtractor` in extraction path
 - Wired `imageQaFusion` for tickboxes/signature outputs
@@ -110,14 +112,16 @@ curl -s "$PRODUCTION_URL/api/trpc/system.version"
 
 The new modules can be enabled via environment variables:
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `FEATURE_CRITICAL_FIELD_EXTRACTOR` | Enable critical field extraction engine | `false` |
-| `FEATURE_IMAGE_QA_FUSION` | Enable OCR + Image QA fusion | `false` |
-| `FEATURE_DETERMINISTIC_CACHE` | Enable deterministic caching | `false` |
-| `FEATURE_ENGINEER_FEEDBACK` | Enable engineer feedback generation | `false` |
+| Flag                               | Description                                     | Default                                             |
+| ---------------------------------- | ----------------------------------------------- | --------------------------------------------------- |
+| `FEATURE_CRITICAL_FIELD_EXTRACTOR` | Enable critical field extraction engine         | `false`                                             |
+| `FEATURE_IMAGE_QA_FUSION`          | Enable OCR + Image QA fusion                    | `false`                                             |
+| `FEATURE_DETERMINISTIC_CACHE`      | Enable deterministic caching                    | `false`                                             |
+| `FEATURE_ENGINEER_FEEDBACK`        | Enable engineer feedback generation             | `false`                                             |
+| `FEATURE_ENSEMBLE_EXTRACTION`      | Stage 1.75 ensemble consensus extraction (PR-8) | `true` (default when unset; set `false` to disable) |
 
 To enable in staging:
+
 ```bash
 az containerapp update \
   --name <app-name> \
@@ -134,6 +138,7 @@ az containerapp update \
 If issues occur after deployment:
 
 1. **Quick Rollback**: Disable feature flags
+
    ```bash
    az containerapp update --name <app-name> --resource-group <rg-name> \
      --set-env-vars FEATURE_CRITICAL_FIELD_EXTRACTOR=false
@@ -159,27 +164,30 @@ After successful deployment, document evidence:
 
 ### Endpoint Verification
 
-| Endpoint | Status | Response Time |
-|----------|--------|---------------|
-| /healthz | ✅ 200 | XXms |
-| /readyz | ✅ 200 | XXms |
-| /metrics | ✅ 200 | XXms |
-| /api/trpc/system.version | ✅ 200 | XXms |
+| Endpoint                 | Status | Response Time |
+| ------------------------ | ------ | ------------- |
+| /healthz                 | ✅ 200 | XXms          |
+| /readyz                  | ✅ 200 | XXms          |
+| /metrics                 | ✅ 200 | XXms          |
+| /api/trpc/system.version | ✅ 200 | XXms          |
 
 ### system.version Response
+
 \`\`\`json
 {
-  "gitSha": "<sha>",
-  "environment": "<env>",
-  "platformVersion": "<version>"
+"gitSha": "<sha>",
+"environment": "<env>",
+"platformVersion": "<version>"
 }
 \`\`\`
 
 ### Feature Flags Active
+
 - FEATURE_CRITICAL_FIELD_EXTRACTOR: true/false
 - FEATURE_DETERMINISTIC_CACHE: true/false
 
 ### Watch Window
+
 - Start: HH:MM
 - End: HH:MM
 - Errors observed: 0
