@@ -15,36 +15,49 @@ Enterprise-grade document auditing system for job sheet validation with OCR extr
 
 ### Required
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | MySQL connection string | - |
+| Variable       | Description             | Default |
+| -------------- | ----------------------- | ------- |
+| `DATABASE_URL` | MySQL connection string | -       |
 
 ### OCR Configuration (Mistral)
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `MISTRAL_API_KEY` | Mistral API key for OCR | - |
-| `MISTRAL_OCR_MODEL` | OCR model identifier | `mistral-ocr-2503` |
-| `OCR_PROVIDER` | OCR provider (`mistral` or `mock`) | `mistral` |
-| `OCR_MAX_RETRIES` | Max retry attempts | `3` |
-| `OCR_BASE_DELAY_MS` | Base retry delay | `2000` |
-| `OCR_MAX_DELAY_MS` | Max retry delay | `30000` |
+| Variable                | Description                                  | Default           |
+| ----------------------- | -------------------------------------------- | ----------------- |
+| `MISTRAL_API_KEY`       | Mistral API key for OCR                      | -                 |
+| `MISTRAL_OCR_MODEL`     | OCR model identifier (pinned)                | `mistral-ocr-4-0` |
+| `OCR_PROVIDER`          | OCR provider (`mistral`, `mock`, or `azure`) | `mistral`         |
+| `OCR_FALLBACK_PROVIDER` | Failover OCR provider                        | `azure`           |
+| `OCR_MAX_RETRIES`       | Max retry attempts                           | `3`               |
+| `OCR_BASE_DELAY_MS`     | Base retry delay                             | `2000`            |
+| `OCR_MAX_DELAY_MS`      | Max retry delay                              | `30000`           |
+
+### Judgment (Canonical Analysis)
+
+| Variable         | Description                              | Default          |
+| ---------------- | ---------------------------------------- | ---------------- |
+| `JUDGMENT_MODEL` | Gemini model for Stage-2 judgment        | `gemini-3.1-pro` |
+| `GEMINI_API_KEY` | Gemini API key (shared with interpreter) | -                |
 
 ### Gemini Interpreter (Advisory Only)
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ENABLE_GEMINI_INSIGHTS` | Enable Gemini interpretation | `false` |
-| `GEMINI_API_KEY` | Gemini API key | - |
-| `GEMINI_MODEL` | Gemini model identifier | `gemini-2.5-pro` |
-| `ENABLE_RAW_OCR_INSIGHTS` | Include raw OCR in Gemini input | `false` |
+| Variable                  | Description                                | Default          |
+| ------------------------- | ------------------------------------------ | ---------------- |
+| `ENABLE_GEMINI_INSIGHTS`  | Enable Gemini interpretation               | `false`          |
+| `GEMINI_API_KEY`          | Gemini API key                             | -                |
+| `GEMINI_MODEL`            | Gemini model identifier (interpreter role) | `gemini-2.5-pro` |
+| `ENABLE_RAW_OCR_INSIGHTS` | Include raw OCR in Gemini input            | `false`          |
+
+### Model Registry (PR-9)
+
+Pinned models are exposed via `system.modelCurrency` / `ai.modelRegistry` (no secrets).
+Roles: `ocr`, `judgment`, `interpreter`, optional `fallback_ocr`. Currency metadata is env-sourced (`source: "env"`).
 
 ### Testing
 
-| Variable | Description | Default |
-|----------|-------------|---------|
+| Variable               | Description                               | Default  |
+| ---------------------- | ----------------------------------------- | -------- |
 | `INTERPRETER_PROVIDER` | Interpreter provider (`gemini` or `mock`) | `gemini` |
-| `RUN_LIVE_TESTS` | Enable live integration tests | `false` |
+| `RUN_LIVE_TESTS`       | Enable live integration tests             | `false`  |
 
 ## Architecture
 

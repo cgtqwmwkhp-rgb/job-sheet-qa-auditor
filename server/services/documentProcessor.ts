@@ -43,6 +43,7 @@ import {
   computePageConfidencePrior,
   hasOcrSignatureEvidence,
 } from "./ocrFindingEnrichment";
+import { modelRegistryStamp } from "./modelRegistry";
 import {
   runEnsembleExtraction,
   buildEnsembleReviewFindings,
@@ -248,6 +249,7 @@ export async function processJobSheetWithOptions(
           ocrConfidenceThreshold: processingSettings.ocrConfidenceThreshold,
           pageCount: ocrResult.totalPages,
           processingStages: stages,
+          modelRegistry: modelRegistryStamp(),
           ...ocrResilienceReportFields(ocrResult),
         },
         processingTimeMs: Date.now() - startTime,
@@ -467,6 +469,7 @@ export async function processJobSheetWithOptions(
             ),
             pageCount: ocrResult.totalPages,
             processingStages: stages,
+            modelRegistry: modelRegistryStamp(),
             ...ocrResilienceReportFields(ocrResult),
             hybridAssessment: hybridResult,
             selectionResult,
@@ -762,6 +765,7 @@ export async function processJobSheetWithOptions(
           : analysisResult.extractedFields,
         pageCount: ocrResult.totalPages,
         processingStages: stages,
+        modelRegistry: modelRegistryStamp(),
         ...(ensembleResult
           ? { ensembleExtraction: ensembleResult.artifact }
           : {}),

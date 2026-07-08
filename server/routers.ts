@@ -26,6 +26,7 @@ import {
   runIntakeGate,
   type IntakeGateResult,
 } from "./services/imageQa";
+import { getModelRegistry } from "./services/modelRegistry";
 
 function throwIfRateLimited(fn: () => void): void {
   try {
@@ -538,8 +539,13 @@ export const appRouter = router({
           configured: !!process.env.GEMINI_API_KEY,
           valid: !!process.env.GEMINI_API_KEY,
         },
+        // PR-9: pinned models (no secrets)
+        modelRegistry: getModelRegistry(),
       };
     }),
+
+    /** PR-9: env-driven model registry (no secrets, no live API calls). */
+    modelRegistry: protectedProcedure.query(() => getModelRegistry()),
   }),
 
   // ============ AUDIT LOG ============
