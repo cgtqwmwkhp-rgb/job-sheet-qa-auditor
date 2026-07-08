@@ -49,7 +49,7 @@ export function normalizeOcrTextForCompare(pages: OCRPage[]): string {
       .join("\n")
       .toLowerCase()
       // Strip common markdown / punctuation so engines can agree on content
-      .replace(/[#*_`>~\[\]()]/g, " ")
+      .replace(/[#*_`>~()[\]]/g, " ")
       .replace(/\s+/g, " ")
       .trim()
   );
