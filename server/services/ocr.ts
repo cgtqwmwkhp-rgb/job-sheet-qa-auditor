@@ -21,6 +21,8 @@ export type {
   OCRConfidenceScores,
   OCRSignatureRegion,
   OCRDeepFeaturesSummary,
+  OCRCrossCheckMetadata,
+  OCRFailoverMetadata,
 } from "./ocrAdapter/types";
 import type { OCRResult, OCROptions } from "./ocrAdapter/types";
 import { getOCRAdapter } from "./ocrAdapter";
