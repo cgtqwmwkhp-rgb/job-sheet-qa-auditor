@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { Upload, File, X, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,22 @@ export function FileUploader({
 }: FileUploaderProps) {
   const [files, setFiles] = useState<FileStatus[]>([]);
 
+  // Merge intake hints during render — avoid setState-in-effect cascading renders
+  const displayFiles = useMemo(() => {
+    if (!intakeHints || intakeHints.length === 0) return files;
+    return files.map(f => {
+      const hint = intakeHints.find(h => h.fileName === f.file.name);
+      if (!hint) return f;
+      return {
+        ...f,
+        status: "rejected" as const,
+        progress: 100,
+        qualityScore: hint.qualityScore,
+        retakeFeedback: hint.retakeFeedback,
+      };
+    });
+  }, [files, intakeHints]);
+
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles = acceptedFiles.map(file => ({
       file,
@@ -42,24 +58,6 @@ export function FileUploader({
     }));
     setFiles(prev => [...prev, ...newFiles]);
   }, []);
-
-  // Apply intake gate score + retake hints onto matching file rows
-  useEffect(() => {
-    if (!intakeHints || intakeHints.length === 0) return;
-    setFiles(prev =>
-      prev.map(f => {
-        const hint = intakeHints.find(h => h.fileName === f.file.name);
-        if (!hint) return f;
-        return {
-          ...f,
-          status: "rejected" as const,
-          progress: 100,
-          qualityScore: hint.qualityScore,
-          retakeFeedback: hint.retakeFeedback,
-        };
-      })
-    );
-  }, [intakeHints]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -77,15 +75,26 @@ export function FileUploader({
 
   const handleUpload = () => {
     setFiles(prev =>
-      prev.map(f =>
-        f.status === "rejected"
-          ? f
-          : { ...f, status: "uploading" as const, progress: 0 }
-      )
+      prev.map(f => {
+        const hint = intakeHints?.find(h => h.fileName === f.file.name);
+        if (hint) {
+          return {
+            ...f,
+            status: "rejected" as const,
+            progress: 100,
+            qualityScore: hint.qualityScore,
+            retakeFeedback: hint.retakeFeedback,
+          };
+        }
+        return { ...f, status: "uploading" as const, progress: 0 };
+      })
     );
 
     const uploadFiles = files
-      .filter(f => f.status !== "rejected")
+      .filter(f => {
+        const hint = intakeHints?.find(h => h.fileName === f.file.name);
+        return !hint && f.status !== "rejected";
+      })
       .map(f => f.file);
     onUpload(uploadFiles);
 
@@ -143,23 +152,25 @@ export function FileUploader({
         </div>
       </div>
 
-      {files.length > 0 && (
+      {displayFiles.length > 0 && (
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
-              <h4 className="font-medium">Selected Files ({files.length})</h4>
+              <h4 className="font-medium">
+                Selected Files ({displayFiles.length})
+              </h4>
               <Button
                 onClick={handleUpload}
-                disabled={files.some(f => f.status === "uploading")}
+                disabled={displayFiles.some(f => f.status === "uploading")}
               >
-                {files.some(f => f.status === "uploading")
+                {displayFiles.some(f => f.status === "uploading")
                   ? "Uploading..."
                   : "Start Upload"}
               </Button>
             </div>
             <ScrollArea className="h-[300px] pr-4">
               <div className="space-y-3">
-                {files.map((fileStatus, index) => (
+                {displayFiles.map((fileStatus, index) => (
                   <div
                     key={index}
                     className={`flex items-center gap-4 p-3 border rounded-lg bg-card ${
