@@ -2,7 +2,7 @@
  * OCR Service Module
  * 
  * Provides pluggable OCR adapter for document text extraction.
- * Primary: Mistral OCR 2503
+ * Primary: Mistral OCR (pinned via DEFAULT_OCR_MODEL, currently mistral-ocr-4-0)
  * Testing: Mock adapter (no-secrets CI)
  */
 
@@ -19,7 +19,7 @@ import { createMockAdapter, getMockAdapter } from './mockAdapter';
  * Get the configured OCR adapter
  * 
  * Uses OCR_PROVIDER env var to select adapter:
- * - 'mistral' (default): Mistral OCR 2503
+ * - 'mistral' (default): Mistral OCR (pinned model, see DEFAULT_OCR_MODEL)
  * - 'mock': Mock adapter for testing
  */
 export function getOCRAdapter(): OCRAdapter {

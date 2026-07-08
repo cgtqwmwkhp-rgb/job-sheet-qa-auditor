@@ -14,6 +14,7 @@
  */
 
 import { extractTextFromDocument, OCRResult } from './ocr';
+import { getOCRConfig, getOCREngineVersion } from './ocrAdapter/types';
 import { analyzeJobSheet, AnalysisResult, GoldSpec } from './analyzer';
 import { selectTemplate, createSelectionTraceArtifact } from './templateSelector';
 import {
@@ -136,7 +137,7 @@ export async function processJobSheetWithOptions(
       success: false,
       pages: [],
       totalPages: 0,
-      model: 'mistral-ocr-latest',
+      model: getOCRConfig().model,
       error: error instanceof Error ? error.message : 'OCR failed',
     };
     stages.push({
@@ -317,7 +318,7 @@ export async function processJobSheetWithOptions(
           result: 'review_queue',
           confidenceScore: String(selectionResult.topScore),
           documentStrategy: 'ocr',
-          ocrEngineVersion: ocrResult.model,
+          ocrEngineVersion: getOCREngineVersion(ocrResult.model),
           pipelineVersion: PIPELINE_VERSION,
           reportJson: {
             summary: hybridResult.llmSummary || hybridResult.reviewExplanation,
@@ -474,7 +475,7 @@ export async function processJobSheetWithOptions(
       result: analysisResult.overallResult.toLowerCase() as 'pass' | 'fail' | 'review_queue',
       confidenceScore: String(analysisResult.score),
       documentStrategy: 'ocr', // We used OCR
-      ocrEngineVersion: ocrResult.model,
+      ocrEngineVersion: getOCREngineVersion(ocrResult.model),
       pipelineVersion: PIPELINE_VERSION,
       reportJson: {
         summary: analysisResult.summary,
