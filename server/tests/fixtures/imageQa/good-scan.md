@@ -10,11 +10,11 @@
 Routine maintenance inspection completed successfully.
 All systems checked and verified against specification.
 
-| Item | Status | Notes |
-|------|--------|-------|
-| Filter | Replaced | OEM part used |
-| Oil | Changed | 5W-30 synthetic |
-| Belts | Inspected | Within tolerance |
+| Item    | Status     | Notes            |
+| ------- | ---------- | ---------------- |
+| Filter  | Replaced   | OEM part used    |
+| Oil     | Changed    | 5W-30 synthetic  |
+| Belts   | Inspected  | Within tolerance |
 | Sensors | Calibrated | All within range |
 
 [x] Filter replaced
