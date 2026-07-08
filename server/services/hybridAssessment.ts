@@ -218,13 +218,12 @@ ${documentText.substring(0, 2000)}
 Respond with ONLY the description, no preamble.`;
 
     const response = await invokeLLM({
-      model: 'gemini-2.0-flash', // Use faster/cheaper model
-      prompt,
+      messages: [{ role: 'user', content: prompt }],
       maxTokens: 150, // Keep it brief
-      temperature: 0.3, // More deterministic
     });
-    
-    return response.text?.trim();
+
+    const content = response.choices[0]?.message?.content;
+    return typeof content === 'string' ? content.trim() : undefined;
   } catch (error) {
     console.warn('[HybridAssessment] LLM summary failed:', error);
     return undefined;

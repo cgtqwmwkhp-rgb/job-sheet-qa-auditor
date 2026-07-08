@@ -282,9 +282,10 @@ export async function processJobSheetWithOptions(
       // Perform hybrid assessment - NEVER FAIL, always provide partial results
       const hybridStartTime = Date.now();
       const pageTexts = ocrResult.pages.map(p => p.markdown);
-      const avgConfidence = ocrResult.pages.length > 0 
-        ? ocrResult.pages.reduce((sum, p) => sum + (p.confidence || 0.7), 0) / ocrResult.pages.length
-        : 0.5;
+      // Per-page OCR confidence is not yet surfaced by the adapter; wiring
+      // word-level confidence from OCR 4 is scoped for a later PR. Until then,
+      // use a neutral prior (0.7 when text was extracted, 0.5 when no pages).
+      const avgConfidence = ocrResult.pages.length > 0 ? 0.7 : 0.5;
       
       const hybridResult = await performHybridAssessment(
         extractedText,
@@ -336,20 +337,12 @@ export async function processJobSheetWithOptions(
           processingTimeMs: Date.now() - startTime,
         });
         
-        // Store hybrid findings as audit findings
-        if (hybridResult.extractedFields.length > 0) {
-          const findingsToInsert = hybridResult.extractedFields.map(field => ({
-            auditResultId: auditResult.id,
-            fieldName: field.field,
-            severity: 'S3' as const, // Minor - just extracted data
-            reasonCode: 'VALID' as const,
-            rawSnippet: field.value,
-            normalisedSnippet: field.value,
-            confidence: String(field.confidence),
-            pageNumber: field.pageNumber,
-          }));
-          await db.createAuditFindings(findingsToInsert);
-        }
+        // NOTE: The hybrid path's extracted fields are informational, not
+        // defects. They are already persisted on reportJson.extractedFields
+        // above. They are intentionally NOT written to audit_findings, whose
+        // reasonCode is a fixed defect enum (no VALID/informational value) —
+        // the previous 'VALID' insert would have failed against the NOT NULL
+        // enum column at runtime.
         
         // Return with hybrid assessment data - SUCCESS with partial results
         return {
