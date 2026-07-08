@@ -57,7 +57,7 @@ describe("File URL Endpoint Contract", () => {
         routersContent.indexOf("getFileUrl: protectedProcedure") + 500
       );
       expect(getFileUrlSection).toMatch(
-        /throw new Error\(['\"]Job sheet not found['\"]\)/
+        /throw new Error(["']Job sheet not found["'])/
       );
     });
 
