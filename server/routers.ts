@@ -21,6 +21,11 @@ import {
   RateLimitError,
   RATE_LIMITS,
 } from "./utils/rateLimiter";
+import {
+  isImageQaIntakeEnabled,
+  runIntakeGate,
+  type IntakeGateResult,
+} from "./services/imageQa";
 
 function throwIfRateLimited(fn: () => void): void {
   try {
@@ -133,8 +138,45 @@ export const appRouter = router({
           enforceRateLimit(`user:${ctx.user.id}:upload`, RATE_LIMITS.upload)
         );
 
-        // Decode base64 and upload to storage
+        // Decode base64 before storage (and optional intake gate)
         const buffer = Buffer.from(input.fileBase64, "base64");
+
+        // Feature-flagged Image QA intake gate (default off). Fail-open on errors.
+        // Runs AFTER rate limit, BEFORE storage — never calls OCR adapters.
+        let intake: IntakeGateResult | undefined;
+        if (isImageQaIntakeEnabled()) {
+          intake = runIntakeGate({
+            buffer,
+            fileName: input.fileName,
+            mimeType: input.fileType,
+          });
+
+          if (!intake.passed && !intake.skipped) {
+            await db.logAction({
+              userId: ctx.user.id,
+              action: "UPLOAD_JOB_SHEET_REJECTED",
+              entityType: "job_sheet",
+              details: {
+                fileName: input.fileName,
+                rejected: true,
+                intake: {
+                  passed: intake.passed,
+                  skipped: intake.skipped,
+                  qualityScore: intake.qualityScore,
+                  grade: intake.grade,
+                  retakeFeedback: intake.retakeFeedback,
+                },
+              },
+            });
+
+            return {
+              rejected: true as const,
+              intake,
+              retakeFeedback: intake.retakeFeedback,
+            };
+          }
+        }
+
         const fileKey = `job-sheets/${ctx.user.id}/${nanoid()}-${input.fileName}`;
 
         // Use the storage adapter (azure, local, etc.) based on STORAGE_PROVIDER
@@ -161,10 +203,22 @@ export const appRouter = router({
           action: "UPLOAD_JOB_SHEET",
           entityType: "job_sheet",
           entityId: result.id,
-          details: { fileName: input.fileName },
+          details: {
+            fileName: input.fileName,
+            ...(intake
+              ? {
+                  intake: {
+                    passed: intake.passed,
+                    skipped: intake.skipped,
+                    qualityScore: intake.qualityScore,
+                    grade: intake.grade,
+                  },
+                }
+              : {}),
+          },
         });
 
-        return result;
+        return intake ? { ...result, intake } : result;
       }),
 
     updateStatus: protectedProcedure
