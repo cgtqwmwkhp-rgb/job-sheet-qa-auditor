@@ -13,6 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DocumentExtractionResult, ExtractedField } from './documentExtraction';
 import { ValidationResult, FieldValidationResult, BusinessRuleResult, GOLD_STANDARD_SPEC_V1 } from './goldStandardSpec';
 import { getCorrelationId } from '../utils/context';
+import { getOCREngineVersion } from './ocrAdapter/types';
 
 // ============================================================================
 // TYPES
@@ -321,7 +322,7 @@ export class AuditReportGenerator {
       versions: {
         pipelineVersion: extraction.pipelineVersion,
         goldSpecVersion: GOLD_STANDARD_SPEC_V1.version,
-        ocrEngineVersion: 'mistral-ocr-latest',
+        ocrEngineVersion: getOCREngineVersion(),
         reportSchemaVersion: this.reportSchemaVersion,
       },
       

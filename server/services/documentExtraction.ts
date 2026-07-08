@@ -15,6 +15,7 @@ import { withRetry, CircuitBreaker } from '../utils/resilience';
 import { getCorrelationId, createRequestContext, runWithContext } from '../utils/context';
 import { redactString } from '../utils/piiRedaction';
 import { calculateHash } from '../utils/fileValidation';
+import { getOCRConfig } from './ocrAdapter/types';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -705,7 +706,7 @@ export class DocumentExtractionEngine {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                model: 'mistral-ocr-latest',
+                model: getOCRConfig().model,
                 document: {
                   type: 'document_url',
                   document_url: `data:application/pdf;base64,${base64}`,

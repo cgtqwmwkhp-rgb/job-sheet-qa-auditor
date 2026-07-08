@@ -138,15 +138,42 @@ export interface OCRConfig {
 }
 
 /**
+ * Default OCR provider.
+ */
+export const DEFAULT_OCR_PROVIDER: OCRProvider = 'mistral';
+
+/**
+ * Pinned, best-in-class OCR model version (single source of truth).
+ *
+ * PR-1: Pin an explicit, immutable model version rather than a floating alias
+ * such as `mistral-ocr-latest`. A floating alias can silently change which
+ * engine produced an audit (Mistral's `-latest` moved from 2503 to OCR 4 in
+ * June 2026), which is unacceptable for an auditable compliance trail.
+ * Upgrade deliberately by overriding the MISTRAL_OCR_MODEL environment
+ * variable once a candidate has passed the golden-set eval gate.
+ */
+export const DEFAULT_OCR_MODEL = 'mistral-ocr-4-0';
+
+/**
  * Get OCR configuration from environment
  */
 export function getOCRConfig(): OCRConfig {
   return {
-    provider: (process.env.OCR_PROVIDER as OCRProvider) || 'mistral',
-    model: process.env.MISTRAL_OCR_MODEL || 'mistral-ocr-2503',
+    provider: (process.env.OCR_PROVIDER as OCRProvider) || DEFAULT_OCR_PROVIDER,
+    model: process.env.MISTRAL_OCR_MODEL || DEFAULT_OCR_MODEL,
     apiKey: process.env.MISTRAL_API_KEY,
     maxRetries: parseInt(process.env.OCR_MAX_RETRIES || '3', 10),
     baseDelayMs: parseInt(process.env.OCR_BASE_DELAY_MS || '2000', 10),
     maxDelayMs: parseInt(process.env.OCR_MAX_DELAY_MS || '30000', 10),
   };
+}
+
+/**
+ * Build the engine-version tag stamped on every audit result, e.g.
+ * `mistral/mistral-ocr-4-0`. Records both provider and exact model so an
+ * audit is always attributable to the engine that produced it. Kept within
+ * the 32-character `audit_results.ocrEngineVersion` column budget.
+ */
+export function getOCREngineVersion(model?: string, config: OCRConfig = getOCRConfig()): string {
+  return `${config.provider}/${model ?? config.model}`;
 }
