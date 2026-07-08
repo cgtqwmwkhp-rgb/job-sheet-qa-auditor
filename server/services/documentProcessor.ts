@@ -5,7 +5,7 @@
  * 2. Template selection (SSOT - templates only)
  * 3. Gemini 2.5 for analysis against Gold Standard
  * 4. Result storage and audit trail
- * 
+ *
  * PR-1: SSOT ENFORCEMENT
  * - No legacy goldSpecId path (deprecated)
  * - No hardcoded fallback specs
@@ -13,10 +13,13 @@
  * - Pipeline fails explicitly if no template matches
  */
 
-import { extractTextFromDocument, OCRResult } from './ocr';
-import { getOCRConfig, getOCREngineVersion } from './ocrAdapter/types';
-import { analyzeJobSheet, AnalysisResult, GoldSpec } from './analyzer';
-import { selectTemplate, createSelectionTraceArtifact } from './templateSelector';
+import { extractTextFromDocument, OCRResult } from "./ocr";
+import { getOCRConfig, getOCREngineVersion } from "./ocrAdapter/types";
+import { analyzeJobSheet, AnalysisResult, GoldSpec } from "./analyzer";
+import {
+  selectTemplate,
+  createSelectionTraceArtifact,
+} from "./templateSelector";
 import {
   getTemplateVersion,
   getActiveTemplates,
@@ -25,16 +28,19 @@ import {
   type SelectionResult,
   FALLBACK_TEMPLATE_ID,
   isFallbackTemplate,
-} from './templateRegistry';
-import { performHybridAssessment, type HybridAssessmentResult } from './hybridAssessment';
-import { specJsonToGoldSpec } from './templateRegistry/defaultTemplate';
+} from "./templateRegistry";
+import {
+  performHybridAssessment,
+  type HybridAssessmentResult,
+} from "./hybridAssessment";
+import { specJsonToGoldSpec } from "./templateRegistry/defaultTemplate";
 import {
   enrichFindingsWithOcrEvidence,
   computePageConfidencePrior,
   hasOcrSignatureEvidence,
-} from './ocrFindingEnrichment';
-import * as db from '../db';
-import { v4 as uuidv4 } from 'uuid';
+} from "./ocrFindingEnrichment";
+import * as db from "../db";
+import { v4 as uuidv4 } from "uuid";
 
 export interface ProcessingResult {
   success: boolean;
@@ -46,10 +52,10 @@ export interface ProcessingResult {
   /** Hybrid assessment result (for fallback/unknown documents) */
   hybridAssessment?: HybridAssessmentResult;
   /** Assessment mode used */
-  assessmentMode?: 'FULL' | 'HYBRID';
+  assessmentMode?: "FULL" | "HYBRID";
   processingStages: {
     stage: string;
-    status: 'success' | 'failed' | 'skipped';
+    status: "success" | "failed" | "skipped";
     durationMs: number;
     error?: string;
   }[];
@@ -59,25 +65,25 @@ export interface ProcessingResult {
 export interface ProcessingOptions {
   /** Explicit template version ID (preferred - bypasses selection) */
   templateVersionId?: number;
-  /** 
+  /**
    * @deprecated Legacy gold spec ID - REMOVED in SSOT enforcement
    * This option is ignored; use templateVersionId instead.
    */
   goldSpecId?: number;
   /** User ID for audit trail */
   userId?: number;
-  /** 
+  /**
    * @deprecated Force use of legacy path - REMOVED in SSOT enforcement
    * This option is ignored; templates are always used.
    */
   useLegacyPath?: boolean;
 }
 
-const PIPELINE_VERSION = '2.0.0'; // Updated for template system
+const PIPELINE_VERSION = "2.0.0"; // Updated for template system
 
 /**
  * Process a job sheet document through the full pipeline
- * 
+ *
  * @param jobSheetId - Job sheet ID to process
  * @param documentUrl - URL of the document file
  * @param goldSpecId - Legacy: Gold spec ID (deprecated, use options.templateVersionId)
@@ -98,7 +104,7 @@ export async function processJobSheet(
 
 /**
  * Process a job sheet with full options support
- * 
+ *
  * TEMPLATE SELECTION RULES:
  * - If templateVersionId is provided: use that version directly
  * - If goldSpecId is provided: use legacy path
@@ -114,26 +120,29 @@ export async function processJobSheetWithOptions(
   options: ProcessingOptions = {}
 ): Promise<ProcessingResult> {
   const startTime = Date.now();
-  const stages: ProcessingResult['processingStages'] = [];
+  const stages: ProcessingResult["processingStages"] = [];
   const runId = uuidv4();
   let selectionResult: SelectionResult | undefined;
-  
+
   // Update job sheet status to processing
   try {
-    await db.updateJobSheetStatus(jobSheetId, 'processing');
+    await db.updateJobSheetStatus(jobSheetId, "processing");
   } catch (error) {
-    console.warn('[DocumentProcessor] Could not update job sheet status:', error);
+    console.warn(
+      "[DocumentProcessor] Could not update job sheet status:",
+      error
+    );
   }
 
   // Stage 1: OCR Text Extraction
   const ocrStartTime = Date.now();
   let ocrResult: OCRResult;
-  
+
   try {
     ocrResult = await extractTextFromDocument(documentUrl);
     stages.push({
-      stage: 'OCR Text Extraction',
-      status: ocrResult.success ? 'success' : 'failed',
+      stage: "OCR Text Extraction",
+      status: ocrResult.success ? "success" : "failed",
       durationMs: Date.now() - ocrStartTime,
       error: ocrResult.error,
     });
@@ -143,11 +152,11 @@ export async function processJobSheetWithOptions(
       pages: [],
       totalPages: 0,
       model: getOCRConfig().model,
-      error: error instanceof Error ? error.message : 'OCR failed',
+      error: error instanceof Error ? error.message : "OCR failed",
     };
     stages.push({
-      stage: 'OCR Text Extraction',
-      status: 'failed',
+      stage: "OCR Text Extraction",
+      status: "failed",
       durationMs: Date.now() - ocrStartTime,
       error: ocrResult.error,
     });
@@ -156,11 +165,14 @@ export async function processJobSheetWithOptions(
   // If OCR failed, mark as failed and return
   if (!ocrResult.success || ocrResult.pages.length === 0) {
     try {
-      await db.updateJobSheetStatus(jobSheetId, 'failed');
+      await db.updateJobSheetStatus(jobSheetId, "failed");
     } catch (error) {
-      console.warn('[DocumentProcessor] Could not update job sheet status:', error);
+      console.warn(
+        "[DocumentProcessor] Could not update job sheet status:",
+        error
+      );
     }
-    
+
     return {
       success: false,
       jobSheetId,
@@ -173,11 +185,11 @@ export async function processJobSheetWithOptions(
   // Combine all page text
   const extractedText = ocrResult.pages
     .map(page => `--- Page ${page.pageNumber} ---\n${page.markdown}`)
-    .join('\n\n');
+    .join("\n\n");
 
   // =========================================================================
   // Stage 1.5: Template Selection (PR-1 SSOT Enforcement)
-  // 
+  //
   // SSOT RULES:
   // - Templates are the ONLY source of truth (no hardcoded fallback)
   // - If no templates exist, pipeline fails explicitly
@@ -186,28 +198,32 @@ export async function processJobSheetWithOptions(
   const selectionStartTime = Date.now();
   let spec: GoldSpec;
   let usedTemplateVersionId: number | undefined;
-  
+
   // SSOT: Ensure templates are ready before processing
   try {
     ensureTemplatesReady();
   } catch (error) {
     // SSOT violation - no templates available
-    const errorMsg = error instanceof Error ? error.message : 'SSOT validation failed';
+    const errorMsg =
+      error instanceof Error ? error.message : "SSOT validation failed";
     console.error(`[DocumentProcessor] SSOT violation: ${errorMsg}`);
-    
+
     try {
-      await db.updateJobSheetStatus(jobSheetId, 'failed');
+      await db.updateJobSheetStatus(jobSheetId, "failed");
     } catch (dbError) {
-      console.warn('[DocumentProcessor] Could not update job sheet status:', dbError);
+      console.warn(
+        "[DocumentProcessor] Could not update job sheet status:",
+        dbError
+      );
     }
-    
+
     stages.push({
-      stage: 'Template Selection',
-      status: 'failed',
+      stage: "Template Selection",
+      status: "failed",
       durationMs: Date.now() - selectionStartTime,
       error: errorMsg,
     });
-    
+
     return {
       success: false,
       jobSheetId,
@@ -216,15 +232,15 @@ export async function processJobSheetWithOptions(
       totalDurationMs: Date.now() - startTime,
     };
   }
-  
+
   // Log deprecation warning if legacy options are used
   if (options.goldSpecId || options.useLegacyPath) {
     console.warn(
-      '[DocumentProcessor] DEPRECATED: goldSpecId/useLegacyPath options are ignored. ' +
-      'Use templateVersionId instead. Pipeline will use template selection.'
+      "[DocumentProcessor] DEPRECATED: goldSpecId/useLegacyPath options are ignored. " +
+        "Use templateVersionId instead. Pipeline will use template selection."
     );
   }
-  
+
   if (options.templateVersionId) {
     // Explicit template version provided - use directly
     const version = getTemplateVersion(options.templateVersionId);
@@ -232,28 +248,31 @@ export async function processJobSheetWithOptions(
       spec = convertSpecJsonToGoldSpec(version.specJson);
       usedTemplateVersionId = version.id;
       stages.push({
-        stage: 'Template Selection',
-        status: 'success',
+        stage: "Template Selection",
+        status: "success",
         durationMs: Date.now() - selectionStartTime,
       });
     } else {
       // Template version not found - fail explicitly (no fallback)
       const errorMsg = `Template version ${options.templateVersionId} not found`;
       console.error(`[DocumentProcessor] ${errorMsg}`);
-      
+
       try {
-        await db.updateJobSheetStatus(jobSheetId, 'failed');
+        await db.updateJobSheetStatus(jobSheetId, "failed");
       } catch (dbError) {
-        console.warn('[DocumentProcessor] Could not update job sheet status:', dbError);
+        console.warn(
+          "[DocumentProcessor] Could not update job sheet status:",
+          dbError
+        );
       }
-      
+
       stages.push({
-        stage: 'Template Selection',
-        status: 'failed',
+        stage: "Template Selection",
+        status: "failed",
         durationMs: Date.now() - selectionStartTime,
         error: errorMsg,
       });
-      
+
       return {
         success: false,
         jobSheetId,
@@ -265,26 +284,31 @@ export async function processJobSheetWithOptions(
   } else {
     // Auto-select template from extracted text
     selectionResult = selectTemplate(extractedText);
-    
+
     if (!selectionResult.autoProcessingAllowed) {
       // LOW or ambiguous MEDIUM confidence - use HYBRID ASSESSMENT instead of stopping
-      console.log(`[DocumentProcessor] Template selection blocked: ${selectionResult.blockReason}`);
-      console.log(`[DocumentProcessor] Using hybrid assessment for fallback processing`);
-      
+      console.log(
+        `[DocumentProcessor] Template selection blocked: ${selectionResult.blockReason}`
+      );
+      console.log(
+        `[DocumentProcessor] Using hybrid assessment for fallback processing`
+      );
+
       stages.push({
-        stage: 'Template Selection',
-        status: 'skipped',
+        stage: "Template Selection",
+        status: "skipped",
         durationMs: Date.now() - selectionStartTime,
         error: selectionResult.blockReason,
       });
-      
+
       // Determine review reason
-      const reviewReason = selectionResult.topScore === 0 
-        ? 'TEMPLATE_NOT_MATCHED' as const
-        : selectionResult.confidenceBand === 'LOW'
-          ? 'LOW_TEMPLATE_CONFIDENCE' as const
-          : 'AMBIGUOUS_SELECTION' as const;
-      
+      const reviewReason =
+        selectionResult.topScore === 0
+          ? ("TEMPLATE_NOT_MATCHED" as const)
+          : selectionResult.confidenceBand === "LOW"
+            ? ("LOW_TEMPLATE_CONFIDENCE" as const)
+            : ("AMBIGUOUS_SELECTION" as const);
+
       // Perform hybrid assessment - NEVER FAIL, always provide partial results
       const hybridStartTime = Date.now();
       const pageTexts = ocrResult.pages.map(p => p.markdown);
@@ -292,7 +316,7 @@ export async function processJobSheetWithOptions(
       const avgConfidence =
         computePageConfidencePrior(ocrResult) ??
         (ocrResult.pages.length > 0 ? 0.7 : 0.5);
-      
+
       const hybridResult = await performHybridAssessment(
         extractedText,
         pageTexts,
@@ -300,41 +324,47 @@ export async function processJobSheetWithOptions(
         reviewReason,
         { hasOcrSignature: hasOcrSignatureEvidence(ocrResult) }
       );
-      
+
       stages.push({
-        stage: 'Hybrid Assessment',
-        status: hybridResult.success ? 'success' : 'failed',
+        stage: "Hybrid Assessment",
+        status: hybridResult.success ? "success" : "failed",
         durationMs: Date.now() - hybridStartTime,
         error: hybridResult.error,
       });
-      
+
       // Update status to review_queue
       try {
-        await db.updateJobSheetStatus(jobSheetId, 'review_queue');
+        await db.updateJobSheetStatus(jobSheetId, "review_queue");
       } catch (error) {
-        console.warn('[DocumentProcessor] Could not update job sheet status:', error);
+        console.warn(
+          "[DocumentProcessor] Could not update job sheet status:",
+          error
+        );
       }
-      
+
       // Store partial audit result with hybrid data
       try {
         const auditResult = await db.createAuditResult({
           jobSheetId,
           goldSpecId: options.goldSpecId || 1,
           runId,
-          result: 'review_queue',
+          result: "review_queue",
           confidenceScore: String(selectionResult.topScore),
-          documentStrategy: 'ocr',
+          documentStrategy: "ocr",
           ocrEngineVersion: getOCREngineVersion(ocrResult.model),
           pipelineVersion: PIPELINE_VERSION,
           reportJson: {
             summary: hybridResult.llmSummary || hybridResult.reviewExplanation,
             extractedText,
             extractedFields: Object.fromEntries(
-              hybridResult.extractedFields.map(f => [f.field, {
-                value: f.value,
-                confidence: f.confidence,
-                pageNumber: f.pageNumber,
-              }])
+              hybridResult.extractedFields.map(f => [
+                f.field,
+                {
+                  value: f.value,
+                  confidence: f.confidence,
+                  pageNumber: f.pageNumber,
+                },
+              ])
             ),
             pageCount: ocrResult.totalPages,
             processingStages: stages,
@@ -343,14 +373,14 @@ export async function processJobSheetWithOptions(
           },
           processingTimeMs: Date.now() - startTime,
         });
-        
+
         // NOTE: The hybrid path's extracted fields are informational, not
         // defects. They are already persisted on reportJson.extractedFields
         // above. They are intentionally NOT written to audit_findings, whose
         // reasonCode is a fixed defect enum (no VALID/informational value) —
         // the previous 'VALID' insert would have failed against the NOT NULL
         // enum column at runtime.
-        
+
         // Return with hybrid assessment data - SUCCESS with partial results
         return {
           success: true, // Changed: always succeed with partial results
@@ -359,13 +389,16 @@ export async function processJobSheetWithOptions(
           ocrResult,
           selectionResult,
           hybridAssessment: hybridResult,
-          assessmentMode: 'HYBRID',
+          assessmentMode: "HYBRID",
           processingStages: stages,
           totalDurationMs: Date.now() - startTime,
         };
       } catch (dbError) {
-        console.error('[DocumentProcessor] Failed to store hybrid results:', dbError);
-        
+        console.error(
+          "[DocumentProcessor] Failed to store hybrid results:",
+          dbError
+        );
+
         // Still return with what we have
         return {
           success: true,
@@ -373,41 +406,44 @@ export async function processJobSheetWithOptions(
           ocrResult,
           selectionResult,
           hybridAssessment: hybridResult,
-          assessmentMode: 'HYBRID',
+          assessmentMode: "HYBRID",
           processingStages: stages,
           totalDurationMs: Date.now() - startTime,
         };
       }
     }
-    
+
     // HIGH or clear MEDIUM confidence - proceed with selected template
     const version = getTemplateVersion(selectionResult.versionId!);
     if (version) {
       spec = convertSpecJsonToGoldSpec(version.specJson);
       usedTemplateVersionId = version.id;
       stages.push({
-        stage: 'Template Selection',
-        status: 'success',
+        stage: "Template Selection",
+        status: "success",
         durationMs: Date.now() - selectionStartTime,
       });
     } else {
       // Template version should exist at this point - fail explicitly
       const errorMsg = `Selected template version ${selectionResult.versionId} not found`;
       console.error(`[DocumentProcessor] ${errorMsg}`);
-      
+
       try {
-        await db.updateJobSheetStatus(jobSheetId, 'failed');
+        await db.updateJobSheetStatus(jobSheetId, "failed");
       } catch (dbError) {
-        console.warn('[DocumentProcessor] Could not update job sheet status:', dbError);
+        console.warn(
+          "[DocumentProcessor] Could not update job sheet status:",
+          dbError
+        );
       }
-      
+
       stages.push({
-        stage: 'Template Selection',
-        status: 'failed',
+        stage: "Template Selection",
+        status: "failed",
         durationMs: Date.now() - selectionStartTime,
         error: errorMsg,
       });
-      
+
       return {
         success: false,
         jobSheetId,
@@ -424,28 +460,32 @@ export async function processJobSheetWithOptions(
   let analysisResult: AnalysisResult;
 
   try {
-    analysisResult = await analyzeJobSheet(extractedText, spec, ocrResult.totalPages);
+    analysisResult = await analyzeJobSheet(
+      extractedText,
+      spec,
+      ocrResult.totalPages
+    );
     stages.push({
-      stage: 'AI Analysis',
-      status: analysisResult.success ? 'success' : 'failed',
+      stage: "AI Analysis",
+      status: analysisResult.success ? "success" : "failed",
       durationMs: Date.now() - analysisStartTime,
       error: analysisResult.error,
     });
   } catch (error) {
     analysisResult = {
       success: false,
-      overallResult: 'REVIEW_QUEUE',
+      overallResult: "REVIEW_QUEUE",
       score: 0,
       findings: [],
       extractedFields: {},
-      summary: 'Analysis failed',
+      summary: "Analysis failed",
       processingTimeMs: Date.now() - analysisStartTime,
-      model: 'gemini-2.5-flash',
-      error: error instanceof Error ? error.message : 'Analysis failed',
+      model: "gemini-2.5-flash",
+      error: error instanceof Error ? error.message : "Analysis failed",
     };
     stages.push({
-      stage: 'AI Analysis',
-      status: 'failed',
+      stage: "AI Analysis",
+      status: "failed",
       durationMs: Date.now() - analysisStartTime,
       error: analysisResult.error,
     });
@@ -457,11 +497,12 @@ export async function processJobSheetWithOptions(
 
   try {
     // Determine final status
-    const finalStatus = analysisResult.overallResult === 'PASS' 
-      ? 'completed' 
-      : analysisResult.overallResult === 'REVIEW_QUEUE'
-        ? 'review_queue'
-        : 'completed';
+    const finalStatus =
+      analysisResult.overallResult === "PASS"
+        ? "completed"
+        : analysisResult.overallResult === "REVIEW_QUEUE"
+          ? "review_queue"
+          : "completed";
 
     console.log(`[DocumentProcessor] Setting final status`, {
       jobSheetId,
@@ -478,9 +519,12 @@ export async function processJobSheetWithOptions(
       jobSheetId,
       goldSpecId: options.goldSpecId || 1, // Default to spec ID 1 if not provided
       runId,
-      result: analysisResult.overallResult.toLowerCase() as 'pass' | 'fail' | 'review_queue',
+      result: analysisResult.overallResult.toLowerCase() as
+        | "pass"
+        | "fail"
+        | "review_queue",
       confidenceScore: String(analysisResult.score),
-      documentStrategy: 'ocr', // We used OCR
+      documentStrategy: "ocr", // We used OCR
       ocrEngineVersion: getOCREngineVersion(ocrResult.model),
       pipelineVersion: PIPELINE_VERSION,
       reportJson: {
@@ -505,24 +549,27 @@ export async function processJobSheetWithOptions(
         );
       } catch (enrichError) {
         // Enrichment must NEVER fail the pipeline
-        console.warn('[DocumentProcessor] OCR finding enrichment failed:', enrichError);
+        console.warn(
+          "[DocumentProcessor] OCR finding enrichment failed:",
+          enrichError
+        );
       }
 
       const findingsToInsert = findingsForInsert.map(finding => ({
         auditResultId: auditResult.id,
-        severity: finding.severity as 'S0' | 'S1' | 'S2' | 'S3',
+        severity: finding.severity as "S0" | "S1" | "S2" | "S3",
         reasonCode: finding.reasonCode as any,
         fieldName: finding.fieldName,
         pageNumber: finding.pageNumber,
         boundingBox: finding.boundingBox || null,
-        rawSnippet: finding.rawSnippet || '',
-        normalisedSnippet: finding.normalisedSnippet || '',
+        rawSnippet: finding.rawSnippet || "",
+        normalisedSnippet: finding.normalisedSnippet || "",
         confidence: String(finding.confidence),
         ruleId: finding.ruleId,
         whyItMatters: finding.whyItMatters,
         suggestedFix: finding.suggestedFix,
       }));
-      
+
       await db.createAuditFindings(findingsToInsert);
     }
 
@@ -530,8 +577,8 @@ export async function processJobSheetWithOptions(
     if (options.userId) {
       await db.logAction({
         userId: options.userId,
-        action: 'PROCESS_JOB_SHEET',
-        entityType: 'job_sheet',
+        action: "PROCESS_JOB_SHEET",
+        entityType: "job_sheet",
         entityId: jobSheetId,
         details: {
           runId,
@@ -544,17 +591,17 @@ export async function processJobSheetWithOptions(
     }
 
     stages.push({
-      stage: 'Store Results',
-      status: 'success',
+      stage: "Store Results",
+      status: "success",
       durationMs: Date.now() - storageStartTime,
     });
   } catch (error) {
-    console.error('[DocumentProcessor] Failed to store results:', error);
+    console.error("[DocumentProcessor] Failed to store results:", error);
     stages.push({
-      stage: 'Store Results',
-      status: 'failed',
+      stage: "Store Results",
+      status: "failed",
       durationMs: Date.now() - storageStartTime,
-      error: error instanceof Error ? error.message : 'Storage failed',
+      error: error instanceof Error ? error.message : "Storage failed",
     });
   }
 
@@ -565,7 +612,7 @@ export async function processJobSheetWithOptions(
     ocrResult,
     analysisResult,
     selectionResult,
-    assessmentMode: 'FULL',
+    assessmentMode: "FULL",
     processingStages: stages,
     totalDurationMs: Date.now() - startTime,
   };
@@ -612,14 +659,14 @@ export async function reprocessWithTemplate(
  */
 function convertSpecJsonToGoldSpec(specJson: any): GoldSpec {
   return {
-    name: specJson.name || 'Template Spec',
-    version: specJson.version || '1.0.0',
+    name: specJson.name || "Template Spec",
+    version: specJson.version || "1.0.0",
     rules: (specJson.rules || []).map((rule: any) => ({
       id: rule.ruleId,
       field: rule.field,
-      type: rule.type === 'required' ? 'presence' : rule.type,
-      required: rule.type === 'required',
-      description: rule.description || '',
+      type: rule.type === "required" ? "presence" : rule.type,
+      required: rule.type === "required",
+      description: rule.description || "",
       pattern: rule.pattern,
       format: rule.pattern,
     })),

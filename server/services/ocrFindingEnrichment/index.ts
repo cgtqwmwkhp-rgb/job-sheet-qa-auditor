@@ -9,10 +9,10 @@ export {
   enrichFindingsWithOcrEvidence,
   computePageConfidencePrior,
   hasOcrSignatureEvidence,
-} from './enrichFindings';
+} from "./enrichFindings";
 
 export type {
   EnrichedFinding,
   FindingEvidenceSource,
   AuditFindingBoundingBox,
-} from './types';
+} from "./types";

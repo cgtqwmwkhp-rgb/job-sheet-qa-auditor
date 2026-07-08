@@ -5,14 +5,18 @@
  * Never throws — callers should still wrap in try/catch for pipeline safety.
  */
 
-import type { Finding } from '../analyzer';
+import type { Finding } from "../analyzer";
 import type {
   OCRBlock,
   OCRPage,
   OCRResult,
   OCRWordConfidence,
-} from '../ocrAdapter/types';
-import type { AuditFindingBoundingBox, EnrichedFinding, FindingEvidenceSource } from './types';
+} from "../ocrAdapter/types";
+import type {
+  AuditFindingBoundingBox,
+  EnrichedFinding,
+  FindingEvidenceSource,
+} from "./types";
 
 function hasDeepEvidence(pages: OCRPage[]): boolean {
   return pages.some(
@@ -24,11 +28,14 @@ function hasDeepEvidence(pages: OCRPage[]): boolean {
 }
 
 function isSignatureFinding(finding: Finding): boolean {
-  return /signature/i.test(finding.fieldName) || /signature/i.test(finding.ruleId ?? '');
+  return (
+    /signature/i.test(finding.fieldName) ||
+    /signature/i.test(finding.ruleId ?? "")
+  );
 }
 
 function normalizeForMatch(text: string): string {
-  return text.toLowerCase().replace(/\s+/g, ' ').trim();
+  return text.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 function pagesForFinding(pages: OCRPage[], pageNumber: number): OCRPage[] {
@@ -51,7 +58,7 @@ function attachBbox(
       height: bbox.height,
       source: bbox.source,
       blockType: bbox.blockType,
-      coordinateSpace: 'percent',
+      coordinateSpace: "percent",
       pageWidthPx: page.dimensions?.width,
       pageHeightPx: page.dimensions?.height,
     },
@@ -81,23 +88,22 @@ function findSignatureEvidence(
   const candidates = pagesForFinding(pages, finding.pageNumber);
   for (const page of candidates) {
     const sig =
-      page.signatures?.[0] ??
-      page.blocks?.find(b => b.type === 'signature');
+      page.signatures?.[0] ?? page.blocks?.find(b => b.type === "signature");
     if (!sig) continue;
 
-    if ('boundingBox' in sig && sig.boundingBox) {
+    if ("boundingBox" in sig && sig.boundingBox) {
       const bbox: AuditFindingBoundingBox = {
         ...sig.boundingBox,
-        source: 'ocr_signature_block',
-        blockType: 'signature',
+        source: "ocr_signature_block",
+        blockType: "signature",
       };
       return attachBbox(finding, bbox, page, page.pageNumber);
     }
 
     // Signature may be an OCRBlock without going through signatures[]
-    if ('type' in sig && (sig as OCRBlock).type === 'signature') {
+    if ("type" in sig && (sig as OCRBlock).type === "signature") {
       const block = sig as OCRBlock;
-      const bbox = blockToAuditBbox(block, 'ocr_signature_block');
+      const bbox = blockToAuditBbox(block, "ocr_signature_block");
       if (bbox) return attachBbox(finding, bbox, page, page.pageNumber);
     }
   }
@@ -117,7 +123,7 @@ function findMatchingBlock(
   for (const page of candidates) {
     if (!page.blocks?.length) continue;
     for (const block of page.blocks) {
-      if (block.type === 'signature') continue;
+      if (block.type === "signature") continue;
       if (!block.content) continue;
       const hay = normalizeForMatch(block.content);
       if (hay.includes(needle) || needle.includes(hay)) {
@@ -176,12 +182,14 @@ function applyWordConfidence(
  * Average page confidence prior for hybrid assessment (0–1).
  * Returns undefined when no page confidence is available.
  */
-export function computePageConfidencePrior(ocrResult: OCRResult): number | undefined {
+export function computePageConfidencePrior(
+  ocrResult: OCRResult
+): number | undefined {
   if (!ocrResult.success || ocrResult.pages.length === 0) return undefined;
 
   const scores = ocrResult.pages
     .map(p => p.confidenceScores?.averagePageConfidence)
-    .filter((c): c is number => typeof c === 'number' && Number.isFinite(c));
+    .filter((c): c is number => typeof c === "number" && Number.isFinite(c));
 
   if (scores.length === 0) return undefined;
   return scores.reduce((a, b) => a + b, 0) / scores.length;
@@ -192,7 +200,9 @@ export function computePageConfidencePrior(ocrResult: OCRResult): number | undef
  */
 export function hasOcrSignatureEvidence(ocrResult: OCRResult): boolean {
   return ocrResult.pages.some(
-    p => (p.signatures?.length ?? 0) > 0 || p.blocks?.some(b => b.type === 'signature')
+    p =>
+      (p.signatures?.length ?? 0) > 0 ||
+      p.blocks?.some(b => b.type === "signature")
   );
 }
 
@@ -213,16 +223,23 @@ export function enrichFindingsWithOcrEvidence(
       if (isSignatureFinding(finding)) {
         const withSig = findSignatureEvidence(finding, ocrResult.pages);
         if (withSig) {
-          const page = ocrResult.pages.find(p => p.pageNumber === withSig.pageNumber);
+          const page = ocrResult.pages.find(
+            p => p.pageNumber === withSig.pageNumber
+          );
           return page ? applyWordConfidence(withSig, page) : withSig;
         }
       }
 
       const match = findMatchingBlock(finding, ocrResult.pages);
       if (match) {
-        const bbox = blockToAuditBbox(match.block, 'ocr_block');
+        const bbox = blockToAuditBbox(match.block, "ocr_block");
         if (bbox) {
-          const enriched = attachBbox(finding, bbox, match.page, match.page.pageNumber);
+          const enriched = attachBbox(
+            finding,
+            bbox,
+            match.page,
+            match.page.pageNumber
+          );
           return applyWordConfidence(enriched, match.page);
         }
       }

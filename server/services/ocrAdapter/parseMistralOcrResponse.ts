@@ -14,8 +14,8 @@ import type {
   OCRPixelCorners,
   OCRSignatureRegion,
   OCRWordConfidence,
-} from './types';
-import { summarizeDeepFeatures } from './types';
+} from "./types";
+import { summarizeDeepFeatures } from "./types";
 
 export interface ParseMistralOcrOptions {
   /** When false, ignore blocks/confidence even if present in raw. */
@@ -48,8 +48,10 @@ export function pixelCornersToPercent(
 
   const x = (corners.topLeftX / dimensions.width) * 100;
   const y = (corners.topLeftY / dimensions.height) * 100;
-  const width = ((corners.bottomRightX - corners.topLeftX) / dimensions.width) * 100;
-  const height = ((corners.bottomRightY - corners.topLeftY) / dimensions.height) * 100;
+  const width =
+    ((corners.bottomRightX - corners.topLeftX) / dimensions.width) * 100;
+  const height =
+    ((corners.bottomRightY - corners.topLeftY) / dimensions.height) * 100;
 
   if (![x, y, width, height].every(n => Number.isFinite(n))) {
     return undefined;
@@ -60,7 +62,7 @@ export function pixelCornersToPercent(
     y: clampPercent(y),
     width: clampPercent(Math.max(0, width)),
     height: clampPercent(Math.max(0, height)),
-    coordinateSpace: 'percent',
+    coordinateSpace: "percent",
   };
 }
 
@@ -69,8 +71,8 @@ function clampPercent(n: number): number {
 }
 
 function asNumber(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && value.trim() !== '') {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
     const n = Number(value);
     if (Number.isFinite(n)) return n;
   }
@@ -78,10 +80,12 @@ function asNumber(value: unknown): number | undefined {
 }
 
 function asString(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
+  return typeof value === "string" ? value : undefined;
 }
 
-function parsePixelCorners(raw: Record<string, unknown>): OCRPixelCorners | undefined {
+function parsePixelCorners(
+  raw: Record<string, unknown>
+): OCRPixelCorners | undefined {
   const topLeftX = asNumber(raw.top_left_x ?? raw.topLeftX);
   const topLeftY = asNumber(raw.top_left_y ?? raw.topLeftY);
   const bottomRightX = asNumber(raw.bottom_right_x ?? raw.bottomRightX);
@@ -103,12 +107,12 @@ function parseBlock(
   raw: unknown,
   dimensions?: { width: number; height: number; dpi: number }
 ): OCRBlock | undefined {
-  if (!raw || typeof raw !== 'object') return undefined;
+  if (!raw || typeof raw !== "object") return undefined;
   const obj = raw as Record<string, unknown>;
   const type = asString(obj.type) as OCRBlockType | undefined;
   if (!type) return undefined;
 
-  const content = asString(obj.content) ?? '';
+  const content = asString(obj.content) ?? "";
   const pixelCorners = parsePixelCorners(obj);
   const boundingBox = pixelCorners
     ? pixelCornersToPercent(pixelCorners, dimensions)
@@ -130,19 +134,23 @@ function parseBlock(
 }
 
 function parseWordConfidence(raw: unknown): OCRWordConfidence | undefined {
-  if (!raw || typeof raw !== 'object') return undefined;
+  if (!raw || typeof raw !== "object") return undefined;
   const obj = raw as Record<string, unknown>;
   const text = asString(obj.text);
   const confidence = asNumber(obj.confidence);
   const startIndex = asNumber(obj.start_index ?? obj.startIndex);
-  if (text === undefined || confidence === undefined || startIndex === undefined) {
+  if (
+    text === undefined ||
+    confidence === undefined ||
+    startIndex === undefined
+  ) {
     return undefined;
   }
   return { text, confidence, startIndex };
 }
 
 function parseConfidenceScores(raw: unknown): OCRConfidenceScores | undefined {
-  if (!raw || typeof raw !== 'object') return undefined;
+  if (!raw || typeof raw !== "object") return undefined;
   const obj = raw as Record<string, unknown>;
 
   const averagePageConfidence = asNumber(
@@ -182,7 +190,7 @@ function deriveSignatures(
 ): OCRSignatureRegion[] | undefined {
   if (!blocks?.length) return undefined;
   const signatures = blocks
-    .filter(b => b.type === 'signature')
+    .filter(b => b.type === "signature")
     .map(b => ({
       pageNumber,
       content: b.content,
@@ -198,20 +206,21 @@ function parsePage(
   index: number,
   options: ParseMistralOcrOptions
 ): OCRPage | undefined {
-  if (!raw || typeof raw !== 'object') return undefined;
+  if (!raw || typeof raw !== "object") return undefined;
   const obj = raw as Record<string, unknown>;
 
-  const pageNumber = asNumber(obj.index) !== undefined
-    ? (asNumber(obj.index) as number) + 1 // Mistral uses 0-based index
-    : index + 1;
+  const pageNumber =
+    asNumber(obj.index) !== undefined
+      ? (asNumber(obj.index) as number) + 1 // Mistral uses 0-based index
+      : index + 1;
 
-  let markdown = asString(obj.markdown) ?? '';
+  let markdown = asString(obj.markdown) ?? "";
   if (options.redactMarkdown) {
     markdown = options.redactMarkdown(markdown);
   }
 
-  let dimensions: OCRPage['dimensions'] | undefined;
-  if (obj.dimensions && typeof obj.dimensions === 'object') {
+  let dimensions: OCRPage["dimensions"] | undefined;
+  if (obj.dimensions && typeof obj.dimensions === "object") {
     const d = obj.dimensions as Record<string, unknown>;
     const width = asNumber(d.width);
     const height = asNumber(d.height);
@@ -221,11 +230,11 @@ function parsePage(
     }
   }
 
-  let images: OCRPage['images'];
+  let images: OCRPage["images"];
   if (Array.isArray(obj.images)) {
     images = obj.images
       .map(img => {
-        if (!img || typeof img !== 'object') return undefined;
+        if (!img || typeof img !== "object") return undefined;
         const i = img as Record<string, unknown>;
         const id = asString(i.id);
         const corners = parsePixelCorners(i);
@@ -260,7 +269,9 @@ function parsePage(
       }
     }
 
-    const confidenceScores = parseConfidenceScores(obj.confidence_scores ?? obj.confidenceScores);
+    const confidenceScores = parseConfidenceScores(
+      obj.confidence_scores ?? obj.confidenceScores
+    );
     if (confidenceScores) {
       page.confidenceScores = confidenceScores;
     }
@@ -283,21 +294,24 @@ export function parseMistralOcrResponse(
     deepFeaturesEnabled,
   };
 
-  if (!raw || typeof raw !== 'object') {
+  if (!raw || typeof raw !== "object") {
     return empty;
   }
 
   const obj = raw as Record<string, unknown>;
   const pagesRaw = Array.isArray(obj.pages) ? obj.pages : [];
   const pages = pagesRaw
-    .map((p, i) => parsePage(p, i, { ...options, includeDeepFeatures: deepFeaturesEnabled }))
+    .map((p, i) =>
+      parsePage(p, i, { ...options, includeDeepFeatures: deepFeaturesEnabled })
+    )
     .filter((p): p is OCRPage => p !== undefined);
 
-  let usageInfo: ParsedMistralOcrResult['usageInfo'];
-  if (obj.usage_info && typeof obj.usage_info === 'object') {
+  let usageInfo: ParsedMistralOcrResult["usageInfo"];
+  if (obj.usage_info && typeof obj.usage_info === "object") {
     const u = obj.usage_info as Record<string, unknown>;
     const pagesProcessed = asNumber(u.pages_processed);
-    const tokensGenerated = asNumber(u.doc_size_tokens) ?? asNumber(u.doc_size_bytes);
+    const tokensGenerated =
+      asNumber(u.doc_size_tokens) ?? asNumber(u.doc_size_bytes);
     if (pagesProcessed !== undefined) {
       usageInfo = {
         pagesProcessed,

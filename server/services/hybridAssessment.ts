@@ -1,17 +1,20 @@
 /**
  * Hybrid Assessment Service
- * 
+ *
  * Provides lightweight assessment for documents that don't match a template.
  * Combines:
  * - Rule-based universal checks (instant)
  * - Field extraction summary (instant)
  * - Brief LLM summary (single, cheap call)
- * 
+ *
  * This ensures REVIEW_QUEUE items always have actionable context for humans.
  */
 
-import { invokeLLM, isLLMConfigured } from '../_core/llm';
-import { getSuggestedTemplates, FALLBACK_SPEC_JSON } from './templateRegistry/fallbackTemplate';
+import { invokeLLM, isLLMConfigured } from "../_core/llm";
+import {
+  getSuggestedTemplates,
+  FALLBACK_SPEC_JSON,
+} from "./templateRegistry/fallbackTemplate";
 
 /**
  * Universal assessment result
@@ -55,7 +58,7 @@ export interface ExtractedField {
  */
 export interface TemplateSuggestion {
   hint: string;
-  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  confidence: "HIGH" | "MEDIUM" | "LOW";
   reason: string;
 }
 
@@ -64,7 +67,7 @@ export interface TemplateSuggestion {
  */
 export interface HybridAssessmentResult {
   /** Assessment mode used */
-  mode: 'HYBRID';
+  mode: "HYBRID";
   /** Whether assessment completed successfully */
   success: boolean;
   /** Universal checks results */
@@ -78,7 +81,10 @@ export interface HybridAssessmentResult {
   /** Processing time in ms */
   processingTimeMs: number;
   /** Review reason */
-  reviewReason: 'TEMPLATE_NOT_MATCHED' | 'LOW_TEMPLATE_CONFIDENCE' | 'AMBIGUOUS_SELECTION';
+  reviewReason:
+    | "TEMPLATE_NOT_MATCHED"
+    | "LOW_TEMPLATE_CONFIDENCE"
+    | "AMBIGUOUS_SELECTION";
   /** Human-readable explanation */
   reviewExplanation: string;
   /** Error if any */
@@ -131,7 +137,7 @@ function extractFieldValue(
       };
     }
   }
-  return { found: false, value: '', confidence: 0 };
+  return { found: false, value: "", confidence: 0 };
 }
 
 /**
@@ -157,10 +163,16 @@ export function performUniversalAssessment(
   const asset = extractFieldValue(documentText, FIELD_PATTERNS.assetIdentifier);
   const engineer = extractFieldValue(documentText, FIELD_PATTERNS.engineerName);
   const customer = extractFieldValue(documentText, FIELD_PATTERNS.customerName);
-  
-  const extractedCount = [jobRef, date, signature, asset, engineer, customer]
-    .filter(f => f.found).length;
-  
+
+  const extractedCount = [
+    jobRef,
+    date,
+    signature,
+    asset,
+    engineer,
+    customer,
+  ].filter(f => f.found).length;
+
   return {
     hasJobReference: jobRef.found,
     hasDate: date.found,
@@ -183,17 +195,19 @@ export function extractUniversalFields(
   pageTexts: string[]
 ): ExtractedField[] {
   const fields: ExtractedField[] = [];
-  
+
   // For each field type, try to extract
   for (const [fieldName, patterns] of Object.entries(FIELD_PATTERNS)) {
     // Check each page
     for (let pageIndex = 0; pageIndex < pageTexts.length; pageIndex++) {
       const pageText = pageTexts[pageIndex];
       const result = extractFieldValue(pageText, patterns);
-      
+
       if (result.found) {
         // Find matching label from spec
-        const specField = FALLBACK_SPEC_JSON.fields.find(f => f.field === fieldName);
+        const specField = FALLBACK_SPEC_JSON.fields.find(
+          f => f.field === fieldName
+        );
         fields.push({
           field: fieldName,
           label: specField?.label || fieldName,
@@ -205,18 +219,20 @@ export function extractUniversalFields(
       }
     }
   }
-  
+
   return fields;
 }
 
 /**
  * Generate brief LLM summary for unknown document
  */
-async function generateLLMSummary(documentText: string): Promise<string | undefined> {
+async function generateLLMSummary(
+  documentText: string
+): Promise<string | undefined> {
   if (!isLLMConfigured()) {
     return undefined;
   }
-  
+
   try {
     // Use a brief, cheap prompt
     const prompt = `Briefly describe this document in 2-3 sentences. What type of document is it? What is its main purpose?
@@ -227,14 +243,14 @@ ${documentText.substring(0, 2000)}
 Respond with ONLY the description, no preamble.`;
 
     const response = await invokeLLM({
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: "user", content: prompt }],
       maxTokens: 150, // Keep it brief
     });
 
     const content = response.choices[0]?.message?.content;
-    return typeof content === 'string' ? content.trim() : undefined;
+    return typeof content === "string" ? content.trim() : undefined;
   } catch (error) {
-    console.warn('[HybridAssessment] LLM summary failed:', error);
+    console.warn("[HybridAssessment] LLM summary failed:", error);
     return undefined;
   }
 }
@@ -246,11 +262,14 @@ export async function performHybridAssessment(
   documentText: string,
   pageTexts: string[],
   ocrConfidence: number,
-  reviewReason: 'TEMPLATE_NOT_MATCHED' | 'LOW_TEMPLATE_CONFIDENCE' | 'AMBIGUOUS_SELECTION',
+  reviewReason:
+    | "TEMPLATE_NOT_MATCHED"
+    | "LOW_TEMPLATE_CONFIDENCE"
+    | "AMBIGUOUS_SELECTION",
   ocrHints?: UniversalAssessmentOcrHints
 ): Promise<HybridAssessmentResult> {
   const startTime = Date.now();
-  
+
   try {
     // 1. Universal assessment (instant)
     const universalAssessment = performUniversalAssessment(
@@ -259,39 +278,45 @@ export async function performHybridAssessment(
       ocrConfidence,
       ocrHints
     );
-    
+
     // 2. Field extraction (instant)
     const extractedFields = extractUniversalFields(documentText, pageTexts);
-    
+
     // 3. Template suggestions (instant)
     const rawSuggestions = getSuggestedTemplates(documentText);
     const suggestedTemplates: TemplateSuggestion[] = rawSuggestions.map(s => ({
       ...s,
       reason: `Document contains keywords matching "${s.hint}"`,
     }));
-    
+
     // 4. LLM summary (async, but optional)
     const llmSummary = await generateLLMSummary(documentText);
-    
+
     // 5. Generate review explanation
     const explanationParts: string[] = [];
-    
-    if (reviewReason === 'TEMPLATE_NOT_MATCHED') {
-      explanationParts.push('No template matched this document type.');
-    } else if (reviewReason === 'LOW_TEMPLATE_CONFIDENCE') {
-      explanationParts.push('Template match confidence was too low for auto-processing.');
+
+    if (reviewReason === "TEMPLATE_NOT_MATCHED") {
+      explanationParts.push("No template matched this document type.");
+    } else if (reviewReason === "LOW_TEMPLATE_CONFIDENCE") {
+      explanationParts.push(
+        "Template match confidence was too low for auto-processing."
+      );
     } else {
-      explanationParts.push('Multiple templates matched with similar scores.');
+      explanationParts.push("Multiple templates matched with similar scores.");
     }
-    
-    explanationParts.push(`Extracted ${extractedFields.length} universal fields.`);
-    
+
+    explanationParts.push(
+      `Extracted ${extractedFields.length} universal fields.`
+    );
+
     if (suggestedTemplates.length > 0) {
-      explanationParts.push(`Suggested template: ${suggestedTemplates[0].hint}`);
+      explanationParts.push(
+        `Suggested template: ${suggestedTemplates[0].hint}`
+      );
     }
-    
+
     return {
-      mode: 'HYBRID',
+      mode: "HYBRID",
       success: true,
       universalAssessment,
       extractedFields,
@@ -299,11 +324,11 @@ export async function performHybridAssessment(
       suggestedTemplates,
       processingTimeMs: Date.now() - startTime,
       reviewReason,
-      reviewExplanation: explanationParts.join(' '),
+      reviewExplanation: explanationParts.join(" "),
     };
   } catch (error) {
     return {
-      mode: 'HYBRID',
+      mode: "HYBRID",
       success: false,
       universalAssessment: {
         hasJobReference: false,
@@ -321,8 +346,8 @@ export async function performHybridAssessment(
       suggestedTemplates: [],
       processingTimeMs: Date.now() - startTime,
       reviewReason,
-      reviewExplanation: 'Hybrid assessment failed. Manual review required.',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      reviewExplanation: "Hybrid assessment failed. Manual review required.",
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }

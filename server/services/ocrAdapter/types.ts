@@ -11,19 +11,19 @@
  * Structural block types returned by Mistral OCR-4 `include_blocks`.
  */
 export type OCRBlockType =
-  | 'text'
-  | 'title'
-  | 'list'
-  | 'table'
-  | 'image'
-  | 'equation'
-  | 'caption'
-  | 'code'
-  | 'references'
-  | 'aside_text'
-  | 'header'
-  | 'footer'
-  | 'signature'
+  | "text"
+  | "title"
+  | "list"
+  | "table"
+  | "image"
+  | "equation"
+  | "caption"
+  | "code"
+  | "references"
+  | "aside_text"
+  | "header"
+  | "footer"
+  | "signature"
   | string;
 
 /**
@@ -35,7 +35,7 @@ export interface OCRBoundingBoxPercent {
   y: number;
   width: number;
   height: number;
-  coordinateSpace: 'percent';
+  coordinateSpace: "percent";
 }
 
 /**
@@ -167,7 +167,7 @@ export interface OCROptions {
    */
   includeDeepFeatures?: boolean;
   /** Maps to Mistral `confidence_scores_granularity`. */
-  confidenceGranularity?: 'word' | 'page' | 'none';
+  confidenceGranularity?: "word" | "page" | "none";
 }
 
 /**
@@ -180,7 +180,7 @@ export interface OCRProviderArtifact {
   timestamp: string;
   correlationId?: string;
   requestMetadata: {
-    documentType: 'url' | 'base64';
+    documentType: "url" | "base64";
     pageLimit?: number;
     imageLimit?: number;
     includeDeepFeatures?: boolean;
@@ -217,7 +217,11 @@ export interface OCRAdapter {
   /**
    * Extract text from base64 encoded document
    */
-  extractFromBase64(base64Data: string, mimeType: string, options?: OCROptions): Promise<OCRResult>;
+  extractFromBase64(
+    base64Data: string,
+    mimeType: string,
+    options?: OCROptions
+  ): Promise<OCRResult>;
 
   /**
    * Validate API key is configured and working
@@ -227,7 +231,10 @@ export interface OCRAdapter {
   /**
    * Get provider artifact for audit trail (redacted)
    */
-  getProviderArtifact(result: OCRResult, options?: OCROptions): OCRProviderArtifact;
+  getProviderArtifact(
+    result: OCRResult,
+    options?: OCROptions
+  ): OCRProviderArtifact;
 }
 
 /**
@@ -238,7 +245,7 @@ export type OCRAdapterFactory = () => OCRAdapter;
 /**
  * Supported OCR providers
  */
-export type OCRProvider = 'mistral' | 'mock';
+export type OCRProvider = "mistral" | "mock";
 
 /**
  * OCR configuration from environment
@@ -252,13 +259,13 @@ export interface OCRConfig {
   maxDelayMs: number;
   /** Master switch for OCR-4 deep features. */
   deepFeaturesEnabled: boolean;
-  confidenceGranularity: 'word' | 'page' | 'none';
+  confidenceGranularity: "word" | "page" | "none";
 }
 
 /**
  * Default OCR provider.
  */
-export const DEFAULT_OCR_PROVIDER: OCRProvider = 'mistral';
+export const DEFAULT_OCR_PROVIDER: OCRProvider = "mistral";
 
 /**
  * Pinned, best-in-class OCR model version (single source of truth).
@@ -270,13 +277,13 @@ export const DEFAULT_OCR_PROVIDER: OCRProvider = 'mistral';
  * Upgrade deliberately by overriding the MISTRAL_OCR_MODEL environment
  * variable once a candidate has passed the golden-set eval gate.
  */
-export const DEFAULT_OCR_MODEL = 'mistral-ocr-4-0';
+export const DEFAULT_OCR_MODEL = "mistral-ocr-4-0";
 
 /**
  * True when the model supports OCR-4 deep features (blocks, word confidence).
  */
 export function supportsDeepFeatures(model: string): boolean {
-  return model.startsWith('mistral-ocr-4');
+  return model.startsWith("mistral-ocr-4");
 }
 
 /**
@@ -284,19 +291,26 @@ export function supportsDeepFeatures(model: string): boolean {
  * OCR_DEEP_FEATURES=false|0 forces off; true|1 forces on.
  * Default: on for mistral-ocr-4* models.
  */
-export function resolveDeepFeaturesEnabled(model: string, envValue?: string): boolean {
+export function resolveDeepFeaturesEnabled(
+  model: string,
+  envValue?: string
+): boolean {
   const raw = envValue ?? process.env.OCR_DEEP_FEATURES;
-  if (raw === 'false' || raw === '0') return false;
-  if (raw === 'true' || raw === '1') return true;
+  if (raw === "false" || raw === "0") return false;
+  if (raw === "true" || raw === "1") return true;
   return supportsDeepFeatures(model);
 }
 
 function resolveConfidenceGranularity(
   envValue?: string
-): 'word' | 'page' | 'none' {
-  const raw = (envValue ?? process.env.OCR_CONFIDENCE_GRANULARITY ?? 'word').toLowerCase();
-  if (raw === 'page' || raw === 'none' || raw === 'word') return raw;
-  return 'word';
+): "word" | "page" | "none" {
+  const raw = (
+    envValue ??
+    process.env.OCR_CONFIDENCE_GRANULARITY ??
+    "word"
+  ).toLowerCase();
+  if (raw === "page" || raw === "none" || raw === "word") return raw;
+  return "word";
 }
 
 /**
@@ -308,9 +322,9 @@ export function getOCRConfig(): OCRConfig {
     provider: (process.env.OCR_PROVIDER as OCRProvider) || DEFAULT_OCR_PROVIDER,
     model,
     apiKey: process.env.MISTRAL_API_KEY,
-    maxRetries: parseInt(process.env.OCR_MAX_RETRIES || '3', 10),
-    baseDelayMs: parseInt(process.env.OCR_BASE_DELAY_MS || '2000', 10),
-    maxDelayMs: parseInt(process.env.OCR_MAX_DELAY_MS || '30000', 10),
+    maxRetries: parseInt(process.env.OCR_MAX_RETRIES || "3", 10),
+    baseDelayMs: parseInt(process.env.OCR_BASE_DELAY_MS || "2000", 10),
+    maxDelayMs: parseInt(process.env.OCR_MAX_DELAY_MS || "30000", 10),
     deepFeaturesEnabled: resolveDeepFeaturesEnabled(model),
     confidenceGranularity: resolveConfidenceGranularity(),
   };
@@ -322,14 +336,20 @@ export function getOCRConfig(): OCRConfig {
  * audit is always attributable to the engine that produced it. Kept within
  * the 32-character `audit_results.ocrEngineVersion` column budget.
  */
-export function getOCREngineVersion(model?: string, config: OCRConfig = getOCRConfig()): string {
+export function getOCREngineVersion(
+  model?: string,
+  config: OCRConfig = getOCRConfig()
+): string {
   return `${config.provider}/${model ?? config.model}`;
 }
 
 /**
  * Summarize deep features for reportJson (no block content / PII).
  */
-export function summarizeDeepFeatures(pages: OCRPage[], enabled: boolean): OCRDeepFeaturesSummary {
+export function summarizeDeepFeatures(
+  pages: OCRPage[],
+  enabled: boolean
+): OCRDeepFeaturesSummary {
   const pagesWithBlocks = pages.filter(p => (p.blocks?.length ?? 0) > 0).length;
   const signatureBlocksDetected = pages.reduce(
     (sum, p) => sum + (p.signatures?.length ?? 0),
@@ -337,7 +357,7 @@ export function summarizeDeepFeatures(pages: OCRPage[], enabled: boolean): OCRDe
   );
   const confidences = pages
     .map(p => p.confidenceScores?.averagePageConfidence)
-    .filter((c): c is number => typeof c === 'number');
+    .filter((c): c is number => typeof c === "number");
   const averagePageConfidence =
     confidences.length > 0
       ? confidences.reduce((a, b) => a + b, 0) / confidences.length

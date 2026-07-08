@@ -5,16 +5,16 @@
  * for persistence on audit_findings.boundingBox / confidence / pageNumber.
  */
 
-import type { Finding } from '../analyzer';
-import type { OCRBlockType, OCRBoundingBoxPercent } from '../ocrAdapter/types';
+import type { Finding } from "../analyzer";
+import type { OCRBlockType, OCRBoundingBoxPercent } from "../ocrAdapter/types";
 
 /**
  * Provenance of the bounding box attached to a finding.
  */
 export type FindingEvidenceSource =
-  | 'ocr_block'
-  | 'ocr_word_span'
-  | 'ocr_signature_block';
+  | "ocr_block"
+  | "ocr_word_span"
+  | "ocr_signature_block";
 
 /**
  * Bounding box JSON stored on audit_findings.boundingBox (existing column).
@@ -33,5 +33,5 @@ export interface AuditFindingBoundingBox extends OCRBoundingBoxPercent {
  * analyzer.Finding.boundingBox remains structurally compatible (x/y/width/height).
  */
 export type EnrichedFinding = Finding & {
-  boundingBox?: Finding['boundingBox'] & Partial<AuditFindingBoundingBox>;
+  boundingBox?: Finding["boundingBox"] & Partial<AuditFindingBoundingBox>;
 };
