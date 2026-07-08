@@ -65,7 +65,11 @@ describe("systemRouter.health", () => {
     const result = await caller.health({ timestamp: Date.now() });
 
     // Verify response structure is deterministic
-    expect(Object.keys(result).sort()).toEqual(["config", "oauthEnabled", "ok"]);
+    expect(Object.keys(result).sort()).toEqual([
+      "config",
+      "oauthEnabled",
+      "ok",
+    ]);
     expect(Object.keys(result.config).sort()).toEqual([
       "databaseConfigured",
       "environment",
@@ -184,6 +188,38 @@ describe("systemRouter.version", () => {
   });
 });
 
+describe("systemRouter.modelCurrency", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it("returns env-driven registry without secrets", async () => {
+    process.env.OCR_PROVIDER = "mock";
+    process.env.MISTRAL_OCR_MODEL = "mock-ocr-v1";
+    process.env.JUDGMENT_MODEL = "gemini-3.1-pro";
+    process.env.GEMINI_MODEL = "gemini-2.5-pro";
+    process.env.MISTRAL_API_KEY = "secret-should-not-leak";
+
+    const { systemRouter } = await import("./systemRouter");
+    const caller = systemRouter.createCaller({});
+    const result = await caller.modelCurrency();
+
+    expect(result.roles.ocr.provider).toBe("mock");
+    expect(result.roles.ocr.model).toBe("mock-ocr-v1");
+    expect(result.roles.judgment.model).toBe("gemini-3.1-pro");
+    expect(result.roles.interpreter.model).toBe("gemini-2.5-pro");
+    expect(result.currency.source).toBe("env");
+    expect(JSON.stringify(result)).not.toContain("secret-should-not-leak");
+  });
+});
+
 describe("systemRouter.platformConfig", () => {
   const originalEnv = process.env;
 
@@ -203,7 +239,9 @@ describe("systemRouter.platformConfig", () => {
 
     const { systemRouter } = await import("./systemRouter");
     // platformConfig requires admin context - mock it
-    const caller = systemRouter.createCaller({ user: { id: 1, role: "admin" } });
+    const caller = systemRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    });
     const result = await caller.platformConfig();
 
     expect(result.safetyFlags.enablePurgeExecution).toBe(false);
@@ -217,7 +255,9 @@ describe("systemRouter.platformConfig", () => {
     process.env.DATABASE_URL = "mysql://user:password@localhost:3306/db";
 
     const { systemRouter } = await import("./systemRouter");
-    const caller = systemRouter.createCaller({ user: { id: 1, role: "admin" } });
+    const caller = systemRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    });
     const result = await caller.platformConfig();
 
     // Should indicate presence but not expose values
@@ -238,8 +278,10 @@ describe("systemRouter.platformConfig", () => {
     process.env.APP_ENV = "staging";
 
     const { systemRouter } = await import("./systemRouter");
-    const caller = systemRouter.createCaller({ user: { id: 1, role: "admin" } });
-    
+    const caller = systemRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    });
+
     const result1 = await caller.platformConfig();
     const result2 = await caller.platformConfig();
 
@@ -253,7 +295,9 @@ describe("systemRouter.platformConfig", () => {
     process.env.APP_ENV = "staging";
 
     const { systemRouter } = await import("./systemRouter");
-    const caller = systemRouter.createCaller({ user: { id: 1, role: "admin" } });
+    const caller = systemRouter.createCaller({
+      user: { id: 1, role: "admin" },
+    });
     const result = await caller.platformConfig();
 
     expect(result.versionInfo.gitShaShort).toBe("abc123d");

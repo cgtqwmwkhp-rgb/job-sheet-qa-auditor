@@ -2,6 +2,7 @@ import { z } from "zod";
 import { notifyOwner } from "./notification";
 import { adminProcedure, publicProcedure, router } from "./trpc";
 import { ENV } from "./env";
+import { getModelRegistry } from "../services/modelRegistry";
 
 // Runtime environment variables for version info (injected at build/deploy time)
 const GIT_SHA = process.env.GIT_SHA || "unknown";
@@ -35,6 +36,12 @@ export const systemRouter = router({
     environment: ENV.appEnvironment,
   })),
 
+  /**
+   * PR-9: Model currency / registry snapshot (public, no secrets).
+   * Returns pinned provider+model per pipeline role from env.
+   */
+  modelCurrency: publicProcedure.query(() => getModelRegistry()),
+
   notifyOwner: adminProcedure
     .input(
       z.object({
@@ -51,7 +58,7 @@ export const systemRouter = router({
 
   /**
    * PR-3: Platform config drift endpoint (admin-only)
-   * 
+   *
    * Returns key configuration flags for ops monitoring.
    * Used to detect configuration drift between environments.
    * Secrets are redacted - only presence is shown.
@@ -69,7 +76,9 @@ export const systemRouter = router({
       provider: process.env.STORAGE_PROVIDER || "local",
       containerName: process.env.AZURE_STORAGE_CONTAINER_NAME || "(not set)",
       // Redacted - only show if configured
-      connectionStringConfigured: Boolean(process.env.AZURE_STORAGE_CONNECTION_STRING),
+      connectionStringConfigured: Boolean(
+        process.env.AZURE_STORAGE_CONNECTION_STRING
+      ),
     };
 
     // Database configuration (redacted)
@@ -130,8 +139,8 @@ function generateConfigHash(
   let hash = 0;
   for (let i = 0; i < configString.length; i++) {
     const char = configString.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32bit integer
   }
-  return Math.abs(hash).toString(16).padStart(8, '0');
+  return Math.abs(hash).toString(16).padStart(8, "0");
 }
