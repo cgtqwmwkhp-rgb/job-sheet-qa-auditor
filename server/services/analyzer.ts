@@ -4,16 +4,25 @@
  * Includes enterprise-grade resilience: retry logic, circuit breaker, correlation tracking
  */
 
-import { invokeLLM, isLLMConfigured, LLMNotConfiguredError } from '../_core/llm';
-import { withResiliency, geminiCircuitBreaker, CircuitBreakerOpenError } from '../utils/resilience';
-import { getCorrelationId, addContextMetadata } from '../utils/context';
-import { redactFindings } from '../utils/piiRedaction';
-import { addToDeadLetterQueue } from '../utils/deadLetterQueue';
+import {
+  invokeLLM,
+  isLLMConfigured,
+  LLMNotConfiguredError,
+} from "../_core/llm";
+import {
+  withResiliency,
+  geminiCircuitBreaker,
+  CircuitBreakerOpenError,
+} from "../utils/resilience";
+import { getCorrelationId, addContextMetadata } from "../utils/context";
+import { redactFindings } from "../utils/piiRedaction";
+import { addToDeadLetterQueue } from "../utils/deadLetterQueue";
+import { isFailClosedEnvironment } from "./templateRegistry/defaultTemplate";
 
 export interface GoldSpecRule {
   id: string;
   field: string;
-  type: 'presence' | 'format' | 'regex' | 'range' | 'enum';
+  type: "presence" | "format" | "regex" | "range" | "enum";
   required: boolean;
   description: string;
   pattern?: string;
@@ -32,8 +41,19 @@ export interface GoldSpec {
 export interface Finding {
   ruleId: string;
   fieldName: string;
-  severity: 'S0' | 'S1' | 'S2' | 'S3';
-  reasonCode: 'MISSING_FIELD' | 'UNREADABLE_FIELD' | 'LOW_CONFIDENCE' | 'INVALID_FORMAT' | 'CONFLICT' | 'OUT_OF_POLICY' | 'INCOMPLETE_EVIDENCE' | 'OCR_FAILURE' | 'PIPELINE_ERROR' | 'SPEC_GAP' | 'SECURITY_RISK';
+  severity: "S0" | "S1" | "S2" | "S3";
+  reasonCode:
+    | "MISSING_FIELD"
+    | "UNREADABLE_FIELD"
+    | "LOW_CONFIDENCE"
+    | "INVALID_FORMAT"
+    | "CONFLICT"
+    | "OUT_OF_POLICY"
+    | "INCOMPLETE_EVIDENCE"
+    | "OCR_FAILURE"
+    | "PIPELINE_ERROR"
+    | "SPEC_GAP"
+    | "SECURITY_RISK";
   rawSnippet: string;
   normalisedSnippet: string;
   confidence: number;
@@ -50,14 +70,17 @@ export interface Finding {
 
 export interface AnalysisResult {
   success: boolean;
-  overallResult: 'PASS' | 'FAIL' | 'REVIEW_QUEUE';
+  overallResult: "PASS" | "FAIL" | "REVIEW_QUEUE";
   score: number;
   findings: Finding[];
-  extractedFields: Record<string, {
-    value: string;
-    confidence: number;
-    pageNumber: number;
-  }>;
+  extractedFields: Record<
+    string,
+    {
+      value: string;
+      confidence: number;
+      pageNumber: number;
+    }
+  >;
   summary: string;
   processingTimeMs: number;
   model: string;
@@ -114,14 +137,18 @@ Name: ${goldSpec.name}
 Version: ${goldSpec.version}
 
 ### Validation Rules:
-${goldSpec.rules.map(rule => `
+${goldSpec.rules
+  .map(
+    rule => `
 - **${rule.id}**: ${rule.field}
   - Type: ${rule.type}
   - Required: ${rule.required}
   - Description: ${rule.description}
-  ${rule.pattern ? `- Pattern: ${rule.pattern}` : ''}
-  ${rule.format ? `- Format: ${rule.format}` : ''}
-`).join('\n')}
+  ${rule.pattern ? `- Pattern: ${rule.pattern}` : ""}
+  ${rule.format ? `- Format: ${rule.format}` : ""}
+`
+  )
+  .join("\n")}
 
 ## Extracted Job Sheet Text (${pageCount} pages):
 ${extractedText}
@@ -142,52 +169,70 @@ Respond with a JSON object containing:
 
   const response = await invokeLLM({
     messages: [
-      { role: 'system', content: ANALYSIS_SYSTEM_PROMPT },
-      { role: 'user', content: userPrompt },
+      { role: "system", content: ANALYSIS_SYSTEM_PROMPT },
+      { role: "user", content: userPrompt },
     ],
     responseFormat: {
-      type: 'json_schema',
+      type: "json_schema",
       json_schema: {
-        name: 'job_sheet_analysis',
+        name: "job_sheet_analysis",
         schema: {
-          type: 'object',
+          type: "object",
           properties: {
-            overallResult: { type: 'string', enum: ['PASS', 'FAIL', 'REVIEW_QUEUE'] },
-            score: { type: 'number' },
+            overallResult: {
+              type: "string",
+              enum: ["PASS", "FAIL", "REVIEW_QUEUE"],
+            },
+            score: { type: "number" },
             findings: {
-              type: 'array',
+              type: "array",
               items: {
-                type: 'object',
+                type: "object",
                 properties: {
-                  ruleId: { type: 'string' },
-                  fieldName: { type: 'string' },
-                  severity: { type: 'string', enum: ['S0', 'S1', 'S2', 'S3'] },
-                  reasonCode: { type: 'string' },
-                  rawSnippet: { type: 'string' },
-                  normalisedSnippet: { type: 'string' },
-                  confidence: { type: 'number' },
-                  pageNumber: { type: 'number' },
-                  whyItMatters: { type: 'string' },
-                  suggestedFix: { type: 'string' },
+                  ruleId: { type: "string" },
+                  fieldName: { type: "string" },
+                  severity: { type: "string", enum: ["S0", "S1", "S2", "S3"] },
+                  reasonCode: { type: "string" },
+                  rawSnippet: { type: "string" },
+                  normalisedSnippet: { type: "string" },
+                  confidence: { type: "number" },
+                  pageNumber: { type: "number" },
+                  whyItMatters: { type: "string" },
+                  suggestedFix: { type: "string" },
                 },
-                required: ['ruleId', 'fieldName', 'severity', 'reasonCode', 'confidence', 'pageNumber', 'whyItMatters', 'suggestedFix'],
+                required: [
+                  "ruleId",
+                  "fieldName",
+                  "severity",
+                  "reasonCode",
+                  "confidence",
+                  "pageNumber",
+                  "whyItMatters",
+                  "suggestedFix",
+                ],
               },
             },
             extractedFields: {
-              type: 'object',
+              type: "object",
               additionalProperties: {
-                type: 'object',
+                type: "object",
                 properties: {
-                  value: { type: 'string' },
-                  confidence: { type: 'number' },
-                  pageNumber: { type: 'number' },
+                  value: { type: "string" },
+                  confidence: { type: "number" },
+                  pageNumber: { type: "number" },
                 },
-                required: ['value', 'confidence', 'pageNumber'],
+                required: ["value", "confidence", "pageNumber"],
               },
             },
-            summary: { type: 'string' },
+            summary: { type: "string" },
           },
-          required: ['overallResult', 'score', 'findings', 'extractedFields', 'summary'],
+          required: [
+            "overallResult",
+            "score",
+            "findings",
+            "extractedFields",
+            "summary",
+          ],
         },
         strict: true,
       },
@@ -195,8 +240,8 @@ Respond with a JSON object containing:
   });
 
   const content = response.choices[0]?.message?.content;
-  if (!content || typeof content !== 'string') {
-    throw new Error('Empty response from LLM');
+  if (!content || typeof content !== "string") {
+    throw new Error("Empty response from LLM");
   }
 
   return { data: JSON.parse(content), model: response.model };
@@ -204,10 +249,10 @@ Respond with a JSON object containing:
 
 /**
  * Analyze job sheet text against a Gold Standard specification with resilience
- * 
- * GRACEFUL DEGRADATION:
- * If LLM API key is not configured, this function returns a rule-based analysis
- * instead of failing. This allows processing to complete without AI insights.
+ *
+ * NO-LLM BEHAVIOR:
+ * - Fail-closed environments: return REVIEW_QUEUE (never auto-PASS without judgment)
+ * - Permissive/dev: rule-based analysis so local processing can complete
  */
 export async function analyzeJobSheet(
   extractedText: string,
@@ -229,19 +274,68 @@ export async function analyzeJobSheet(
     llmConfigured: isLLMConfigured(),
   });
 
-  // GRACEFUL DEGRADATION: If LLM is not configured, use rule-based analysis
+  // NO-LLM BEHAVIOR:
+  // - Fail-closed (staging/production): REVIEW_QUEUE — never auto-PASS without judgment
+  // - Permissive (dev/test): rule-based fallback so local processing can complete
   if (!isLLMConfigured()) {
-    console.warn('[Analyzer] LLM not configured - using rule-based analysis (no AI insights)', {
-      correlationId,
-    });
-    
-    const ruleBasedResult = performRuleBasedAnalysis(extractedText, goldSpec, pageCount);
     const processingTimeMs = Date.now() - startTime;
-    
+
+    if (isFailClosedEnvironment()) {
+      console.warn(
+        "[Analyzer] LLM not configured in fail-closed environment - routing to REVIEW_QUEUE",
+        {
+          correlationId,
+        }
+      );
+
+      return {
+        success: true,
+        overallResult: "REVIEW_QUEUE",
+        score: 0,
+        findings: [
+          {
+            ruleId: "SYSTEM",
+            fieldName: "AI Judgment",
+            severity: "S1",
+            reasonCode: "LOW_CONFIDENCE",
+            rawSnippet: "",
+            normalisedSnippet: "",
+            confidence: 0,
+            pageNumber: 1,
+            whyItMatters:
+              "AI judgment is unavailable. Automatic pass/fail decisions are not permitted in this environment.",
+            suggestedFix:
+              "Configure LLM credentials or complete a manual review.",
+          },
+        ],
+        extractedFields: {},
+        summary:
+          "AI judgment unavailable. Document routed to review queue (fail-closed).",
+        processingTimeMs,
+        model: "no-llm-fail-closed",
+        correlationId,
+        retryAttempts: 0,
+        errorCode: "LLM_NOT_CONFIGURED",
+      };
+    }
+
+    console.warn(
+      "[Analyzer] LLM not configured - using rule-based analysis (no AI insights)",
+      {
+        correlationId,
+      }
+    );
+
+    const ruleBasedResult = performRuleBasedAnalysis(
+      extractedText,
+      goldSpec,
+      pageCount
+    );
+
     return {
       ...ruleBasedResult,
       processingTimeMs,
-      model: 'rule-based-fallback',
+      model: "rule-based-fallback",
       correlationId,
       retryAttempts: 0,
     };
@@ -274,8 +368,8 @@ export async function analyzeJobSheet(
     const sortedFindings = sortFindings(analysisData.findings || []);
 
     // Optionally redact PII from findings
-    const finalFindings = options.redactPII 
-      ? redactFindings(sortedFindings) as Finding[]
+    const finalFindings = options.redactPII
+      ? (redactFindings(sortedFindings) as Finding[])
       : sortedFindings;
 
     console.log(`[Analyzer] Analysis complete`, {
@@ -286,9 +380,9 @@ export async function analyzeJobSheet(
       processingTimeMs,
     });
 
-    addContextMetadata('analysisResult', analysisData.overallResult);
-    addContextMetadata('analysisScore', analysisData.score);
-    addContextMetadata('analysisProcessingMs', processingTimeMs);
+    addContextMetadata("analysisResult", analysisData.overallResult);
+    addContextMetadata("analysisScore", analysisData.score);
+    addContextMetadata("analysisProcessingMs", processingTimeMs);
 
     return {
       success: true,
@@ -298,23 +392,22 @@ export async function analyzeJobSheet(
       extractedFields: analysisData.extractedFields || {},
       summary: analysisData.summary,
       processingTimeMs,
-      model: model || 'gemini-2.5-flash',
+      model: model || "gemini-2.5-flash",
       correlationId,
       retryAttempts,
     };
-
   } catch (error) {
     const processingTimeMs = Date.now() - startTime;
 
     // Handle circuit breaker open
     if (error instanceof CircuitBreakerOpenError) {
-      console.error('[Analyzer] Circuit breaker open', {
+      console.error("[Analyzer] Circuit breaker open", {
         correlationId,
         retryAfterMs: error.retryAfterMs,
       });
 
       if (options.jobSheetId) {
-        addToDeadLetterQueue(options.jobSheetId, 'analysis', error, {
+        addToDeadLetterQueue(options.jobSheetId, "analysis", error, {
           correlationId,
           recoverable: true,
           metadata: { specName: goldSpec.name, circuitBreakerOpen: true },
@@ -322,17 +415,17 @@ export async function analyzeJobSheet(
       }
 
       return createErrorResult(
-        'Analysis service temporarily unavailable. Please try again later.',
-        'CIRCUIT_BREAKER_OPEN',
+        "Analysis service temporarily unavailable. Please try again later.",
+        "CIRCUIT_BREAKER_OPEN",
         processingTimeMs,
         correlationId,
         retryAttempts
       );
     }
 
-    console.error('[Analyzer] Analysis failed after retries', {
+    console.error("[Analyzer] Analysis failed after retries", {
       correlationId,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
       retryAttempts,
       processingTimeMs,
     });
@@ -341,7 +434,7 @@ export async function analyzeJobSheet(
     if (options.jobSheetId) {
       addToDeadLetterQueue(
         options.jobSheetId,
-        'analysis',
+        "analysis",
         error instanceof Error ? error : new Error(String(error)),
         {
           correlationId,
@@ -353,8 +446,8 @@ export async function analyzeJobSheet(
     }
 
     return createErrorResult(
-      error instanceof Error ? error.message : 'Unknown analysis error',
-      'PROCESSING_ERROR',
+      error instanceof Error ? error.message : "Unknown analysis error",
+      "PROCESSING_ERROR",
       processingTimeMs,
       correlationId,
       retryAttempts
@@ -368,16 +461,16 @@ export async function analyzeJobSheet(
  */
 function sortFindings(findings: Finding[]): Finding[] {
   const severityOrder: Record<string, number> = { S0: 0, S1: 1, S2: 2, S3: 3 };
-  
+
   return [...findings].sort((a, b) => {
     // First by severity
     const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
     if (severityDiff !== 0) return severityDiff;
-    
+
     // Then by reason code
     const reasonDiff = a.reasonCode.localeCompare(b.reasonCode);
     if (reasonDiff !== 0) return reasonDiff;
-    
+
     // Finally by field name
     return a.fieldName.localeCompare(b.fieldName);
   });
@@ -395,24 +488,27 @@ function createErrorResult(
 ): AnalysisResult {
   return {
     success: false,
-    overallResult: 'REVIEW_QUEUE',
+    overallResult: "REVIEW_QUEUE",
     score: 0,
-    findings: [{
-      ruleId: 'SYSTEM',
-      fieldName: 'Analysis Pipeline',
-      severity: 'S1',
-      reasonCode: 'PIPELINE_ERROR',
-      rawSnippet: '',
-      normalisedSnippet: '',
-      confidence: 0,
-      pageNumber: 1,
-      whyItMatters: 'The analysis pipeline encountered an error and could not complete validation.',
-      suggestedFix: 'Review the document manually or retry the analysis.',
-    }],
+    findings: [
+      {
+        ruleId: "SYSTEM",
+        fieldName: "Analysis Pipeline",
+        severity: "S1",
+        reasonCode: "PIPELINE_ERROR",
+        rawSnippet: "",
+        normalisedSnippet: "",
+        confidence: 0,
+        pageNumber: 1,
+        whyItMatters:
+          "The analysis pipeline encountered an error and could not complete validation.",
+        suggestedFix: "Review the document manually or retry the analysis.",
+      },
+    ],
     extractedFields: {},
-    summary: 'Analysis failed due to pipeline error.',
+    summary: "Analysis failed due to pipeline error.",
     processingTimeMs,
-    model: 'gemini-2.5-flash',
+    model: "gemini-2.5-flash",
     correlationId,
     retryAttempts,
     error: errorMessage,
@@ -425,83 +521,84 @@ function createErrorResult(
  */
 export function getDefaultGoldSpec(): GoldSpec {
   return {
-    name: 'Standard Maintenance Job Sheet',
-    version: '2.1.0',
+    name: "Standard Maintenance Job Sheet",
+    version: "2.1.0",
     rules: [
       {
-        id: 'R-001',
-        field: 'Customer Signature',
-        type: 'presence',
+        id: "R-001",
+        field: "Customer Signature",
+        type: "presence",
         required: true,
-        description: 'Must contain a valid signature in the customer sign-off box.',
+        description:
+          "Must contain a valid signature in the customer sign-off box.",
       },
       {
-        id: 'R-002',
-        field: 'Date of Service',
-        type: 'format',
-        format: 'DD/MM/YYYY',
+        id: "R-002",
+        field: "Date of Service",
+        type: "format",
+        format: "DD/MM/YYYY",
         required: true,
-        description: 'Date must be present and match the standard format.',
+        description: "Date must be present and match the standard format.",
       },
       {
-        id: 'R-003',
-        field: 'Serial Number',
-        type: 'regex',
-        pattern: '^SN-\\d{5}-[A-Z]{2}$',
+        id: "R-003",
+        field: "Serial Number",
+        type: "regex",
+        pattern: "^SN-\\d{5}-[A-Z]{2}$",
         required: true,
-        description: 'Serial number must match the pattern SN-XXXXX-XX.',
+        description: "Serial number must match the pattern SN-XXXXX-XX.",
       },
       {
-        id: 'R-004',
-        field: 'Technician Name',
-        type: 'presence',
+        id: "R-004",
+        field: "Technician Name",
+        type: "presence",
         required: true,
-        description: 'Technician name must be clearly written.',
+        description: "Technician name must be clearly written.",
       },
       {
-        id: 'R-005',
-        field: 'Work Description',
-        type: 'presence',
+        id: "R-005",
+        field: "Work Description",
+        type: "presence",
         required: true,
-        description: 'Description of work performed must be provided.',
+        description: "Description of work performed must be provided.",
       },
       {
-        id: 'R-006',
-        field: 'Parts Used',
-        type: 'presence',
+        id: "R-006",
+        field: "Parts Used",
+        type: "presence",
         required: false,
-        description: 'List of parts used during service (if applicable).',
+        description: "List of parts used during service (if applicable).",
       },
       {
-        id: 'R-007',
-        field: 'Time In',
-        type: 'format',
-        format: 'HH:MM',
+        id: "R-007",
+        field: "Time In",
+        type: "format",
+        format: "HH:MM",
         required: true,
-        description: 'Start time of service must be recorded.',
+        description: "Start time of service must be recorded.",
       },
       {
-        id: 'R-008',
-        field: 'Time Out',
-        type: 'format',
-        format: 'HH:MM',
+        id: "R-008",
+        field: "Time Out",
+        type: "format",
+        format: "HH:MM",
         required: true,
-        description: 'End time of service must be recorded.',
+        description: "End time of service must be recorded.",
       },
       {
-        id: 'R-009',
-        field: 'Customer Name',
-        type: 'presence',
+        id: "R-009",
+        field: "Customer Name",
+        type: "presence",
         required: true,
-        description: 'Customer name must be clearly identified.',
+        description: "Customer name must be clearly identified.",
       },
       {
-        id: 'R-010',
-        field: 'Job Number',
-        type: 'regex',
-        pattern: '^JOB-\\d{6}$',
+        id: "R-010",
+        field: "Job Number",
+        type: "regex",
+        pattern: "^JOB-\\d{6}$",
         required: true,
-        description: 'Job number must match the pattern JOB-XXXXXX.',
+        description: "Job number must match the pattern JOB-XXXXXX.",
       },
     ],
   };
@@ -519,129 +616,145 @@ export function getAnalyzerCircuitBreakerStatus() {
  */
 export function resetAnalyzerCircuitBreaker() {
   geminiCircuitBreaker.reset();
-  console.log('[Analyzer] Circuit breaker manually reset');
+  console.log("[Analyzer] Circuit breaker manually reset");
 }
 
 /**
  * Rule-based analysis fallback when LLM is not available.
- * 
+ *
  * IMPORTANT: This fallback is intentionally LENIENT because:
  * 1. We cannot do real semantic validation without AI
  * 2. The purpose is to allow processing to complete, not to queue
  * 3. Documents will be marked for human review in the summary
- * 
- * Rules:
+ *
+ * Rules (permissive/dev only — fail-closed uses REVIEW_QUEUE before this runs):
  * - If document has content: PASS (with advisory note)
  * - If document is empty or OCR failed: FAIL
- * - NEVER return REVIEW_QUEUE (defeats the purpose of fallback)
+ * - NEVER return REVIEW_QUEUE from this function (fail-closed path is separate)
  */
 function performRuleBasedAnalysis(
   extractedText: string,
   goldSpec: GoldSpec,
   pageCount: number
-): Omit<AnalysisResult, 'processingTimeMs' | 'model' | 'correlationId' | 'retryAttempts'> {
+): Omit<
+  AnalysisResult,
+  "processingTimeMs" | "model" | "correlationId" | "retryAttempts"
+> {
   const findings: Finding[] = [];
-  const extractedFields: Record<string, { value: string; confidence: number; pageNumber: number }> = {};
+  const extractedFields: Record<
+    string,
+    { value: string; confidence: number; pageNumber: number }
+  > = {};
   const textLower = extractedText.toLowerCase();
-  
+
   // Basic content validation
   const hasContent = extractedText.trim().length > 50;
   const wordCount = extractedText.split(/\s+/).filter(w => w.length > 0).length;
-  
+
   // Track field detection for informational purposes
   let fieldsDetected = 0;
   const fieldsExpected = goldSpec.rules.filter(r => r.required).length;
-  
+
   for (const rule of goldSpec.rules) {
     const fieldLower = rule.field.toLowerCase();
-    
+
     // Simple field detection: look for the field name or related keywords
-    const fieldFound = textLower.includes(fieldLower) || 
-      textLower.includes(fieldLower.split(' ')[0]); // Also check first word
-    
+    const fieldFound =
+      textLower.includes(fieldLower) ||
+      textLower.includes(fieldLower.split(" ")[0]); // Also check first word
+
     // Extract value after field name (simple heuristic)
-    let extractedValue = '';
+    let extractedValue = "";
     if (fieldFound) {
       fieldsDetected++;
       const fieldIndex = textLower.indexOf(fieldLower);
       if (fieldIndex !== -1) {
-        const afterField = extractedText.substring(fieldIndex + rule.field.length, fieldIndex + rule.field.length + 100);
+        const afterField = extractedText.substring(
+          fieldIndex + rule.field.length,
+          fieldIndex + rule.field.length + 100
+        );
         const match = afterField.match(/[:=]?\s*([^\n\r]+)/);
         if (match) {
           extractedValue = match[1].trim().substring(0, 50);
         }
       }
-      
+
       extractedFields[rule.field] = {
-        value: extractedValue || '[detected]',
+        value: extractedValue || "[detected]",
         confidence: 60, // Moderate confidence for rule-based
         pageNumber: 1,
       };
     }
-    
+
     // Only add findings for REQUIRED fields that are completely missing
     // and use S3 (minor) since we can't be certain without AI
     if (rule.required && !fieldFound) {
       findings.push({
         ruleId: rule.id,
         fieldName: rule.field,
-        severity: 'S3', // Minor - we can't be certain without AI
-        reasonCode: 'LOW_CONFIDENCE',
-        rawSnippet: '',
-        normalisedSnippet: '',
+        severity: "S3", // Minor - we can't be certain without AI
+        reasonCode: "LOW_CONFIDENCE",
+        rawSnippet: "",
+        normalisedSnippet: "",
         confidence: 30,
         pageNumber: 1,
         whyItMatters: `Field "${rule.field}" was not detected by rule-based analysis. AI analysis may find it.`,
-        suggestedFix: 'Consider enabling AI analysis for comprehensive validation.',
+        suggestedFix:
+          "Consider enabling AI analysis for comprehensive validation.",
       });
     }
   }
-  
+
   // Calculate a quality score based on content, not rule matching
   // (Rule matching is too strict without semantic understanding)
   let score: number;
-  let overallResult: 'PASS' | 'FAIL' | 'REVIEW_QUEUE';
-  
+  let overallResult: "PASS" | "FAIL" | "REVIEW_QUEUE";
+
   if (!hasContent || wordCount < 10) {
     // Empty or near-empty document
     score = 0;
-    overallResult = 'FAIL';
+    overallResult = "FAIL";
     findings.push({
-      ruleId: 'SYSTEM',
-      fieldName: 'Document Content',
-      severity: 'S1',
-      reasonCode: 'OCR_FAILURE',
-      rawSnippet: '',
-      normalisedSnippet: '',
+      ruleId: "SYSTEM",
+      fieldName: "Document Content",
+      severity: "S1",
+      reasonCode: "OCR_FAILURE",
+      rawSnippet: "",
+      normalisedSnippet: "",
       confidence: 100,
       pageNumber: 1,
-      whyItMatters: 'Document appears to be empty or OCR failed to extract content.',
-      suggestedFix: 'Ensure the document is readable and re-upload.',
+      whyItMatters:
+        "Document appears to be empty or OCR failed to extract content.",
+      suggestedFix: "Ensure the document is readable and re-upload.",
     });
   } else {
     // Document has content - PASS with advisory score
     // Score based on word count and detected fields (informational only)
     const contentScore = Math.min(50, wordCount / 10); // Up to 50 from content
-    const fieldScore = fieldsExpected > 0 
-      ? Math.round((fieldsDetected / fieldsExpected) * 50)
-      : 50; // Up to 50 from fields
+    const fieldScore =
+      fieldsExpected > 0
+        ? Math.round((fieldsDetected / fieldsExpected) * 50)
+        : 50; // Up to 50 from fields
     score = Math.round(contentScore + fieldScore);
-    
+
     // ALWAYS PASS if document has content
     // This is a FALLBACK - we err on the side of allowing processing
-    overallResult = 'PASS';
+    overallResult = "PASS";
   }
-  
-  console.log(`[Analyzer] Rule-based result: ${overallResult}, score: ${score}, ` +
-    `fields: ${fieldsDetected}/${fieldsExpected}, words: ${wordCount}`);
-  
+
+  console.log(
+    `[Analyzer] Rule-based result: ${overallResult}, score: ${score}, ` +
+      `fields: ${fieldsDetected}/${fieldsExpected}, words: ${wordCount}`
+  );
+
   return {
     success: true,
     overallResult,
     score,
     findings: sortFindings(findings),
     extractedFields,
-    summary: `Rule-based analysis completed. ` +
+    summary:
+      `Rule-based analysis completed. ` +
       `Detected ${fieldsDetected}/${fieldsExpected} expected fields. ` +
       `Word count: ${wordCount}. ` +
       `Note: AI analysis unavailable - results are based on pattern matching only. ` +

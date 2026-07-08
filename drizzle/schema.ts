@@ -1,4 +1,14 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, decimal } from "drizzle-orm/mysql-core";
+import {
+  int,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+  json,
+  boolean,
+  decimal,
+} from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -9,7 +19,9 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin", "qa_lead", "technician"]).default("user").notNull(),
+  role: mysqlEnum("role", ["user", "admin", "qa_lead", "technician"])
+    .default("user")
+    .notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -29,7 +41,9 @@ export const goldSpecs = mysqlTable("gold_specs", {
   /** JSON schema defining required fields and validation rules */
   schema: json("schema").notNull(),
   /** Layering: base, client, contract, workType */
-  specType: mysqlEnum("specType", ["base", "client", "contract", "workType"]).default("base").notNull(),
+  specType: mysqlEnum("specType", ["base", "client", "contract", "workType"])
+    .default("base")
+    .notNull(),
   /** Parent spec ID for layered inheritance */
   parentSpecId: int("parentSpecId"),
   isActive: boolean("isActive").default(true).notNull(),
@@ -57,7 +71,15 @@ export const jobSheets = mysqlTable("job_sheets", {
   /** SHA-256 hash for determinism verification */
   fileHash: varchar("fileHash", { length: 64 }),
   /** Processing status */
-  status: mysqlEnum("status", ["pending", "processing", "completed", "failed", "review_queue"]).default("pending").notNull(),
+  status: mysqlEnum("status", [
+    "pending",
+    "processing",
+    "completed",
+    "failed",
+    "review_queue",
+  ])
+    .default("pending")
+    .notNull(),
   /** Technician who submitted the job sheet */
   technicianId: int("technicianId"),
   /** Site/location information */
@@ -81,11 +103,20 @@ export const auditResults = mysqlTable("audit_results", {
   /** Unique run identifier for traceability */
   runId: varchar("runId", { length: 64 }).notNull(),
   /** Overall result */
-  result: mysqlEnum("result", ["pass", "fail", "review_queue", "waived"]).notNull(),
+  result: mysqlEnum("result", [
+    "pass",
+    "fail",
+    "review_queue",
+    "waived",
+  ]).notNull(),
   /** Overall confidence score 0-100 */
   confidenceScore: decimal("confidenceScore", { precision: 5, scale: 2 }),
   /** Document strategy used: EMBEDDED_TEXT, OCR, HYBRID */
-  documentStrategy: mysqlEnum("documentStrategy", ["embedded_text", "ocr", "hybrid"]).notNull(),
+  documentStrategy: mysqlEnum("documentStrategy", [
+    "embedded_text",
+    "ocr",
+    "hybrid",
+  ]).notNull(),
   /** OCR engine version used */
   ocrEngineVersion: varchar("ocrEngineVersion", { length: 32 }),
   /** Pipeline version for reproducibility */
@@ -110,9 +141,17 @@ export const auditFindings = mysqlTable("audit_findings", {
   severity: mysqlEnum("severity", ["S0", "S1", "S2", "S3"]).notNull(),
   /** Reason code from fixed set */
   reasonCode: mysqlEnum("reasonCode", [
-    "MISSING_FIELD", "UNREADABLE_FIELD", "LOW_CONFIDENCE", "INVALID_FORMAT",
-    "CONFLICT", "OUT_OF_POLICY", "INCOMPLETE_EVIDENCE", "OCR_FAILURE",
-    "PIPELINE_ERROR", "SPEC_GAP", "SECURITY_RISK"
+    "MISSING_FIELD",
+    "UNREADABLE_FIELD",
+    "LOW_CONFIDENCE",
+    "INVALID_FORMAT",
+    "CONFLICT",
+    "OUT_OF_POLICY",
+    "INCOMPLETE_EVIDENCE",
+    "OCR_FAILURE",
+    "PIPELINE_ERROR",
+    "SPEC_GAP",
+    "SECURITY_RISK",
   ]).notNull(),
   fieldName: varchar("fieldName", { length: 128 }).notNull(),
   /** Page number where issue was found */
@@ -145,7 +184,15 @@ export const disputes = mysqlTable("disputes", {
   auditFindingId: int("auditFindingId").notNull(),
   /** Technician who raised the dispute */
   raisedBy: int("raisedBy").notNull(),
-  status: mysqlEnum("status", ["open", "under_review", "accepted", "rejected", "escalated"]).default("open").notNull(),
+  status: mysqlEnum("status", [
+    "open",
+    "under_review",
+    "accepted",
+    "rejected",
+    "escalated",
+  ])
+    .default("open")
+    .notNull(),
   /** Technician's explanation */
   reason: text("reason").notNull(),
   /** Supporting evidence URLs */
@@ -200,7 +247,6 @@ export const systemAuditLog = mysqlTable("system_audit_log", {
 export type SystemAuditLog = typeof systemAuditLog.$inferSelect;
 export type InsertSystemAuditLog = typeof systemAuditLog.$inferInsert;
 
-
 /**
  * Processing Settings - configuration for document extraction pipeline
  */
@@ -213,7 +259,14 @@ export const processingSettings = mysqlTable("processing_settings", {
   /** Human-readable description */
   description: text("description"),
   /** Category for grouping in UI */
-  category: mysqlEnum("category", ["extraction", "validation", "performance", "notifications"]).default("extraction").notNull(),
+  category: mysqlEnum("category", [
+    "extraction",
+    "validation",
+    "performance",
+    "notifications",
+  ])
+    .default("extraction")
+    .notNull(),
   /** Last modified by user */
   updatedBy: int("updatedBy"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -244,7 +297,9 @@ export const templates = mysqlTable("templates", {
   /** Work type this template applies to */
   workType: varchar("workType", { length: 128 }),
   /** Template status: draft, active, deprecated, archived */
-  status: mysqlEnum("status", ["draft", "active", "deprecated", "archived"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "active", "deprecated", "archived"])
+    .default("draft")
+    .notNull(),
   /** Description of the template */
   description: text("description"),
   createdBy: int("createdBy").notNull(),
@@ -297,7 +352,11 @@ export const selectionTraces = mysqlTable("selection_traces", {
   /** Selected version ID (null if no selection made) */
   versionId: int("versionId"),
   /** Confidence band: HIGH (>=80), MEDIUM (50-79), LOW (<50) */
-  confidenceBand: mysqlEnum("confidenceBand", ["HIGH", "MEDIUM", "LOW"]).notNull(),
+  confidenceBand: mysqlEnum("confidenceBand", [
+    "HIGH",
+    "MEDIUM",
+    "LOW",
+  ]).notNull(),
   /** Top confidence score (0-100) */
   topScore: decimal("topScore", { precision: 5, scale: 2 }).notNull(),
   /** Runner-up score for ambiguity detection */
@@ -309,7 +368,9 @@ export const selectionTraces = mysqlTable("selection_traces", {
   /** Matched tokens for the selected template */
   tokensJson: json("tokensJson").notNull(),
   /** Whether auto-processing was allowed based on selection */
-  autoProcessingAllowed: boolean("autoProcessingAllowed").default(false).notNull(),
+  autoProcessingAllowed: boolean("autoProcessingAllowed")
+    .default(false)
+    .notNull(),
   /** Reason if auto-processing was blocked */
   blockReason: varchar("blockReason", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -317,3 +378,27 @@ export const selectionTraces = mysqlTable("selection_traces", {
 
 export type SelectionTrace = typeof selectionTraces.$inferSelect;
 export type InsertSelectionTrace = typeof selectionTraces.$inferInsert;
+
+/**
+ * Failed Jobs — durable dead-letter queue for processing failures (PR-3)
+ * Write-through from in-memory DLQ when DATABASE_URL is available.
+ */
+export const failedJobs = mysqlTable("failed_jobs", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  jobSheetId: int("jobSheetId").notNull(),
+  correlationId: varchar("correlationId", { length: 64 }),
+  stage: mysqlEnum("stage", ["upload", "ocr", "analysis", "storage"]).notNull(),
+  errorMessage: text("errorMessage").notNull(),
+  errorCode: varchar("errorCode", { length: 64 }),
+  errorStack: text("errorStack"),
+  attempts: int("attempts").default(1).notNull(),
+  maxAttempts: int("maxAttempts").default(3).notNull(),
+  lastAttemptAt: timestamp("lastAttemptAt").defaultNow().notNull(),
+  metadata: json("metadata"),
+  recoverable: boolean("recoverable").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  resolvedAt: timestamp("resolvedAt"),
+});
+
+export type FailedJobRow = typeof failedJobs.$inferSelect;
+export type InsertFailedJob = typeof failedJobs.$inferInsert;

@@ -11,6 +11,7 @@
  */
 
 import { invokeLLM, isLLMConfigured } from "../_core/llm";
+import { isFailClosedEnvironment } from "./templateRegistry/defaultTemplate";
 import {
   getSuggestedTemplates,
   FALLBACK_SPEC_JSON,
@@ -290,7 +291,10 @@ export async function performHybridAssessment(
     }));
 
     // 4. LLM summary (async, but optional)
-    const llmSummary = await generateLLMSummary(documentText);
+    const llmAvailable = isLLMConfigured();
+    const llmSummary = llmAvailable
+      ? await generateLLMSummary(documentText)
+      : undefined;
 
     // 5. Generate review explanation
     const explanationParts: string[] = [];
@@ -312,6 +316,13 @@ export async function performHybridAssessment(
     if (suggestedTemplates.length > 0) {
       explanationParts.push(
         `Suggested template: ${suggestedTemplates[0].hint}`
+      );
+    }
+
+    // Fail-closed: make it explicit that AI judgment was unavailable
+    if (!llmAvailable && isFailClosedEnvironment()) {
+      explanationParts.push(
+        "AI judgment unavailable (LLM not configured). Manual review required — automated assessment cannot be trusted."
       );
     }
 

@@ -139,7 +139,7 @@ export async function processJobSheetWithOptions(
   let ocrResult: OCRResult;
 
   try {
-    ocrResult = await extractTextFromDocument(documentUrl);
+    ocrResult = await extractTextFromDocument(documentUrl, { jobSheetId });
     stages.push({
       stage: "OCR Text Extraction",
       status: ocrResult.success ? "success" : "failed",
@@ -176,6 +176,85 @@ export async function processJobSheetWithOptions(
     return {
       success: false,
       jobSheetId,
+      ocrResult,
+      processingStages: stages,
+      totalDurationMs: Date.now() - startTime,
+    };
+  }
+
+  // Load processing thresholds (OCR / LLM confidence)
+  const processingSettings = await db.getProcessingSettings();
+
+  // Threshold: low OCR page confidence → review_queue (do not auto-complete)
+  const pageConfidencePrior = computePageConfidencePrior(ocrResult);
+  const ocrThreshold = (processingSettings.ocrConfidenceThreshold ?? 60) / 100;
+  if (
+    typeof pageConfidencePrior === "number" &&
+    pageConfidencePrior < ocrThreshold
+  ) {
+    console.warn(`[DocumentProcessor] OCR confidence below threshold`, {
+      jobSheetId,
+      pageConfidencePrior,
+      ocrThreshold,
+    });
+
+    try {
+      await db.updateJobSheetStatus(jobSheetId, "review_queue");
+    } catch (error) {
+      console.warn(
+        "[DocumentProcessor] Could not update job sheet status:",
+        error
+      );
+    }
+
+    stages.push({
+      stage: "OCR Confidence Gate",
+      status: "failed",
+      durationMs: 0,
+      error: "LOW_OCR_CONFIDENCE",
+    });
+
+    let auditResultId: number | undefined;
+    try {
+      const auditResult = await db.createAuditResult({
+        jobSheetId,
+        goldSpecId: options.goldSpecId || 1,
+        runId,
+        result: "review_queue",
+        confidenceScore: String(Math.round(pageConfidencePrior * 100)),
+        documentStrategy: "ocr",
+        ocrEngineVersion: getOCREngineVersion(ocrResult.model),
+        pipelineVersion: PIPELINE_VERSION,
+        reportJson: {
+          summary:
+            "OCR confidence below configured threshold. Manual review required.",
+          reasonCode: "LOW_OCR_CONFIDENCE",
+          pageConfidencePrior,
+          ocrConfidenceThreshold: processingSettings.ocrConfidenceThreshold,
+          pageCount: ocrResult.totalPages,
+          processingStages: stages,
+        },
+        processingTimeMs: Date.now() - startTime,
+      });
+      auditResultId = auditResult.id;
+    } catch (dbError) {
+      console.error(
+        "[DocumentProcessor] Failed to store low-OCR-confidence result:",
+        dbError
+      );
+      return {
+        success: false,
+        jobSheetId,
+        ocrResult,
+        processingStages: stages,
+        totalDurationMs: Date.now() - startTime,
+      };
+    }
+
+    return {
+      success: true,
+      jobSheetId,
+      auditResultId,
       ocrResult,
       processingStages: stages,
       totalDurationMs: Date.now() - startTime,
@@ -381,9 +460,9 @@ export async function processJobSheetWithOptions(
         // the previous 'VALID' insert would have failed against the NOT NULL
         // enum column at runtime.
 
-        // Return with hybrid assessment data - SUCCESS with partial results
+        // Persist succeeded; overall success follows hybrid assessment outcome
         return {
-          success: true, // Changed: always succeed with partial results
+          success: hybridResult.success,
           jobSheetId,
           auditResultId: auditResult.id,
           ocrResult,
@@ -399,9 +478,8 @@ export async function processJobSheetWithOptions(
           dbError
         );
 
-        // Still return with what we have
         return {
-          success: true,
+          success: false,
           jobSheetId,
           ocrResult,
           selectionResult,
@@ -463,7 +541,11 @@ export async function processJobSheetWithOptions(
     analysisResult = await analyzeJobSheet(
       extractedText,
       spec,
-      ocrResult.totalPages
+      ocrResult.totalPages,
+      {
+        jobSheetId,
+        confidenceThreshold: processingSettings.llmConfidenceThreshold,
+      }
     );
     stages.push({
       stage: "AI Analysis",
@@ -489,6 +571,46 @@ export async function processJobSheetWithOptions(
       durationMs: Date.now() - analysisStartTime,
       error: analysisResult.error,
     });
+  }
+
+  // Threshold: analyzer score below LLM confidence → force review_queue (LOW_LLM_CONFIDENCE)
+  const llmThreshold = processingSettings.llmConfidenceThreshold ?? 70;
+  if (
+    analysisResult.success &&
+    analysisResult.overallResult !== "REVIEW_QUEUE" &&
+    analysisResult.score < llmThreshold
+  ) {
+    console.warn(
+      `[DocumentProcessor] Analyzer score below LLM confidence threshold`,
+      {
+        jobSheetId,
+        score: analysisResult.score,
+        llmThreshold,
+      }
+    );
+    analysisResult = {
+      ...analysisResult,
+      overallResult: "REVIEW_QUEUE",
+      summary:
+        `${analysisResult.summary} ` +
+        `[LOW_LLM_CONFIDENCE] Score ${analysisResult.score} is below confidence threshold ${llmThreshold}; queued for human review.`,
+      findings: [
+        ...analysisResult.findings,
+        {
+          ruleId: "SYSTEM",
+          fieldName: "Overall Confidence",
+          severity: "S2" as const,
+          reasonCode: "LOW_CONFIDENCE" as const,
+          rawSnippet: "",
+          normalisedSnippet: "",
+          confidence: analysisResult.score,
+          pageNumber: 1,
+          whyItMatters: `Analyzer score ${analysisResult.score} is below llmConfidenceThreshold ${llmThreshold}.`,
+          suggestedFix:
+            "Review the document manually before accepting the result.",
+        },
+      ],
+    };
   }
 
   // Stage 3: Store Results
@@ -605,8 +727,12 @@ export async function processJobSheetWithOptions(
     });
   }
 
+  const storageFailed = stages.some(
+    s => s.stage === "Store Results" && s.status === "failed"
+  );
+
   return {
-    success: analysisResult.success,
+    success: analysisResult.success && !storageFailed && !!auditResultId,
     jobSheetId,
     auditResultId,
     ocrResult,
