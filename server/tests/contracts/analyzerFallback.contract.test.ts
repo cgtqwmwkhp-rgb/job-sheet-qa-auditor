@@ -40,7 +40,7 @@ describe("Analyzer Fallback Contract", () => {
 
       // The misleading OPENAI_API_KEY error should be replaced
       expect(llmContent).not.toContain('"OPENAI_API_KEY is not configured"');
-      expect(llmContent).toContain("BUILT_IN_FORGE_API_KEY");
+      expect(llmContent).toContain("GEMINI_API_KEY");
     });
 
     it("should have rule-based analysis fallback that returns valid result", async () => {
@@ -204,12 +204,23 @@ describe("Analyzer Fallback Contract", () => {
   });
 
   describe("Environment Configuration", () => {
-    it("should use BUILT_IN_FORGE_API_KEY for LLM", async () => {
+    it("should use GEMINI_API_KEY for LLM judgment", async () => {
       const envPath = path.resolve(__dirname, "../../_core/env.ts");
       const envContent = fs.readFileSync(envPath, "utf-8");
 
-      expect(envContent).toContain("BUILT_IN_FORGE_API_KEY");
-      expect(envContent).toContain("forgeApiKey");
+      expect(envContent).toContain("GEMINI_API_KEY");
+      expect(envContent).toContain("geminiApiKey");
+      expect(envContent).toContain("judgmentModel");
+    });
+
+    it("should route LLM_PROVIDER=mock without Forge proxy", async () => {
+      const llmPath = path.resolve(__dirname, "../../_core/llm.ts");
+      const llmContent = fs.readFileSync(llmPath, "utf-8");
+
+      expect(llmContent).toContain('LLM_PROVIDER === "mock"');
+      expect(llmContent).not.toContain("forge.manus.im");
+      expect(llmContent).not.toContain("/v1/chat/completions");
+      expect(llmContent).toContain("generativelanguage.googleapis.com");
     });
   });
 });

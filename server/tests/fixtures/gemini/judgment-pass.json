@@ -1,0 +1,12 @@
+{
+  "overallResult": "PASS",
+  "score": 92,
+  "findings": [],
+  "extractedFields": {
+    "Job Number": "JS-12345",
+    "Customer": "Acme Corp",
+    "Engineer": "Jane Doe",
+    "Date": "2026-07-08"
+  },
+  "summary": "Mock judgment: job sheet meets gold-standard requirements."
+}

@@ -535,8 +535,8 @@ export const appRouter = router({
           error: mistralResult.error,
         },
         geminiAnalyzer: {
-          configured: !!process.env.BUILT_IN_FORGE_API_KEY,
-          valid: true, // Forge API is always available
+          configured: !!process.env.GEMINI_API_KEY,
+          valid: !!process.env.GEMINI_API_KEY,
         },
       };
     }),

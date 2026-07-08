@@ -37,16 +37,16 @@ on:
     branches:
       - main
     paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.github/workflows/ci*.yml'
-      - '.github/workflows/parity*.yml'
+      - "**.md"
+      - "docs/**"
+      - ".github/workflows/ci*.yml"
+      - ".github/workflows/parity*.yml"
 
   # Manual deployment trigger
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment'
+        description: "Target environment"
         required: true
         type: choice
         options:
@@ -54,15 +54,15 @@ on:
           - production
         default: staging
       skip_verification:
-        description: 'Skip release verification (NOT recommended)'
+        description: "Skip release verification (NOT recommended)"
         required: false
         type: boolean
         default: false
       deploy_sha:
-        description: 'Specific SHA to deploy (7-40 hex chars, defaults to current HEAD)'
+        description: "Specific SHA to deploy (7-40 hex chars, defaults to current HEAD)"
         required: false
         type: string
-        default: ''
+        default: ""
 
 env:
   NODE_VERSION: "22"
@@ -191,27 +191,27 @@ jobs:
           echo "Target Container App:  ${{ vars.CONTAINER_APP_NAME }}"
           echo "Target URL:            ${{ vars.STAGING_URL }}"
           echo ""
-          
+
           # Fail-fast guardrails
           if [ -z "${{ vars.AZURE_RESOURCE_GROUP }}" ]; then
             echo "❌ FATAL: vars.AZURE_RESOURCE_GROUP is not set in staging environment"
             echo "   Go to: Repository Settings → Environments → staging → Add variable"
             exit 1
           fi
-          
+
           if [ -z "${{ vars.CONTAINER_APP_NAME }}" ]; then
             echo "❌ FATAL: vars.CONTAINER_APP_NAME is not set in staging environment"
             echo "   Go to: Repository Settings → Environments → staging → Add variable"
             exit 1
           fi
-          
+
           if [ -z "${{ vars.STAGING_URL }}" ]; then
             echo "⚠️ WARNING: vars.STAGING_URL is not set - will auto-detect from Azure"
           elif [[ ! "${{ vars.STAGING_URL }}" =~ ^https:// ]]; then
             echo "❌ FATAL: vars.STAGING_URL must start with https://"
             exit 1
           fi
-          
+
           echo "✅ Environment variables validated"
 
       - name: Login to Azure
@@ -273,7 +273,7 @@ jobs:
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "AZURE_STORAGE_CONNECTION_STRING=secretref:azure-storage-connection-string"
           fi
-          
+
           # Set database URL as a secret env var
           if [ -n "${{ secrets.DATABASE_URL }}" ]; then
             az containerapp secret set \
@@ -286,7 +286,7 @@ jobs:
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "DATABASE_URL=secretref:database-url"
           fi
-          
+
           # Set AI API keys (Mistral OCR + Gemini Analysis)
           if [ -n "${{ secrets.MISTRAL_API_KEY }}" ]; then
             az containerapp secret set \
@@ -299,7 +299,7 @@ jobs:
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "MISTRAL_API_KEY=secretref:mistral-api-key"
           fi
-          
+
           if [ -n "${{ secrets.GEMINI_API_KEY }}" ]; then
             az containerapp secret set \
               --name "${{ vars.CONTAINER_APP_NAME }}" \
@@ -310,7 +310,8 @@ jobs:
               --name "${{ vars.CONTAINER_APP_NAME }}" \
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "GEMINI_API_KEY=secretref:gemini-api-key" \
-                "ENABLE_GEMINI_INSIGHTS=true"
+                "ENABLE_GEMINI_INSIGHTS=true" \
+                "JUDGMENT_MODEL=gemini-3.1-pro"
           fi
 
       - name: Get staging URL
@@ -339,7 +340,7 @@ jobs:
         run: |
           APP_URL="${{ steps.get_url.outputs.app_url }}"
           echo "Testing: $APP_URL"
-          
+
           # Test healthz (required)
           HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/healthz" --max-time 30)
           if [[ "$HTTP_CODE" != "200" ]]; then
@@ -348,16 +349,16 @@ jobs:
             exit 1
           fi
           echo "✅ /healthz returned 200"
-          
+
           # Test readyz (REQUIRED - deployment fails if unhealthy)
           HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/readyz" --max-time 30)
           READYZ_BODY=$(curl -sS "$APP_URL/readyz" --max-time 30)
           echo "📋 /readyz response:"
           echo "$READYZ_BODY" | jq . 2>/dev/null || echo "$READYZ_BODY"
-          
+
           # Parse status from response
           READYZ_STATUS=$(echo "$READYZ_BODY" | jq -r '.status // "unknown"' 2>/dev/null || echo "unknown")
-          
+
           if [[ "$HTTP_CODE" != "200" ]] || [[ "$READYZ_STATUS" != "ok" ]]; then
             echo ""
             echo "❌ /readyz FAILED - deployment cannot proceed"
@@ -377,7 +378,7 @@ jobs:
             exit 1
           fi
           echo "✅ /readyz returned 200 with status: ok"
-          
+
           # Test metrics (required per ADR-003)
           HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/metrics" --max-time 30)
           if [[ "$HTTP_CODE" != "200" ]]; then
@@ -411,7 +412,7 @@ jobs:
           echo "Target Resource Group: ${{ vars.AZURE_RESOURCE_GROUP }}"
           echo "Target Container App:  ${{ vars.CONTAINER_APP_NAME }}"
           echo "Target URL:            ${{ vars.STAGING_URL }}"
-          
+
           if [ -z "${{ vars.AZURE_RESOURCE_GROUP }}" ] || [ -z "${{ vars.CONTAINER_APP_NAME }}" ]; then
             echo "❌ FATAL: Environment variables not set"
             exit 1
@@ -450,13 +451,13 @@ jobs:
           fi
           echo "🔗 Using STAGING_URL: $STAGING_URL"
           echo "📌 EXPECTED_SHA (DEPLOY_SHA): $EXPECTED_SHA"
-          
+
           chmod +x scripts/release/smoke-check.sh
           chmod +x scripts/release/monitor-snapshot.sh
-          
+
           # Run smoke checks (soft mode for staging)
           ./scripts/release/smoke-check.sh "$STAGING_URL" "$EXPECTED_SHA" "soft"
-          
+
           # Run monitoring snapshot
           ENVIRONMENT=staging HEALTH_ONLY=false \
             ./scripts/release/monitor-snapshot.sh "$STAGING_URL" "soft" "false"
@@ -466,13 +467,13 @@ jobs:
         run: |
           STAGING_URL="${{ steps.get_url.outputs.staging_url }}"
           mkdir -p logs/release/evidence
-          
+
           echo "Capturing endpoint evidence..."
           curl -sS "$STAGING_URL/healthz" > logs/release/evidence/healthz.json || true
           curl -sS "$STAGING_URL/readyz" > logs/release/evidence/readyz.json || true
           curl -sS "$STAGING_URL/metrics" | head -50 > logs/release/evidence/metrics.txt || true
           curl -sS "$STAGING_URL/api/trpc/system.version" > logs/release/evidence/version.json || true
-          
+
           # Verify SHA match
           DEPLOYED_SHA=$(cat logs/release/evidence/version.json | jq -r '.result.data.gitSha // empty' 2>/dev/null || echo "")
           if [ -n "$DEPLOYED_SHA" ]; then
@@ -489,37 +490,37 @@ jobs:
         run: |
           STAGING_URL="${{ steps.get_url.outputs.staging_url }}"
           mkdir -p logs/release/evidence
-          
+
           echo "=== STAGE D: Static Asset Verification ==="
-          
+
           # 1. Verify manifest.webmanifest is accessible with correct content-type
           echo "Testing manifest.webmanifest..."
           MANIFEST_HEADERS=$(curl -sI "$STAGING_URL/manifest.webmanifest" --max-time 10)
           MANIFEST_STATUS=$(echo "$MANIFEST_HEADERS" | grep -i "^HTTP" | tail -1 | awk '{print $2}')
           MANIFEST_TYPE=$(echo "$MANIFEST_HEADERS" | grep -i "^content-type:" | cut -d: -f2 | tr -d ' \r')
-          
+
           if [[ "$MANIFEST_STATUS" != "200" ]]; then
             echo "❌ manifest.webmanifest returned $MANIFEST_STATUS (expected 200)"
             echo "$MANIFEST_HEADERS"
             exit 1
           fi
           echo "✅ manifest.webmanifest: $MANIFEST_STATUS, $MANIFEST_TYPE"
-          
+
           # 2. Verify assets/*.js chunks are accessible with correct cache headers
           echo "Testing assets JS chunk..."
           # Get any asset from manifest or build
           ASSET_PATH=$(curl -sS "$STAGING_URL/manifest.webmanifest" --max-time 10 2>/dev/null | grep -o '"src":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "")
-          
+
           # If no asset in manifest, try to find from index.html
           if [ -z "$ASSET_PATH" ]; then
             # Since we need auth for index.html, test a known static path pattern
             ASSET_PATH="sw.js"
           fi
-          
+
           ASSET_HEADERS=$(curl -sI "$STAGING_URL/$ASSET_PATH" --max-time 10)
           ASSET_STATUS=$(echo "$ASSET_HEADERS" | grep -i "^HTTP" | tail -1 | awk '{print $2}')
           ASSET_CACHE=$(echo "$ASSET_HEADERS" | grep -i "^cache-control:" | cut -d: -f2 | tr -d '\r')
-          
+
           if [[ "$ASSET_STATUS" != "200" ]]; then
             echo "❌ /$ASSET_PATH returned $ASSET_STATUS (expected 200)"
             echo "   Static assets may be blocked by Azure Easy Auth excludedPaths"
@@ -529,11 +530,11 @@ jobs:
           else
             echo "✅ /$ASSET_PATH: $ASSET_STATUS, Cache-Control:$ASSET_CACHE"
           fi
-          
+
           # 3. Save headers evidence
           echo "$MANIFEST_HEADERS" > logs/release/evidence/manifest-headers.txt
           echo "$ASSET_HEADERS" > logs/release/evidence/asset-headers.txt
-          
+
           echo "=== Static asset verification complete ==="
 
       - name: Upload verification artifacts
@@ -564,27 +565,27 @@ jobs:
           echo "Target Container App:  ${{ vars.CONTAINER_APP_NAME }}"
           echo "Target URL:            ${{ vars.PRODUCTION_URL }}"
           echo ""
-          
+
           # Fail-fast guardrails (STRICT for production)
           if [ -z "${{ vars.AZURE_RESOURCE_GROUP }}" ]; then
             echo "❌ FATAL: vars.AZURE_RESOURCE_GROUP is not set in production environment"
             echo "   Go to: Repository Settings → Environments → production → Add variable"
             exit 1
           fi
-          
+
           if [ -z "${{ vars.CONTAINER_APP_NAME }}" ]; then
             echo "❌ FATAL: vars.CONTAINER_APP_NAME is not set in production environment"
             echo "   Go to: Repository Settings → Environments → production → Add variable"
             exit 1
           fi
-          
+
           if [ -z "${{ vars.PRODUCTION_URL }}" ]; then
             echo "⚠️ WARNING: vars.PRODUCTION_URL is not set - will auto-detect from Azure"
           elif [[ ! "${{ vars.PRODUCTION_URL }}" =~ ^https:// ]]; then
             echo "❌ FATAL: vars.PRODUCTION_URL must start with https://"
             exit 1
           fi
-          
+
           echo "✅ Environment variables validated"
 
       - name: Login to Azure
@@ -646,7 +647,7 @@ jobs:
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "AZURE_STORAGE_CONNECTION_STRING=secretref:azure-storage-connection-string"
           fi
-          
+
           # Set database URL as a secret env var
           if [ -n "${{ secrets.DATABASE_URL }}" ]; then
             az containerapp secret set \
@@ -659,7 +660,7 @@ jobs:
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "DATABASE_URL=secretref:database-url"
           fi
-          
+
           # Set AI API keys (Mistral OCR + Gemini Analysis)
           if [ -n "${{ secrets.MISTRAL_API_KEY }}" ]; then
             az containerapp secret set \
@@ -672,7 +673,7 @@ jobs:
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "MISTRAL_API_KEY=secretref:mistral-api-key"
           fi
-          
+
           if [ -n "${{ secrets.GEMINI_API_KEY }}" ]; then
             az containerapp secret set \
               --name "${{ vars.CONTAINER_APP_NAME }}" \
@@ -683,7 +684,8 @@ jobs:
               --name "${{ vars.CONTAINER_APP_NAME }}" \
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "GEMINI_API_KEY=secretref:gemini-api-key" \
-                "ENABLE_GEMINI_INSIGHTS=true"
+                "ENABLE_GEMINI_INSIGHTS=true" \
+                "JUDGMENT_MODEL=gemini-3.1-pro"
           fi
 
       - name: Get production URL
@@ -712,7 +714,7 @@ jobs:
         run: |
           APP_URL="${{ steps.get_url.outputs.app_url }}"
           echo "Testing: $APP_URL (STRICT mode - all checks must pass)"
-          
+
           # Test all endpoints - ALL must pass for production
           for ENDPOINT in healthz readyz metrics; do
             HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$APP_URL/$ENDPOINT" --max-time 30)
@@ -723,7 +725,7 @@ jobs:
             fi
             echo "✅ /$ENDPOINT returned 200"
           done
-          
+
           # Verify metrics is Prometheus format (ADR-003)
           METRICS_SAMPLE=$(curl -sS "$APP_URL/metrics" --max-time 30 | head -5)
           if ! echo "$METRICS_SAMPLE" | grep -q "^# HELP"; then
@@ -751,7 +753,7 @@ jobs:
           echo "Target Resource Group: ${{ vars.AZURE_RESOURCE_GROUP }}"
           echo "Target Container App:  ${{ vars.CONTAINER_APP_NAME }}"
           echo "Target URL:            ${{ vars.PRODUCTION_URL }}"
-          
+
           if [ -z "${{ vars.AZURE_RESOURCE_GROUP }}" ] || [ -z "${{ vars.CONTAINER_APP_NAME }}" ]; then
             echo "❌ FATAL: Environment variables not set"
             exit 1
@@ -790,13 +792,13 @@ jobs:
           fi
           echo "🔗 Using PRODUCTION_URL: $PRODUCTION_URL"
           echo "📌 EXPECTED_SHA (DEPLOY_SHA): $EXPECTED_SHA"
-          
+
           chmod +x scripts/release/smoke-check.sh
           chmod +x scripts/release/monitor-snapshot.sh
-          
+
           # Run smoke checks (STRICT mode for production)
           ./scripts/release/smoke-check.sh "$PRODUCTION_URL" "$EXPECTED_SHA" "strict"
-          
+
           # Run monitoring snapshot (STRICT mode, metrics REQUIRED)
           ENVIRONMENT=production HEALTH_ONLY=false \
             ./scripts/release/monitor-snapshot.sh "$PRODUCTION_URL" "strict" "false"
@@ -806,23 +808,23 @@ jobs:
         run: |
           PRODUCTION_URL="${{ steps.get_url.outputs.production_url }}"
           mkdir -p logs/release/evidence
-          
+
           echo "Capturing endpoint evidence..."
           curl -sS "$PRODUCTION_URL/healthz" > logs/release/evidence/healthz.json || true
           curl -sS "$PRODUCTION_URL/readyz" > logs/release/evidence/readyz.json || true
           curl -sS "$PRODUCTION_URL/metrics" | head -50 > logs/release/evidence/metrics.txt || true
           curl -sS "$PRODUCTION_URL/api/trpc/system.version" > logs/release/evidence/version.json || true
-          
+
           # Verify SHA match (STRICT for production)
           DEPLOYED_SHA=$(cat logs/release/evidence/version.json | jq -r '.result.data.gitSha // empty' 2>/dev/null || echo "")
           if [ -z "$DEPLOYED_SHA" ]; then
             echo "❌ FATAL: Could not retrieve deployed SHA"
             exit 1
           fi
-          
+
           echo "Deployed SHA: $DEPLOYED_SHA"
           echo "Expected SHA: $EXPECTED_SHA"
-          
+
           if [ "$DEPLOYED_SHA" != "$EXPECTED_SHA" ]; then
             echo "❌ FATAL: SHA mismatch - deployment verification failed"
             exit 1
@@ -833,15 +835,15 @@ jobs:
         run: |
           PRODUCTION_URL="${{ steps.get_url.outputs.production_url }}"
           mkdir -p logs/release/evidence
-          
+
           echo "=== STAGE D: Static Asset Verification (STRICT) ==="
-          
+
           # 1. Verify manifest.webmanifest is accessible (MUST pass)
           echo "Testing manifest.webmanifest..."
           MANIFEST_HEADERS=$(curl -sI "$PRODUCTION_URL/manifest.webmanifest" --max-time 10)
           MANIFEST_STATUS=$(echo "$MANIFEST_HEADERS" | grep -i "^HTTP" | tail -1 | awk '{print $2}')
           MANIFEST_TYPE=$(echo "$MANIFEST_HEADERS" | grep -i "^content-type:" | cut -d: -f2 | tr -d ' \r')
-          
+
           if [[ "$MANIFEST_STATUS" != "200" ]]; then
             echo "❌ FATAL: manifest.webmanifest returned $MANIFEST_STATUS (expected 200)"
             echo "   This indicates Azure Easy Auth excludedPaths is misconfigured"
@@ -849,26 +851,26 @@ jobs:
             exit 1
           fi
           echo "✅ manifest.webmanifest: $MANIFEST_STATUS, $MANIFEST_TYPE"
-          
+
           # 2. Verify sw.js (service worker) is accessible
           echo "Testing service worker..."
           SW_HEADERS=$(curl -sI "$PRODUCTION_URL/sw.js" --max-time 10)
           SW_STATUS=$(echo "$SW_HEADERS" | grep -i "^HTTP" | tail -1 | awk '{print $2}')
           SW_CACHE=$(echo "$SW_HEADERS" | grep -i "^cache-control:" | cut -d: -f2 | tr -d '\r')
-          
+
           if [[ "$SW_STATUS" != "200" ]]; then
             echo "❌ FATAL: sw.js returned $SW_STATUS (expected 200)"
             echo "$SW_HEADERS"
             exit 1
           fi
           echo "✅ sw.js: $SW_STATUS, Cache-Control:$SW_CACHE"
-          
+
           # 3. Verify images are accessible
           echo "Testing images..."
           IMG_HEADERS=$(curl -sI "$PRODUCTION_URL/images/audit-icon.png" --max-time 10)
           IMG_STATUS=$(echo "$IMG_HEADERS" | grep -i "^HTTP" | tail -1 | awk '{print $2}')
           IMG_TYPE=$(echo "$IMG_HEADERS" | grep -i "^content-type:" | cut -d: -f2 | tr -d ' \r')
-          
+
           if [[ "$IMG_STATUS" != "200" ]]; then
             echo "❌ FATAL: images/audit-icon.png returned $IMG_STATUS (expected 200)"
             echo "$IMG_HEADERS"
@@ -879,12 +881,12 @@ jobs:
             exit 1
           fi
           echo "✅ images/audit-icon.png: $IMG_STATUS, $IMG_TYPE"
-          
+
           # Save headers evidence
           echo "$MANIFEST_HEADERS" > logs/release/evidence/manifest-headers.txt
           echo "$SW_HEADERS" > logs/release/evidence/sw-headers.txt
           echo "$IMG_HEADERS" > logs/release/evidence/image-headers.txt
-          
+
           echo "=== Static asset verification PASSED (STRICT) ==="
 
       - name: Upload verification artifacts

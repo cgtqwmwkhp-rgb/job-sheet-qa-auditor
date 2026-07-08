@@ -1,4 +1,5 @@
 import { ENV } from "./env";
+import { getMockLlmResponse } from "./mockLlm";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -19,7 +20,12 @@ export type FileContent = {
   type: "file_url";
   file_url: {
     url: string;
-    mime_type?: "audio/mpeg" | "audio/wav" | "application/pdf" | "audio/mp4" | "video/mp4" ;
+    mime_type?:
+      | "audio/mpeg"
+      | "audio/wav"
+      | "application/pdf"
+      | "audio/mp4"
+      | "video/mp4";
   };
 };
 
@@ -110,109 +116,31 @@ export type ResponseFormat =
   | { type: "json_object" }
   | { type: "json_schema"; json_schema: JsonSchema };
 
+const GEMINI_API_ENDPOINT =
+  "https://generativelanguage.googleapis.com/v1beta/models";
+
 const ensureArray = (
   value: MessageContent | MessageContent[]
 ): MessageContent[] => (Array.isArray(value) ? value : [value]);
 
-const normalizeContentPart = (
-  part: MessageContent
-): TextContent | ImageContent | FileContent => {
+const contentPartToText = (part: MessageContent): string => {
   if (typeof part === "string") {
-    return { type: "text", text: part };
+    return part;
   }
-
   if (part.type === "text") {
-    return part;
+    return part.text;
   }
-
   if (part.type === "image_url") {
-    return part;
+    return `[image: ${part.image_url.url}]`;
   }
-
   if (part.type === "file_url") {
-    return part;
+    return `[file: ${part.file_url.url}]`;
   }
-
-  throw new Error("Unsupported message content part");
+  return JSON.stringify(part);
 };
 
-const normalizeMessage = (message: Message) => {
-  const { role, name, tool_call_id } = message;
-
-  if (role === "tool" || role === "function") {
-    const content = ensureArray(message.content)
-      .map(part => (typeof part === "string" ? part : JSON.stringify(part)))
-      .join("\n");
-
-    return {
-      role,
-      name,
-      tool_call_id,
-      content,
-    };
-  }
-
-  const contentParts = ensureArray(message.content).map(normalizeContentPart);
-
-  // If there's only text content, collapse to a single string for compatibility
-  if (contentParts.length === 1 && contentParts[0].type === "text") {
-    return {
-      role,
-      name,
-      content: contentParts[0].text,
-    };
-  }
-
-  return {
-    role,
-    name,
-    content: contentParts,
-  };
-};
-
-const normalizeToolChoice = (
-  toolChoice: ToolChoice | undefined,
-  tools: Tool[] | undefined
-): "none" | "auto" | ToolChoiceExplicit | undefined => {
-  if (!toolChoice) return undefined;
-
-  if (toolChoice === "none" || toolChoice === "auto") {
-    return toolChoice;
-  }
-
-  if (toolChoice === "required") {
-    if (!tools || tools.length === 0) {
-      throw new Error(
-        "tool_choice 'required' was provided but no tools were configured"
-      );
-    }
-
-    if (tools.length > 1) {
-      throw new Error(
-        "tool_choice 'required' needs a single tool or specify the tool name explicitly"
-      );
-    }
-
-    return {
-      type: "function",
-      function: { name: tools[0].function.name },
-    };
-  }
-
-  if ("name" in toolChoice) {
-    return {
-      type: "function",
-      function: { name: toolChoice.name },
-    };
-  }
-
-  return toolChoice;
-};
-
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
+const messageToText = (message: Message): string =>
+  ensureArray(message.content).map(contentPartToText).join("\n");
 
 /**
  * Custom error for missing LLM API key configuration.
@@ -220,23 +148,37 @@ const resolveApiUrl = () =>
  */
 export class LLMNotConfiguredError extends Error {
   constructor() {
-    super("LLM API key not configured (BUILT_IN_FORGE_API_KEY)");
+    super("LLM API key not configured (GEMINI_API_KEY)");
     this.name = "LLMNotConfiguredError";
   }
 }
 
 /**
- * Check if LLM is configured and available
+ * Check if LLM (judgment) is configured and available.
+ * Reads process.env live so tests can toggle the key without module reload.
  */
 export function isLLMConfigured(): boolean {
-  return Boolean(ENV.forgeApiKey && ENV.forgeApiKey.trim().length > 0);
+  return Boolean(process.env.GEMINI_API_KEY?.trim());
 }
 
 const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
+  if (process.env.LLM_PROVIDER === "mock") {
+    return;
+  }
+  if (!process.env.GEMINI_API_KEY?.trim()) {
     throw new LLMNotConfiguredError();
   }
 };
+
+function resolveJudgmentModel(): string {
+  return (
+    process.env.JUDGMENT_MODEL?.trim() || ENV.judgmentModel || "gemini-3.1-pro"
+  );
+}
+
+function resolveGeminiApiKey(): string {
+  return process.env.GEMINI_API_KEY?.trim() || ENV.geminiApiKey || "";
+}
 
 const normalizeResponseFormat = ({
   responseFormat,
@@ -283,58 +225,174 @@ const normalizeResponseFormat = ({
   };
 };
 
-export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  assertApiKey();
+/**
+ * Strip OpenAI-style JSON Schema keywords Gemini responseSchema rejects.
+ */
+function sanitizeSchemaForGemini(
+  schema: Record<string, unknown>
+): Record<string, unknown> {
+  const clone = JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
 
-  const {
-    messages,
-    tools,
-    toolChoice,
-    tool_choice,
-    outputSchema,
-    output_schema,
-    responseFormat,
-    response_format,
-  } = params;
-
-  const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
-    messages: messages.map(normalizeMessage),
+  const walk = (node: unknown): void => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    const obj = node as Record<string, unknown>;
+    delete obj.$schema;
+    delete obj.additionalProperties;
+    delete obj.strict;
+    for (const value of Object.values(obj)) {
+      walk(value);
+    }
   };
 
-  if (tools && tools.length > 0) {
-    payload.tools = tools;
+  walk(clone);
+  return clone;
+}
+
+function buildGeminiContents(messages: Message[]): {
+  systemInstruction?: { parts: Array<{ text: string }> };
+  contents: Array<{ role: string; parts: Array<{ text: string }> }>;
+} {
+  const systemParts: string[] = [];
+  const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+
+  for (const message of messages) {
+    if (message.role === "system") {
+      systemParts.push(messageToText(message));
+      continue;
+    }
+
+    // Gemini uses "user" | "model" (not "assistant")
+    const role = message.role === "assistant" ? "model" : "user";
+
+    contents.push({
+      role,
+      parts: [{ text: messageToText(message) }],
+    });
   }
 
-  const normalizedToolChoice = normalizeToolChoice(
-    toolChoice || tool_choice,
-    tools
-  );
-  if (normalizedToolChoice) {
-    payload.tool_choice = normalizedToolChoice;
+  return {
+    systemInstruction:
+      systemParts.length > 0
+        ? { parts: [{ text: systemParts.join("\n\n") }] }
+        : undefined,
+    contents,
+  };
+}
+
+function buildGenerationConfig(
+  params: InvokeParams,
+  normalizedFormat:
+    | { type: "json_schema"; json_schema: JsonSchema }
+    | { type: "text" }
+    | { type: "json_object" }
+    | undefined
+): Record<string, unknown> {
+  const maxTokens = params.maxTokens ?? params.max_tokens ?? 32768;
+  const generationConfig: Record<string, unknown> = {
+    maxOutputTokens: maxTokens,
+    temperature: 0.2,
+  };
+
+  if (normalizedFormat?.type === "json_schema") {
+    generationConfig.responseMimeType = "application/json";
+    generationConfig.responseSchema = sanitizeSchemaForGemini(
+      normalizedFormat.json_schema.schema
+    );
+  } else if (normalizedFormat?.type === "json_object") {
+    generationConfig.responseMimeType = "application/json";
   }
 
-  payload.max_tokens = 32768
-  payload.thinking = {
-    "budget_tokens": 128
+  return generationConfig;
+}
+
+function mapGeminiResponseToInvokeResult(
+  data: Record<string, unknown>,
+  model: string
+): InvokeResult {
+  const candidates = data.candidates as
+    | Array<{
+        content?: { parts?: Array<{ text?: string }> };
+        finishReason?: string;
+      }>
+    | undefined;
+  const text =
+    candidates?.[0]?.content?.parts
+      ?.map(p => p.text ?? "")
+      .join("")
+      .trim() ?? "";
+
+  if (!text) {
+    throw new Error("Empty response from Gemini");
   }
 
-  const normalizedResponseFormat = normalizeResponseFormat({
-    responseFormat,
-    response_format,
-    outputSchema,
-    output_schema,
-  });
+  const usageMetadata = data.usageMetadata as
+    | {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+        totalTokenCount?: number;
+      }
+    | undefined;
 
-  if (normalizedResponseFormat) {
-    payload.response_format = normalizedResponseFormat;
+  return {
+    id: `gemini-${Date.now()}`,
+    created: Math.floor(Date.now() / 1000),
+    model,
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: "assistant",
+          content: text,
+        },
+        finish_reason: candidates?.[0]?.finishReason?.toLowerCase() ?? "stop",
+      },
+    ],
+    usage: usageMetadata
+      ? {
+          prompt_tokens: usageMetadata.promptTokenCount ?? 0,
+          completion_tokens: usageMetadata.candidatesTokenCount ?? 0,
+          total_tokens: usageMetadata.totalTokenCount ?? 0,
+        }
+      : undefined,
+  };
+}
+
+async function invokeGeminiDirect(params: InvokeParams): Promise<InvokeResult> {
+  assertApiKey();
+
+  const model = resolveJudgmentModel();
+  const apiKey = resolveGeminiApiKey();
+  const url = `${GEMINI_API_ENDPOINT}/${model}:generateContent?key=${apiKey}`;
+
+  const normalizedFormat = normalizeResponseFormat(params);
+  const { systemInstruction, contents } = buildGeminiContents(params.messages);
+
+  if (contents.length === 0) {
+    throw new Error("invokeLLM requires at least one non-system message");
   }
 
-  const response = await fetch(resolveApiUrl(), {
+  const payload: Record<string, unknown> = {
+    contents,
+    generationConfig: buildGenerationConfig(params, normalizedFormat),
+  };
+
+  if (systemInstruction) {
+    payload.systemInstruction = systemInstruction;
+  }
+
+  // Tools are not used by current judgment callers; ignore if present.
+  void params.tools;
+  void params.toolChoice;
+  void params.tool_choice;
+
+  const response = await fetch(url, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
     },
     body: JSON.stringify(payload),
   });
@@ -346,5 +404,19 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     );
   }
 
-  return (await response.json()) as InvokeResult;
+  const data = (await response.json()) as Record<string, unknown>;
+  return mapGeminiResponseToInvokeResult(data, model);
+}
+
+/**
+ * Invoke the judgment LLM.
+ * - LLM_PROVIDER=mock → deterministic fixture (no network)
+ * - otherwise → direct Google Gemini generateContent
+ */
+export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  if (process.env.LLM_PROVIDER === "mock") {
+    return getMockLlmResponse(params);
+  }
+
+  return invokeGeminiDirect(params);
 }
