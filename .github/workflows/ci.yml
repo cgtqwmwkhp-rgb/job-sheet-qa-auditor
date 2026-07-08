@@ -347,8 +347,26 @@ jobs:
         # Note: Lint is blocking for errors only; warnings are allowed
         # This catches errors but allows incremental cleanup of warnings
 
-      - name: Check formatting
-        run: pnpm format --check
+      - name: Check formatting (changed files only)
+        # The repo is not yet fully Prettier-formatted, so we enforce formatting
+        # incrementally: only files changed on this branch must be clean. Local
+        # commits are auto-formatted by the lint-staged pre-commit hook.
+        # (Previously ran `pnpm format --check`, which resolved to
+        # `prettier --write . --check` — a no-op that silently reformatted and
+        # always passed.)
+        run: |
+          BASE_REF="${{ github.base_ref }}"
+          if [ -z "$BASE_REF" ]; then BASE_REF="main"; fi
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          CHANGED=$(git diff --name-only --diff-filter=ACMR "origin/$BASE_REF" HEAD \
+            | grep -E '\.(ts|tsx|js|jsx|json|jsonc|md|css|scss|html|yaml|yml)$' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "No changed files require formatting checks."
+            exit 0
+          fi
+          echo "Checking Prettier formatting on changed files:"
+          echo "$CHANGED"
+          echo "$CHANGED" | xargs npx prettier --check
 
   # Docker Build Gate (BLOCKING)
   # Ensures the production container can be built successfully
@@ -414,13 +432,13 @@ jobs:
             -e DATABASE_URL="" \
             -e STORAGE_PROVIDER=local \
             job-sheet-qa-auditor:${{ github.sha }}
-          
+
           # Wait for container to start
           sleep 10
-          
+
           # Test healthz endpoint
           curl -sf http://localhost:3000/healthz | jq .
-          
+
           # Cleanup
           docker stop jsqa-test
           docker rm jsqa-test

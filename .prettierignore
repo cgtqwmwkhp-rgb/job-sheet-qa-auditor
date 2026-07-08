@@ -11,6 +11,13 @@ build/
 *.tsbuildinfo
 coverage/
 
+# Test & report artifacts (generated, not source)
+test-results/
+playwright-report/
+visual-regression-report/
+visual-regression-results/
+load-tests/results/
+
 # Package files
 package-lock.json
 pnpm-lock.yaml
