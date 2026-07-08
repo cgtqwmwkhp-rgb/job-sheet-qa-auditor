@@ -170,11 +170,43 @@ export const auditFindings = mysqlTable("audit_findings", {
   whyItMatters: text("whyItMatters"),
   /** Suggested fix action */
   suggestedFix: text("suggestedFix"),
+  /**
+   * PR-10: reviewer resolution on this finding.
+   * open = unresolved; waived/overridden/flagged/approved = action applied.
+   */
+  resolutionStatus: mysqlEnum("resolutionStatus", [
+    "open",
+    "waived",
+    "overridden",
+    "flagged",
+    "approved",
+  ])
+    .default("open")
+    .notNull(),
+  /** Reason captured with the resolution action */
+  resolutionReason: text("resolutionReason"),
+  /** User who applied the resolution */
+  resolvedBy: int("resolvedBy"),
+  resolvedAt: timestamp("resolvedAt"),
+  /** Prior status for soft-undo */
+  previousResolutionStatus: mysqlEnum("previousResolutionStatus", [
+    "open",
+    "waived",
+    "overridden",
+    "flagged",
+    "approved",
+  ]),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type AuditFinding = typeof auditFindings.$inferSelect;
 export type InsertAuditFinding = typeof auditFindings.$inferInsert;
+export type FindingResolutionStatus =
+  | "open"
+  | "waived"
+  | "overridden"
+  | "flagged"
+  | "approved";
 
 /**
  * Disputes - technician challenges to audit findings

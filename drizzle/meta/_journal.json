@@ -36,6 +36,13 @@
       "when": 1767980000000,
       "tag": "0004_failed_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1767981000000,
+      "tag": "0005_audit_finding_resolution",
+      "breakpoints": true
     }
   ]
 }

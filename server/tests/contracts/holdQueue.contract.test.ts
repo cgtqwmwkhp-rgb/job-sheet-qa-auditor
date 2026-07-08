@@ -48,7 +48,7 @@ describe('Hold Queue Contract', () => {
     });
 
     it('should filter by review_queue status', () => {
-      expect(holdQueueContent).toContain("status: 'review_queue'");
+      expect(holdQueueContent).toMatch(/status:\s*['"]review_queue['"]/);
     });
   });
 
