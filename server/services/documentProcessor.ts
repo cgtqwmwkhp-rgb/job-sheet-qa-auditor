@@ -43,6 +43,13 @@ import {
   computePageConfidencePrior,
   hasOcrSignatureEvidence,
 } from "./ocrFindingEnrichment";
+import {
+  runEnsembleExtraction,
+  buildEnsembleReviewFindings,
+  mergeExtractedFields,
+  isEnsembleExtractionEnabled,
+  type EnsembleAdapterResult,
+} from "./ensembleExtraction";
 import * as db from "../db";
 import { v4 as uuidv4 } from "uuid";
 
@@ -83,7 +90,7 @@ export interface ProcessingOptions {
   useLegacyPath?: boolean;
 }
 
-const PIPELINE_VERSION = "2.0.0"; // Updated for template system
+const PIPELINE_VERSION = "2.1.0"; // PR-8: ensemble extraction stage
 
 /**
  * Process a job sheet document through the full pipeline
@@ -547,6 +554,51 @@ export async function processJobSheetWithOptions(
     }
   }
 
+  // =========================================================================
+  // Stage 1.75: Ensemble Extraction (PR-8) — FULL path only
+  // Non-fatal: failures are logged and the pipeline continues to analyzer.
+  // Never sets overallResult PASS on its own (preserves PR-3 fail-closed).
+  // =========================================================================
+  const ensembleStartTime = Date.now();
+  let ensembleResult: EnsembleAdapterResult | null = null;
+
+  if (isEnsembleExtractionEnabled()) {
+    try {
+      ensembleResult = await runEnsembleExtraction(extractedText, {
+        filename: `job-sheet-${jobSheetId}`,
+        settings: processingSettings,
+        useLlm: processingSettings.llmFallbackEnabled,
+        extractionMethod: "OCR",
+      });
+      stages.push({
+        stage: "Ensemble Extraction",
+        status: ensembleResult ? "success" : "failed",
+        durationMs: Date.now() - ensembleStartTime,
+        error: ensembleResult ? undefined : "Ensemble returned null",
+      });
+    } catch (ensembleError) {
+      console.warn(
+        "[DocumentProcessor] Ensemble extraction failed (non-fatal):",
+        ensembleError
+      );
+      stages.push({
+        stage: "Ensemble Extraction",
+        status: "failed",
+        durationMs: Date.now() - ensembleStartTime,
+        error:
+          ensembleError instanceof Error
+            ? ensembleError.message
+            : "Ensemble extraction failed",
+      });
+    }
+  } else {
+    stages.push({
+      stage: "Ensemble Extraction",
+      status: "skipped",
+      durationMs: Date.now() - ensembleStartTime,
+    });
+  }
+
   // Stage 2: AI Analysis
   const analysisStartTime = Date.now();
   let analysisResult: AnalysisResult;
@@ -627,6 +679,38 @@ export async function processJobSheetWithOptions(
     };
   }
 
+  // Ensemble consensus → review_queue on CONFLICT / low confidence required fields
+  // Does not override FAIL; never promotes to PASS.
+  if (
+    ensembleResult?.reviewSignals.reviewRequired &&
+    analysisResult.overallResult !== "FAIL"
+  ) {
+    const ensembleFindings = buildEnsembleReviewFindings(
+      ensembleResult.reviewSignals,
+      ensembleResult.artifact.fieldDetails,
+      llmThreshold
+    );
+    const reasonTags = [
+      ...ensembleResult.reviewSignals.conflictFields.map(
+        () => "ENSEMBLE_CONFLICT"
+      ),
+      ...ensembleResult.reviewSignals.lowConfidenceFields.map(
+        () => "ENSEMBLE_LOW_CONFIDENCE"
+      ),
+      ...ensembleResult.reviewSignals.missingRequired.map(
+        () => "ENSEMBLE_MISSING_REQUIRED"
+      ),
+    ];
+    analysisResult = {
+      ...analysisResult,
+      overallResult: "REVIEW_QUEUE",
+      summary:
+        `${analysisResult.summary} ` +
+        `[ENSEMBLE] Consensus review required (${reasonTags.join(", ")}).`,
+      findings: [...analysisResult.findings, ...ensembleFindings],
+    };
+  }
+
   // Stage 3: Store Results
   const storageStartTime = Date.now();
   let auditResultId: number | undefined;
@@ -670,9 +754,17 @@ export async function processJobSheetWithOptions(
       reportJson: {
         summary: analysisResult.summary,
         extractedText,
-        extractedFields: analysisResult.extractedFields,
+        extractedFields: ensembleResult
+          ? mergeExtractedFields(
+              analysisResult.extractedFields,
+              ensembleResult.ensembleExtractedFields
+            )
+          : analysisResult.extractedFields,
         pageCount: ocrResult.totalPages,
         processingStages: stages,
+        ...(ensembleResult
+          ? { ensembleExtraction: ensembleResult.artifact }
+          : {}),
         ...ocrResilienceReportFields(ocrResult),
       },
       processingTimeMs: Date.now() - startTime,
