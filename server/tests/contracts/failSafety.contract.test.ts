@@ -62,8 +62,10 @@ describe("Fail-Safety Contract (PR-3)", () => {
   beforeEach(() => {
     clearDeadLetterQueue();
     clearAllRateLimits();
+    delete process.env.GEMINI_API_KEY;
     delete process.env.BUILT_IN_FORGE_API_KEY;
     delete process.env.OPENAI_API_KEY;
+    delete process.env.LLM_PROVIDER;
     delete process.env.APP_ENV;
     process.env.NODE_ENV = "test";
   });

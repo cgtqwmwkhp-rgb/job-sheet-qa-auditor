@@ -310,7 +310,8 @@ jobs:
               --name "${{ vars.CONTAINER_APP_NAME }}" \
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "GEMINI_API_KEY=secretref:gemini-api-key" \
-                "ENABLE_GEMINI_INSIGHTS=true"
+                "ENABLE_GEMINI_INSIGHTS=true" \
+                "JUDGMENT_MODEL=gemini-3.1-pro"
           fi
 
       - name: Get staging URL
@@ -683,7 +684,8 @@ jobs:
               --name "${{ vars.CONTAINER_APP_NAME }}" \
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "GEMINI_API_KEY=secretref:gemini-api-key" \
-                "ENABLE_GEMINI_INSIGHTS=true"
+                "ENABLE_GEMINI_INSIGHTS=true" \
+                "JUDGMENT_MODEL=gemini-3.1-pro"
           fi
 
       - name: Get production URL

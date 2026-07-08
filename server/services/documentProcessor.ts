@@ -3,7 +3,7 @@
  * Orchestrates the full document processing pipeline:
  * 1. Mistral OCR for text extraction
  * 2. Template selection (SSOT - templates only)
- * 3. Gemini 2.5 for analysis against Gold Standard
+ * 3. Gemini 3.1 Pro for analysis against Gold Standard
  * 4. Result storage and audit trail
  *
  * PR-1: SSOT ENFORCEMENT
@@ -576,7 +576,7 @@ export async function processJobSheetWithOptions(
       extractedFields: {},
       summary: "Analysis failed",
       processingTimeMs: Date.now() - analysisStartTime,
-      model: "gemini-2.5-flash",
+      model: "gemini-3.1-pro",
       error: error instanceof Error ? error.message : "Analysis failed",
     };
     stages.push({

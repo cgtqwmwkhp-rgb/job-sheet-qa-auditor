@@ -392,7 +392,7 @@ export async function analyzeJobSheet(
       extractedFields: analysisData.extractedFields || {},
       summary: analysisData.summary,
       processingTimeMs,
-      model: model || "gemini-2.5-flash",
+      model: model || "gemini-3.1-pro",
       correlationId,
       retryAttempts,
     };
@@ -508,7 +508,7 @@ function createErrorResult(
     extractedFields: {},
     summary: "Analysis failed due to pipeline error.",
     processingTimeMs,
-    model: "gemini-2.5-flash",
+    model: "gemini-3.1-pro",
     correlationId,
     retryAttempts,
     error: errorMessage,
