@@ -126,32 +126,10 @@ export const FALLBACK_SPEC_JSON: SpecJson = {
       aliases: ['Description', 'Work Performed', 'Summary'],
     },
   ],
-  validationRules: [
-    {
-      id: 'GEN-001',
-      name: 'Document has readable content',
-      description: 'At least some text was extracted from the document',
-      rule: 'extractedFieldCount >= 1',
-      severity: 'S2',
-      reasonCode: 'OCR_FAILURE',
-    },
-    {
-      id: 'GEN-002',
-      name: 'Basic identification present',
-      description: 'Document has at least a date OR job reference OR asset identifier',
-      rule: 'hasJobReference OR hasDate OR hasAssetIdentifier',
-      severity: 'S2',
-      reasonCode: 'MISSING_FIELD',
-    },
-    {
-      id: 'GEN-003',
-      name: 'OCR confidence acceptable',
-      description: 'Overall OCR confidence is above minimum threshold',
-      rule: 'ocrConfidence >= 0.5',
-      severity: 'S2',
-      reasonCode: 'LOW_CONFIDENCE',
-    },
-  ],
+  // The fallback template is routing-only (always REVIEW_QUEUE) and carries no
+  // formal spec rules — it exists to give unknown documents partial context,
+  // not to validate them against a known specification.
+  rules: [],
 };
 
 /**
@@ -163,20 +141,17 @@ export const FALLBACK_SPEC_JSON: SpecJson = {
  * - Has no excluders (accepts all documents)
  */
 export const FALLBACK_SELECTION_CONFIG: SelectionConfig = {
-  fingerprint: {
-    requiredTokensAll: [],
-    requiredTokensAny: [],
-    optionalTokens: [],
-    excludeTokens: [],
-  },
-  // No client context - accepts all clients
+  // No required tokens - matches any document; no boosters so it never
+  // outscores a real template.
+  requiredTokensAll: [],
+  requiredTokensAny: [],
+  optionalTokens: [],
 };
 
 /**
  * Fallback ROI config - empty since we don't know where to look
  */
 export const FALLBACK_ROI_CONFIG: RoiConfig = {
-  pageIndex0Based: 0,
   regions: [],
 };
 
