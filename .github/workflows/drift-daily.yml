@@ -11,18 +11,18 @@ name: Drift Detection (Daily)
 on:
   # Daily schedule
   schedule:
-    - cron: '0 6 * * *'  # 6:00 AM UTC daily
-  
+    - cron: "0 6 * * *" # 6:00 AM UTC daily
+
   # Manual trigger
   workflow_dispatch:
     inputs:
       create_baseline:
-        description: 'Create new baseline from current metrics'
+        description: "Create new baseline from current metrics"
         required: false
         type: boolean
         default: false
       environment:
-        description: 'Target environment'
+        description: "Target environment"
         required: false
         type: choice
         options:
@@ -30,6 +30,11 @@ on:
           - staging
           - production
         default: local
+      live:
+        description: "Use live DB metrics when DATABASE_URL secret is present"
+        required: false
+        type: boolean
+        default: false
 
 env:
   NODE_VERSION: "22"
@@ -38,42 +43,53 @@ jobs:
   drift-check:
     name: Run Drift Detection
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 10
-      
+
       - name: Install dependencies
         run: pnpm install
-      
+
       - name: Run drift detection
         id: drift
         run: |
+          LIVE_ARG=""
+
+          if [ "${{ github.event.inputs.live }}" = "true" ]; then
+            if [ -n "${DATABASE_URL:-}" ]; then
+              LIVE_ARG="--live"
+            else
+              echo "::warning::Live drift requested but DATABASE_URL secret is not configured; running deterministic fixture mode"
+            fi
+          fi
+
           if [ "${{ github.event.inputs.create_baseline }}" = "true" ]; then
-            pnpm drift:baseline
+            pnpm drift:baseline $LIVE_ARG
           else
-            pnpm drift:check || true
+            pnpm drift:check $LIVE_ARG || true
           fi
         env:
           DRIFT_ENVIRONMENT: ${{ github.event.inputs.environment || 'local' }}
-      
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Upload drift report
         uses: actions/upload-artifact@v4
         with:
           name: drift-report-${{ github.run_id }}
           path: scripts/drift/reports/latest.json
           retention-days: 30
-      
+
       - name: Check for critical alerts
         run: |
           if [ -f scripts/drift/reports/latest.json ]; then
@@ -83,7 +99,7 @@ jobs:
               echo "::warning::$CRITICAL critical drift alert(s) detected!"
             fi
           fi
-      
+
       - name: Summary
         run: |
           echo "## Drift Detection Summary" >> $GITHUB_STEP_SUMMARY

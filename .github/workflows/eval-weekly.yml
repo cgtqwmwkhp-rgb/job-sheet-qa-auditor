@@ -11,13 +11,13 @@ name: Evaluation Harness (Weekly)
 on:
   # Weekly schedule
   schedule:
-    - cron: '0 7 * * 0'  # 7:00 AM UTC on Sundays
-  
+    - cron: "0 7 * * 0" # 7:00 AM UTC on Sundays
+
   # Manual trigger
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Evaluation mode'
+        description: "Evaluation mode"
         required: false
         type: choice
         options:
@@ -26,9 +26,14 @@ on:
           - quick
         default: fixtures
       compare_run:
-        description: 'Run ID to compare against (optional)'
+        description: "Run ID to compare against (optional)"
         required: false
         type: string
+      live:
+        description: "Use live DB metrics when DATABASE_URL secret is present"
+        required: false
+        type: boolean
+        default: false
 
 env:
   NODE_VERSION: "22"
@@ -37,45 +42,55 @@ jobs:
   evaluation:
     name: Run Evaluation Harness
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 10
-      
+
       - name: Install dependencies
         run: pnpm install
-      
+
       - name: Run evaluation
         id: eval
         run: |
           MODE="${{ github.event.inputs.mode || 'fixtures' }}"
           COMPARE="${{ github.event.inputs.compare_run }}"
-          
+          LIVE_ARG=""
+
+          if [ "${{ github.event.inputs.live }}" = "true" ]; then
+            if [ -n "${DATABASE_URL:-}" ]; then
+              LIVE_ARG="--live"
+            else
+              echo "::warning::Live evaluation requested but DATABASE_URL secret is not configured; running fixture mode"
+            fi
+          fi
+
           if [ -n "$COMPARE" ]; then
-            pnpm eval:run --mode "$MODE" --compare "$COMPARE"
+            pnpm eval:run --mode "$MODE" --compare "$COMPARE" $LIVE_ARG
           else
-            pnpm eval:run --mode "$MODE"
+            pnpm eval:run --mode "$MODE" $LIVE_ARG
           fi
         env:
           EVAL_ENVIRONMENT: ${{ github.event.inputs.environment || 'local' }}
-      
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Upload evaluation report
         uses: actions/upload-artifact@v4
         with:
           name: eval-report-${{ github.run_id }}
           path: scripts/eval/reports/latest.json
           retention-days: 90
-      
+
       - name: Check score threshold
         run: |
           if [ -f scripts/eval/reports/latest.json ]; then
@@ -88,7 +103,7 @@ jobs:
               echo "::warning::Overall score $SCORE is below threshold $THRESHOLD"
             fi
           fi
-      
+
       - name: Summary
         run: |
           echo "## Evaluation Harness Summary" >> $GITHUB_STEP_SUMMARY

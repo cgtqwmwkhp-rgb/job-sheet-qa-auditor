@@ -27,10 +27,13 @@ import {
 /**
  * Generate unique alert ID
  */
+let alertIdCounter = 0;
+
 function generateAlertId(category: string): string {
   const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 6);
-  return `alert-${category}-${timestamp}-${random}`;
+  alertIdCounter = (alertIdCounter + 1) % Number.MAX_SAFE_INTEGER;
+  const counter = alertIdCounter.toString(36).padStart(4, "0");
+  return `alert-${category}-${timestamp}-${counter}`;
 }
 
 /**
