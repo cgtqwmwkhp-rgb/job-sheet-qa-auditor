@@ -303,100 +303,100 @@ export function DocumentViewer({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : (
-        <Document
-          file={pdfFile}
-          options={{ withCredentials: true }}
-          onLoadSuccess={onDocumentLoadSuccess}
-          className="shadow-lg"
-          loading={
-            <div className="flex items-center justify-center h-64 w-full">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          }
-          error={
-            <div className="flex flex-col items-center justify-center h-64 w-full text-destructive">
-              <p>Failed to load document.</p>
-              <p className="text-xs mt-2">
-                {pdfLoadError ||
-                  "Please check if the file exists and is a valid PDF."}
-              </p>
-            </div>
-          }
-        >
-          <div
-            className={`relative inline-block ${isDrawing ? "cursor-crosshair" : ""}`}
-            ref={containerRef}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
+          <Document
+            file={pdfFile}
+            options={{ withCredentials: true }}
+            onLoadSuccess={onDocumentLoadSuccess}
+            className="shadow-lg"
+            loading={
+              <div className="flex items-center justify-center h-64 w-full">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            }
+            error={
+              <div className="flex flex-col items-center justify-center h-64 w-full text-destructive">
+                <p>Failed to load document.</p>
+                <p className="text-xs mt-2">
+                  {pdfLoadError ||
+                    "Please check if the file exists and is a valid PDF."}
+                </p>
+              </div>
+            }
           >
-            <Page
-              pageNumber={pageNumber}
-              scale={scale}
-              rotate={rotation}
-              renderTextLayer={true}
-              renderAnnotationLayer={true}
-              className="bg-white shadow-md"
-            />
-
-            {/* Current Drawing Box */}
-            {currentBox && (
-              <div
-                className="absolute border-2 border-blue-500 bg-blue-500/20 z-20"
-                style={{
-                  left: `${currentBox.x}%`,
-                  top: `${currentBox.y}%`,
-                  width: `${currentBox.width}%`,
-                  height: `${currentBox.height}%`,
-                }}
+            <div
+              className={`relative inline-block ${isDrawing ? "cursor-crosshair" : ""}`}
+              ref={containerRef}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
+              <Page
+                pageNumber={pageNumber}
+                scale={scale}
+                rotate={rotation}
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+                className="bg-white shadow-md"
               />
-            )}
 
-            {/* Bounding Boxes Overlay */}
-            {currentPageBoxes.map(box => {
-              const isActive = activeBoxId != null && box.id === activeBoxId;
-              const isPulsing = isActive;
-              return (
+              {/* Current Drawing Box */}
+              {currentBox && (
                 <div
-                  key={box.id}
-                  data-box-id={String(box.id)}
-                  data-active={isActive ? "true" : undefined}
-                  onClick={e => {
-                    e.stopPropagation();
-                    onBoxClick?.(box.id);
-                  }}
-                  className={`absolute border-2 cursor-pointer transition-all hover:bg-opacity-20 z-10 ${
-                    isActive
-                      ? "scale-[1.02] z-20 ring-2 ring-offset-1 ring-primary"
-                      : "hover:scale-[1.02]"
-                  } ${isPulsing ? "animate-pulse" : ""}`}
+                  className="absolute border-2 border-blue-500 bg-blue-500/20 z-20"
                   style={{
-                    left: `${box.x}%`,
-                    top: `${box.y}%`,
-                    width: `${box.width}%`,
-                    height: `${box.height}%`,
-                    borderColor: box.color || "#ef4444",
-                    backgroundColor: isActive
-                      ? `${box.color || "#ef4444"}40`
-                      : `${box.color || "#ef4444"}1A`, // 10% opacity
-                    borderWidth: isActive ? 3 : 2,
+                    left: `${currentBox.x}%`,
+                    top: `${currentBox.y}%`,
+                    width: `${currentBox.width}%`,
+                    height: `${currentBox.height}%`,
                   }}
-                  title={box.label}
-                >
-                  {box.label && (
-                    <span
-                      className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
-                      style={{ backgroundColor: box.color || "#ef4444" }}
-                    >
-                      {box.label}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Document>
+                />
+              )}
+
+              {/* Bounding Boxes Overlay */}
+              {currentPageBoxes.map(box => {
+                const isActive = activeBoxId != null && box.id === activeBoxId;
+                const isPulsing = isActive;
+                return (
+                  <div
+                    key={box.id}
+                    data-box-id={String(box.id)}
+                    data-active={isActive ? "true" : undefined}
+                    onClick={e => {
+                      e.stopPropagation();
+                      onBoxClick?.(box.id);
+                    }}
+                    className={`absolute border-2 cursor-pointer transition-all hover:bg-opacity-20 z-10 ${
+                      isActive
+                        ? "scale-[1.02] z-20 ring-2 ring-offset-1 ring-primary"
+                        : "hover:scale-[1.02]"
+                    } ${isPulsing ? "animate-pulse" : ""}`}
+                    style={{
+                      left: `${box.x}%`,
+                      top: `${box.y}%`,
+                      width: `${box.width}%`,
+                      height: `${box.height}%`,
+                      borderColor: box.color || "#ef4444",
+                      backgroundColor: isActive
+                        ? `${box.color || "#ef4444"}40`
+                        : `${box.color || "#ef4444"}1A`, // 10% opacity
+                      borderWidth: isActive ? 3 : 2,
+                    }}
+                    title={box.label}
+                  >
+                    {box.label && (
+                      <span
+                        className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
+                        style={{ backgroundColor: box.color || "#ef4444" }}
+                      >
+                        {box.label}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Document>
         )}
       </div>
     </Card>

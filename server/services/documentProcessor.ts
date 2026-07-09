@@ -1224,8 +1224,7 @@ async function processJobSheetWithOptions(
         ...(typeof pageConfidencePrior === "number"
           ? {
               pageConfidencePrior,
-              ocrConfidenceThreshold:
-                processingSettings.ocrConfidenceThreshold,
+              ocrConfidenceThreshold: processingSettings.ocrConfidenceThreshold,
               lowOcrConfidence,
             }
           : {}),
