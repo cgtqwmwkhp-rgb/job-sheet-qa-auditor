@@ -9,21 +9,39 @@ import {
   Loader2,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useAnalyticsFilters } from "@/hooks/useAnalyticsFilters";
+
+function formatPeriodRange(start: string, end: string): string {
+  const opts: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  };
+  return `${new Date(start).toLocaleDateString(undefined, opts)} – ${new Date(end).toLocaleDateString(undefined, opts)}`;
+}
 
 export default function ExecutiveDashboard() {
-  const { data: statsData, isLoading, error } = trpc.stats.dashboard.useQuery();
+  const { startDate, endDate } = useAnalyticsFilters();
+  const {
+    data: statsData,
+    isLoading,
+    error,
+  } = trpc.analytics.getExecutiveSummary.useQuery({ startDate, endDate });
 
   const totalAudits = statsData?.totalAudits ?? 0;
   const passRate = statsData?.passRate ?? 0;
   const criticalIssues = statsData?.criticalIssues ?? 0;
   const reviewQueue = statsData?.reviewQueue ?? 0;
-  const hasData = totalAudits > 0;
+  const periodLabel = statsData?.period
+    ? formatPeriodRange(statsData.period.start, statsData.period.end)
+    : formatPeriodRange(startDate, endDate);
+  const hasData = totalAudits > 0 || reviewQueue > 0 || criticalIssues > 0;
 
   if (isLoading) {
     return (
       <AnalyticsLayout
         title="Executive Overview"
-        description="High-level operational metrics and performance trends."
+        description={`High-level operational metrics for ${periodLabel}.`}
       >
         <div className="flex items-center justify-center h-[50vh]">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -39,7 +57,7 @@ export default function ExecutiveDashboard() {
     return (
       <AnalyticsLayout
         title="Executive Overview"
-        description="High-level operational metrics and performance trends."
+        description={`High-level operational metrics for ${periodLabel}.`}
       >
         <div className="flex flex-col items-center justify-center h-[50vh]">
           <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
@@ -56,7 +74,7 @@ export default function ExecutiveDashboard() {
     return (
       <AnalyticsLayout
         title="Executive Overview"
-        description="High-level operational metrics and performance trends."
+        description={`High-level operational metrics for ${periodLabel}.`}
       >
         <Card className="p-12">
           <div className="flex flex-col items-center justify-center text-center">
@@ -77,7 +95,7 @@ export default function ExecutiveDashboard() {
   return (
     <AnalyticsLayout
       title="Executive Overview"
-      description="High-level operational metrics and performance trends."
+      description={`High-level operational metrics for ${periodLabel}.`}
     >
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -90,7 +108,7 @@ export default function ExecutiveDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{passRate}%</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Based on completed audits
+              Based on completed audits in period
             </p>
           </CardContent>
         </Card>
@@ -105,7 +123,7 @@ export default function ExecutiveDashboard() {
               {totalAudits.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              All time processed
+              Processed in selected period
             </p>
           </CardContent>
         </Card>
@@ -140,7 +158,9 @@ export default function ExecutiveDashboard() {
             >
               {reviewQueue}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Pending review</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Current queue (live snapshot)
+            </p>
           </CardContent>
         </Card>
       </div>

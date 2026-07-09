@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { PredictiveAlerts } from "@/components/PredictiveAlerts";
+import { useAnalyticsFilters } from "@/hooks/useAnalyticsFilters";
 import { useMemo, useState } from "react";
 import {
   Bar,
@@ -53,13 +54,14 @@ function bandVariant(
 }
 
 export default function PredictiveRisk() {
+  const { startDate, endDate } = useAnalyticsFilters();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const {
     data: summary,
     isLoading,
     error,
-  } = trpc.analytics.getPredictiveRiskSummary.useQuery();
+  } = trpc.analytics.getPredictiveRiskSummary.useQuery({ startDate, endDate });
 
   const chartData = useMemo(
     () =>

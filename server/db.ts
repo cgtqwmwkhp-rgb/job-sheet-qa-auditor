@@ -622,9 +622,6 @@ export async function getDashboardStats() {
   const db = await getDb();
   if (!db) return null;
 
-  const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
   // Get total audits
   const totalAudits = await db.select({ count: count() }).from(auditResults);
 
@@ -654,6 +651,70 @@ export async function getDashboardStats() {
     passRate: total > 0 ? ((passed / total) * 100).toFixed(1) : "0",
     reviewQueue: reviewQueue[0]?.count ?? 0,
     criticalIssues: criticalIssues[0]?.count ?? 0,
+  };
+}
+
+/**
+ * Period-scoped executive KPIs for analytics overview.
+ * totalAudits / passRate / criticalIssues honor startDate–endDate;
+ * reviewQueue remains a live snapshot of currently queued job sheets.
+ */
+export async function getExecutiveSummaryStats(options?: {
+  startDate?: Date;
+  endDate?: Date;
+}) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const end = options?.endDate ?? new Date();
+  const start =
+    options?.startDate ??
+    new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const auditPeriod = and(
+    gte(auditResults.createdAt, start),
+    lte(auditResults.createdAt, end)
+  );
+
+  const totalAudits = await db
+    .select({ count: count() })
+    .from(auditResults)
+    .where(auditPeriod);
+
+  const passedAudits = await db
+    .select({ count: count() })
+    .from(auditResults)
+    .where(and(auditPeriod, eq(auditResults.result, "pass")));
+
+  // Live snapshot — not filtered by the selected analytics period.
+  const reviewQueue = await db
+    .select({ count: count() })
+    .from(jobSheets)
+    .where(eq(jobSheets.status, "review_queue"));
+
+  const criticalIssues = await db
+    .select({ count: count() })
+    .from(auditFindings)
+    .where(
+      and(
+        sql`${auditFindings.severity} IN ('S0', 'S1')`,
+        gte(auditFindings.createdAt, start),
+        lte(auditFindings.createdAt, end)
+      )
+    );
+
+  const total = totalAudits[0]?.count ?? 0;
+  const passed = passedAudits[0]?.count ?? 0;
+
+  return {
+    totalAudits: total,
+    passRate: total > 0 ? ((passed / total) * 100).toFixed(1) : "0",
+    reviewQueue: reviewQueue[0]?.count ?? 0,
+    criticalIssues: criticalIssues[0]?.count ?? 0,
+    period: {
+      start: start.toISOString(),
+      end: end.toISOString(),
+    },
   };
 }
 

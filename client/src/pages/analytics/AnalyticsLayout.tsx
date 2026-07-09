@@ -1,4 +1,9 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { Button } from "@/components/ui/button";
+import {
+  useAnalyticsFilters,
+  type AnalyticsPeriodPreset,
+} from "@/hooks/useAnalyticsFilters";
 import {
   LayoutDashboard,
   Map,
@@ -33,23 +38,52 @@ const navItems = [
   },
 ];
 
+const PERIOD_PRESETS: { value: AnalyticsPeriodPreset; label: string }[] = [
+  { value: "7d", label: "Last 7d" },
+  { value: "30d", label: "Last 30d" },
+  { value: "90d", label: "Last 90d" },
+];
+
 export function AnalyticsLayout({
   children,
   title,
   description,
 }: AnalyticsLayoutProps) {
   const [location] = useLocation();
+  const { preset, setPreset } = useAnalyticsFilters();
 
   return (
     <DashboardLayout>
       <div className="space-y-8">
         <div className="pb-6 border-b border-border/50">
-          <h1 className="text-3xl font-heading font-bold tracking-tight text-foreground">
-            {title}
-          </h1>
-          <p className="text-muted-foreground mt-2 text-lg max-w-2xl">
-            {description}
-          </p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-heading font-bold tracking-tight text-foreground">
+                {title}
+              </h1>
+              <p className="text-muted-foreground mt-2 text-lg max-w-2xl">
+                {description}
+              </p>
+            </div>
+            <div
+              className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit shrink-0"
+              role="group"
+              aria-label="Analytics period"
+            >
+              {PERIOD_PRESETS.map(item => (
+                <Button
+                  key={item.value}
+                  type="button"
+                  size="sm"
+                  variant={preset === item.value ? "default" : "ghost"}
+                  className="h-8 px-3 text-xs"
+                  onClick={() => setPreset(item.value)}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit flex-wrap">

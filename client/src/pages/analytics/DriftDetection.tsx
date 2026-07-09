@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { AlertTriangle, Activity, Loader2, Target } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useAnalyticsFilters } from "@/hooks/useAnalyticsFilters";
 import { useMemo } from "react";
 import {
   Bar,
@@ -44,11 +45,12 @@ function severityVariant(
 }
 
 export default function DriftDetection() {
+  const { startDate, endDate } = useAnalyticsFilters();
   const {
     data: summary,
     isLoading,
     error,
-  } = trpc.analytics.getDriftSummary.useQuery();
+  } = trpc.analytics.getDriftSummary.useQuery({ startDate, endDate });
 
   const topSeries = useMemo(() => summary?.series.slice(0, 8) ?? [], [summary]);
 
