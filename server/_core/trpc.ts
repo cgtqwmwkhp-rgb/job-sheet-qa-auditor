@@ -1,4 +1,8 @@
-import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
+import {
+  NOT_ADMIN_ERR_MSG,
+  NOT_QA_LEAD_ERR_MSG,
+  UNAUTHED_ERR_MSG,
+} from "@shared/const";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
@@ -31,7 +35,7 @@ export const adminProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
-    if (!ctx.user || ctx.user.role !== 'admin') {
+    if (!ctx.user || ctx.user.role !== "admin") {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
 
@@ -41,5 +45,23 @@ export const adminProcedure = t.procedure.use(
         user: ctx.user,
       },
     });
-  }),
+  })
+);
+
+/** Admin or QA lead — review / hold-queue mutations. */
+export const qaLeadProcedure = t.procedure.use(
+  t.middleware(async opts => {
+    const { ctx, next } = opts;
+    const role = ctx.user?.role;
+    if (!ctx.user || (role !== "admin" && role !== "qa_lead")) {
+      throw new TRPCError({ code: "FORBIDDEN", message: NOT_QA_LEAD_ERR_MSG });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        user: ctx.user,
+      },
+    });
+  })
 );
