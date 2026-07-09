@@ -1,17 +1,5 @@
 import * as React from "react";
-import {
-  Calculator,
-  Calendar,
-  CreditCard,
-  Settings,
-  Smile,
-  User,
-  Search,
-  FileText,
-  Map,
-  AlertTriangle,
-  BarChart2,
-} from "lucide-react";
+import { Search, FileText, User, AlertTriangle, BarChart2 } from "lucide-react";
 
 import {
   CommandDialog,
@@ -48,16 +36,19 @@ export function CommandCenter() {
 
   return (
     <>
-      <div
-        className="hidden md:flex items-center text-sm text-muted-foreground border rounded-md px-3 py-1.5 bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
+      <button
+        type="button"
+        className="hidden md:flex items-center text-sm text-muted-foreground border rounded-md px-3 py-1.5 bg-muted/50 hover:bg-muted cursor-pointer transition-colors duration-[var(--duration-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         onClick={() => setOpen(true)}
+        aria-label="Open command search"
+        aria-keyshortcuts="Meta+K Control+K"
       >
-        <Search className="w-4 h-4 mr-2" />
+        <Search className="w-4 h-4 mr-2" aria-hidden="true" />
         <span>Search...</span>
         <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 ml-4">
           <span className="text-xs">⌘</span>K
         </kbd>
-      </div>
+      </button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
         <CommandInput placeholder="Type a command or search..." />
@@ -83,7 +74,7 @@ export function CommandCenter() {
             <CommandItem
               onSelect={() => runCommand(() => setLocation("/analytics/ai"))}
             >
-              <Smile className="mr-2 h-4 w-4" />
+              <BarChart2 className="mr-2 h-4 w-4" />
               <span>AI Analyst</span>
             </CommandItem>
           </CommandGroup>

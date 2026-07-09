@@ -49,31 +49,44 @@ const mockNotifications: Notification[] = [
 ];
 
 export function NotificationsDropdown() {
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const [notifications, setNotifications] =
+    useState<Notification[]>(mockNotifications);
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    setNotifications(prev =>
+      prev.map(n => (n.id === id ? { ...n, read: true } : n))
     );
   };
 
   const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
   const clearNotification = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          aria-label={
+            unreadCount > 0
+              ? `Notifications, ${unreadCount} unread`
+              : "Notifications"
+          }
+        >
+          <Bell className="h-5 w-5" aria-hidden="true" />
           {unreadCount > 0 && (
-            <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive animate-pulse" />
+            <span
+              className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive animate-pulse"
+              aria-hidden="true"
+            />
           )}
         </Button>
       </DropdownMenuTrigger>
@@ -99,7 +112,7 @@ export function NotificationsDropdown() {
             </div>
           ) : (
             <div className="flex flex-col">
-              {notifications.map((notification) => (
+              {notifications.map(notification => (
                 <DropdownMenuItem
                   key={notification.id}
                   className={`flex flex-col items-start gap-1 p-4 cursor-pointer ${
@@ -121,7 +134,9 @@ export function NotificationsDropdown() {
                       {notification.type === "error" && (
                         <AlertTriangle className="h-4 w-4 text-red-500" />
                       )}
-                      <span className="font-medium text-sm">{notification.title}</span>
+                      <span className="font-medium text-sm">
+                        {notification.title}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -131,7 +146,7 @@ export function NotificationsDropdown() {
                         variant="ghost"
                         size="icon"
                         className="h-4 w-4 hover:bg-transparent hover:text-destructive"
-                        onClick={(e) => clearNotification(e, notification.id)}
+                        onClick={e => clearNotification(e, notification.id)}
                       >
                         <X className="h-3 w-3" />
                       </Button>
@@ -141,7 +156,10 @@ export function NotificationsDropdown() {
                     {notification.message}
                   </p>
                   {!notification.read && (
-                    <Badge variant="default" className="h-1.5 w-1.5 rounded-full p-0 absolute top-4 right-2" />
+                    <Badge
+                      variant="default"
+                      className="h-1.5 w-1.5 rounded-full p-0 absolute top-4 right-2"
+                    />
                   )}
                 </DropdownMenuItem>
               ))}

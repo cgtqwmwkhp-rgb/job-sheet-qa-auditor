@@ -1,22 +1,28 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { EmailTemplateManager } from "@/components/EmailTemplateManager";
 import { AIPersonaSettings } from "@/components/AIPersonaSettings";
 import { ProcessingSettings } from "@/components/ProcessingSettings";
-import { 
-  Bell, 
-  Mail, 
-  Shield, 
-  UserCog, 
-  Palette, 
+import {
+  Bell,
+  Mail,
+  Shield,
+  UserCog,
+  Palette,
   Globe,
   BrainCircuit,
   Moon,
   Sun,
   Database,
-  Cpu
+  Cpu,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -25,13 +31,17 @@ import { Input } from "@/components/ui/input";
 import { useTheme } from "@/contexts/ThemeContext";
 
 export default function Settings() {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
       <div className="pb-6 border-b border-border/50">
-        <h1 className="text-3xl font-heading font-bold tracking-tight text-foreground">System Settings</h1>
-        <p className="text-muted-foreground mt-2 text-lg">Manage platform configuration, notifications, and templates.</p>
+        <h1 className="text-3xl font-heading font-bold tracking-tight text-foreground">
+          System Settings
+        </h1>
+        <p className="text-muted-foreground mt-2 text-lg">
+          Manage platform configuration, notifications, and templates.
+        </p>
       </div>
 
       <Tabs defaultValue="notifications" className="w-full">
@@ -39,50 +49,50 @@ export default function Settings() {
           {/* Sidebar Navigation for Settings */}
           <aside className="w-full md:w-64 shrink-0">
             <TabsList className="flex flex-col h-auto w-full bg-transparent p-0 gap-1.5">
-              <TabsTrigger 
-                value="notifications" 
+              <TabsTrigger
+                value="notifications"
                 className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
               >
                 <Bell className="w-4 h-4 mr-3" />
                 Notifications
               </TabsTrigger>
-              <TabsTrigger 
-                value="email-templates" 
+              <TabsTrigger
+                value="email-templates"
                 className="w-full justify-start px-4 py-2 data-[state=active]:bg-muted data-[state=active]:text-foreground"
               >
                 <Mail className="w-4 h-4 mr-2" />
                 Email Templates
               </TabsTrigger>
-              <TabsTrigger 
-                value="ai-persona" 
+              <TabsTrigger
+                value="ai-persona"
                 className="w-full justify-start px-4 py-2 data-[state=active]:bg-muted data-[state=active]:text-foreground"
               >
                 <BrainCircuit className="w-4 h-4 mr-2" />
                 AI Auditor Persona
               </TabsTrigger>
-              <TabsTrigger 
-                value="general" 
+              <TabsTrigger
+                value="general"
                 className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
               >
                 <Globe className="w-4 h-4 mr-3" />
                 General
               </TabsTrigger>
-              <TabsTrigger 
-                value="appearance" 
+              <TabsTrigger
+                value="appearance"
                 className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
               >
                 <Palette className="w-4 h-4 mr-3" />
                 Appearance
               </TabsTrigger>
-              <TabsTrigger 
-                value="processing" 
+              <TabsTrigger
+                value="processing"
                 className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
               >
                 <Cpu className="w-4 h-4 mr-3" />
                 Processing
               </TabsTrigger>
-              <TabsTrigger 
-                value="security" 
+              <TabsTrigger
+                value="security"
                 className="w-full justify-start px-4 py-2 data-[state=active]:bg-muted data-[state=active]:text-foreground"
               >
                 <Shield className="w-4 h-4 mr-2" />
@@ -95,8 +105,12 @@ export default function Settings() {
           <div className="flex-1">
             <TabsContent value="notifications" className="mt-0 space-y-6">
               <div className="mb-4">
-                <h2 className="text-lg font-medium">Notification Preferences</h2>
-                <p className="text-sm text-muted-foreground">Configure how and when you receive system alerts.</p>
+                <h2 className="text-lg font-medium">
+                  Notification Preferences
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Configure how and when you receive system alerts.
+                </p>
               </div>
               <NotificationSettings />
             </TabsContent>
@@ -104,15 +118,22 @@ export default function Settings() {
             <TabsContent value="email-templates" className="mt-0 space-y-6">
               <div className="mb-4">
                 <h2 className="text-lg font-medium">Email Template Manager</h2>
-                <p className="text-sm text-muted-foreground">Customize automated email content and AI generation rules.</p>
+                <p className="text-sm text-muted-foreground">
+                  Customize automated email content and AI generation rules.
+                </p>
               </div>
               <EmailTemplateManager />
             </TabsContent>
 
             <TabsContent value="ai-persona" className="mt-0 space-y-6">
               <div className="mb-4">
-                <h2 className="text-lg font-medium">AI Auditor Configuration</h2>
-                <p className="text-sm text-muted-foreground">Configure the behavior, tone, and strictness of the AI analysis engine.</p>
+                <h2 className="text-lg font-medium">
+                  AI Auditor Configuration
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Configure the behavior, tone, and strictness of the AI
+                  analysis engine.
+                </p>
               </div>
               <AIPersonaSettings />
             </TabsContent>
@@ -121,23 +142,38 @@ export default function Settings() {
               <Card>
                 <CardHeader>
                   <CardTitle>Appearance Settings</CardTitle>
-                  <CardDescription>Customize the look and feel of the application.</CardDescription>
+                  <CardDescription>
+                    Customize the look and feel of the application.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex items-center justify-between py-2">
                     <div className="space-y-0.5">
-                      <Label className="text-base">Dark Mode</Label>
+                      <Label htmlFor="dark-mode-toggle" className="text-base">
+                        Dark Mode
+                      </Label>
                       <p className="text-sm text-muted-foreground">
-                        Switch between light and dark themes.
+                        Switch between light and dark themes. Preference is
+                        saved for this browser.
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Sun className="h-4 w-4 text-muted-foreground" />
-                      <Switch 
-                        checked={theme === 'dark'} 
-                        onCheckedChange={toggleTheme}
+                      <Sun
+                        className="h-4 w-4 text-muted-foreground"
+                        aria-hidden="true"
                       />
-                      <Moon className="h-4 w-4 text-muted-foreground" />
+                      <Switch
+                        id="dark-mode-toggle"
+                        checked={theme === "dark"}
+                        onCheckedChange={checked =>
+                          setTheme(checked ? "dark" : "light")
+                        }
+                        aria-label="Toggle dark mode"
+                      />
+                      <Moon
+                        className="h-4 w-4 text-muted-foreground"
+                        aria-hidden="true"
+                      />
                     </div>
                   </div>
                 </CardContent>
@@ -148,21 +184,31 @@ export default function Settings() {
               <Card>
                 <CardHeader>
                   <CardTitle>Platform Information</CardTitle>
-                  <CardDescription>General settings for the Job Sheet QA instance.</CardDescription>
+                  <CardDescription>
+                    General settings for the Job Sheet QA instance.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid gap-2">
                     <Label htmlFor="site-name">Instance Name</Label>
-                    <Input id="site-name" defaultValue="Job Sheet QA - Production" />
+                    <Input
+                      id="site-name"
+                      defaultValue="Job Sheet QA - Production"
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="support-email">Support Email</Label>
-                    <Input id="support-email" defaultValue="support@jobsheetqa.com" />
+                    <Input
+                      id="support-email"
+                      defaultValue="support@jobsheetqa.com"
+                    />
                   </div>
                   <div className="flex items-center justify-between py-2">
                     <div className="space-y-0.5">
                       <Label>Maintenance Mode</Label>
-                      <p className="text-sm text-muted-foreground">Disable access for non-admin users.</p>
+                      <p className="text-sm text-muted-foreground">
+                        Disable access for non-admin users.
+                      </p>
                     </div>
                     <Switch />
                   </div>
@@ -175,21 +221,28 @@ export default function Settings() {
                     <Database className="h-5 w-5" />
                     Demo Data Management
                   </CardTitle>
-                  <CardDescription>Manage the sample data used in this demo environment.</CardDescription>
+                  <CardDescription>
+                    Manage the sample data used in this demo environment.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label>Reset Demo Data</Label>
                       <p className="text-sm text-muted-foreground">
-                        Clear all local changes and restore the original "Gold Standard" dataset. 
-                        Useful if you want to restart the demo experience.
+                        Clear all local changes and restore the original "Gold
+                        Standard" dataset. Useful if you want to restart the
+                        demo experience.
                       </p>
                     </div>
-                    <Button 
-                      variant="destructive" 
+                    <Button
+                      variant="destructive"
                       onClick={() => {
-                        if (confirm("Are you sure? This will reload the page and reset all data.")) {
+                        if (
+                          confirm(
+                            "Are you sure? This will reload the page and reset all data."
+                          )
+                        ) {
                           localStorage.clear();
                           window.location.reload();
                         }
@@ -204,8 +257,13 @@ export default function Settings() {
 
             <TabsContent value="processing" className="mt-0 space-y-6">
               <div className="mb-4">
-                <h2 className="text-lg font-medium">Document Processing Settings</h2>
-                <p className="text-sm text-muted-foreground">Configure extraction strategies, AI fallback, and performance options.</p>
+                <h2 className="text-lg font-medium">
+                  Document Processing Settings
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Configure extraction strategies, AI fallback, and performance
+                  options.
+                </p>
               </div>
               <ProcessingSettings />
             </TabsContent>
@@ -214,25 +272,34 @@ export default function Settings() {
               <Card>
                 <CardHeader>
                   <CardTitle>Security Policies</CardTitle>
-                  <CardDescription>Manage access controls and session policies.</CardDescription>
+                  <CardDescription>
+                    Manage access controls and session policies.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between py-2">
                     <div className="space-y-0.5">
                       <Label>Enforce 2FA</Label>
-                      <p className="text-sm text-muted-foreground">Require two-factor authentication for all admin users.</p>
+                      <p className="text-sm text-muted-foreground">
+                        Require two-factor authentication for all admin users.
+                      </p>
                     </div>
                     <Switch defaultChecked />
                   </div>
                   <div className="flex items-center justify-between py-2">
                     <div className="space-y-0.5">
                       <Label>Session Timeout</Label>
-                      <p className="text-sm text-muted-foreground">Automatically log out inactive users after 30 minutes.</p>
+                      <p className="text-sm text-muted-foreground">
+                        Automatically log out inactive users after 30 minutes.
+                      </p>
                     </div>
                     <Switch defaultChecked />
                   </div>
                   <div className="pt-4">
-                    <Button variant="outline" className="text-destructive hover:text-destructive">
+                    <Button
+                      variant="outline"
+                      className="text-destructive hover:text-destructive"
+                    >
                       Reset All Security Settings
                     </Button>
                   </div>
