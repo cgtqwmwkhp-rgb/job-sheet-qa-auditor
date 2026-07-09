@@ -131,6 +131,77 @@ vi.mock("./db", () => ({
       occurredAt: new Date("2024-06-10T11:00:00Z"),
     },
   ]),
+  getExceptionHoldQueueItems: vi.fn().mockResolvedValue([
+    {
+      jobSheetId: 1,
+      referenceNumber: "JS-1",
+      siteInfo: "London HQ",
+      queuedAt: new Date("2024-06-19T10:00:00Z"),
+      highestSeverity: "S1",
+      openFindingCount: 1,
+      technicianId: 2,
+    },
+  ]),
+  getExceptionOverturnFindings: vi.fn().mockResolvedValue([
+    {
+      findingId: 1,
+      jobSheetId: 1,
+      ruleId: "RULE_SIG",
+      reasonCode: "MISSING_FIELD",
+      severity: "S1",
+      fieldName: "signature",
+      resolutionStatus: "overridden",
+      siteInfo: "London HQ",
+      occurredAt: new Date("2024-06-10T11:00:00Z"),
+      resolvedAt: new Date("2024-06-10T12:00:00Z"),
+    },
+  ]),
+  getDriftAnalyticsDocuments: vi.fn().mockResolvedValue([
+    {
+      jobSheetId: 1,
+      technicianId: 2,
+      templateSlug: "gen-service",
+      assetType: "generator",
+      result: "fail",
+      confidenceScore: 40,
+      processedAt: new Date("2024-06-01T10:00:00Z"),
+    },
+    {
+      jobSheetId: 2,
+      technicianId: 2,
+      templateSlug: "gen-service",
+      assetType: "generator",
+      result: "fail",
+      confidenceScore: 35,
+      processedAt: new Date("2024-06-05T10:00:00Z"),
+    },
+    {
+      jobSheetId: 3,
+      technicianId: 2,
+      templateSlug: "gen-service",
+      assetType: "generator",
+      result: "pass",
+      confidenceScore: 90,
+      processedAt: new Date("2024-06-08T10:00:00Z"),
+    },
+    {
+      jobSheetId: 4,
+      technicianId: 2,
+      templateSlug: "gen-service",
+      assetType: "generator",
+      result: "fail",
+      confidenceScore: 30,
+      processedAt: new Date("2024-06-10T10:00:00Z"),
+    },
+  ]),
+  getDriftAnalyticsFindings: vi.fn().mockResolvedValue([
+    {
+      findingId: 1,
+      jobSheetId: 1,
+      severity: "S1",
+      occurredAt: new Date("2024-06-01T11:00:00Z"),
+    },
+  ]),
 }));
 
 // Mock storage module
@@ -268,6 +339,44 @@ describe("analytics.engineer (PR-15)", () => {
     const caller = appRouter.createCaller(ctx);
 
     await expect(caller.analytics.getEngineerSummary()).rejects.toThrow();
+  });
+});
+
+describe("analytics.drift (PR-18)", () => {
+  it("returns drift summary for authenticated users", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.analytics.getDriftSummary({
+      startDate: "2024-06-01T00:00:00.000Z",
+      endDate: "2024-06-30T23:59:59.999Z",
+    });
+
+    expect(result.summary).toHaveProperty("seriesCount");
+    expect(result.summary).toHaveProperty("ece");
+    expect(Array.isArray(result.series)).toBe(true);
+    expect(result.calibration).toHaveProperty("bins");
+    expect(Array.isArray(result.alerts)).toBe(true);
+  });
+
+  it("returns drift alerts payload", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.analytics.getDriftAlerts({
+      startDate: "2024-06-01T00:00:00.000Z",
+      endDate: "2024-06-30T23:59:59.999Z",
+    });
+
+    expect(result).toHaveProperty("alerts");
+    expect(result.summary).toHaveProperty("alertCount");
+  });
+
+  it("rejects unauthenticated drift summary", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(caller.analytics.getDriftSummary()).rejects.toThrow();
   });
 });
 

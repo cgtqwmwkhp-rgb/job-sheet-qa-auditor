@@ -1215,3 +1215,114 @@ export async function getExceptionOverturnFindings(options?: {
     resolvedAt: r.resolvedAt ?? null,
   }));
 }
+
+// ============ PR-18: DRIFT ANALYTICS ============
+
+export interface DriftAnalyticsDocumentRow {
+  jobSheetId: number;
+  technicianId: number | null;
+  templateSlug: string | null;
+  assetType: string | null;
+  result: "pass" | "fail" | "review_queue" | "waived";
+  confidenceScore: number | null;
+  processedAt: Date;
+}
+
+export interface DriftAnalyticsFindingRow {
+  findingId: number;
+  jobSheetId: number;
+  severity: "S0" | "S1" | "S2" | "S3";
+  occurredAt: Date;
+}
+
+/**
+ * Job sheets + latest audit for EWMA/CUSUM defect-rate series (PR-18).
+ */
+export async function getDriftAnalyticsDocuments(options?: {
+  startDate?: Date;
+  endDate?: Date;
+}): Promise<DriftAnalyticsDocumentRow[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [];
+  if (options?.startDate) {
+    conditions.push(gte(jobSheets.createdAt, options.startDate));
+  }
+  if (options?.endDate) {
+    conditions.push(lte(jobSheets.createdAt, options.endDate));
+  }
+
+  const rows = await db
+    .select({
+      jobSheetId: jobSheets.id,
+      technicianId: jobSheets.technicianId,
+      result: auditResults.result,
+      confidenceScore: auditResults.confidenceScore,
+      reportJson: auditResults.reportJson,
+      processedAt: jobSheets.createdAt,
+    })
+    .from(jobSheets)
+    .innerJoin(auditResults, eq(auditResults.jobSheetId, jobSheets.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  const latest = new Map<number, (typeof rows)[number]>();
+  for (const row of rows) {
+    const existing = latest.get(row.jobSheetId);
+    if (!existing || row.processedAt > existing.processedAt) {
+      latest.set(row.jobSheetId, row);
+    }
+  }
+
+  return Array.from(latest.values()).map(r => {
+    const cohort = parseReportCohort(r.reportJson);
+    const conf = r.confidenceScore != null ? Number(r.confidenceScore) : null;
+    return {
+      jobSheetId: r.jobSheetId,
+      technicianId: r.technicianId,
+      templateSlug: cohort.templateSlug,
+      assetType: cohort.assetType,
+      result: r.result,
+      confidenceScore: conf != null && Number.isFinite(conf) ? conf : null,
+      processedAt: r.processedAt,
+    };
+  });
+}
+
+/**
+ * Findings for drift analytics within an optional date window.
+ */
+export async function getDriftAnalyticsFindings(options?: {
+  startDate?: Date;
+  endDate?: Date;
+}): Promise<DriftAnalyticsFindingRow[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [];
+  if (options?.startDate) {
+    conditions.push(gte(auditFindings.createdAt, options.startDate));
+  }
+  if (options?.endDate) {
+    conditions.push(lte(auditFindings.createdAt, options.endDate));
+  }
+
+  const rows = await db
+    .select({
+      findingId: auditFindings.id,
+      jobSheetId: jobSheets.id,
+      severity: auditFindings.severity,
+      occurredAt: auditFindings.createdAt,
+    })
+    .from(auditFindings)
+    .innerJoin(auditResults, eq(auditFindings.auditResultId, auditResults.id))
+    .innerJoin(jobSheets, eq(auditResults.jobSheetId, jobSheets.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  return rows.map(r => ({
+    findingId: r.findingId,
+    jobSheetId: r.jobSheetId,
+    severity: r.severity,
+    occurredAt: r.occurredAt,
+  }));
+}
