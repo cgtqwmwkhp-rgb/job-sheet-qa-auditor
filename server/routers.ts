@@ -11,7 +11,7 @@ import { z } from "zod";
 import * as db from "./db";
 import { getStorageAdapter } from "./storage";
 import { nanoid } from "nanoid";
-import { processJobSheet } from "./services/documentProcessor";
+import { orchestrateJobSheetProcessing } from "./services/documentProcessor";
 import { validateMistralApiKey } from "./services/ocr";
 import { resolveProcessStatus } from "./services/processStatus";
 import { templateRouter } from "./routers/templateRouter";
@@ -288,12 +288,13 @@ export const appRouter = router({
           throw new Error("Job sheet not found");
         }
 
-        const result = await processJobSheet(
-          input.id,
-          jobSheet.fileUrl,
-          input.goldSpecId,
-          ctx.user.id
-        );
+        const result = await orchestrateJobSheetProcessing({
+          source: "primary",
+          jobSheetId: input.id,
+          documentUrl: jobSheet.fileUrl,
+          goldSpecId: input.goldSpecId,
+          userId: ctx.user.id,
+        });
 
         return result;
       }),

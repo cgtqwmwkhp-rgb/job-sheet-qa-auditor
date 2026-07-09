@@ -109,6 +109,18 @@ export interface ProcessingOptions {
   useLegacyPath?: boolean;
 }
 
+export interface OrchestrateJobSheetProcessingRequest
+  extends ProcessingOptions {
+  jobSheetId: number;
+  /**
+   * Primary HTTP callers already have this from their job sheet lookup. Retry
+   * callers can omit it and let documentProcessor hydrate the canonical record.
+   */
+  documentUrl?: string;
+  /** Names the external entrypoint for logs/tests; do not branch pipeline logic on it. */
+  source?: "primary" | "reprocess" | "template-reprocess" | "dlq-retry";
+}
+
 /**
  * PR-16: Persist selection + template cohort dimensions on the audit report
  * so analytics can aggregate by assetType / workType without a live registry join.
@@ -171,15 +183,43 @@ export async function processJobSheet(
   goldSpecId?: number,
   userId?: number
 ): Promise<ProcessingResult> {
-  // Wrap legacy parameters into options
-  return processJobSheetWithOptions(jobSheetId, documentUrl, {
+  return orchestrateJobSheetProcessing({
+    source: "primary",
+    jobSheetId,
+    documentUrl,
     goldSpecId,
     userId,
   });
 }
 
 /**
- * Process a job sheet with full options support
+ * Sole external orchestration entry for job-sheet processing. HTTP/tRPC,
+ * reprocess, and DLQ retry paths should call this instead of assembling a
+ * second pipeline outside documentProcessor.
+ */
+export async function orchestrateJobSheetProcessing(
+  request: OrchestrateJobSheetProcessingRequest
+): Promise<ProcessingResult> {
+  let documentUrl = request.documentUrl;
+
+  if (!documentUrl) {
+    const jobSheet = await db.getJobSheetById(request.jobSheetId);
+    if (!jobSheet) {
+      throw new Error(`Job sheet ${request.jobSheetId} not found`);
+    }
+    documentUrl = jobSheet.fileUrl;
+  }
+
+  return processJobSheetWithOptions(request.jobSheetId, documentUrl, {
+    goldSpecId: request.goldSpecId,
+    templateVersionId: request.templateVersionId,
+    userId: request.userId,
+    useLegacyPath: request.useLegacyPath,
+  });
+}
+
+/**
+ * Internal implementation for the documentProcessor orchestration entry.
  *
  * TEMPLATE SELECTION RULES:
  * - If templateVersionId is provided: use that version directly
@@ -190,7 +230,7 @@ export async function processJobSheet(
  *   - MEDIUM with gap < 10: REVIEW_QUEUE (CONFLICT)
  *   - LOW: REVIEW_QUEUE (CONFLICT)
  */
-export async function processJobSheetWithOptions(
+async function processJobSheetWithOptions(
   jobSheetId: number,
   documentUrl: string,
   options: ProcessingOptions = {}
@@ -1133,13 +1173,12 @@ export async function reprocessJobSheet(
   goldSpecId: number,
   userId?: number
 ): Promise<ProcessingResult> {
-  // Get the job sheet
-  const jobSheet = await db.getJobSheetById(jobSheetId);
-  if (!jobSheet) {
-    throw new Error(`Job sheet ${jobSheetId} not found`);
-  }
-
-  return processJobSheet(jobSheetId, jobSheet.fileUrl, goldSpecId, userId);
+  return orchestrateJobSheetProcessing({
+    source: "reprocess",
+    jobSheetId,
+    goldSpecId,
+    userId,
+  });
 }
 
 /**
@@ -1150,12 +1189,9 @@ export async function reprocessWithTemplate(
   templateVersionId: number,
   userId?: number
 ): Promise<ProcessingResult> {
-  const jobSheet = await db.getJobSheetById(jobSheetId);
-  if (!jobSheet) {
-    throw new Error(`Job sheet ${jobSheetId} not found`);
-  }
-
-  return processJobSheetWithOptions(jobSheetId, jobSheet.fileUrl, {
+  return orchestrateJobSheetProcessing({
+    source: "template-reprocess",
+    jobSheetId,
     templateVersionId,
     userId,
   });
