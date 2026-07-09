@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import { BrandLogo } from "@/components/BrandLogo";
 
 // Menu items
 const items = [
@@ -97,20 +98,8 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="h-16 flex items-center justify-center border-b border-sidebar-border">
-        <div className="flex items-center gap-2 px-2 w-full">
-          <div className="h-8 w-8 rounded bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-bold text-xs tracking-tight">
-            PE
-          </div>
-          <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
-            <span className="font-heading font-bold text-sm truncate leading-tight">
-              PlantExpand
-            </span>
-            <span className="text-xs text-muted-foreground truncate">
-              Job Sheet QA
-            </span>
-          </div>
-        </div>
+      <SidebarHeader className="h-12 flex items-center justify-center border-b border-sidebar-border">
+        <BrandLogo className="px-2 w-full" subtitle="Job Sheet QA" />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>

@@ -33,11 +33,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </a>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4 bg-background sticky top-0 z-10">
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 bg-background sticky top-0 z-10">
           <SidebarTrigger className="-ml-1" />
-          <div className="w-px h-4 bg-border mx-2" aria-hidden="true" />
+          <div className="w-px h-4 bg-border mx-1.5" aria-hidden="true" />
           <div className="flex-1" />
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             <ThemeToggle />
             <NotificationsDropdown />
             <DropdownMenu>
