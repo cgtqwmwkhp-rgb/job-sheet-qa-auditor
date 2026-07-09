@@ -52,6 +52,11 @@ import {
   PERF_MEASURES,
   perfClear,
 } from "@/lib/perf";
+import {
+  findingsToViewerBoxes,
+  syncSelectionFromBox,
+  syncSelectionFromFinding,
+} from "@/lib/pdfFindingSync";
 
 // Local Finding type for this page
 interface Finding {
@@ -62,6 +67,7 @@ interface Finding {
   value?: string;
   message?: string;
   confidence: number;
+  pageNumber?: number;
   box?: {
     page: number;
     x: number;
@@ -400,35 +406,59 @@ export default function AuditResults() {
     );
   }
 
-  // Convert findings to the local Finding type
-  const findings: Finding[] = (findingsData || []).map(f => ({
-    id: f.id,
-    field: f.fieldName || "Unknown Field",
-    status:
-      f.severity === "S0" || f.severity === "S1"
-        ? "missing"
-        : f.severity === "S2"
-          ? "warning"
-          : "passed",
-    severity:
+  // Convert findings to the local Finding type (PR-2 percent bboxes preserved for PR-12 sync)
+  const findings: Finding[] = (findingsData || []).map(f => {
+    const severity =
       f.severity === "S0" || f.severity === "S1"
         ? "critical"
         : f.severity === "S2"
           ? "major"
-          : "minor",
-    value: f.rawSnippet || undefined,
-    message: f.normalisedSnippet || undefined,
-    confidence: parseFloat(f.confidence || "0") / 100,
-    box: f.boundingBox
-      ? {
-          page: f.pageNumber || 1,
-          x: (f.boundingBox as any).x || 0,
-          y: (f.boundingBox as any).y || 0,
-          width: (f.boundingBox as any).width || 0,
-          height: (f.boundingBox as any).height || 0,
+          : "minor";
+    const status =
+      f.severity === "S0" || f.severity === "S1"
+        ? "missing"
+        : f.severity === "S2"
+          ? "warning"
+          : "passed";
+    const bb = f.boundingBox as
+      | {
+          x?: number;
+          y?: number;
+          width?: number;
+          height?: number;
+          coordinateSpace?: string;
         }
-      : undefined,
-  }));
+      | null
+      | undefined;
+    const hasPercentBox =
+      bb &&
+      typeof bb.x === "number" &&
+      typeof bb.y === "number" &&
+      typeof bb.width === "number" &&
+      typeof bb.height === "number" &&
+      (bb.coordinateSpace == null || bb.coordinateSpace === "percent");
+
+    return {
+      id: f.id,
+      field: f.fieldName || "Unknown Field",
+      status,
+      severity,
+      value: f.rawSnippet || undefined,
+      message: f.normalisedSnippet || undefined,
+      confidence: parseFloat(f.confidence || "0") / 100,
+      pageNumber: f.pageNumber || undefined,
+      box: hasPercentBox
+        ? {
+            page: f.pageNumber || 1,
+            x: bb!.x!,
+            y: bb!.y!,
+            width: bb!.width!,
+            height: bb!.height!,
+            label: f.fieldName || undefined,
+          }
+        : undefined,
+    };
+  });
 
   // Convert real job sheet data to AuditData format
   const auditData: AuditData = {
@@ -472,6 +502,7 @@ function AuditResultsContent({
   jobSheetId: number;
 }) {
   const [activeBoxId, setActiveBoxId] = useState<string | number | null>(null);
+  const [focusPage, setFocusPage] = useState<number | null>(null);
   const [annotationOpen, setAnnotationOpen] = useState(false);
   const [newBox, setNewBox] = useState<ViewerBoundingBox | null>(null);
   const [annotationLabel, setAnnotationLabel] = useState("");
@@ -611,24 +642,57 @@ function AuditResultsContent({
     );
   };
 
-  const boxes: ViewerBoundingBox[] = auditData.findings
-    .filter(f => f.box)
-    .map(f => ({
+  const boxes: ViewerBoundingBox[] = findingsToViewerBoxes(
+    auditData.findings.map(f => ({
       id: f.id,
-      page: f.box!.page,
-      x: f.box!.x,
-      y: f.box!.y,
-      width: f.box!.width,
-      height: f.box!.height,
-      color: f.box!.color,
-      label: f.box!.label,
-    }));
+      pageNumber: f.pageNumber ?? f.box?.page,
+      box: f.box,
+      field: f.field,
+      severity: f.severity,
+      status: f.status,
+      label: f.box?.label || f.field,
+    }))
+  );
 
+  /** PDF overlay → findings list (scroll + highlight). */
   const handleBoxClick = (id: string | number) => {
-    setActiveBoxId(id);
-    const element = document.getElementById(`finding-${id}`);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "center" });
+    const { activeBoxId: nextId } = syncSelectionFromBox(id);
+    setActiveBoxId(nextId);
+    const finding = auditData.findings.find(f => f.id === id);
+    const page = finding?.box?.page ?? finding?.pageNumber;
+    if (page) {
+      setFocusPage(page);
+    }
+    // Defer scroll so the active ring paints first
+    requestAnimationFrame(() => {
+      const element = document.getElementById(`finding-${id}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+  };
+
+  /** Finding row / "View on Doc" → PDF page jump + pulse overlay. */
+  const handleFindingClick = (id: string | number) => {
+    const finding = auditData.findings.find(f => f.id === id) ?? null;
+    const sync = syncSelectionFromFinding(
+      finding
+        ? {
+            id: finding.id,
+            pageNumber: finding.pageNumber ?? finding.box?.page,
+            box: finding.box,
+            field: finding.field,
+            severity: finding.severity,
+            status: finding.status,
+          }
+        : null
+    );
+    setActiveBoxId(sync.activeBoxId);
+    if (sync.focusPage != null) {
+      setFocusPage(sync.focusPage);
+    }
+    if (!showPdfViewer) {
+      handleShowPdfViewer();
     }
   };
 
@@ -749,6 +813,8 @@ function AuditResultsContent({
                 <DocumentViewer
                   url={documentUrl || ""}
                   boxes={boxes}
+                  activeBoxId={activeBoxId}
+                  focusPage={focusPage}
                   onBoxClick={handleBoxClick}
                   onBoxCreate={handleBoxCreate}
                 />
@@ -799,7 +865,7 @@ function AuditResultsContent({
                 <FindingsList
                   findings={auditData.findings}
                   activeBoxId={activeBoxId}
-                  onFindingClick={setActiveBoxId}
+                  onFindingClick={handleFindingClick}
                   onReportIssue={handleReportIssue}
                   onOverride={handleOverrideClick}
                 />
@@ -809,7 +875,7 @@ function AuditResultsContent({
                 <FindingsList
                   findings={failedFindings}
                   activeBoxId={activeBoxId}
-                  onFindingClick={setActiveBoxId}
+                  onFindingClick={handleFindingClick}
                   onReportIssue={handleReportIssue}
                   onOverride={handleOverrideClick}
                 />
@@ -819,7 +885,7 @@ function AuditResultsContent({
                 <FindingsList
                   findings={passedFindings}
                   activeBoxId={activeBoxId}
-                  onFindingClick={setActiveBoxId}
+                  onFindingClick={handleFindingClick}
                   onReportIssue={handleReportIssue}
                   onOverride={handleOverrideClick}
                 />

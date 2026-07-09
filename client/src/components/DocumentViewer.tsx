@@ -1,12 +1,20 @@
-import { useState, useRef, useEffect } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
+import { useState, useRef, useEffect } from "react";
+import { Document, Page, pdfjs } from "react-pdf";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, PenTool, MousePointer2 } from "lucide-react";
+import {
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  ChevronLeft,
+  ChevronRight,
+  PenTool,
+  MousePointer2,
+} from "lucide-react";
 import { perfMark, perfMeasure, PERF_MARKS, PERF_MEASURES } from "@/lib/perf";
 
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 
 // Set worker source to CDN to avoid build-time resolution issues
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -16,8 +24,9 @@ pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.vers
  * This prevents CORS issues with Azure Blob SAS URLs
  */
 function assertNoDirectBlobUrl(url: string): void {
-  if (url && url.includes('blob.core.windows.net')) {
-    const errorMsg = '[DocumentViewer] Direct blob.core.windows.net URLs are not allowed. Use the PDF proxy endpoint (/api/documents/:id/pdf) instead.';
+  if (url && url.includes("blob.core.windows.net")) {
+    const errorMsg =
+      "[DocumentViewer] Direct blob.core.windows.net URLs are not allowed. Use the PDF proxy endpoint (/api/documents/:id/pdf) instead.";
     console.error(errorMsg);
     if (import.meta.env.DEV) {
       throw new Error(errorMsg);
@@ -39,34 +48,75 @@ export interface BoundingBox {
 interface DocumentViewerProps {
   url: string;
   initialPage?: number;
+  /** Controlled page jump from finding → PDF sync (PR-12). */
+  focusPage?: number | null;
+  /** Highlight / pulse the active finding overlay (PR-12). */
+  activeBoxId?: string | number | null;
   onPageChange?: (page: number) => void;
   boxes?: BoundingBox[];
   onBoxClick?: (boxId: string | number) => void;
   onBoxCreate?: (box: BoundingBox) => void;
 }
 
-export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [], onBoxClick, onBoxCreate }: DocumentViewerProps) {
+export function DocumentViewer({
+  url,
+  initialPage = 1,
+  focusPage = null,
+  activeBoxId = null,
+  onPageChange,
+  boxes = [],
+  onBoxClick,
+  onBoxCreate,
+}: DocumentViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(initialPage);
   const [scale, setScale] = useState<number>(1.0);
   const [rotation, setRotation] = useState<number>(0);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
-  const [currentBox, setCurrentBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(
+    null
+  );
+  const [currentBox, setCurrentBox] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [pulseBoxId, setPulseBoxId] = useState<string | number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   // Guard: prevent direct blob URLs
   useEffect(() => {
     assertNoDirectBlobUrl(url);
   }, [url]);
 
+  // Jump to page when a finding is selected (PR-12)
+  useEffect(() => {
+    if (focusPage == null || focusPage < 1) return;
+    if (numPages > 0 && focusPage > numPages) return;
+    if (focusPage === pageNumber) return;
+    setPageNumber(focusPage);
+    onPageChange?.(focusPage);
+  }, [focusPage, numPages]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pulse the active overlay briefly when selection changes
+  useEffect(() => {
+    if (activeBoxId == null) {
+      setPulseBoxId(null);
+      return;
+    }
+    setPulseBoxId(activeBoxId);
+    const timer = window.setTimeout(() => setPulseBoxId(null), 1200);
+    return () => window.clearTimeout(timer);
+  }, [activeBoxId, focusPage]);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!isDrawing || !containerRef.current) return;
-    
+
     const rect = containerRef.current.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
-    
+
     setDrawStart({ x, y });
     setCurrentBox({ x, y, width: 0, height: 0 });
   };
@@ -94,8 +144,8 @@ export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [],
         id: Date.now(),
         page: pageNumber,
         ...currentBox,
-        color: '#3b82f6',
-        label: 'New Finding'
+        color: "#3b82f6",
+        label: "New Finding",
       });
     }
 
@@ -106,10 +156,14 @@ export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [],
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
-    
+
     // Performance: mark PDF first byte received
     perfMark(PERF_MARKS.PDF_FIRST_BYTE);
-    perfMeasure(PERF_MEASURES.PDF_TTFB, PERF_MARKS.PDF_VIEW_CLICK, PERF_MARKS.PDF_FIRST_BYTE);
+    perfMeasure(
+      PERF_MEASURES.PDF_TTFB,
+      PERF_MARKS.PDF_VIEW_CLICK,
+      PERF_MARKS.PDF_FIRST_BYTE
+    );
   }
 
   const handlePageChange = (newPage: number) => {
@@ -126,57 +180,80 @@ export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [],
         <CardTitle className="text-sm font-medium">Document Viewer</CardTitle>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 border-r pr-2 mr-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8" 
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
               onClick={() => handlePageChange(Math.max(1, pageNumber - 1))}
               disabled={pageNumber <= 1}
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <span className="text-xs w-16 text-center">
-              Page {pageNumber} of {numPages || '--'}
+              Page {pageNumber} of {numPages || "--"}
             </span>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8" 
-              onClick={() => handlePageChange(Math.min(numPages, pageNumber + 1))}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() =>
+                handlePageChange(Math.min(numPages, pageNumber + 1))
+              }
               disabled={pageNumber >= numPages}
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
-          
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setRotation((r) => (r + 90) % 360)}>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setRotation(r => (r + 90) % 360)}
+          >
             <RotateCw className="w-4 h-4" />
           </Button>
-          
+
           <div className="flex items-center gap-1 border-l pl-2 ml-2">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setScale(s => Math.max(0.5, s - 0.1))}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setScale(s => Math.max(0.5, s - 0.1))}
+            >
               <ZoomOut className="w-4 h-4" />
             </Button>
-            <span className="text-xs w-12 text-center">{Math.round(scale * 100)}%</span>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setScale(s => Math.min(2.5, s + 0.1))}>
+            <span className="text-xs w-12 text-center">
+              {Math.round(scale * 100)}%
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setScale(s => Math.min(2.5, s + 0.1))}
+            >
               <ZoomIn className="w-4 h-4" />
             </Button>
           </div>
-          
+
           <div className="flex items-center gap-1 border-l pl-2 ml-2">
-            <Button 
-              variant={isDrawing ? "secondary" : "ghost"} 
-              size="icon" 
-              className="h-8 w-8" 
+            <Button
+              variant={isDrawing ? "secondary" : "ghost"}
+              size="icon"
+              className="h-8 w-8"
               onClick={() => setIsDrawing(!isDrawing)}
               title={isDrawing ? "Cancel Drawing" : "Draw Box"}
             >
-              {isDrawing ? <MousePointer2 className="w-4 h-4" /> : <PenTool className="w-4 h-4" />}
+              {isDrawing ? (
+                <MousePointer2 className="w-4 h-4" />
+              ) : (
+                <PenTool className="w-4 h-4" />
+              )}
             </Button>
           </div>
         </div>
       </CardHeader>
-      
+
       <div className="flex-1 bg-muted/50 overflow-auto p-4 flex items-center justify-center relative">
         <Document
           file={url}
@@ -190,27 +267,29 @@ export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [],
           error={
             <div className="flex flex-col items-center justify-center h-64 w-full text-destructive">
               <p>Failed to load document.</p>
-              <p className="text-xs mt-2">Please check if the file exists and is a valid PDF.</p>
+              <p className="text-xs mt-2">
+                Please check if the file exists and is a valid PDF.
+              </p>
             </div>
           }
         >
-          <div 
-            className={`relative inline-block ${isDrawing ? 'cursor-crosshair' : ''}`}
+          <div
+            className={`relative inline-block ${isDrawing ? "cursor-crosshair" : ""}`}
             ref={containerRef}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
           >
-            <Page 
-              pageNumber={pageNumber} 
-              scale={scale} 
+            <Page
+              pageNumber={pageNumber}
+              scale={scale}
               rotate={rotation}
               renderTextLayer={true}
               renderAnnotationLayer={true}
               className="bg-white shadow-md"
             />
-            
+
             {/* Current Drawing Box */}
             {currentBox && (
               <div
@@ -225,34 +304,47 @@ export function DocumentViewer({ url, initialPage = 1, onPageChange, boxes = [],
             )}
 
             {/* Bounding Boxes Overlay */}
-            {currentPageBoxes.map(box => (
-              <div
-                key={box.id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onBoxClick?.(box.id);
-                }}
-                className="absolute border-2 cursor-pointer transition-all hover:bg-opacity-20 hover:scale-[1.02] z-10"
-                style={{
-                  left: `${box.x}%`,
-                  top: `${box.y}%`,
-                  width: `${box.width}%`,
-                  height: `${box.height}%`,
-                  borderColor: box.color || '#ef4444',
-                  backgroundColor: `${box.color || '#ef4444'}1A`, // 10% opacity
-                }}
-                title={box.label}
-              >
-                {box.label && (
-                  <span 
-                    className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
-                    style={{ backgroundColor: box.color || '#ef4444' }}
-                  >
-                    {box.label}
-                  </span>
-                )}
-              </div>
-            ))}
+            {currentPageBoxes.map(box => {
+              const isActive = activeBoxId != null && box.id === activeBoxId;
+              const isPulsing = pulseBoxId != null && box.id === pulseBoxId;
+              return (
+                <div
+                  key={box.id}
+                  data-box-id={String(box.id)}
+                  data-active={isActive ? "true" : undefined}
+                  onClick={e => {
+                    e.stopPropagation();
+                    onBoxClick?.(box.id);
+                  }}
+                  className={`absolute border-2 cursor-pointer transition-all hover:bg-opacity-20 z-10 ${
+                    isActive
+                      ? "scale-[1.02] z-20 ring-2 ring-offset-1 ring-primary"
+                      : "hover:scale-[1.02]"
+                  } ${isPulsing ? "animate-pulse" : ""}`}
+                  style={{
+                    left: `${box.x}%`,
+                    top: `${box.y}%`,
+                    width: `${box.width}%`,
+                    height: `${box.height}%`,
+                    borderColor: box.color || "#ef4444",
+                    backgroundColor: isActive
+                      ? `${box.color || "#ef4444"}40`
+                      : `${box.color || "#ef4444"}1A`, // 10% opacity
+                    borderWidth: isActive ? 3 : 2,
+                  }}
+                  title={box.label}
+                >
+                  {box.label && (
+                    <span
+                      className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
+                      style={{ backgroundColor: box.color || "#ef4444" }}
+                    >
+                      {box.label}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </Document>
       </div>
