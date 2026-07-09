@@ -21,7 +21,13 @@ import {
   MessageSquare,
   Pencil,
 } from "lucide-react";
-import { useState, useRef, type RefObject, type MouseEvent } from "react";
+import {
+  useState,
+  useRef,
+  useMemo,
+  type RefObject,
+  type MouseEvent,
+} from "react";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +58,13 @@ import {
   syncSelectionFromFinding,
 } from "@/lib/pdfFindingSync";
 import { isTerminalJobSheetStatus } from "@shared/processingProgress";
+import {
+  SelectionTracePanel,
+  type SelectionTrace,
+} from "@/components/audit/SelectionTracePanel";
+import { mapSelectionTraceFromReport } from "@/components/review/mapSelectionTrace";
+import { useReviewFindingKeyboard } from "@/hooks/useReviewFindingKeyboard";
+import { usePersistFn } from "@/hooks/usePersistFn";
 
 export interface Finding {
   id: number | string;
@@ -81,6 +94,8 @@ export interface AuditData {
   technician: string;
   documentUrl: string;
   findings: Finding[];
+  /** Template selection explainability (from reportJson when available). */
+  selectionTrace?: SelectionTrace | null;
 }
 
 export function mapFindingsFromApi(
@@ -191,9 +206,10 @@ export function ReviewWorkstationPane({
       {
         enabled:
           jobSheetId > 0 &&
-          !auditDataProp &&
-          !!jobSheetData &&
-          isTerminalJobSheetStatus(jobSheetData.status),
+          (auditDataProp
+            ? // Parent supplied findings; still fetch reportJson for SelectionTracePanel.
+              auditDataProp.selectionTrace === undefined
+            : !!jobSheetData && isTerminalJobSheetStatus(jobSheetData.status)),
       }
     );
 
@@ -221,10 +237,18 @@ export function ReviewWorkstationPane({
           technician: `User ${jobSheetData.uploadedBy}`,
           documentUrl: jobSheetData.fileUrl,
           findings: mapFindingsFromApi(findingsData || []),
+          selectionTrace: mapSelectionTraceFromReport(auditResult?.reportJson),
         }
       : null;
 
-  const auditData = auditDataProp ?? fetchedAuditData;
+  const selectionTrace =
+    auditDataProp?.selectionTrace !== undefined
+      ? (auditDataProp.selectionTrace ?? null)
+      : mapSelectionTraceFromReport(auditResult?.reportJson);
+
+  const auditData = auditDataProp
+    ? { ...auditDataProp, selectionTrace }
+    : fetchedAuditData;
   const documentUrl =
     documentUrlProp ??
     (jobSheetId > 0 ? `/api/documents/${jobSheetId}/pdf` : undefined);
@@ -400,16 +424,24 @@ function ReviewWorkstationContent({
     );
   };
 
-  const handleOverrideClick = (finding: Finding, e: MouseEvent) => {
-    e.stopPropagation();
+  const openOverrideForFinding = (finding: Finding) => {
     setActionDialog({ finding, action: "override" });
     setActionReason("");
   };
 
-  const handleCorrectClick = (finding: Finding, e: MouseEvent) => {
-    e.stopPropagation();
+  const openCorrectForFinding = (finding: Finding) => {
     setCorrectionDialog(finding);
     setCorrectedValue(finding.message || finding.value || "");
+  };
+
+  const handleOverrideClick = (finding: Finding, e: MouseEvent) => {
+    e.stopPropagation();
+    openOverrideForFinding(finding);
+  };
+
+  const handleCorrectClick = (finding: Finding, e: MouseEvent) => {
+    e.stopPropagation();
+    openCorrectForFinding(finding);
   };
 
   const submitCorrection = () => {
@@ -569,7 +601,103 @@ function ReviewWorkstationContent({
     if (!showPdfViewer) {
       setShowPdfViewer(true);
     }
+    requestAnimationFrame(() => {
+      const element = document.getElementById(`finding-${id}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
   };
+
+  const navigationFindings = useMemo(() => {
+    const issues = auditData.findings.filter(f => f.status !== "passed");
+    return issues.length > 0 ? issues : auditData.findings;
+  }, [auditData.findings]);
+
+  const selectFindingByOffset = usePersistFn((delta: number) => {
+    if (navigationFindings.length === 0) return;
+    const currentIdx =
+      activeBoxId != null
+        ? navigationFindings.findIndex(f => f.id === activeBoxId)
+        : -1;
+    const nextIdx =
+      currentIdx < 0
+        ? delta > 0
+          ? 0
+          : navigationFindings.length - 1
+        : Math.max(
+            0,
+            Math.min(navigationFindings.length - 1, currentIdx + delta)
+          );
+    handleFindingClick(navigationFindings[nextIdx].id);
+  });
+
+  const getActiveFinding = usePersistFn((): Finding | null => {
+    if (activeBoxId != null) {
+      const active = auditData.findings.find(f => f.id === activeBoxId);
+      if (active) return active;
+    }
+    return (
+      navigationFindings[0] ??
+      auditData.findings.find(f => f.status !== "passed") ??
+      auditData.findings[0] ??
+      null
+    );
+  });
+
+  const onNextFinding = usePersistFn(() => selectFindingByOffset(1));
+  const onPrevFinding = usePersistFn(() => selectFindingByOffset(-1));
+  const onOverrideFinding = usePersistFn(() => {
+    const finding = getActiveFinding();
+    if (!finding) {
+      toast.error("No finding selected");
+      return;
+    }
+    if (finding.status === "passed") {
+      toast.error("Override applies to open findings");
+      return;
+    }
+    openOverrideForFinding(finding);
+  });
+  const onCorrectFinding = usePersistFn(() => {
+    const finding = getActiveFinding();
+    if (!finding) {
+      toast.error("No finding selected");
+      return;
+    }
+    openCorrectForFinding(finding);
+  });
+  const onViewFinding = usePersistFn(() => {
+    const finding = getActiveFinding();
+    if (!finding) {
+      toast.error("No finding selected");
+      return;
+    }
+    handleFindingClick(finding.id);
+    resolvedPaneRef.current?.focus();
+  });
+
+  const findingKeyboardHandlers = useMemo(
+    () => ({
+      onNextFinding,
+      onPrevFinding,
+      onOverrideFinding,
+      onCorrectFinding,
+      onViewFinding,
+    }),
+    [
+      onNextFinding,
+      onPrevFinding,
+      onOverrideFinding,
+      onCorrectFinding,
+      onViewFinding,
+    ]
+  );
+
+  useReviewFindingKeyboard(
+    findingKeyboardHandlers,
+    auditData.findings.length > 0
+  );
 
   const handleBoxCreate = (box: ViewerBoundingBox) => {
     setNewBox(box);
@@ -710,6 +838,14 @@ function ReviewWorkstationContent({
             </>
           )}
         </div>
+      </div>
+
+      <div className={compact ? "mb-2 px-1" : "mb-4"}>
+        <SelectionTracePanel
+          trace={auditData.selectionTrace ?? null}
+          defaultOpen={false}
+          className="shadow-none"
+        />
       </div>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
