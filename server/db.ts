@@ -891,3 +891,157 @@ export async function getEngineerAnalyticsFindings(options?: {
       occurredAt: r.occurredAt,
     }));
 }
+
+// ============ PR-16: COHORT ANALYTICS ============
+
+export interface CohortAnalyticsDocumentRow {
+  jobSheetId: number;
+  siteInfo: string | null;
+  assetType: string | null;
+  workType: string | null;
+  templateSlug: string | null;
+  result: "pass" | "fail" | "review_queue" | "waived";
+  confidenceScore: number | null;
+  processedAt: Date;
+}
+
+export interface CohortAnalyticsFindingRow {
+  findingId: number;
+  jobSheetId: number;
+  severity: "S0" | "S1" | "S2" | "S3";
+  reasonCode: string;
+  fieldName: string;
+  occurredAt: Date;
+}
+
+function parseReportCohort(reportJson: unknown): {
+  assetType: string | null;
+  workType: string | null;
+  templateSlug: string | null;
+} {
+  if (!reportJson || typeof reportJson !== "object") {
+    return { assetType: null, workType: null, templateSlug: null };
+  }
+  const report = reportJson as Record<string, unknown>;
+  const cohort = report.selectionCohort as Record<string, unknown> | undefined;
+  const selection = report.selectionResult as
+    | Record<string, unknown>
+    | undefined;
+  const candidates = selection?.candidates as
+    | Array<Record<string, unknown>>
+    | undefined;
+
+  return {
+    assetType: typeof cohort?.assetType === "string" ? cohort.assetType : null,
+    workType: typeof cohort?.workType === "string" ? cohort.workType : null,
+    templateSlug:
+      typeof cohort?.templateSlug === "string"
+        ? cohort.templateSlug
+        : typeof candidates?.[0]?.templateSlug === "string"
+          ? (candidates[0].templateSlug as string)
+          : null,
+  };
+}
+
+/**
+ * Job sheets + latest audit result for cohort analytics (site / asset / work type).
+ */
+export async function getCohortAnalyticsDocuments(options?: {
+  startDate?: Date;
+  endDate?: Date;
+}): Promise<CohortAnalyticsDocumentRow[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [];
+  if (options?.startDate) {
+    conditions.push(gte(jobSheets.createdAt, options.startDate));
+  }
+  if (options?.endDate) {
+    conditions.push(lte(jobSheets.createdAt, options.endDate));
+  }
+
+  const rows = await db
+    .select({
+      jobSheetId: jobSheets.id,
+      siteInfo: jobSheets.siteInfo,
+      result: auditResults.result,
+      confidenceScore: auditResults.confidenceScore,
+      reportJson: auditResults.reportJson,
+      processedAt: jobSheets.createdAt,
+    })
+    .from(jobSheets)
+    .innerJoin(auditResults, eq(auditResults.jobSheetId, jobSheets.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  // Keep latest audit per job sheet
+  const latest = new Map<number, (typeof rows)[number]>();
+  for (const row of rows) {
+    const existing = latest.get(row.jobSheetId);
+    if (!existing) {
+      latest.set(row.jobSheetId, row);
+      continue;
+    }
+    // Prefer higher audit id via processedAt tie-break already ordered loosely
+    if (row.processedAt > existing.processedAt) {
+      latest.set(row.jobSheetId, row);
+    }
+  }
+
+  return Array.from(latest.values()).map(r => {
+    const cohort = parseReportCohort(r.reportJson);
+    const conf = r.confidenceScore != null ? Number(r.confidenceScore) : null;
+    return {
+      jobSheetId: r.jobSheetId,
+      siteInfo: r.siteInfo,
+      assetType: cohort.assetType,
+      workType: cohort.workType,
+      templateSlug: cohort.templateSlug,
+      result: r.result,
+      confidenceScore: conf != null && Number.isFinite(conf) ? conf : null,
+      processedAt: r.processedAt,
+    };
+  });
+}
+
+/**
+ * Findings for cohort analytics within an optional date window.
+ */
+export async function getCohortAnalyticsFindings(options?: {
+  startDate?: Date;
+  endDate?: Date;
+}): Promise<CohortAnalyticsFindingRow[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [];
+  if (options?.startDate) {
+    conditions.push(gte(auditFindings.createdAt, options.startDate));
+  }
+  if (options?.endDate) {
+    conditions.push(lte(auditFindings.createdAt, options.endDate));
+  }
+
+  const rows = await db
+    .select({
+      findingId: auditFindings.id,
+      jobSheetId: jobSheets.id,
+      severity: auditFindings.severity,
+      reasonCode: auditFindings.reasonCode,
+      fieldName: auditFindings.fieldName,
+      occurredAt: auditFindings.createdAt,
+    })
+    .from(auditFindings)
+    .innerJoin(auditResults, eq(auditFindings.auditResultId, auditResults.id))
+    .innerJoin(jobSheets, eq(auditResults.jobSheetId, jobSheets.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  return rows.map(r => ({
+    findingId: r.findingId,
+    jobSheetId: r.jobSheetId,
+    severity: r.severity,
+    reasonCode: r.reasonCode,
+    fieldName: r.fieldName,
+    occurredAt: r.occurredAt,
+  }));
+}

@@ -26,6 +26,7 @@ import {
 } from "./templateSelector";
 import {
   getTemplateVersion,
+  getTemplate,
   getActiveTemplates,
   ensureTemplatesReady,
   getDefaultTemplateVersion,
@@ -95,6 +96,48 @@ export interface ProcessingOptions {
    * This option is ignored; templates are always used.
    */
   useLegacyPath?: boolean;
+}
+
+/**
+ * PR-16: Persist selection + template cohort dimensions on the audit report
+ * so analytics can aggregate by assetType / workType without a live registry join.
+ */
+function buildSelectionCohortMeta(
+  selectionResult: SelectionResult | undefined,
+  templateVersionId?: number
+): {
+  templateSlug: string | null;
+  templateId: number | null;
+  versionId: number | null;
+  assetType: string | null;
+  workType: string | null;
+  client: string | null;
+  confidenceBand: string | null;
+  scoreGap: number | null;
+} | null {
+  if (!selectionResult && templateVersionId == null) return null;
+
+  const versionId = selectionResult?.versionId ?? templateVersionId ?? null;
+  const version = versionId != null ? getTemplateVersion(versionId) : null;
+  const template =
+    version != null
+      ? getTemplate(version.templateId)
+      : selectionResult?.templateId != null
+        ? getTemplate(selectionResult.templateId)
+        : null;
+
+  const topCandidate = selectionResult?.candidates?.[0];
+
+  return {
+    templateSlug: topCandidate?.templateSlug ?? template?.templateId ?? null,
+    templateId: selectionResult?.templateId ?? template?.id ?? null,
+    versionId,
+    assetType: template?.assetType ?? null,
+    workType: template?.workType ?? null,
+    client: template?.client ?? null,
+    confidenceBand: selectionResult?.confidenceBand ?? null,
+    scoreGap: selectionResult?.scoreGap ?? null,
+  };
 }
 
 const PIPELINE_VERSION = "2.1.0"; // PR-8: ensemble extraction stage
@@ -517,6 +560,7 @@ export async function processJobSheetWithOptions(
             ...ocrResilienceReportFields(ocrResult),
             hybridAssessment: hybridResult,
             selectionResult,
+            selectionCohort: buildSelectionCohortMeta(selectionResult),
           },
           processingTimeMs: Date.now() - startTime,
         });
@@ -835,6 +879,11 @@ export async function processJobSheetWithOptions(
           ? { ensembleExtraction: ensembleResult.artifact }
           : {}),
         ...ocrResilienceReportFields(ocrResult),
+        ...(selectionResult ? { selectionResult } : {}),
+        selectionCohort: buildSelectionCohortMeta(
+          selectionResult,
+          usedTemplateVersionId
+        ),
       },
       processingTimeMs: Date.now() - startTime,
     });

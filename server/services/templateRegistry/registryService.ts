@@ -1,13 +1,13 @@
 /**
  * Template Registry Service
- * 
+ *
  * Manages template lifecycle: creation, versioning, and retrieval.
  * Provides deterministic hashing for version integrity.
- * 
+ *
  * PR-1: SSOT Enforcement - The registry is the ONLY source of truth for templates.
  */
 
-import { createHash } from 'crypto';
+import { createHash } from "crypto";
 import type {
   CreateTemplateInput,
   CreateVersionInput,
@@ -15,9 +15,18 @@ import type {
   SelectionConfig,
   RoiConfig,
   TemplateWithVersion,
-} from './types';
-import { checkActivationPreconditions, formatActivationError } from './activationGates';
-import { checkFixturesForActivation, hasFixturePack } from './fixtureRunner';
+} from "./types";
+import {
+  checkActivationPreconditions,
+  formatActivationError,
+} from "./activationGates";
+import { checkFixturesForActivation, hasFixturePack } from "./fixtureRunner";
+import {
+  detectTemplateCollisions,
+  fingerprintFromSelectionConfig,
+  formatCollisionError,
+  type TemplateFingerprint,
+} from "./collisionDetector";
 import {
   DEFAULT_TEMPLATE_ID,
   DEFAULT_TEMPLATE_NAME,
@@ -27,7 +36,7 @@ import {
   getSsotMode,
   type SsotMode,
   type SsotValidationResult,
-} from './defaultTemplate';
+} from "./defaultTemplate";
 
 // In-memory store for no-secrets CI (production would use DB)
 interface TemplateRecord {
@@ -37,7 +46,7 @@ interface TemplateRecord {
   client: string | null;
   assetType: string | null;
   workType: string | null;
-  status: 'draft' | 'active' | 'deprecated' | 'archived';
+  status: "draft" | "active" | "deprecated" | "archived";
   description: string | null;
   /** Template category (e.g., 'maintenance', 'inspection') */
   category: string | null;
@@ -71,7 +80,7 @@ let nextVersionId = 1;
 /**
  * Compute deterministic SHA-256 hash of template version content.
  * Hash includes specJson + selectionConfigJson (not ROI as it's optional).
- * 
+ *
  * CRITICAL: Uses stable JSON stringification for determinism.
  */
 export function computeVersionHash(
@@ -81,29 +90,29 @@ export function computeVersionHash(
   // Create combined object and deep sort for determinism
   const combined = { selection: selectionConfigJson, spec: specJson };
   const sortedContent = JSON.stringify(sortObjectKeys(combined));
-  
-  return createHash('sha256').update(sortedContent).digest('hex');
+
+  return createHash("sha256").update(sortedContent).digest("hex");
 }
 
 /**
  * Recursively sort object keys
  */
 function sortObjectKeys(obj: unknown): unknown {
-  if (obj === null || typeof obj !== 'object') {
+  if (obj === null || typeof obj !== "object") {
     return obj;
   }
-  
+
   if (Array.isArray(obj)) {
     return obj.map(sortObjectKeys);
   }
-  
+
   const sorted: Record<string, unknown> = {};
   const keys = Object.keys(obj as Record<string, unknown>).sort();
-  
+
   for (const key of keys) {
     sorted[key] = sortObjectKeys((obj as Record<string, unknown>)[key]);
   }
-  
+
   return sorted;
 }
 
@@ -113,7 +122,7 @@ function sortObjectKeys(obj: unknown): unknown {
 export function createTemplate(input: CreateTemplateInput): TemplateRecord {
   const id = nextTemplateId++;
   const now = new Date();
-  
+
   const template: TemplateRecord = {
     id,
     templateId: input.templateId,
@@ -121,7 +130,7 @@ export function createTemplate(input: CreateTemplateInput): TemplateRecord {
     client: input.client ?? null,
     assetType: input.assetType ?? null,
     workType: input.workType ?? null,
-    status: 'draft',
+    status: "draft",
     description: input.description ?? null,
     category: input.category ?? null,
     tags: input.tags ?? [],
@@ -129,7 +138,7 @@ export function createTemplate(input: CreateTemplateInput): TemplateRecord {
     createdAt: now,
     updatedAt: now,
   };
-  
+
   templateStore.set(id, template);
   return template;
 }
@@ -137,25 +146,35 @@ export function createTemplate(input: CreateTemplateInput): TemplateRecord {
 /**
  * Upload a new template version
  */
-export function uploadTemplateVersion(input: CreateVersionInput): VersionRecord {
+export function uploadTemplateVersion(
+  input: CreateVersionInput
+): VersionRecord {
   const template = templateStore.get(input.templateId);
   if (!template) {
     throw new Error(`Template not found: ${input.templateId}`);
   }
-  
+
   // Compute deterministic hash
-  const hashSha256 = computeVersionHash(input.specJson, input.selectionConfigJson);
-  
+  const hashSha256 = computeVersionHash(
+    input.specJson,
+    input.selectionConfigJson
+  );
+
   // Check for duplicate hash (same content)
   for (const version of Array.from(versionStore.values())) {
-    if (version.templateId === input.templateId && version.hashSha256 === hashSha256) {
-      throw new Error(`Version with identical content already exists: ${version.version}`);
+    if (
+      version.templateId === input.templateId &&
+      version.hashSha256 === hashSha256
+    ) {
+      throw new Error(
+        `Version with identical content already exists: ${version.version}`
+      );
     }
   }
-  
+
   const id = nextVersionId++;
   const now = new Date();
-  
+
   const version: VersionRecord = {
     id,
     templateId: input.templateId,
@@ -169,7 +188,7 @@ export function uploadTemplateVersion(input: CreateVersionInput): VersionRecord 
     createdBy: input.createdBy,
     createdAt: now,
   };
-  
+
   versionStore.set(id, version);
   return version;
 }
@@ -179,12 +198,12 @@ export function uploadTemplateVersion(input: CreateVersionInput): VersionRecord 
  */
 export function listTemplates(): TemplateWithVersion[] {
   const result: TemplateWithVersion[] = [];
-  
+
   for (const template of Array.from(templateStore.values())) {
     // Find active version for this template
     let activeVersion: VersionRecord | undefined;
     let versionCount = 0;
-    
+
     for (const version of Array.from(versionStore.values())) {
       if (version.templateId === template.id) {
         versionCount++;
@@ -193,7 +212,7 @@ export function listTemplates(): TemplateWithVersion[] {
         }
       }
     }
-    
+
     result.push({
       id: template.id,
       templateId: template.templateId,
@@ -208,7 +227,7 @@ export function listTemplates(): TemplateWithVersion[] {
       versionCount,
     });
   }
-  
+
   // Sort by templateId for determinism
   return result.sort((a, b) => a.templateId.localeCompare(b.templateId));
 }
@@ -218,13 +237,13 @@ export function listTemplates(): TemplateWithVersion[] {
  */
 export function listVersions(templateId: number): VersionRecord[] {
   const versions: VersionRecord[] = [];
-  
+
   for (const version of Array.from(versionStore.values())) {
     if (version.templateId === templateId) {
       versions.push(version);
     }
   }
-  
+
   // Sort by version (semver-like) for determinism
   return versions.sort((a, b) => {
     // Sort by createdAt desc (newest first)
@@ -266,44 +285,81 @@ export interface ActivationOptions {
   skipPreconditions?: boolean;
   /** Skip fixture checks (for testing only) */
   skipFixtures?: boolean;
+  /** Skip fingerprint collision checks (for testing only) */
+  skipCollisionCheck?: boolean;
+}
+
+/**
+ * Build fingerprints for all templates that have an active (or any) version.
+ * Used by collision governance before activation.
+ */
+export function listTemplateFingerprints(
+  excludeTemplateId?: number
+): TemplateFingerprint[] {
+  const fingerprints: TemplateFingerprint[] = [];
+
+  for (const template of Array.from(templateStore.values())) {
+    if (excludeTemplateId != null && template.id === excludeTemplateId) {
+      continue;
+    }
+    const version =
+      getActiveVersion(template.id) ?? listVersions(template.id)[0] ?? null;
+    if (!version) continue;
+    fingerprints.push(
+      fingerprintFromSelectionConfig(
+        template.templateId,
+        version.selectionConfigJson,
+        template.id
+      )
+    );
+  }
+
+  return fingerprints.sort((a, b) =>
+    a.templateSlug.localeCompare(b.templateSlug)
+  );
 }
 
 /**
  * Activate a template version
  * Deactivates any other active version for the same template
- * 
+ *
  * PR-D: Enforces activation preconditions
  * PR-E: Enforces fixture validation
- * 
+ *
  * @param versionId - Version ID to activate
  * @param skipOrOptions - Boolean for backward compat or options object
  */
 export function activateVersion(
-  versionId: number, 
+  versionId: number,
   skipOrOptions: boolean | ActivationOptions = false
 ): VersionRecord {
   // Handle backward compatibility
-  const options: ActivationOptions = typeof skipOrOptions === 'boolean'
-    ? { skipPreconditions: skipOrOptions, skipFixtures: skipOrOptions }
-    : skipOrOptions;
+  const options: ActivationOptions =
+    typeof skipOrOptions === "boolean"
+      ? {
+          skipPreconditions: skipOrOptions,
+          skipFixtures: skipOrOptions,
+          skipCollisionCheck: skipOrOptions,
+        }
+      : skipOrOptions;
 
   const version = versionStore.get(versionId);
   if (!version) {
     throw new Error(`Version not found: ${versionId}`);
   }
-  
+
   // PR-D: Check activation preconditions
   if (!options.skipPreconditions) {
     const preconditionResult = checkActivationPreconditions(
       version.specJson,
       version.selectionConfigJson
     );
-    
+
     if (!preconditionResult.allowed) {
       throw new Error(formatActivationError(preconditionResult));
     }
   }
-  
+
   // PR-E: Check fixtures (only if not skipped and fixtures exist)
   if (!options.skipFixtures && hasFixturePack(versionId)) {
     const fixtureResult = checkFixturesForActivation(
@@ -311,29 +367,48 @@ export function activateVersion(
       version.specJson,
       version.selectionConfigJson
     );
-    
+
     if (!fixtureResult.allowed) {
-      throw new Error(fixtureResult.error || 'Fixture validation failed');
+      throw new Error(fixtureResult.error || "Fixture validation failed");
     }
   }
-  
+
+  // PR-16: Template fingerprint collision governance.
+  // Default: skip when preconditions are skipped (test helpers); production
+  // activateVersion(id) runs the check.
+  const skipCollision =
+    options.skipCollisionCheck ?? options.skipPreconditions ?? false;
+  if (!skipCollision) {
+    const template = templateStore.get(version.templateId);
+    const candidate = fingerprintFromSelectionConfig(
+      template?.templateId ?? `template-${version.templateId}`,
+      version.selectionConfigJson,
+      version.templateId
+    );
+    const existing = listTemplateFingerprints(version.templateId);
+    const collisionReport = detectTemplateCollisions(candidate, existing);
+    if (!collisionReport.allowed) {
+      throw new Error(formatCollisionError(collisionReport));
+    }
+  }
+
   // Deactivate other versions for this template
   for (const v of Array.from(versionStore.values())) {
     if (v.templateId === version.templateId && v.id !== versionId) {
       v.isActive = false;
     }
   }
-  
+
   // Activate this version
   version.isActive = true;
-  
+
   // Also activate the template if it's in draft
   const template = templateStore.get(version.templateId);
-  if (template && template.status === 'draft') {
-    template.status = 'active';
+  if (template && template.status === "draft") {
+    template.status = "active";
     template.updatedAt = new Date();
   }
-  
+
   return version;
 }
 
@@ -353,8 +428,8 @@ export function getActiveVersion(templateId: number): VersionRecord | null {
  * Get all active templates (status = 'active' and has an active version)
  */
 export function getActiveTemplates(): TemplateWithVersion[] {
-  return listTemplates().filter(t => 
-    t.status === 'active' && t.activeVersionId !== null
+  return listTemplates().filter(
+    t => t.status === "active" && t.activeVersionId !== null
   );
 }
 
@@ -363,22 +438,22 @@ export function getActiveTemplates(): TemplateWithVersion[] {
  */
 export function updateTemplateStatus(
   id: number,
-  status: 'draft' | 'active' | 'deprecated' | 'archived'
+  status: "draft" | "active" | "deprecated" | "archived"
 ): TemplateRecord {
   const template = templateStore.get(id);
   if (!template) {
     throw new Error(`Template not found: ${id}`);
   }
-  
+
   template.status = status;
   template.updatedAt = new Date();
-  
+
   return template;
 }
 
 /**
  * Update ROI configuration for a template version
- * 
+ *
  * PR-H: Allows saving ROI from the visual editor
  */
 export function updateVersionRoi(
@@ -389,9 +464,9 @@ export function updateVersionRoi(
   if (!version) {
     throw new Error(`Version not found: ${versionId}`);
   }
-  
+
   version.roiJson = roiJson;
-  
+
   return version;
 }
 
@@ -428,48 +503,50 @@ export function hasDefaultTemplate(): boolean {
 
 /**
  * Initialize the default template if it doesn't exist
- * 
+ *
  * This is called in permissive mode to ensure there's always a fallback.
  * In strict mode, this should NOT be called - templates must be explicitly created.
- * 
+ *
  * @returns The default template version ID, or null if already exists
  */
-export function initializeDefaultTemplate(createdBy: number = 0): number | null {
+export function initializeDefaultTemplate(
+  createdBy: number = 0
+): number | null {
   // Check if default template already exists
   if (hasDefaultTemplate()) {
     return null;
   }
-  
+
   // Create the default template
   const template = createTemplate({
     templateId: DEFAULT_TEMPLATE_ID,
     name: DEFAULT_TEMPLATE_NAME,
-    description: 'Default job sheet template (auto-created by SSOT system)',
-    category: 'maintenance',
-    tags: ['default', 'ssot', 'auto-created'],
+    description: "Default job sheet template (auto-created by SSOT system)",
+    category: "maintenance",
+    tags: ["default", "ssot", "auto-created"],
     createdBy,
   });
-  
+
   // Create the default version
   const version = uploadTemplateVersion({
     templateId: template.id,
-    version: '1.0.0',
+    version: "1.0.0",
     specJson: DEFAULT_SPEC_JSON,
     selectionConfigJson: DEFAULT_SELECTION_CONFIG,
     roiJson: DEFAULT_ROI_CONFIG,
-    changeNotes: 'Initial version - migrated from legacy getDefaultGoldSpec()',
+    changeNotes: "Initial version - migrated from legacy getDefaultGoldSpec()",
     createdBy,
   });
-  
+
   // Activate it (skip preconditions for the default template)
   activateVersion(version.id, { skipPreconditions: true, skipFixtures: true });
-  
+
   return version.id;
 }
 
 /**
  * Validate SSOT requirements
- * 
+ *
  * In strict mode: At least one active template must exist
  * In permissive mode: Auto-initializes default template if needed
  */
@@ -478,8 +555,8 @@ export function validateSsotRequirements(): SsotValidationResult {
   const activeTemplates = getActiveTemplates();
   const hasActive = activeTemplates.length > 0;
   const hasDefault = hasDefaultTemplate();
-  
-  if (mode === 'strict') {
+
+  if (mode === "strict") {
     // Strict mode: require at least one active template
     if (!hasActive) {
       return {
@@ -487,8 +564,9 @@ export function validateSsotRequirements(): SsotValidationResult {
         mode,
         hasActiveTemplates: false,
         hasDefaultTemplate: hasDefault,
-        error: 'SSOT_VIOLATION: No active templates in strict mode. ' +
-               'Either activate a template or set TEMPLATE_SSOT_MODE=permissive.',
+        error:
+          "SSOT_VIOLATION: No active templates in strict mode. " +
+          "Either activate a template or set TEMPLATE_SSOT_MODE=permissive.",
       };
     }
   } else {
@@ -497,7 +575,7 @@ export function validateSsotRequirements(): SsotValidationResult {
       initializeDefaultTemplate();
     }
   }
-  
+
   return {
     valid: true,
     mode,
@@ -508,7 +586,7 @@ export function validateSsotRequirements(): SsotValidationResult {
 
 /**
  * Get the default template version (if it exists and is active)
- * 
+ *
  * @returns The active version of the default template, or null
  */
 export function getDefaultTemplateVersion(): VersionRecord | null {
@@ -519,13 +597,13 @@ export function getDefaultTemplateVersion(): VersionRecord | null {
 
 /**
  * Ensure templates are ready for processing
- * 
+ *
  * This is the main entry point for SSOT validation before processing.
  * Throws an error if SSOT requirements are not met.
  */
 export function ensureTemplatesReady(): void {
   const validation = validateSsotRequirements();
   if (!validation.valid) {
-    throw new Error(validation.error ?? 'SSOT validation failed');
+    throw new Error(validation.error ?? "SSOT validation failed");
   }
 }
