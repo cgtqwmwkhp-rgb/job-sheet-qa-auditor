@@ -119,7 +119,7 @@ describe("Fail-Safety Contract (PR-3)", () => {
   });
 
   describe("B. Thresholds", () => {
-    it("computePageConfidencePrior below ocrConfidenceThreshold/100 triggers LOW_OCR_CONFIDENCE path", () => {
+    it("computePageConfidencePrior below ocrConfidenceThreshold/100 soft-gates LOW_OCR_CONFIDENCE after judgment", () => {
       const ocrResult: OCRResult = {
         success: true,
         totalPages: 1,
@@ -137,7 +137,7 @@ describe("Fail-Safety Contract (PR-3)", () => {
       expect(prior).toBeDefined();
       expect(prior!).toBeLessThan(60 / 100);
 
-      // documentProcessor wires this check — verify source contains the gate
+      // Soft gate: continue to judgment, then demote to REVIEW_QUEUE — do not early-return
       const dpPath = path.resolve(
         __dirname,
         "../../services/documentProcessor.ts"
@@ -146,6 +146,12 @@ describe("Fail-Safety Contract (PR-3)", () => {
       expect(dp).toContain("LOW_OCR_CONFIDENCE");
       expect(dp).toContain("ocrConfidenceThreshold");
       expect(dp).toContain("computePageConfidencePrior");
+      expect(dp).toContain("continuing to judgment");
+      expect(dp).toContain("lowOcrConfidence");
+      // Must not hard-abort before template/Gemini (old early-return pattern)
+      expect(dp).not.toMatch(
+        /OCR confidence below threshold[\s\S]{0,200}createAuditResult[\s\S]{0,400}finishProgress\("review_queue"\)/
+      );
     });
 
     it("documentProcessor forces review_queue when analyzer score < llmConfidenceThreshold", () => {

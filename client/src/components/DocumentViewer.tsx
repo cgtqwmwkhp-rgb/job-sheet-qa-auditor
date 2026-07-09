@@ -19,6 +19,8 @@ import "react-pdf/dist/Page/TextLayer.css";
 // Set worker source to CDN to avoid build-time resolution issues
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
+type PdfFileSource = string | { data: ArrayBuffer };
+
 /**
  * Guard: Throw in dev if blob.core.windows.net URL is used
  * This prevents CORS issues with Azure Blob SAS URLs
@@ -83,11 +85,53 @@ export function DocumentViewer({
     width: number;
     height: number;
   } | null>(null);
+  /** Authenticated bytes for Easy Auth — pdf.js URL fetch omits cookies by default. */
+  const [pdfFile, setPdfFile] = useState<PdfFileSource | null>(null);
+  const [pdfLoadError, setPdfLoadError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Guard: prevent direct blob URLs
   useEffect(() => {
     assertNoDirectBlobUrl(url);
+  }, [url]);
+
+  // Fetch via credentials:include so AppServiceAuthSession reaches /api/documents/:id/pdf
+  useEffect(() => {
+    let cancelled = false;
+    setPdfFile(null);
+    setPdfLoadError(null);
+    setNumPages(0);
+
+    if (!url) return;
+
+    (async () => {
+      try {
+        const res = await fetch(url, {
+          credentials: "include",
+          headers: { Accept: "application/pdf" },
+        });
+        if (!res.ok) {
+          throw new Error(`PDF fetch failed (${res.status})`);
+        }
+        const buffer = await res.arrayBuffer();
+        if (!cancelled) {
+          setPdfFile({ data: buffer });
+        }
+      } catch (err) {
+        console.error("[DocumentViewer] Authenticated PDF fetch failed:", err);
+        if (!cancelled) {
+          // Fallback: let react-pdf try with withCredentials
+          setPdfFile(url);
+          setPdfLoadError(
+            err instanceof Error ? err.message : "PDF fetch failed"
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [url]);
 
   // Sync page from finding selection during render (avoids setState-in-effect)
@@ -254,8 +298,14 @@ export function DocumentViewer({
       </CardHeader>
 
       <div className="flex-1 bg-muted/50 overflow-auto p-4 flex items-center justify-center relative">
+        {!pdfFile ? (
+          <div className="flex items-center justify-center h-64 w-full">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : (
         <Document
-          file={url}
+          file={pdfFile}
+          options={{ withCredentials: true }}
           onLoadSuccess={onDocumentLoadSuccess}
           className="shadow-lg"
           loading={
@@ -267,7 +317,8 @@ export function DocumentViewer({
             <div className="flex flex-col items-center justify-center h-64 w-full text-destructive">
               <p>Failed to load document.</p>
               <p className="text-xs mt-2">
-                Please check if the file exists and is a valid PDF.
+                {pdfLoadError ||
+                  "Please check if the file exists and is a valid PDF."}
               </p>
             </div>
           }
@@ -346,6 +397,7 @@ export function DocumentViewer({
             })}
           </div>
         </Document>
+        )}
       </div>
     </Card>
   );
