@@ -26,7 +26,10 @@ describe('API Authentication Contract', () => {
     });
 
     it('should decode base64 principal from Azure header', () => {
-      expect(sdkContent).toContain("Buffer.from(azureClientPrincipal, 'base64')");
+      // Prettier may use "base64" or 'base64' — match either.
+      expect(sdkContent).toMatch(
+        /Buffer\.from\(\s*azureClientPrincipal\s*,\s*['"]base64['"]\s*\)/
+      );
     });
 
     it('should parse principal JSON', () => {
