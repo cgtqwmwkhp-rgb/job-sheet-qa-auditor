@@ -70,6 +70,7 @@ export function DocumentViewer({
 }: DocumentViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(initialPage);
+  const [syncedFocusPage, setSyncedFocusPage] = useState(focusPage);
   const [scale, setScale] = useState<number>(1.0);
   const [rotation, setRotation] = useState<number>(0);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -82,7 +83,6 @@ export function DocumentViewer({
     width: number;
     height: number;
   } | null>(null);
-  const [pulseBoxId, setPulseBoxId] = useState<string | number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Guard: prevent direct blob URLs
@@ -90,25 +90,24 @@ export function DocumentViewer({
     assertNoDirectBlobUrl(url);
   }, [url]);
 
-  // Jump to page when a finding is selected (PR-12)
+  // Sync page from finding selection during render (avoids setState-in-effect)
+  if (focusPage !== syncedFocusPage) {
+    setSyncedFocusPage(focusPage);
+    if (
+      focusPage != null &&
+      focusPage >= 1 &&
+      (numPages === 0 || focusPage <= numPages)
+    ) {
+      setPageNumber(focusPage);
+    }
+  }
+
+  // Notify parent of focus-driven page jumps without setState in the effect
   useEffect(() => {
     if (focusPage == null || focusPage < 1) return;
     if (numPages > 0 && focusPage > numPages) return;
-    if (focusPage === pageNumber) return;
-    setPageNumber(focusPage);
     onPageChange?.(focusPage);
   }, [focusPage, numPages]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Pulse the active overlay briefly when selection changes
-  useEffect(() => {
-    if (activeBoxId == null) {
-      setPulseBoxId(null);
-      return;
-    }
-    setPulseBoxId(activeBoxId);
-    const timer = window.setTimeout(() => setPulseBoxId(null), 1200);
-    return () => window.clearTimeout(timer);
-  }, [activeBoxId, focusPage]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!isDrawing || !containerRef.current) return;
@@ -306,7 +305,7 @@ export function DocumentViewer({
             {/* Bounding Boxes Overlay */}
             {currentPageBoxes.map(box => {
               const isActive = activeBoxId != null && box.id === activeBoxId;
-              const isPulsing = pulseBoxId != null && box.id === pulseBoxId;
+              const isPulsing = isActive;
               return (
                 <div
                   key={box.id}
