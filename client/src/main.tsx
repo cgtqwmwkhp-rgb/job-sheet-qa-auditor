@@ -12,33 +12,8 @@ import "./index.css";
 // Initialize analytics if configured
 initAnalytics();
 
-/**
- * If a stale service worker SPA-fallback served index.html for /.auth/*,
- * the React app boots on an Easy Auth URL and shows 404 while login.windows.net
- * is blocked as a cross-origin frame load. Unregister SW and hard-navigate once
- * so Easy Auth can 302 to Microsoft at the top level.
- */
-async function recoverEasyAuthFromServiceWorker(): Promise<void> {
-  if (typeof window === "undefined") return;
-  const path = window.location.pathname;
-  if (!path.startsWith("/.auth")) return;
-  try {
-    if ("serviceWorker" in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map(r => r.unregister()));
-    }
-    const keys = await caches.keys();
-    await Promise.all(keys.map(k => caches.delete(k)));
-  } catch {
-    // continue to hard navigation anyway
-  }
-  const url = `${path}${window.location.search}`;
-  window.location.replace(url);
-}
-
-void recoverEasyAuthFromServiceWorker();
-
-// One-time purge of pre-denylist service workers (navigateFallback ate /.auth).
+// One-time purge of pre-denylist service workers (old NavigationRoute ate /.auth).
+// Do NOT auto-navigate on /.auth/* — that caused login loops with Easy Auth.
 try {
   const FLAG = "jsqa_sw_auth_denylist_v1";
   if (
@@ -48,6 +23,12 @@ try {
   ) {
     void navigator.serviceWorker.getRegistrations().then(async regs => {
       await Promise.all(regs.map(r => r.unregister()));
+      try {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      } catch {
+        // ignore
+      }
       localStorage.setItem(FLAG, "1");
     });
   }
