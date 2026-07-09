@@ -109,7 +109,8 @@ export interface ProcessingOptions {
   useLegacyPath?: boolean;
 }
 
-export interface OrchestrateJobSheetProcessingRequest extends ProcessingOptions {
+export interface OrchestrateJobSheetProcessingRequest
+  extends ProcessingOptions {
   jobSheetId: number;
   /**
    * Primary HTTP callers already have this from their job sheet lookup. Retry
@@ -1032,7 +1033,9 @@ async function processJobSheetWithOptions(
       goldSpecId: options.goldSpecId || 1, // Default to spec ID 1 if not provided
       runId,
       result: analysisResult.overallResult.toLowerCase() as
-        "pass" | "fail" | "review_queue",
+        | "pass"
+        | "fail"
+        | "review_queue",
       confidenceScore: String(analysisResult.score),
       documentStrategy: "ocr", // We used OCR
       ocrEngineVersion: getOCREngineVersion(
