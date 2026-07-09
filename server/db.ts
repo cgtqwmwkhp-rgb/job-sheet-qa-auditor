@@ -668,8 +668,7 @@ export async function getExecutiveSummaryStats(options?: {
 
   const end = options?.endDate ?? new Date();
   const start =
-    options?.startDate ??
-    new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    options?.startDate ?? new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   const auditPeriod = and(
     gte(auditResults.createdAt, start),
