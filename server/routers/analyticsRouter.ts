@@ -82,8 +82,20 @@ const periodInput = z
   .object({
     startDate: z.string().optional(),
     endDate: z.string().optional(),
+    site: z.string().optional(),
   })
   .optional();
+
+type AnalyticsPeriodInput = {
+  startDate?: string;
+  endDate?: string;
+  site?: string;
+};
+
+function normalizeSite(site?: string): string | undefined {
+  const trimmed = site?.trim();
+  return trimmed ? trimmed : undefined;
+}
 
 function priorWindowStart(startIso: string, endIso: string): Date {
   const startMs = new Date(startIso).getTime();
@@ -96,10 +108,12 @@ async function loadEngineerAnalyticsInputs(input?: {
   startDate?: string;
   endDate?: string;
   technicianId?: number;
+  site?: string;
 }) {
   const period = resolvePeriod(input?.startDate, input?.endDate);
   const fetchStart = priorWindowStart(period.start, period.end);
   const fetchEnd = new Date(period.end);
+  const site = normalizeSite(input?.site);
 
   const [users, documents, findings] = await Promise.all([
     db.getAllUsers(),
@@ -107,11 +121,13 @@ async function loadEngineerAnalyticsInputs(input?: {
       startDate: fetchStart,
       endDate: fetchEnd,
       technicianId: input?.technicianId,
+      site,
     }),
     db.getEngineerAnalyticsFindings({
       startDate: fetchStart,
       endDate: fetchEnd,
       technicianId: input?.technicianId,
+      site,
     }),
   ]);
 
@@ -130,22 +146,22 @@ async function loadEngineerAnalyticsInputs(input?: {
   };
 }
 
-async function loadCohortAnalyticsInputs(input?: {
-  startDate?: string;
-  endDate?: string;
-}) {
+async function loadCohortAnalyticsInputs(input?: AnalyticsPeriodInput) {
   const period = resolveCohortPeriod(input?.startDate, input?.endDate);
   const fetchStart = new Date(period.start);
   const fetchEnd = new Date(period.end);
+  const site = normalizeSite(input?.site);
 
   const [documents, findings] = await Promise.all([
     db.getCohortAnalyticsDocuments({
       startDate: fetchStart,
       endDate: fetchEnd,
+      site,
     }),
     db.getCohortAnalyticsFindings({
       startDate: fetchStart,
       endDate: fetchEnd,
+      site,
     }),
   ]);
 
@@ -156,16 +172,15 @@ async function loadCohortAnalyticsInputs(input?: {
   };
 }
 
-async function loadExceptionAnalyticsInputs(input?: {
-  startDate?: string;
-  endDate?: string;
-}) {
+async function loadExceptionAnalyticsInputs(input?: AnalyticsPeriodInput) {
   const period = resolveExceptionPeriod(input?.startDate, input?.endDate);
+  const site = normalizeSite(input?.site);
   const [holdItems, findings] = await Promise.all([
-    db.getExceptionHoldQueueItems(),
+    db.getExceptionHoldQueueItems({ site }),
     db.getExceptionOverturnFindings({
       startDate: new Date(period.start),
       endDate: new Date(period.end),
+      site,
     }),
   ]);
 
@@ -176,19 +191,19 @@ async function loadExceptionAnalyticsInputs(input?: {
   };
 }
 
-async function loadDriftAnalyticsInputs(input?: {
-  startDate?: string;
-  endDate?: string;
-}) {
+async function loadDriftAnalyticsInputs(input?: AnalyticsPeriodInput) {
   const period = resolveDriftPeriod(input?.startDate, input?.endDate);
+  const site = normalizeSite(input?.site);
   const [documents, findings] = await Promise.all([
     db.getDriftAnalyticsDocuments({
       startDate: new Date(period.start),
       endDate: new Date(period.end),
+      site,
     }),
     db.getDriftAnalyticsFindings({
       startDate: new Date(period.start),
       endDate: new Date(period.end),
+      site,
     }),
   ]);
 
@@ -199,23 +214,24 @@ async function loadDriftAnalyticsInputs(input?: {
   };
 }
 
-async function loadPredictiveRiskInputs(input?: {
-  startDate?: string;
-  endDate?: string;
-}) {
+async function loadPredictiveRiskInputs(input?: AnalyticsPeriodInput) {
   const period = resolvePredictivePeriod(input?.startDate, input?.endDate);
+  const site = normalizeSite(input?.site);
   const [documents, findings, disputes, users] = await Promise.all([
     db.getPredictiveRiskDocuments({
       startDate: new Date(period.start),
       endDate: new Date(period.end),
+      site,
     }),
     db.getPredictiveRiskFindings({
       startDate: new Date(period.start),
       endDate: new Date(period.end),
+      site,
     }),
     db.getPredictiveRiskDisputes({
       startDate: new Date(period.start),
       endDate: new Date(period.end),
+      site,
     }),
     db.getAllUsers(),
   ]);
@@ -233,14 +249,12 @@ async function loadPredictiveRiskInputs(input?: {
   };
 }
 
-async function loadShadowChallengerInputs(input?: {
-  startDate?: string;
-  endDate?: string;
-}) {
+async function loadShadowChallengerInputs(input?: AnalyticsPeriodInput) {
   const period = resolveShadowPeriod(input);
   const reportJsons = await db.getShadowComparisonReportJsons({
     startDate: new Date(period.start),
     endDate: new Date(period.end),
+    site: normalizeSite(input?.site),
   });
   return { period, reportJsons };
 }
@@ -410,6 +424,7 @@ export const analyticsRouter = router({
       const stats = await db.getExecutiveSummaryStats({
         startDate: new Date(period.start),
         endDate: new Date(period.end),
+        site: normalizeSite(input?.site),
       });
       if (!stats) {
         return {
@@ -450,6 +465,7 @@ export const analyticsRouter = router({
         engineerId: z.string().min(1),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
+        site: z.string().optional(),
       })
     )
     .query(async ({ input }) => {
@@ -458,6 +474,7 @@ export const analyticsRouter = router({
         startDate: input.startDate,
         endDate: input.endDate,
         technicianId: Number.isFinite(technicianId) ? technicianId : undefined,
+        site: input.site,
       });
       return buildEngineerScoreCardDetail({
         users: loaded.users,
@@ -496,6 +513,7 @@ export const analyticsRouter = router({
         key: z.string().min(1),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
+        site: z.string().optional(),
         limit: z.number().min(1).max(100).optional(),
       })
     )
@@ -600,6 +618,7 @@ export const analyticsRouter = router({
       const findings = await db.getExceptionOverturnFindings({
         startDate: new Date(period.start),
         endDate: new Date(period.end),
+        site: normalizeSite(input?.site),
       });
       return buildOverturnAnalytics({
         findings: findings as OverturnFindingRow[],
@@ -617,6 +636,7 @@ export const analyticsRouter = router({
         .object({
           startDate: z.string().optional(),
           endDate: z.string().optional(),
+          site: z.string().optional(),
           threshold: z.number().min(2).max(50).optional(),
         })
         .optional()
@@ -626,6 +646,7 @@ export const analyticsRouter = router({
       const findings = await db.getExceptionOverturnFindings({
         startDate: new Date(period.start),
         endDate: new Date(period.end),
+        site: normalizeSite(input?.site),
       });
       return buildRecurrenceSummary({
         findings: findings as OverturnFindingRow[],

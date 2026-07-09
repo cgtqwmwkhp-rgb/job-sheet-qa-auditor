@@ -54,14 +54,18 @@ function bandVariant(
 }
 
 export default function PredictiveRisk() {
-  const { startDate, endDate } = useAnalyticsFilters();
+  const { startDate, endDate, site } = useAnalyticsFilters();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const {
     data: summary,
     isLoading,
     error,
-  } = trpc.analytics.getPredictiveRiskSummary.useQuery({ startDate, endDate });
+  } = trpc.analytics.getPredictiveRiskSummary.useQuery({
+    startDate,
+    endDate,
+    site,
+  });
 
   const chartData = useMemo(
     () =>

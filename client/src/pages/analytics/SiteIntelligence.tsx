@@ -47,7 +47,7 @@ function passRatePct(rate: number): string {
 }
 
 export default function SiteIntelligence() {
-  const { startDate, endDate } = useAnalyticsFilters();
+  const { startDate, endDate, site } = useAnalyticsFilters();
   const [dimension, setDimension] = useState<CohortDimension>("site");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
@@ -55,7 +55,7 @@ export default function SiteIntelligence() {
     data: summary,
     isLoading,
     error,
-  } = trpc.analytics.getCohortSummary.useQuery({ startDate, endDate });
+  } = trpc.analytics.getCohortSummary.useQuery({ startDate, endDate, site });
 
   const { data: collisionReport, isLoading: collisionLoading } =
     trpc.analytics.getTemplateCollisionReport.useQuery(undefined, {
@@ -69,6 +69,7 @@ export default function SiteIntelligence() {
         key: selectedKey ?? "",
         startDate,
         endDate,
+        site,
       },
       { enabled: !!selectedKey }
     );

@@ -21,12 +21,12 @@ function formatPeriodRange(start: string, end: string): string {
 }
 
 export default function ExecutiveDashboard() {
-  const { startDate, endDate } = useAnalyticsFilters();
+  const { startDate, endDate, site } = useAnalyticsFilters();
   const {
     data: statsData,
     isLoading,
     error,
-  } = trpc.analytics.getExecutiveSummary.useQuery({ startDate, endDate });
+  } = trpc.analytics.getExecutiveSummary.useQuery({ startDate, endDate, site });
 
   const totalAudits = statsData?.totalAudits ?? 0;
   const passRate = statsData?.passRate ?? 0;

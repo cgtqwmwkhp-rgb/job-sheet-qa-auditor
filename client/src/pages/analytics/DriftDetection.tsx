@@ -45,12 +45,12 @@ function severityVariant(
 }
 
 export default function DriftDetection() {
-  const { startDate, endDate } = useAnalyticsFilters();
+  const { startDate, endDate, site } = useAnalyticsFilters();
   const {
     data: summary,
     isLoading,
     error,
-  } = trpc.analytics.getDriftSummary.useQuery({ startDate, endDate });
+  } = trpc.analytics.getDriftSummary.useQuery({ startDate, endDate, site });
 
   const topSeries = useMemo(() => summary?.series.slice(0, 8) ?? [], [summary]);
 

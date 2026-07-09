@@ -69,7 +69,7 @@ function severityBadgeClass(severity: string): string {
 }
 
 export default function TechnicianPerformance() {
-  const { startDate, endDate } = useAnalyticsFilters();
+  const { startDate, endDate, site } = useAnalyticsFilters();
   const [selectedEngineerId, setSelectedEngineerId] = useState<string | null>(
     null
   );
@@ -78,11 +78,11 @@ export default function TechnicianPerformance() {
     data: summary,
     isLoading,
     error,
-  } = trpc.analytics.getEngineerSummary.useQuery({ startDate, endDate });
+  } = trpc.analytics.getEngineerSummary.useQuery({ startDate, endDate, site });
 
   const { data: detail, isLoading: detailLoading } =
     trpc.analytics.getEngineerScoreCard.useQuery(
-      { engineerId: selectedEngineerId!, startDate, endDate },
+      { engineerId: selectedEngineerId!, startDate, endDate, site },
       { enabled: !!selectedEngineerId }
     );
 

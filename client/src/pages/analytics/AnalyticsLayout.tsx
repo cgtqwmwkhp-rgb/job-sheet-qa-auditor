@@ -4,6 +4,7 @@ import {
   useAnalyticsFilters,
   type AnalyticsPeriodPreset,
 } from "@/hooks/useAnalyticsFilters";
+import { Input } from "@/components/ui/input";
 import {
   LayoutDashboard,
   Map,
@@ -50,7 +51,7 @@ export function AnalyticsLayout({
   description,
 }: AnalyticsLayoutProps) {
   const [location] = useLocation();
-  const { preset, setPreset } = useAnalyticsFilters();
+  const { preset, site, setPreset, setSite } = useAnalyticsFilters();
 
   return (
     <DashboardLayout>
@@ -65,23 +66,36 @@ export function AnalyticsLayout({
                 {description}
               </p>
             </div>
-            <div
-              className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit shrink-0"
-              role="group"
-              aria-label="Analytics period"
-            >
-              {PERIOD_PRESETS.map(item => (
-                <Button
-                  key={item.value}
-                  type="button"
-                  size="sm"
-                  variant={preset === item.value ? "default" : "ghost"}
-                  className="h-8 px-3 text-xs"
-                  onClick={() => setPreset(item.value)}
-                >
-                  {item.label}
-                </Button>
-              ))}
+            <div className="flex flex-col gap-2 sm:items-end shrink-0">
+              <div
+                className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit"
+                role="group"
+                aria-label="Analytics period"
+              >
+                {PERIOD_PRESETS.map(item => (
+                  <Button
+                    key={item.value}
+                    type="button"
+                    size="sm"
+                    variant={preset === item.value ? "default" : "ghost"}
+                    className="h-8 px-3 text-xs"
+                    onClick={() => setPreset(item.value)}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
+              </div>
+              <label className="w-full sm:w-64">
+                <span className="sr-only">Filter analytics by site</span>
+                <Input
+                  type="text"
+                  value={site}
+                  onChange={event => setSite(event.target.value)}
+                  placeholder="Filter by site"
+                  aria-label="Filter analytics by site"
+                  className="h-8 text-xs"
+                />
+              </label>
             </div>
           </div>
         </div>

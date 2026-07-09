@@ -50,13 +50,13 @@ function formatHours(h: number): string {
 }
 
 export default function DefectAnalysis() {
-  const { startDate, endDate } = useAnalyticsFilters();
+  const { startDate, endDate, site } = useAnalyticsFilters();
   const {
     data: summary,
     isLoading,
     error,
     refetch,
-  } = trpc.analytics.getExceptionSummary.useQuery({ startDate, endDate });
+  } = trpc.analytics.getExceptionSummary.useQuery({ startDate, endDate, site });
 
   const { data: dlqStatus } = trpc.analytics.getDlqStatus.useQuery(undefined, {
     retry: false,
