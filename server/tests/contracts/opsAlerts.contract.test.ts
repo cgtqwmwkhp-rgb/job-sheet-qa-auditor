@@ -7,7 +7,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import type { AlertChannel, AttentionItem } from "../../services/opsAlerts/types";
+import type {
+  AlertChannel,
+  AttentionItem,
+} from "../../services/opsAlerts/types";
 
 const CHANNELS: AlertChannel[] = ["slack", "pagerduty", "log"];
 
