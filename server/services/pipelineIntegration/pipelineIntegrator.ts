@@ -1,16 +1,16 @@
 /**
  * Pipeline Integrator
- * 
+ *
  * PR-6: Central integration layer that wires enhancement modules
  * into the document processing pipeline with feature flags.
  */
 
-import { createHash } from 'crypto';
+import { createHash } from "crypto";
 import {
   extractAllCriticalFields,
   type FieldExtractionResult,
   type ValidationTrace,
-} from '../extraction/criticalFieldExtractor';
+} from "../extraction/criticalFieldExtractor";
 import {
   fuseAllFields,
   type OcrFieldResult,
@@ -18,7 +18,7 @@ import {
   type FusedFieldResult,
   type FusionEvidence,
   type RoiBbox,
-} from '../imageQaFusion/fusionService';
+} from "../imageQaFusion/fusionService";
 import {
   getProcessingCache,
   getCachedResult,
@@ -28,27 +28,27 @@ import {
   type CacheKeyComponents,
   type ProcessingResult,
   type CacheStats,
-} from '../cache/deterministicCache';
+} from "../cache/deterministicCache";
 import {
   generateEngineerScorecard,
   generateEngineerFixPack,
-} from '../engineerFeedback/feedbackService';
+} from "../engineerFeedback/feedbackService";
 import type {
   PipelineFeatureFlags,
   PipelineInput,
   PipelineOutput,
   PipelineContext,
   ValidationTraceArtifact,
-} from './types';
-import { DEFAULT_FEATURE_FLAGS } from './types';
+} from "./types";
+import { DEFAULT_FEATURE_FLAGS } from "./types";
 
 /**
  * Engine version constants for cache invalidation
  */
 export const ENGINE_VERSIONS = {
-  criticalFieldExtractor: '1.0.0',
-  imageQaFusion: '1.0.0',
-  cache: '1.0.0',
+  criticalFieldExtractor: "1.0.0",
+  imageQaFusion: "1.0.0",
+  cache: "1.0.0",
 } as const;
 
 /**
@@ -60,7 +60,7 @@ export async function processWithIntegration(
   ocrText?: string,
   ocrResults?: Map<string, OcrFieldResult>,
   imageQaResults?: Map<string, ImageQaResult>,
-  roiBboxes?: Map<string, RoiBbox>,
+  roiBboxes?: Map<string, RoiBbox>
 ): Promise<PipelineOutput> {
   const startTime = Date.now();
   const context: PipelineContext = {
@@ -71,15 +71,20 @@ export async function processWithIntegration(
 
   // Check cache if enabled
   if (flags.useDeterministicCache && input.templateHash) {
-    const cached = getCachedResult(input.fileContent, { templateHash: input.templateHash });
-    
+    const cached = getCachedResult(input.fileContent, {
+      templateHash: input.templateHash,
+    });
+
     if (cached.fromCache && cached.result) {
       return {
         documentId: input.documentId,
-        status: 'PASS', // Cached results were previously validated
-        criticalFields: cached.result.extractedFields as unknown as FieldExtractionResult[],
-        validationTrace: cached.result.validationTrace as ValidationTrace | null,
-        fusionResults: cached.result.fusionResults as unknown as FusedFieldResult[],
+        status: "PASS", // Cached results were previously validated
+        criticalFields: cached.result
+          .extractedFields as unknown as FieldExtractionResult[],
+        validationTrace: cached.result
+          .validationTrace as ValidationTrace | null,
+        fusionResults: cached.result
+          .fusionResults as unknown as FusedFieldResult[],
         fusionEvidence: null,
         fromCache: true,
         cacheKey: `${input.fileHash}:${input.templateHash}`,
@@ -137,7 +142,11 @@ export async function processWithIntegration(
       validationTrace,
       processingTimeMs: output.processingTimeMs,
     };
-    cacheResult(input.fileContent, { templateHash: input.templateHash }, processingResult);
+    cacheResult(
+      input.fileContent,
+      { templateHash: input.templateHash },
+      processingResult
+    );
     output.cacheKey = `${input.fileHash}:${input.templateHash}`;
   }
 
@@ -149,48 +158,45 @@ export async function processWithIntegration(
  */
 function determineStatus(
   criticalFields: FieldExtractionResult[],
-  fusionResults: FusedFieldResult[],
-): 'PASS' | 'FAIL' | 'REVIEW_QUEUE' {
+  fusionResults: FusedFieldResult[]
+): "PASS" | "FAIL" | "REVIEW_QUEUE" {
   // Check for any failures in critical fields
-  const failedFields = criticalFields.filter(f => f.status === 'FAIL');
+  const failedFields = criticalFields.filter(f => f.status === "FAIL");
   const missingRequired = failedFields.filter(
-    f => f.reasonCode === 'MISSING_FIELD' && isRequiredField(f.fieldId)
+    f => f.reasonCode === "MISSING_FIELD" && isRequiredField(f.fieldId)
   );
 
   if (missingRequired.length > 0) {
-    return 'FAIL';
+    return "FAIL";
   }
 
   // Check for conflicts or low confidence
-  const hasConflicts = failedFields.some(f => f.reasonCode === 'CONFLICT');
-  const hasLowConfidence = failedFields.some(f => f.reasonCode === 'LOW_CONFIDENCE');
+  const hasConflicts = failedFields.some(f => f.reasonCode === "CONFLICT");
+  const hasLowConfidence = failedFields.some(
+    f => f.reasonCode === "LOW_CONFIDENCE"
+  );
 
   if (hasConflicts || hasLowConfidence) {
-    return 'REVIEW_QUEUE';
+    return "REVIEW_QUEUE";
   }
 
   // Check fusion results for issues
   const fusionIssues = fusionResults.filter(
-    r => r.fusedOutcome === 'CONFLICT' || r.fusedOutcome === 'LOW_CONFIDENCE'
+    r => r.fusedOutcome === "CONFLICT" || r.fusedOutcome === "LOW_CONFIDENCE"
   );
 
   if (fusionIssues.length > 0) {
-    return 'REVIEW_QUEUE';
+    return "REVIEW_QUEUE";
   }
 
-  return 'PASS';
+  return "PASS";
 }
 
 /**
  * Check if a field is required
  */
 function isRequiredField(fieldId: string): boolean {
-  const requiredFields = [
-    'jobReference',
-    'assetId',
-    'date',
-    'engineerSignOff',
-  ];
+  const requiredFields = ["jobReference", "assetId", "date", "engineerSignOff"];
   return requiredFields.includes(fieldId);
 }
 
@@ -200,13 +206,13 @@ function isRequiredField(fieldId: string): boolean {
 export function generateValidationTraceArtifact(
   documentId: string,
   runId: string,
-  fields: FieldExtractionResult[],
+  fields: FieldExtractionResult[]
 ): ValidationTraceArtifact {
-  const passed = fields.filter(f => f.status === 'PASS');
-  const failed = fields.filter(f => f.status === 'FAIL');
+  const passed = fields.filter(f => f.status === "PASS");
+  const failed = fields.filter(f => f.status === "FAIL");
 
   return {
-    version: '1.0.0',
+    version: "1.0.0",
     documentId,
     runId,
     timestamp: new Date().toISOString(),
@@ -217,13 +223,13 @@ export function generateValidationTraceArtifact(
       passed: passed.length,
       failed: failed.length,
       missingFields: failed
-        .filter(f => f.reasonCode === 'MISSING_FIELD')
+        .filter(f => f.reasonCode === "MISSING_FIELD")
         .map(f => f.fieldId),
       lowConfidenceFields: failed
-        .filter(f => f.reasonCode === 'LOW_CONFIDENCE')
+        .filter(f => f.reasonCode === "LOW_CONFIDENCE")
         .map(f => f.fieldId),
       conflictFields: failed
-        .filter(f => f.reasonCode === 'CONFLICT')
+        .filter(f => f.reasonCode === "CONFLICT")
         .map(f => f.fieldId),
     },
   };
@@ -241,11 +247,15 @@ export function getCacheStats(): CacheStats {
  * Generate feature flags from environment
  */
 export function getFeatureFlagsFromEnv(): PipelineFeatureFlags {
+  if (process.env.FEATURE_PIPELINE_INTEGRATION !== "true") {
+    return DEFAULT_FEATURE_FLAGS;
+  }
+
   return {
     useCriticalFieldExtractor:
-      process.env.FEATURE_CRITICAL_FIELD_EXTRACTOR === 'true',
-    useImageQaFusion: process.env.FEATURE_IMAGE_QA_FUSION === 'true',
-    useDeterministicCache: process.env.FEATURE_DETERMINISTIC_CACHE === 'true',
-    useEngineerFeedback: process.env.FEATURE_ENGINEER_FEEDBACK === 'true',
+      process.env.FEATURE_CRITICAL_FIELD_EXTRACTOR === "true",
+    useImageQaFusion: process.env.FEATURE_IMAGE_QA_FUSION === "true",
+    useDeterministicCache: process.env.FEATURE_DETERMINISTIC_CACHE === "true",
+    useEngineerFeedback: process.env.FEATURE_ENGINEER_FEEDBACK === "true",
   };
 }
