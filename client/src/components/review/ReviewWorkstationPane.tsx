@@ -21,7 +21,13 @@ import {
   MessageSquare,
   Pencil,
 } from "lucide-react";
-import { useState, useRef, type RefObject, type MouseEvent } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  type RefObject,
+  type MouseEvent,
+} from "react";
 import {
   Dialog,
   DialogContent,
@@ -330,9 +336,15 @@ function ReviewWorkstationContent({
     null
   );
   const [correctedValue, setCorrectedValue] = useState("");
-  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [showPdfViewer, setShowPdfViewer] = useState(true);
   const localPaneRef = useRef<HTMLDivElement>(null);
   const resolvedPaneRef = paneRef ?? localPaneRef;
+
+  useEffect(() => {
+    setShowPdfViewer(true);
+    setActiveBoxId(null);
+    setFocusPage(null);
+  }, [jobSheetId]);
 
   const createDispute = trpc.disputes.create.useMutation();
   const flagMutation = trpc.auditActions.flag.useMutation();

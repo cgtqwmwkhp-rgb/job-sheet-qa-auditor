@@ -37,7 +37,7 @@ import { useMemo, useRef, useState } from "react";
 import { useReviewQueueKeyboard } from "@/hooks/useReviewQueueKeyboard";
 import { usePersistFn } from "@/hooks/usePersistFn";
 
-type FilterChip = "all" | "critical" | "low_confidence";
+type FilterChip = "all" | "critical";
 
 export default function HoldQueue() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -122,17 +122,8 @@ export default function HoldQueue() {
           `${item.referenceNumber} ${item.fileName} ${item.site} ${item.technician}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
-      // Basic filter chips — overnight scope: All vs Critical/Low confidence
-      // placeholders until finding severity is joined on the list query.
       if (filterChip === "critical") {
-        return (
-          item.slaBreached ||
-          item.severity === "critical" ||
-          item.severity === "warning"
-        );
-      }
-      if (filterChip === "low_confidence") {
-        return true;
+        return item.severity === "critical" || item.slaBreached;
       }
       return true;
     });
@@ -435,15 +426,6 @@ export default function HoldQueue() {
               onClick={() => setFilterChip("critical")}
             >
               Critical
-            </Badge>
-            <Badge
-              variant={
-                filterChip === "low_confidence" ? "default" : "secondary"
-              }
-              className="cursor-pointer"
-              onClick={() => setFilterChip("low_confidence")}
-            >
-              Low confidence
             </Badge>
             {slaSummary && slaSummary.breachedCount > 0 && (
               <Badge variant="destructive" className="gap-1">
