@@ -1,13 +1,14 @@
 /**
- * Phase 1.10 — DLQ retry → reprocessJobSheet + hydrate helpers
+ * Phase 1.10/1.1 — DLQ retry → documentProcessor orchestrator + hydrate helpers
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const reprocessJobSheet = vi.fn();
+const orchestrateJobSheetProcessing = vi.fn();
 
 vi.mock("../services/documentProcessor", () => ({
-  reprocessJobSheet: (...args: unknown[]) => reprocessJobSheet(...args),
+  orchestrateJobSheetProcessing: (...args: unknown[]) =>
+    orchestrateJobSheetProcessing(...args),
 }));
 
 vi.mock("../db", () => ({
@@ -23,22 +24,26 @@ import {
 } from "../utils/deadLetterQueue";
 import { runDlqRetryPass } from "../services/exceptionAnalytics/dlqRetryWorker";
 
-describe("DLQ retry → reprocessJobSheet (Phase 1.10)", () => {
+describe("DLQ retry → documentProcessor orchestrator", () => {
   beforeEach(() => {
     clearDeadLetterQueue();
-    reprocessJobSheet.mockReset();
+    orchestrateJobSheetProcessing.mockReset();
   });
 
-  it("retryDeadLetterJob calls reprocessJobSheet and marks recovered", async () => {
+  it("retryDeadLetterJob calls orchestrator and marks recovered", async () => {
     const job = addToDeadLetterQueue(42, "ocr", new Error("503"), {
       recoverable: true,
       metadata: { goldSpecId: 9 },
     });
-    reprocessJobSheet.mockResolvedValue({ success: true });
+    orchestrateJobSheetProcessing.mockResolvedValue({ success: true });
 
     const ok = await retryDeadLetterJob(job.id);
     expect(ok).toBe(true);
-    expect(reprocessJobSheet).toHaveBeenCalledWith(42, 9);
+    expect(orchestrateJobSheetProcessing).toHaveBeenCalledWith({
+      source: "dlq-retry",
+      jobSheetId: 42,
+      goldSpecId: 9,
+    });
     expect(getFailedJob(job.id)).toBeUndefined();
   });
 
@@ -48,23 +53,27 @@ describe("DLQ retry → reprocessJobSheet (Phase 1.10)", () => {
       attempts: 1,
       maxAttempts: 3,
     });
-    reprocessJobSheet.mockRejectedValue(new Error("still failing"));
+    orchestrateJobSheetProcessing.mockRejectedValue(new Error("still failing"));
 
     const ok = await retryDeadLetterJob(job.id);
     expect(ok).toBe(false);
-    expect(reprocessJobSheet).toHaveBeenCalledWith(7, 1);
+    expect(orchestrateJobSheetProcessing).toHaveBeenCalledWith({
+      source: "dlq-retry",
+      jobSheetId: 7,
+      goldSpecId: 1,
+    });
     expect(getFailedJob(job.id)?.attempts).toBe(2);
     expect(getFailedJob(job.id)?.recoverable).toBe(true);
   });
 
-  it("default runDlqRetryPass recovers via reprocessJobSheet", async () => {
+  it("default runDlqRetryPass recovers via orchestrator", async () => {
     addToDeadLetterQueue(55, "ocr", new Error("502"), { recoverable: true });
-    reprocessJobSheet.mockResolvedValue({ success: true });
+    orchestrateJobSheetProcessing.mockResolvedValue({ success: true });
 
     const result = await runDlqRetryPass({ limit: 5 });
     expect(result.recovered).toBe(1);
     expect(result.scanned).toBe(1);
-    expect(reprocessJobSheet).toHaveBeenCalled();
+    expect(orchestrateJobSheetProcessing).toHaveBeenCalled();
   });
 
   it("hydrateDeadLetterQueueFromDb is fail-safe when getDb returns null", async () => {

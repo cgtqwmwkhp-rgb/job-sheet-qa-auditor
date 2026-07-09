@@ -203,7 +203,7 @@ describe("Fail-Safety Contract (PR-3)", () => {
       expect(dlq).toContain("getDeadLetterQueueStatus");
       expect(dlq).toContain("hydrateDeadLetterQueueFromDb");
       expect(dlq).toContain("retryDeadLetterJob");
-      expect(dlq).toContain("reprocessJobSheet");
+      expect(dlq).toContain("orchestrateJobSheetProcessing");
     });
 
     it("server boot hydrates DLQ from failed_jobs", () => {

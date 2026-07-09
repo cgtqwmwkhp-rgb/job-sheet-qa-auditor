@@ -3,8 +3,8 @@
  *
  * PR-3 persists failed_jobs. This worker walks recoverable in-memory DLQ
  * entries (and optionally DB rows when provided), and by default retries via
- * reprocessJobSheet (Phase 1.10). Callers can still inject a custom handler
- * for tests / dry-runs.
+ * documentProcessor's orchestration entry. Callers can still inject a custom
+ * handler for tests / dry-runs.
  */
 
 import {

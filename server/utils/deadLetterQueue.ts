@@ -404,7 +404,7 @@ function resolveGoldSpecId(job: FailedJob): number {
 }
 
 /**
- * Retry a single DLQ job by calling reprocessJobSheet.
+ * Retry a single DLQ job through documentProcessor's orchestration entry.
  * On success the job is marked recovered; on failure attempts are incremented.
  * Uses dynamic import to avoid a circular dependency with documentProcessor.
  */
@@ -422,9 +422,15 @@ export async function retryDeadLetterJob(id: string): Promise<boolean> {
   const goldSpecId = resolveGoldSpecId(job);
 
   try {
-    const { reprocessJobSheet } = await import("../services/documentProcessor");
-    await reprocessJobSheet(job.jobSheetId, goldSpecId);
-    console.log(`[DLQ] Retry succeeded via reprocessJobSheet: ${id}`, {
+    const { orchestrateJobSheetProcessing } = await import(
+      "../services/documentProcessor"
+    );
+    await orchestrateJobSheetProcessing({
+      source: "dlq-retry",
+      jobSheetId: job.jobSheetId,
+      goldSpecId,
+    });
+    console.log(`[DLQ] Retry succeeded via documentProcessor: ${id}`, {
       jobSheetId: job.jobSheetId,
       goldSpecId,
     });
