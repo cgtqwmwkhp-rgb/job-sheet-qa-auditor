@@ -12,5 +12,6 @@ CREATE TABLE `failed_jobs` (
 	`recoverable` boolean NOT NULL DEFAULT true,
 	`metadata` json,
 	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`resolvedAt` timestamp,
 	CONSTRAINT `failed_jobs_id` PRIMARY KEY(`id`)
 );
