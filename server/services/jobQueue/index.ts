@@ -46,6 +46,4 @@ export function enqueueJobSheetProcessing(
   };
 }
 
-// TODO(Phase 1.2): Wire this from jobSheets.process once PR #141 lands.
-// PR #141 currently owns server/routers.ts, so this branch intentionally keeps
-// the router hook out of the conflict path while exposing the adapter above.
+// Wired from jobSheets.process when FEATURE_ASYNC_PROCESSING=true.
