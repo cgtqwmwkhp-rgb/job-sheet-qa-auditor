@@ -21,7 +21,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 function normalizeRole(raw: unknown): UserRole {
-  if (raw === "admin" || raw === "qa_lead" || raw === "technician" || raw === "viewer") {
+  if (
+    raw === "admin" ||
+    raw === "qa_lead" ||
+    raw === "technician" ||
+    raw === "viewer"
+  ) {
     return raw;
   }
   // Phase 0 UI: preserve prior behaviour (authenticated staff = admin) until
@@ -34,7 +39,8 @@ function checkDemoAuth(): User | null {
   try {
     const role = localStorage.getItem("demo_user_role") as UserRole | null;
     if (!role) return null;
-    if (!["admin", "qa_lead", "technician", "viewer"].includes(role)) return null;
+    if (!["admin", "qa_lead", "technician", "viewer"].includes(role))
+      return null;
     return {
       id: "demo-user",
       name: localStorage.getItem("demo_user_name") || "Demo User",

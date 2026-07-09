@@ -45,7 +45,10 @@ export default function EntraSignIn({
   return (
     <div
       className="min-h-screen flex items-center justify-center p-4"
-      style={{ backgroundColor: "#ececec", fontFamily: "Segoe UI, system-ui, sans-serif" }}
+      style={{
+        backgroundColor: "#ececec",
+        fontFamily: "Segoe UI, system-ui, sans-serif",
+      }}
     >
       <div
         className="w-full bg-white"
@@ -91,10 +94,7 @@ export default function EntraSignIn({
           Sign in with Microsoft Entra ID
         </button>
 
-        <p
-          className="mt-6 text-center text-xs"
-          style={{ color: "#8a8686" }}
-        >
+        <p className="mt-6 text-center text-xs" style={{ color: "#8a8686" }}>
           Secured by Microsoft Entra ID
         </p>
       </div>

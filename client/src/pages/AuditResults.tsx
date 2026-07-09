@@ -215,7 +215,7 @@ export default function AuditResults() {
   if (!numericId || !jobSheetData) {
     return (
       <DashboardLayout>
-        <div className="space-y-6">
+        <div className="space-y-6" data-testid="audit-list">
           <div>
             <h1 className="text-3xl font-heading font-bold tracking-tight">
               Audit Results

@@ -27,7 +27,9 @@ export default function ExecutiveDashboard() {
       >
         <div className="flex items-center justify-center h-[50vh]">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-muted-foreground">Loading analytics...</span>
+          <span className="ml-2 text-muted-foreground">
+            Loading analytics...
+          </span>
         </div>
       </AnalyticsLayout>
     );
@@ -41,7 +43,9 @@ export default function ExecutiveDashboard() {
       >
         <div className="flex flex-col items-center justify-center h-[50vh]">
           <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Failed to Load Analytics</h2>
+          <h2 className="text-xl font-semibold mb-2">
+            Failed to Load Analytics
+          </h2>
           <p className="text-muted-foreground">{error.message}</p>
         </div>
       </AnalyticsLayout>
@@ -57,7 +61,9 @@ export default function ExecutiveDashboard() {
         <Card className="p-12">
           <div className="flex flex-col items-center justify-center text-center">
             <BarChart3 className="h-16 w-16 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">No Analytics Data Yet</h2>
+            <h2 className="text-xl font-semibold mb-2">
+              No Analytics Data Yet
+            </h2>
             <p className="text-muted-foreground max-w-md">
               Upload and process job sheets to start seeing executive analytics
               and insights here.
@@ -76,7 +82,9 @@ export default function ExecutiveDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overall Pass Rate</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Overall Pass Rate
+            </CardTitle>
             <CheckCircle2 className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
@@ -93,14 +101,20 @@ export default function ExecutiveDashboard() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalAudits.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground mt-1">All time processed</p>
+            <div className="text-2xl font-bold">
+              {totalAudits.toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              All time processed
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Critical Issues</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Critical Issues
+            </CardTitle>
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
@@ -109,7 +123,9 @@ export default function ExecutiveDashboard() {
             >
               {criticalIssues}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Requires attention</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Requires attention
+            </p>
           </CardContent>
         </Card>
 

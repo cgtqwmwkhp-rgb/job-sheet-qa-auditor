@@ -80,9 +80,7 @@ function Router() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>
-        <Route path="/login">
-          {user ? <Redirect to="/" /> : <Login />}
-        </Route>
+        <Route path="/login">{user ? <Redirect to="/" /> : <Login />}</Route>
         <Route path="/portal/login">
           {user ? <Redirect to="/portal/dashboard" /> : <PortalLogin />}
         </Route>
@@ -190,11 +188,8 @@ function Router() {
             allowedRoles={["admin", "qa_lead"]}
           />
         </Route>
-        <Route path="/help">
-          <RequireAuth>
-            <HelpCenter />
-          </RequireAuth>
-        </Route>
+        {/* Help stays public (E2E + support links) */}
+        <Route path="/help" component={HelpCenter} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

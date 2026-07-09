@@ -87,10 +87,10 @@ export function AppSidebar() {
 
   const filteredItems = items.filter(item => {
     if (item.title === "Disputes") {
-      return hasRole(['admin', 'qa_lead']);
+      return hasRole(["admin", "qa_lead"]);
     }
     if (item.title === "Audit Log") {
-      return hasRole(['admin']);
+      return hasRole(["admin"]);
     }
     return true;
   });
@@ -117,10 +117,10 @@ export function AppSidebar() {
           <SidebarGroupLabel>Platform</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {filteredItems.map((item) => (
+              {filteredItems.map(item => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild 
+                  <SidebarMenuButton
+                    asChild
                     isActive={location === item.url}
                     tooltip={item.title}
                   >

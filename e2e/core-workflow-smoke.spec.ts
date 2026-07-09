@@ -40,22 +40,16 @@ test.describe('Core Workflow Smoke Test', () => {
   test('Audits page is accessible', async ({ page }) => {
     await page.goto('/audits');
     await closeModalIfPresent(page);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
-    // Page should render without crash
-    const content = page.locator('body');
-    await expect(content).toBeVisible({ timeout: 15000 });
+    // Page should render without crash (demo auth from beforeEach)
+    await expect(page.locator('body')).toBeVisible({ timeout: 15000 });
 
-    // Check for either:
-    // - "Audit Results" heading
-    // - "No Audits" message
-    // - A list of audits
-    const auditIndicator = page.locator(
-      'text="Audit Results", ' +
-      'text="No Audits", ' +
-      '[data-testid="audit-list"], ' +
-      'h1, h2'
-    );
+    // Prefer stable test id; fall back to heading text (includes "No Audits Yet")
+    const auditIndicator = page
+      .getByTestId('audit-list')
+      .or(page.getByRole('heading', { name: /audit results|no audits/i }))
+      .or(page.locator('h1, h2'));
     await expect(auditIndicator.first()).toBeVisible({ timeout: 15000 });
 
     console.log('✅ Audits page accessible');
