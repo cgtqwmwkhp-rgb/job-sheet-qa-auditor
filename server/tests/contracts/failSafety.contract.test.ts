@@ -201,6 +201,25 @@ describe("Fail-Safety Contract (PR-3)", () => {
       expect(dlq).toContain("getDb");
       expect(dlq).toContain("failedJobs");
       expect(dlq).toContain("getDeadLetterQueueStatus");
+      expect(dlq).toContain("hydrateDeadLetterQueueFromDb");
+      expect(dlq).toContain("retryDeadLetterJob");
+      expect(dlq).toContain("reprocessJobSheet");
+    });
+
+    it("server boot hydrates DLQ from failed_jobs", () => {
+      const indexPath = path.resolve(__dirname, "../../_core/index.ts");
+      const index = fs.readFileSync(indexPath, "utf-8");
+      expect(index).toContain("hydrateDeadLetterQueueFromDb");
+    });
+
+    it("default DLQ retry handler calls retryDeadLetterJob", () => {
+      const workerPath = path.resolve(
+        __dirname,
+        "../../services/exceptionAnalytics/dlqRetryWorker.ts"
+      );
+      const worker = fs.readFileSync(workerPath, "utf-8");
+      expect(worker).toContain("retryDeadLetterJob");
+      expect(worker).toContain("defaultDlqRetryHandler");
     });
   });
 

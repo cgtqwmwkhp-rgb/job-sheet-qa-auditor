@@ -10,6 +10,7 @@ import { serveStatic, setupVite } from "./vite";
 import { handleHealthz, handleReadyz } from "./health";
 import { handleMetrics } from "./metrics";
 import { initializeDefaultTemplate, hasDefaultTemplate } from "../services/templateRegistry";
+import { hydrateDeadLetterQueueFromDb } from "../utils/deadLetterQueue";
 import { pdfProxyRouter } from "./pdfProxy";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -48,6 +49,16 @@ async function startServer() {
     }
   } else {
     console.log("[Templates] Default template already exists");
+  }
+
+  // Phase 1.10: restore in-memory DLQ from durable failed_jobs (fail-safe)
+  try {
+    const hydrated = await hydrateDeadLetterQueueFromDb();
+    if (hydrated > 0) {
+      console.log(`[DLQ] Boot hydrate restored ${hydrated} job(s)`);
+    }
+  } catch (error) {
+    console.warn("[DLQ] Boot hydrate skipped:", error);
   }
 
   // Health check endpoints (before auth, before static files)
