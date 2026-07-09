@@ -46,6 +46,12 @@ WORKDIR /app
 COPY --from=builder --chown=appuser:nodejs /app/dist ./dist
 COPY --from=builder --chown=appuser:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=appuser:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=appuser:nodejs /app/drizzle ./drizzle
+COPY --from=builder --chown=appuser:nodejs /app/drizzle.config.ts ./drizzle.config.ts
+
+# Migrate-on-start entrypoint (runs drizzle-kit migrate when DATABASE_URL is set)
+COPY scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh && chown appuser:nodejs /app/docker-entrypoint.sh
 
 # Create uploads directory with correct ownership (for local storage provider)
 RUN mkdir -p ./uploads && chown appuser:nodejs ./uploads
@@ -71,6 +77,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # Switch to non-root user
 USER appuser
 
-# Start the server
+# Run migrations (if DATABASE_URL set), then start the server
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]
 
