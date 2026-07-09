@@ -161,10 +161,10 @@ export const appRouter = router({
         const buffer = Buffer.from(input.fileBase64, "base64");
 
         // Feature-flagged Image QA intake gate (default off). Fail-open on errors.
-        // Runs AFTER rate limit, BEFORE storage — never calls OCR adapters.
+        // Runs AFTER rate limit, BEFORE storage — OCRs the real upload buffer when enabled.
         let intake: IntakeGateResult | undefined;
         if (isImageQaIntakeEnabled()) {
-          intake = runIntakeGate({
+          intake = await runIntakeGate({
             buffer,
             fileName: input.fileName,
             mimeType: input.fileType,
