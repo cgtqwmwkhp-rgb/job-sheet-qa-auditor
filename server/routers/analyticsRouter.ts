@@ -5,6 +5,7 @@
  * PR-15: engineer scorecards, trends, and drill-through.
  * PR-16: cohort analytics (site/asset/workType) + template collision governance.
  * PR-17: exception management — review SLAs, ageing, overturn rates, DLQ retry.
+ * PR-18: drift detection — EWMA/CUSUM, calibration histograms, alerting.
  */
 
 import { z } from "zod";
@@ -49,6 +50,12 @@ import {
   type HoldQueueItemRow,
   type OverturnFindingRow,
 } from "../services/exceptionAnalytics";
+import {
+  buildDriftAnalyticsSummary,
+  resolveDriftPeriod,
+  type DriftDocumentRow,
+  type DriftFindingRow,
+} from "../services/driftAnalytics";
 import {
   enforceRateLimit,
   RateLimitError,
@@ -151,6 +158,29 @@ async function loadExceptionAnalyticsInputs(input?: {
     period,
     holdItems: holdItems as HoldQueueItemRow[],
     findings: findings as OverturnFindingRow[],
+  };
+}
+
+async function loadDriftAnalyticsInputs(input?: {
+  startDate?: string;
+  endDate?: string;
+}) {
+  const period = resolveDriftPeriod(input?.startDate, input?.endDate);
+  const [documents, findings] = await Promise.all([
+    db.getDriftAnalyticsDocuments({
+      startDate: new Date(period.start),
+      endDate: new Date(period.end),
+    }),
+    db.getDriftAnalyticsFindings({
+      startDate: new Date(period.start),
+      endDate: new Date(period.end),
+    }),
+  ]);
+
+  return {
+    period,
+    documents: documents as DriftDocumentRow[],
+    findings: findings as DriftFindingRow[],
   };
 }
 
@@ -567,6 +597,44 @@ export const analyticsRouter = router({
         enforceRateLimit(`user:${ctx.user.id}:review`, RATE_LIMITS.review)
       );
       return runDlqRetryPass({ limit: input?.limit });
+    }),
+
+  // ============ PR-18: DRIFT DETECTION ============
+
+  /**
+   * EWMA/CUSUM defect-rate drift + calibration histograms + alerts.
+   */
+  getDriftSummary: protectedProcedure
+    .input(periodInput)
+    .query(async ({ input }) => {
+      const loaded = await loadDriftAnalyticsInputs(input);
+      return buildDriftAnalyticsSummary({
+        documents: loaded.documents,
+        findings: loaded.findings,
+        startDate: loaded.period.start,
+        endDate: loaded.period.end,
+      });
+    }),
+
+  /**
+   * Active drift alerts only (sorted by severity).
+   */
+  getDriftAlerts: protectedProcedure
+    .input(periodInput)
+    .query(async ({ input }) => {
+      const loaded = await loadDriftAnalyticsInputs(input);
+      const summary = buildDriftAnalyticsSummary({
+        documents: loaded.documents,
+        findings: loaded.findings,
+        startDate: loaded.period.start,
+        endDate: loaded.period.end,
+      });
+      return {
+        period: summary.period,
+        asOf: summary.asOf,
+        alerts: summary.alerts,
+        summary: summary.summary,
+      };
     }),
 });
 
