@@ -382,12 +382,27 @@ export default function HoldQueue() {
               <span>
                 <kbd className="font-mono text-foreground">j</kbd> /{" "}
                 <kbd className="font-mono text-foreground">k</kbd> next / prev
+                job
               </span>
               <span>
                 <kbd className="font-mono text-foreground">a</kbd> approve
               </span>
               <span>
                 <kbd className="font-mono text-foreground">r</kbd> reject
+              </span>
+              <span>
+                <kbd className="font-mono text-foreground">n</kbd> /{" "}
+                <kbd className="font-mono text-foreground">p</kbd> next / prev
+                finding
+              </span>
+              <span>
+                <kbd className="font-mono text-foreground">o</kbd> override
+              </span>
+              <span>
+                <kbd className="font-mono text-foreground">c</kbd> correct
+              </span>
+              <span>
+                <kbd className="font-mono text-foreground">v</kbd> view on PDF
               </span>
               <span>
                 <kbd className="font-mono text-foreground">Enter</kbd> focus
