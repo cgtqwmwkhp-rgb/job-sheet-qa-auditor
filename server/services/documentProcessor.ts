@@ -53,6 +53,12 @@ import {
 } from "./ensembleExtraction";
 import * as db from "../db";
 import { v4 as uuidv4 } from "uuid";
+import {
+  beginProcessingProgress,
+  finishProcessingProgress,
+  syncStagesFromProcessor,
+} from "./processingProgressStore";
+import type { JobSheetProcessStatus } from "@shared/processingProgress";
 
 export interface ProcessingResult {
   success: boolean;
@@ -136,6 +142,27 @@ export async function processJobSheetWithOptions(
   const runId = uuidv4();
   let selectionResult: SelectionResult | undefined;
 
+  /** PR-11: push stage + sync live poll snapshot (non-fatal). */
+  const recordStage = (
+    stage: ProcessingResult["processingStages"][number],
+    nextRunning?: string
+  ) => {
+    stages.push(stage);
+    try {
+      syncStagesFromProcessor(jobSheetId, stages, nextRunning);
+    } catch (err) {
+      console.warn("[DocumentProcessor] progress sync failed:", err);
+    }
+  };
+
+  const finishProgress = (finalStatus: JobSheetProcessStatus) => {
+    try {
+      finishProcessingProgress(jobSheetId, finalStatus, stages);
+    } catch (err) {
+      console.warn("[DocumentProcessor] progress finish failed:", err);
+    }
+  };
+
   // Update job sheet status to processing
   try {
     await db.updateJobSheetStatus(jobSheetId, "processing");
@@ -146,18 +173,27 @@ export async function processJobSheetWithOptions(
     );
   }
 
+  try {
+    beginProcessingProgress(jobSheetId);
+  } catch (err) {
+    console.warn("[DocumentProcessor] progress begin failed:", err);
+  }
+
   // Stage 1: OCR Text Extraction
   const ocrStartTime = Date.now();
   let ocrResult: OCRResult;
 
   try {
     ocrResult = await extractTextFromDocument(documentUrl, { jobSheetId });
-    stages.push({
-      stage: "OCR Text Extraction",
-      status: ocrResult.success ? "success" : "failed",
-      durationMs: Date.now() - ocrStartTime,
-      error: ocrResult.error,
-    });
+    recordStage(
+      {
+        stage: "OCR Text Extraction",
+        status: ocrResult.success ? "success" : "failed",
+        durationMs: Date.now() - ocrStartTime,
+        error: ocrResult.error,
+      },
+      ocrResult.success ? "Template Selection" : undefined
+    );
   } catch (error) {
     ocrResult = {
       success: false,
@@ -166,7 +202,7 @@ export async function processJobSheetWithOptions(
       model: getOCRConfig().model,
       error: error instanceof Error ? error.message : "OCR failed",
     };
-    stages.push({
+    recordStage({
       stage: "OCR Text Extraction",
       status: "failed",
       durationMs: Date.now() - ocrStartTime,
@@ -185,6 +221,7 @@ export async function processJobSheetWithOptions(
       );
     }
 
+    finishProgress("failed");
     return {
       success: false,
       jobSheetId,
@@ -219,7 +256,7 @@ export async function processJobSheetWithOptions(
       );
     }
 
-    stages.push({
+    recordStage({
       stage: "OCR Confidence Gate",
       status: "failed",
       durationMs: 0,
@@ -260,6 +297,7 @@ export async function processJobSheetWithOptions(
         "[DocumentProcessor] Failed to store low-OCR-confidence result:",
         dbError
       );
+      finishProgress("failed");
       return {
         success: false,
         jobSheetId,
@@ -269,6 +307,7 @@ export async function processJobSheetWithOptions(
       };
     }
 
+    finishProgress("review_queue");
     return {
       success: true,
       jobSheetId,
@@ -314,13 +353,14 @@ export async function processJobSheetWithOptions(
       );
     }
 
-    stages.push({
+    recordStage({
       stage: "Template Selection",
       status: "failed",
       durationMs: Date.now() - selectionStartTime,
       error: errorMsg,
     });
 
+    finishProgress("failed");
     return {
       success: false,
       jobSheetId,
@@ -344,11 +384,14 @@ export async function processJobSheetWithOptions(
     if (version) {
       spec = convertSpecJsonToGoldSpec(version.specJson);
       usedTemplateVersionId = version.id;
-      stages.push({
-        stage: "Template Selection",
-        status: "success",
-        durationMs: Date.now() - selectionStartTime,
-      });
+      recordStage(
+        {
+          stage: "Template Selection",
+          status: "success",
+          durationMs: Date.now() - selectionStartTime,
+        },
+        "Ensemble Extraction"
+      );
     } else {
       // Template version not found - fail explicitly (no fallback)
       const errorMsg = `Template version ${options.templateVersionId} not found`;
@@ -363,13 +406,14 @@ export async function processJobSheetWithOptions(
         );
       }
 
-      stages.push({
+      recordStage({
         stage: "Template Selection",
         status: "failed",
         durationMs: Date.now() - selectionStartTime,
         error: errorMsg,
       });
 
+      finishProgress("failed");
       return {
         success: false,
         jobSheetId,
@@ -391,7 +435,7 @@ export async function processJobSheetWithOptions(
         `[DocumentProcessor] Using hybrid assessment for fallback processing`
       );
 
-      stages.push({
+      recordStage({
         stage: "Template Selection",
         status: "skipped",
         durationMs: Date.now() - selectionStartTime,
@@ -422,7 +466,7 @@ export async function processJobSheetWithOptions(
         { hasOcrSignature: hasOcrSignatureEvidence(ocrResult) }
       );
 
-      stages.push({
+      recordStage({
         stage: "Hybrid Assessment",
         status: hybridResult.success ? "success" : "failed",
         durationMs: Date.now() - hybridStartTime,
@@ -485,6 +529,7 @@ export async function processJobSheetWithOptions(
         // enum column at runtime.
 
         // Persist succeeded; overall success follows hybrid assessment outcome
+        finishProgress("review_queue");
         return {
           success: hybridResult.success,
           jobSheetId,
@@ -502,6 +547,7 @@ export async function processJobSheetWithOptions(
           dbError
         );
 
+        finishProgress("failed");
         return {
           success: false,
           jobSheetId,
@@ -520,11 +566,14 @@ export async function processJobSheetWithOptions(
     if (version) {
       spec = convertSpecJsonToGoldSpec(version.specJson);
       usedTemplateVersionId = version.id;
-      stages.push({
-        stage: "Template Selection",
-        status: "success",
-        durationMs: Date.now() - selectionStartTime,
-      });
+      recordStage(
+        {
+          stage: "Template Selection",
+          status: "success",
+          durationMs: Date.now() - selectionStartTime,
+        },
+        "Ensemble Extraction"
+      );
     } else {
       // Template version should exist at this point - fail explicitly
       const errorMsg = `Selected template version ${selectionResult.versionId} not found`;
@@ -539,13 +588,14 @@ export async function processJobSheetWithOptions(
         );
       }
 
-      stages.push({
+      recordStage({
         stage: "Template Selection",
         status: "failed",
         durationMs: Date.now() - selectionStartTime,
         error: errorMsg,
       });
 
+      finishProgress("failed");
       return {
         success: false,
         jobSheetId,
@@ -573,33 +623,42 @@ export async function processJobSheetWithOptions(
         useLlm: processingSettings.llmFallbackEnabled,
         extractionMethod: "OCR",
       });
-      stages.push({
-        stage: "Ensemble Extraction",
-        status: ensembleResult ? "success" : "failed",
-        durationMs: Date.now() - ensembleStartTime,
-        error: ensembleResult ? undefined : "Ensemble returned null",
-      });
+      recordStage(
+        {
+          stage: "Ensemble Extraction",
+          status: ensembleResult ? "success" : "failed",
+          durationMs: Date.now() - ensembleStartTime,
+          error: ensembleResult ? undefined : "Ensemble returned null",
+        },
+        "AI Analysis"
+      );
     } catch (ensembleError) {
       console.warn(
         "[DocumentProcessor] Ensemble extraction failed (non-fatal):",
         ensembleError
       );
-      stages.push({
-        stage: "Ensemble Extraction",
-        status: "failed",
-        durationMs: Date.now() - ensembleStartTime,
-        error:
-          ensembleError instanceof Error
-            ? ensembleError.message
-            : "Ensemble extraction failed",
-      });
+      recordStage(
+        {
+          stage: "Ensemble Extraction",
+          status: "failed",
+          durationMs: Date.now() - ensembleStartTime,
+          error:
+            ensembleError instanceof Error
+              ? ensembleError.message
+              : "Ensemble extraction failed",
+        },
+        "AI Analysis"
+      );
     }
   } else {
-    stages.push({
-      stage: "Ensemble Extraction",
-      status: "skipped",
-      durationMs: Date.now() - ensembleStartTime,
-    });
+    recordStage(
+      {
+        stage: "Ensemble Extraction",
+        status: "skipped",
+        durationMs: Date.now() - ensembleStartTime,
+      },
+      "AI Analysis"
+    );
   }
 
   // Stage 2: AI Analysis
@@ -616,12 +675,15 @@ export async function processJobSheetWithOptions(
         confidenceThreshold: processingSettings.llmConfidenceThreshold,
       }
     );
-    stages.push({
-      stage: "AI Analysis",
-      status: analysisResult.success ? "success" : "failed",
-      durationMs: Date.now() - analysisStartTime,
-      error: analysisResult.error,
-    });
+    recordStage(
+      {
+        stage: "AI Analysis",
+        status: analysisResult.success ? "success" : "failed",
+        durationMs: Date.now() - analysisStartTime,
+        error: analysisResult.error,
+      },
+      "Store Results"
+    );
   } catch (error) {
     analysisResult = {
       success: false,
@@ -634,12 +696,15 @@ export async function processJobSheetWithOptions(
       model: "gemini-3.1-pro",
       error: error instanceof Error ? error.message : "Analysis failed",
     };
-    stages.push({
-      stage: "AI Analysis",
-      status: "failed",
-      durationMs: Date.now() - analysisStartTime,
-      error: analysisResult.error,
-    });
+    recordStage(
+      {
+        stage: "AI Analysis",
+        status: "failed",
+        durationMs: Date.now() - analysisStartTime,
+        error: analysisResult.error,
+      },
+      "Store Results"
+    );
   }
 
   // Threshold: analyzer score below LLM confidence → force review_queue (LOW_LLM_CONFIDENCE)
@@ -827,14 +892,14 @@ export async function processJobSheetWithOptions(
       });
     }
 
-    stages.push({
+    recordStage({
       stage: "Store Results",
       status: "success",
       durationMs: Date.now() - storageStartTime,
     });
   } catch (error) {
     console.error("[DocumentProcessor] Failed to store results:", error);
-    stages.push({
+    recordStage({
       stage: "Store Results",
       status: "failed",
       durationMs: Date.now() - storageStartTime,
@@ -845,6 +910,13 @@ export async function processJobSheetWithOptions(
   const storageFailed = stages.some(
     s => s.stage === "Store Results" && s.status === "failed"
   );
+
+  const terminalStatus: JobSheetProcessStatus = storageFailed
+    ? "failed"
+    : analysisResult.overallResult === "REVIEW_QUEUE"
+      ? "review_queue"
+      : "completed";
+  finishProgress(terminalStatus);
 
   return {
     success: analysisResult.success && !storageFailed && !!auditResultId,

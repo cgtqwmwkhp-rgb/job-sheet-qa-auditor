@@ -1,5 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { FileUploader } from "@/components/FileUploader";
+import { ProcessingProgressPanel } from "@/components/ProcessingProgressPanel";
 import {
   Card,
   CardContent,
@@ -18,12 +19,17 @@ import {
   Play,
   AlertCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { GuidedTour } from "@/components/GuidedTour";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import {
+  useJobSheetProcessStatus,
+  watchJobSheetsProcessing,
+} from "@/hooks/useProcessingWatch";
+import { isActiveJobSheetStatus } from "@shared/processingProgress";
 
 interface IntakeFeedback {
   fileName: string;
@@ -40,27 +46,47 @@ export default function UploadPage() {
     []
   );
 
-  // Fetch recent uploads
+  // Fetch recent uploads — poll while any are actively processing
   const {
     data: recentUploads,
     isLoading: uploadsLoading,
     refetch,
-  } = trpc.jobSheets.list.useQuery({ limit: 10 });
+  } = trpc.jobSheets.list.useQuery(
+    { limit: 10 },
+    {
+      refetchInterval: query => {
+        const rows = query.state.data;
+        if (!rows?.length) return false;
+        const active =
+          rows.some(r => isActiveJobSheetStatus(r.status)) ||
+          processingIds.length > 0;
+        return active ? 2000 : false;
+      },
+    }
+  );
   const uploadMutation = trpc.jobSheets.upload.useMutation();
   const processMutation = trpc.jobSheets.process.useMutation();
   const utils = trpc.useUtils();
+
+  const primaryProcessingId = useMemo(() => {
+    if (processingIds.length > 0) return processingIds[0];
+    const fromList = recentUploads?.find(u => isActiveJobSheetStatus(u.status));
+    return fromList?.id ?? null;
+  }, [processingIds, recentUploads]);
+
+  const { data: liveProgress } = useJobSheetProcessStatus(primaryProcessingId, {
+    enabled: primaryProcessingId != null,
+  });
 
   const handleUpload = async (files: File[]) => {
     if (files.length === 0) return;
 
     setIsUploading(true);
-    const uploadedIds: number[] = [];
+    const uploaded: Array<{ id: number; fileName: string }> = [];
     const rejections: IntakeFeedback[] = [];
 
     try {
-      // Upload files one by one
       for (const file of files) {
-        // Convert file to base64
         const base64 = await fileToBase64(file);
 
         const result = await uploadMutation.mutateAsync({
@@ -70,8 +96,6 @@ export default function UploadPage() {
           referenceNumber: generateReferenceNumber(),
         });
 
-        // Intake gate may reject before storage (feature-flagged).
-        // Response is a union; narrow via runtime checks for the client.
         const uploadResult = result as {
           id?: number;
           rejected?: boolean;
@@ -97,7 +121,7 @@ export default function UploadPage() {
         }
 
         if (typeof uploadResult.id === "number") {
-          uploadedIds.push(uploadResult.id);
+          uploaded.push({ id: uploadResult.id, fileName: file.name });
         }
       }
 
@@ -109,48 +133,49 @@ export default function UploadPage() {
         );
       }
 
-      if (uploadedIds.length === 0) {
+      if (uploaded.length === 0) {
         return;
       }
 
       toast.success(
-        `Successfully uploaded ${uploadedIds.length} file(s). Starting AI analysis...`
+        `Uploaded ${uploaded.length} file(s). Processing in the background — you can navigate away.`
       );
 
-      // Invalidate queries to refresh data
       utils.jobSheets.list.invalidate();
       utils.stats.dashboard.invalidate();
 
-      // Auto-process only accepted uploads (skip rejected)
-      setProcessingIds(uploadedIds);
-      for (const id of uploadedIds) {
-        try {
-          await processMutation.mutateAsync({ id });
-        } catch (error) {
-          console.error(`Failed to process job sheet ${id}:`, error);
+      const ids = uploaded.map(u => u.id);
+      setProcessingIds(ids);
+      watchJobSheetsProcessing(uploaded);
+
+      // Fire-and-forget process so SPA navigation does not block on the mutation UI
+      void (async () => {
+        for (const item of uploaded) {
+          try {
+            await processMutation.mutateAsync({ id: item.id });
+          } catch (error) {
+            console.error(`Failed to process job sheet ${item.id}:`, error);
+            toast.error(`Failed to process ${item.fileName}`);
+          }
         }
-      }
-      setProcessingIds([]);
-
-      // Refresh the list
-      refetch();
-      utils.stats.dashboard.invalidate();
-
-      toast.success("AI analysis complete! View results in Audit Results.");
+        setProcessingIds([]);
+        refetch();
+        utils.stats.dashboard.invalidate();
+      })();
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Failed to upload files. Please try again.");
+      setProcessingIds([]);
     } finally {
       setIsUploading(false);
-      setProcessingIds([]);
     }
   };
 
-  const handleProcessSingle = async (id: number) => {
+  const handleProcessSingle = async (id: number, fileName?: string) => {
     setProcessingIds(prev => [...prev, id]);
+    watchJobSheetsProcessing([{ id, fileName }]);
     try {
       await processMutation.mutateAsync({ id });
-      toast.success("Analysis complete!");
       refetch();
       utils.stats.dashboard.invalidate();
     } catch (error) {
@@ -162,14 +187,12 @@ export default function UploadPage() {
   };
 
   const getStatusIcon = (status: string, id: number) => {
-    if (processingIds.includes(id)) {
+    if (processingIds.includes(id) || status === "processing") {
       return <Loader2 className="w-4 h-4 animate-spin" />;
     }
     switch (status) {
       case "completed":
         return <CheckCircle2 className="w-4 h-4" />;
-      case "processing":
-        return <Loader2 className="w-4 h-4 animate-spin" />;
       case "failed":
         return <AlertCircle className="w-4 h-4" />;
       case "review_queue":
@@ -180,14 +203,12 @@ export default function UploadPage() {
   };
 
   const getStatusColor = (status: string, id: number) => {
-    if (processingIds.includes(id)) {
+    if (processingIds.includes(id) || status === "processing") {
       return "bg-blue-100 text-blue-600";
     }
     switch (status) {
       case "completed":
         return "bg-green-100 text-green-600";
-      case "processing":
-        return "bg-blue-100 text-blue-600";
       case "failed":
         return "bg-red-100 text-red-600";
       case "review_queue":
@@ -196,6 +217,8 @@ export default function UploadPage() {
         return "bg-gray-100 text-gray-600";
     }
   };
+
+  const showBusyOverlay = isUploading;
 
   return (
     <DashboardLayout>
@@ -207,7 +230,7 @@ export default function UploadPage() {
             popover: {
               title: "Upload Zone",
               description:
-                "Drag and drop your PDF job sheets here. Files are automatically processed through Mistral OCR and Gemini AI analysis.",
+                "Drag and drop your PDF job sheets here. Files are processed through OCR and Gemini analysis with live per-stage progress.",
               side: "bottom",
               align: "start",
             },
@@ -239,9 +262,10 @@ export default function UploadPage() {
           <Info className="h-4 w-4 text-blue-800" />
           <AlertTitle>AI-Powered Processing</AlertTitle>
           <AlertDescription>
-            Files are automatically processed using <strong>Mistral OCR</strong>{" "}
-            for text extraction and <strong>Google Gemini 2.5</strong> for
-            intelligent analysis against the Gold Standard specification.
+            Files are processed with <strong>OCR text extraction</strong> and{" "}
+            <strong>Gemini 3.1 Pro</strong> judgment against the Gold Standard
+            specification. Progress updates live per stage — you can leave this
+            page and still get a completion notification.
           </AlertDescription>
         </Alert>
 
@@ -250,34 +274,30 @@ export default function UploadPage() {
             <CardTitle>File Upload</CardTitle>
             <CardDescription>
               Drag and drop your job sheets here or click to browse. Processing
-              starts automatically.
+              starts automatically in the background.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            {isUploading || processingIds.length > 0 ? (
+          <CardContent className="space-y-4">
+            {showBusyOverlay ? (
               <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-lg bg-blue-50/50">
                 <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                <p className="text-lg font-medium">
-                  {isUploading
-                    ? "Uploading files..."
-                    : "Running AI Analysis..."}
-                </p>
+                <p className="text-lg font-medium">Uploading files...</p>
                 <p className="text-sm text-muted-foreground">
-                  {isUploading
-                    ? "Please wait while we upload your documents."
-                    : "Mistral OCR → Gemini Analysis → Generating Report"}
+                  Please wait while we upload your documents.
                 </p>
-                {processingIds.length > 0 && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Processing {processingIds.length} document(s)...
-                  </p>
-                )}
               </div>
             ) : (
               <FileUploader
                 onUpload={handleUpload}
                 maxFiles={50}
                 intakeHints={intakeRejections}
+              />
+            )}
+
+            {liveProgress && isActiveJobSheetStatus(liveProgress.status) && (
+              <ProcessingProgressPanel
+                progress={liveProgress}
+                title="Live pipeline progress"
               />
             )}
 
@@ -333,7 +353,7 @@ export default function UploadPage() {
             <CardHeader>
               <CardTitle>Recent Uploads</CardTitle>
               <CardDescription>
-                Click to view details or re-process pending items
+                Click to open the audit deep link, or re-process pending items
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -355,7 +375,7 @@ export default function UploadPage() {
                       </div>
                       <div
                         className="flex-1 min-w-0 cursor-pointer"
-                        onClick={() => setLocation(`/audits`)}
+                        onClick={() => setLocation(`/audits?id=${upload.id}`)}
                       >
                         <p className="text-sm font-medium truncate">
                           {upload.fileName}
@@ -372,7 +392,9 @@ export default function UploadPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleProcessSingle(upload.id)}
+                            onClick={() =>
+                              handleProcessSingle(upload.id, upload.fileName)
+                            }
                           >
                             <Play className="w-3 h-3 mr-1" />
                             Process
@@ -380,21 +402,21 @@ export default function UploadPage() {
                         )}
                       <span
                         className={`text-xs font-medium px-2 py-1 rounded ${
-                          processingIds.includes(upload.id)
+                          processingIds.includes(upload.id) ||
+                          upload.status === "processing"
                             ? "bg-blue-100 text-blue-700"
                             : upload.status === "completed"
                               ? "bg-green-100 text-green-700"
                               : upload.status === "failed"
                                 ? "bg-red-100 text-red-700"
-                                : upload.status === "processing"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : upload.status === "review_queue"
-                                    ? "bg-yellow-100 text-yellow-700"
-                                    : "bg-gray-100 text-gray-700"
+                                : upload.status === "review_queue"
+                                  ? "bg-yellow-100 text-yellow-700"
+                                  : "bg-gray-100 text-gray-700"
                         }`}
                       >
-                        {processingIds.includes(upload.id)
-                          ? "Analyzing..."
+                        {processingIds.includes(upload.id) ||
+                        upload.status === "processing"
+                          ? "Processing…"
                           : upload.status.charAt(0).toUpperCase() +
                             upload.status.slice(1).replace("_", " ")}
                       </span>
@@ -415,13 +437,11 @@ export default function UploadPage() {
   );
 }
 
-// Helper function to convert File to base64
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => {
-      // Remove the data URL prefix (e.g., "data:application/pdf;base64,")
       const result = reader.result as string;
       const base64 = result.split(",")[1];
       resolve(base64);
@@ -430,7 +450,6 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-// Generate a reference number
 function generateReferenceNumber(): string {
   const date = new Date();
   const year = date.getFullYear();
