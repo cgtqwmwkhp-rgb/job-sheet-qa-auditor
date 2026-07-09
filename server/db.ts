@@ -1,4 +1,4 @@
-import { eq, desc, and, sql, count, gte, lte } from "drizzle-orm";
+import { eq, desc, and, sql, count, gte, lte, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -748,4 +748,146 @@ export async function getAllProcessingSettings() {
     .select()
     .from(processingSettings)
     .orderBy(processingSettings.category);
+}
+
+// ============ ENGINEER ANALYTICS QUERIES (PR-15) ============
+
+export interface EngineerAnalyticsDocumentRow {
+  technicianId: number;
+  jobSheetId: number;
+  processedAt: Date;
+}
+
+export interface EngineerAnalyticsFindingRow {
+  findingId: number;
+  technicianId: number;
+  jobSheetId: number;
+  severity: "S0" | "S1" | "S2" | "S3";
+  reasonCode:
+    | "MISSING_FIELD"
+    | "UNREADABLE_FIELD"
+    | "LOW_CONFIDENCE"
+    | "INVALID_FORMAT"
+    | "CONFLICT"
+    | "OUT_OF_POLICY"
+    | "INCOMPLETE_EVIDENCE"
+    | "OCR_FAILURE"
+    | "PIPELINE_ERROR"
+    | "SPEC_GAP"
+    | "SECURITY_RISK";
+  fieldName: string;
+  resolutionStatus: "open" | "waived" | "overridden" | "flagged" | "approved";
+  occurredAt: Date;
+}
+
+/**
+ * Job sheets attributed to a technician within an optional date window.
+ * Uses jobSheets.createdAt as the processing timestamp.
+ */
+export async function getEngineerAnalyticsDocuments(options?: {
+  startDate?: Date;
+  endDate?: Date;
+  technicianId?: number;
+}): Promise<EngineerAnalyticsDocumentRow[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [isNotNull(jobSheets.technicianId)];
+  if (options?.startDate) {
+    conditions.push(gte(jobSheets.createdAt, options.startDate));
+  }
+  if (options?.endDate) {
+    conditions.push(lte(jobSheets.createdAt, options.endDate));
+  }
+  if (options?.technicianId != null) {
+    conditions.push(eq(jobSheets.technicianId, options.technicianId));
+  }
+
+  const rows = await db
+    .select({
+      technicianId: jobSheets.technicianId,
+      jobSheetId: jobSheets.id,
+      processedAt: jobSheets.createdAt,
+    })
+    .from(jobSheets)
+    .where(and(...conditions));
+
+  return rows
+    .filter(
+      (
+        r
+      ): r is { technicianId: number; jobSheetId: number; processedAt: Date } =>
+        r.technicianId != null
+    )
+    .map(r => ({
+      technicianId: r.technicianId,
+      jobSheetId: r.jobSheetId,
+      processedAt: r.processedAt,
+    }));
+}
+
+/**
+ * Audit findings joined to technician-attributed job sheets.
+ * Window is applied to finding createdAt; prior-period callers pass a wider range.
+ */
+export async function getEngineerAnalyticsFindings(options?: {
+  startDate?: Date;
+  endDate?: Date;
+  technicianId?: number;
+}): Promise<EngineerAnalyticsFindingRow[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [isNotNull(jobSheets.technicianId)];
+  if (options?.startDate) {
+    conditions.push(gte(auditFindings.createdAt, options.startDate));
+  }
+  if (options?.endDate) {
+    conditions.push(lte(auditFindings.createdAt, options.endDate));
+  }
+  if (options?.technicianId != null) {
+    conditions.push(eq(jobSheets.technicianId, options.technicianId));
+  }
+
+  const rows = await db
+    .select({
+      findingId: auditFindings.id,
+      technicianId: jobSheets.technicianId,
+      jobSheetId: jobSheets.id,
+      severity: auditFindings.severity,
+      reasonCode: auditFindings.reasonCode,
+      fieldName: auditFindings.fieldName,
+      resolutionStatus: auditFindings.resolutionStatus,
+      occurredAt: auditFindings.createdAt,
+    })
+    .from(auditFindings)
+    .innerJoin(auditResults, eq(auditFindings.auditResultId, auditResults.id))
+    .innerJoin(jobSheets, eq(auditResults.jobSheetId, jobSheets.id))
+    .where(and(...conditions));
+
+  return rows
+    .filter(
+      (
+        r
+      ): r is {
+        findingId: number;
+        technicianId: number;
+        jobSheetId: number;
+        severity: EngineerAnalyticsFindingRow["severity"];
+        reasonCode: EngineerAnalyticsFindingRow["reasonCode"];
+        fieldName: string;
+        resolutionStatus: EngineerAnalyticsFindingRow["resolutionStatus"];
+        occurredAt: Date;
+      } => r.technicianId != null
+    )
+    .map(r => ({
+      findingId: r.findingId,
+      technicianId: r.technicianId,
+      jobSheetId: r.jobSheetId,
+      severity: r.severity,
+      reasonCode: r.reasonCode,
+      fieldName: r.fieldName,
+      resolutionStatus: r.resolutionStatus,
+      occurredAt: r.occurredAt,
+    }));
 }
