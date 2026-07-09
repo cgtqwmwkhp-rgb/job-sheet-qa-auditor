@@ -1,22 +1,22 @@
 /**
  * Parity Runner Types - Stage 8 v2
- * 
+ *
  * Types for parity testing with positive/negative suite support.
  */
 
 /**
  * Canonical FAILURE reason codes - explains WHY something failed
- * 
+ *
  * IMPORTANT: VALID is NOT a reason code. It is a STATUS (PASS).
  * When status is PASS, reasonCode must be null/absent.
- * 
+ *
  * Document-level codes (attributed to document/engineer):
  * - MISSING_FIELD: Required field not present in document
  * - INVALID_FORMAT: Field format is incorrect
  * - OUT_OF_POLICY: Value outside acceptable policy range
  * - LOW_CONFIDENCE: Extraction confidence below threshold
  * - CONFLICT: Conflicting information detected
- * 
+ *
  * System/Config-level codes (attributed to system, not document):
  * - SPEC_GAP: Template spec or ROI configuration incomplete
  * - OCR_FAILURE: OCR or image QA processing failed
@@ -24,15 +24,15 @@
  */
 export const CANONICAL_REASON_CODES = [
   // Document-level (attributed to document/engineer)
-  'MISSING_FIELD',
-  'INVALID_FORMAT',
-  'OUT_OF_POLICY',
-  'LOW_CONFIDENCE',
-  'CONFLICT',
+  "MISSING_FIELD",
+  "INVALID_FORMAT",
+  "OUT_OF_POLICY",
+  "LOW_CONFIDENCE",
+  "CONFLICT",
   // System/Config-level (attributed to system, not document)
-  'SPEC_GAP',
-  'OCR_FAILURE',
-  'PIPELINE_ERROR',
+  "SPEC_GAP",
+  "OCR_FAILURE",
+  "PIPELINE_ERROR",
 ] as const;
 
 /**
@@ -41,15 +41,15 @@ export const CANONICAL_REASON_CODES = [
  * - FAIL: Validation failed (reasonCode required)
  * - REVIEW_QUEUE: Needs manual review (reasonCode required)
  */
-export const CANONICAL_STATUSES = ['PASS', 'FAIL', 'REVIEW_QUEUE'] as const;
-export type CanonicalStatus = typeof CANONICAL_STATUSES[number];
+export const CANONICAL_STATUSES = ["PASS", "FAIL", "REVIEW_QUEUE"] as const;
+export type CanonicalStatus = (typeof CANONICAL_STATUSES)[number];
 
-export type CanonicalReasonCode = typeof CANONICAL_REASON_CODES[number];
+export type CanonicalReasonCode = (typeof CANONICAL_REASON_CODES)[number];
 
 /**
  * Severity levels
  */
-export type Severity = 'S0' | 'S1' | 'S2' | 'S3';
+export type Severity = "S0" | "S1" | "S2" | "S3";
 
 /**
  * Expected failure specification for negative suite
@@ -62,19 +62,36 @@ export interface ExpectedFailure {
 }
 
 /**
+ * Optional runtime metadata that lets parity fixtures execute through the
+ * application processing pipeline instead of using mock actuals.
+ */
+export interface ParityPipelineFixture {
+  jobSheetId?: number;
+  documentUrl?: string;
+  templateVersionId?: number;
+  userId?: number;
+  fileName?: string;
+  fileKey?: string;
+  fileType?: string;
+  fileSizeBytes?: number;
+}
+
+/**
  * Golden document fixture
  */
 export interface GoldenDocument {
   id: string;
   name: string;
   description: string;
-  expectedResult: 'pass' | 'fail';
+  expectedResult: "pass" | "fail";
   reviewQueueReasons?: string[];
   extractedFields: Record<string, unknown>;
   validatedFields: GoldenValidatedField[];
   findings: GoldenFinding[];
   /** Expected failures for negative suite documents */
   expectedFailures?: ExpectedFailure[];
+  /** Runtime metadata for real pipeline-backed parity runs */
+  pipeline?: ParityPipelineFixture;
 }
 
 /**
@@ -83,7 +100,7 @@ export interface GoldenDocument {
 export interface GoldenValidatedField {
   ruleId: string;
   field: string;
-  status: 'passed' | 'failed' | 'skipped' | 'error';
+  status: "passed" | "failed" | "skipped" | "error";
   value: unknown;
   confidence: number;
   pageNumber?: number;
@@ -143,7 +160,7 @@ export interface GoldenRule {
 /**
  * Parity comparison result
  */
-export type ParityStatus = 'same' | 'improved' | 'worse' | 'new' | 'missing';
+export type ParityStatus = "same" | "improved" | "worse" | "new" | "missing";
 
 /**
  * Field comparison result
@@ -170,8 +187,8 @@ export interface DocumentComparison {
   documentId: string;
   documentName: string;
   status: ParityStatus;
-  expectedResult: 'pass' | 'fail';
-  actualResult: 'pass' | 'fail' | null;
+  expectedResult: "pass" | "fail";
+  actualResult: "pass" | "fail" | null;
   fieldComparisons: FieldComparison[];
   findingsComparison: {
     expected: number;
@@ -195,7 +212,7 @@ export interface DocumentComparison {
 export interface NegativeDocumentResult {
   documentId: string;
   documentName: string;
-  status: 'pass' | 'fail';
+  status: "pass" | "fail";
   expectedFailures: ExpectedFailure[];
   detectedFailures: ExpectedFailure[];
   matchedFailures: ExpectedFailure[];
@@ -211,8 +228,8 @@ export interface PositiveParityReport {
   runId: string;
   timestamp: string;
   goldenVersion: string;
-  suiteType: 'positive';
-  status: 'pass' | 'fail' | 'warning';
+  suiteType: "positive";
+  status: "pass" | "fail" | "warning";
   summary: {
     totalDocuments: number;
     same: number;
@@ -236,8 +253,8 @@ export interface NegativeParityReport {
   runId: string;
   timestamp: string;
   goldenVersion: string;
-  suiteType: 'negative';
-  status: 'pass' | 'fail';
+  suiteType: "negative";
+  status: "pass" | "fail";
   summary: {
     totalDocuments: number;
     passed: number;
@@ -258,7 +275,7 @@ export interface CombinedParityReport {
   version: string;
   runId: string;
   timestamp: string;
-  status: 'pass' | 'fail';
+  status: "pass" | "fail";
   positive: PositiveParityReport;
   negative: NegativeParityReport;
   violations: string[];
@@ -272,7 +289,7 @@ export interface ParityReport {
   runId: string;
   timestamp: string;
   goldenVersion: string;
-  status: 'pass' | 'fail' | 'warning';
+  status: "pass" | "fail" | "warning";
   summary: {
     totalDocuments: number;
     same: number;
@@ -311,7 +328,9 @@ export const DEFAULT_THRESHOLDS: ParityThresholds = {
 /**
  * Validate that a reason code is canonical
  */
-export function isCanonicalReasonCode(code: string): code is CanonicalReasonCode {
+export function isCanonicalReasonCode(
+  code: string
+): code is CanonicalReasonCode {
   return CANONICAL_REASON_CODES.includes(code as CanonicalReasonCode);
 }
 
@@ -320,14 +339,14 @@ export function isCanonicalReasonCode(code: string): code is CanonicalReasonCode
  */
 export function mapToCanonicalReasonCode(code: string): CanonicalReasonCode {
   const mapping: Record<string, CanonicalReasonCode> = {
-    'OUT_OF_RANGE': 'OUT_OF_POLICY',
-    'RANGE_ERROR': 'OUT_OF_POLICY',
-    'POLICY_VIOLATION': 'OUT_OF_POLICY',
+    OUT_OF_RANGE: "OUT_OF_POLICY",
+    RANGE_ERROR: "OUT_OF_POLICY",
+    POLICY_VIOLATION: "OUT_OF_POLICY",
   };
-  
+
   if (isCanonicalReasonCode(code)) {
     return code;
   }
-  
-  return mapping[code] || 'OUT_OF_POLICY';
+
+  return mapping[code] || "OUT_OF_POLICY";
 }
