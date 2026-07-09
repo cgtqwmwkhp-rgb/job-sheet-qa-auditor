@@ -422,9 +422,8 @@ export async function retryDeadLetterJob(id: string): Promise<boolean> {
   const goldSpecId = resolveGoldSpecId(job);
 
   try {
-    const { orchestrateJobSheetProcessing } = await import(
-      "../services/documentProcessor"
-    );
+    const { orchestrateJobSheetProcessing } =
+      await import("../services/documentProcessor");
     await orchestrateJobSheetProcessing({
       source: "dlq-retry",
       jobSheetId: job.jobSheetId,

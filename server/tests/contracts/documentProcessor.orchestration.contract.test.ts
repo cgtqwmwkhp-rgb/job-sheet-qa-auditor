@@ -14,7 +14,9 @@ function readRepoFile(relativePath: string): string {
 
 describe("documentProcessor orchestration contract", () => {
   it("exposes one orchestrator for primary and retry entrypoints", () => {
-    const documentProcessor = readRepoFile("server/services/documentProcessor.ts");
+    const documentProcessor = readRepoFile(
+      "server/services/documentProcessor.ts"
+    );
     const router = readRepoFile("server/routers.ts");
     const deadLetterQueue = readRepoFile("server/utils/deadLetterQueue.ts");
 
@@ -28,7 +30,9 @@ describe("documentProcessor orchestration contract", () => {
   });
 
   it("keeps pipeline integration behind documentProcessor", () => {
-    const documentProcessor = readRepoFile("server/services/documentProcessor.ts");
+    const documentProcessor = readRepoFile(
+      "server/services/documentProcessor.ts"
+    );
     const router = readRepoFile("server/routers.ts");
     const deadLetterQueue = readRepoFile("server/utils/deadLetterQueue.ts");
 

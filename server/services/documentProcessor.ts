@@ -1032,9 +1032,7 @@ async function processJobSheetWithOptions(
       goldSpecId: options.goldSpecId || 1, // Default to spec ID 1 if not provided
       runId,
       result: analysisResult.overallResult.toLowerCase() as
-        | "pass"
-        | "fail"
-        | "review_queue",
+        "pass" | "fail" | "review_queue",
       confidenceScore: String(analysisResult.score),
       documentStrategy: "ocr", // We used OCR
       ocrEngineVersion: getOCREngineVersion(
