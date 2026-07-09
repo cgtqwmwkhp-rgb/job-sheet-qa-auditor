@@ -37,6 +37,12 @@ import {
   type SsotMode,
   type SsotValidationResult,
 } from "./defaultTemplate";
+import {
+  persistTemplateActivationToMysqlBestEffort,
+  persistTemplateStatusToMysqlBestEffort,
+  persistTemplateToMysqlBestEffort,
+  persistTemplateVersionToMysqlBestEffort,
+} from "./mysqlPersistence";
 
 // In-memory store for no-secrets CI (production would use DB)
 interface TemplateRecord {
@@ -140,6 +146,7 @@ export function createTemplate(input: CreateTemplateInput): TemplateRecord {
   };
 
   templateStore.set(id, template);
+  persistTemplateToMysqlBestEffort(template);
   return template;
 }
 
@@ -190,6 +197,7 @@ export function uploadTemplateVersion(
   };
 
   versionStore.set(id, version);
+  persistTemplateVersionToMysqlBestEffort(version, template);
   return version;
 }
 
@@ -409,6 +417,10 @@ export function activateVersion(
     template.updatedAt = new Date();
   }
 
+  if (template) {
+    persistTemplateActivationToMysqlBestEffort(version, template);
+  }
+
   return version;
 }
 
@@ -447,6 +459,7 @@ export function updateTemplateStatus(
 
   template.status = status;
   template.updatedAt = new Date();
+  persistTemplateStatusToMysqlBestEffort(template);
 
   return template;
 }

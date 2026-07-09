@@ -1,20 +1,21 @@
 /**
  * Selection Trace Writer
- * 
+ *
  * PR-D: Always-on selection trace artifact generation.
  * Writes deterministic JSON artifacts for every selection decision.
  */
 
-import { writeFileSync, mkdirSync, existsSync } from 'fs';
-import { join } from 'path';
-import type { SelectionResult, ConfidenceBand } from './types';
+import { writeFileSync, mkdirSync, existsSync } from "fs";
+import { join } from "path";
+import type { SelectionResult, ConfidenceBand } from "./types";
+import { persistSelectionTraceArtifactToMysqlBestEffort } from "./mysqlPersistence";
 
 /**
  * Selection trace artifact structure
  */
 export interface SelectionTraceArtifact {
   /** Artifact version for schema evolution */
-  artifactVersion: '1.0.0';
+  artifactVersion: "1.0.0";
   /** ISO timestamp of selection */
   timestamp: string;
   /** Job sheet ID being processed */
@@ -66,7 +67,7 @@ export interface SelectionTraceArtifact {
 /**
  * Artifacts directory path
  */
-const ARTIFACTS_DIR = 'artifacts/selection';
+const ARTIFACTS_DIR = "artifacts/selection";
 
 /**
  * Ensure artifacts directory exists
@@ -79,7 +80,7 @@ function ensureArtifactsDir(): void {
 
 /**
  * Write a selection trace artifact
- * 
+ *
  * @param jobSheetId - Job sheet ID
  * @param result - Selection result
  * @param documentTokens - Tokens extracted from document
@@ -95,7 +96,7 @@ export function writeSelectionTrace(
   ensureArtifactsDir();
 
   const artifact: SelectionTraceArtifact = {
-    artifactVersion: '1.0.0',
+    artifactVersion: "1.0.0",
     timestamp: new Date().toISOString(),
     jobSheetId,
     inputSignals: {
@@ -107,7 +108,9 @@ export function writeSelectionTrace(
       selected: result.selected,
       templateId: result.templateId ?? null,
       versionId: result.versionId ?? null,
-      templateSlug: result.candidates.find(c => c.templateId === result.templateId)?.templateSlug ?? null,
+      templateSlug:
+        result.candidates.find(c => c.templateId === result.templateId)
+          ?.templateSlug ?? null,
       confidenceBand: result.confidenceBand,
       topScore: result.topScore,
       runnerUpScore: result.runnerUpScore,
@@ -132,6 +135,7 @@ export function writeSelectionTrace(
 
   // Write with deterministic JSON formatting
   writeFileSync(filepath, JSON.stringify(artifact, null, 2));
+  persistSelectionTraceArtifactToMysqlBestEffort(artifact, result);
 
   return filepath;
 }
@@ -146,7 +150,7 @@ export function createSelectionTraceInMemory(
   documentLength: number
 ): SelectionTraceArtifact {
   return {
-    artifactVersion: '1.0.0',
+    artifactVersion: "1.0.0",
     timestamp: new Date().toISOString(),
     jobSheetId,
     inputSignals: {
@@ -158,7 +162,9 @@ export function createSelectionTraceInMemory(
       selected: result.selected,
       templateId: result.templateId ?? null,
       versionId: result.versionId ?? null,
-      templateSlug: result.candidates.find(c => c.templateId === result.templateId)?.templateSlug ?? null,
+      templateSlug:
+        result.candidates.find(c => c.templateId === result.templateId)
+          ?.templateSlug ?? null,
       confidenceBand: result.confidenceBand,
       topScore: result.topScore,
       runnerUpScore: result.runnerUpScore,
