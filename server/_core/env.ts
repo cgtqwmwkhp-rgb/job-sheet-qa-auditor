@@ -38,7 +38,7 @@ export const ENV = {
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   // Direct Gemini judgment (PR-6) — shared key with advisory interpreter
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
-  judgmentModel: process.env.JUDGMENT_MODEL?.trim() || "gemini-3.1-pro",
+  judgmentModel: process.env.JUDGMENT_MODEL?.trim() || "gemini-2.5-pro",
   // OAuth is enabled only when OAUTH_SERVER_URL is configured
   oauthEnabled: Boolean(process.env.OAUTH_SERVER_URL),
   // Dev bypass allows authentication without OAuth in development

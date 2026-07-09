@@ -35,7 +35,7 @@ Enterprise-grade document auditing system for job sheet validation with OCR extr
 
 | Variable         | Description                              | Default          |
 | ---------------- | ---------------------------------------- | ---------------- |
-| `JUDGMENT_MODEL` | Gemini model for Stage-2 judgment        | `gemini-3.1-pro` |
+| `JUDGMENT_MODEL` | Gemini model for Stage-2 judgment        | `gemini-2.5-pro` |
 | `GEMINI_API_KEY` | Gemini API key (shared with interpreter) | -                |
 
 ### Gemini Interpreter (Advisory Only)

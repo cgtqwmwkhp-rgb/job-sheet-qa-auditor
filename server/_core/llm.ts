@@ -172,7 +172,7 @@ const assertApiKey = () => {
 
 function resolveJudgmentModel(): string {
   return (
-    process.env.JUDGMENT_MODEL?.trim() || ENV.judgmentModel || "gemini-3.1-pro"
+    process.env.JUDGMENT_MODEL?.trim() || ENV.judgmentModel || "gemini-2.5-pro"
   );
 }
 
