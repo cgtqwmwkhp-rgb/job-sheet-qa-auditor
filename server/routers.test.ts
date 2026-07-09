@@ -90,6 +90,25 @@ vi.mock("./db", () => ({
     .fn()
     .mockResolvedValue([{ id: 1, action: "LOGIN", userId: 1 }]),
   logAction: vi.fn().mockResolvedValue(undefined),
+  getEngineerAnalyticsDocuments: vi.fn().mockResolvedValue([
+    {
+      technicianId: 2,
+      jobSheetId: 1,
+      processedAt: new Date("2024-06-10T10:00:00Z"),
+    },
+  ]),
+  getEngineerAnalyticsFindings: vi.fn().mockResolvedValue([
+    {
+      findingId: 1,
+      technicianId: 2,
+      jobSheetId: 1,
+      severity: "S1",
+      reasonCode: "MISSING_FIELD",
+      fieldName: "signature",
+      resolutionStatus: "open",
+      occurredAt: new Date("2024-06-10T11:00:00Z"),
+    },
+  ]),
 }));
 
 // Mock storage module
@@ -188,6 +207,45 @@ describe("stats.dashboard", () => {
     const caller = appRouter.createCaller(ctx);
 
     await expect(caller.stats.dashboard()).rejects.toThrow();
+  });
+});
+
+describe("analytics.engineer (PR-15)", () => {
+  it("returns engineer summary for authenticated users", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.analytics.getEngineerSummary({
+      startDate: "2024-06-01T00:00:00.000Z",
+      endDate: "2024-06-30T23:59:59.999Z",
+    });
+
+    expect(result.engineerCount).toBeGreaterThanOrEqual(1);
+    expect(result.leaderboard.length).toBeGreaterThanOrEqual(1);
+    expect(result.leaderboard[0]).toHaveProperty("overallScore");
+    expect(result.trends).toHaveProperty("timeSeries");
+  });
+
+  it("returns engineer scorecard with drill-through", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.analytics.getEngineerScoreCard({
+      engineerId: "2",
+      startDate: "2024-06-01T00:00:00.000Z",
+      endDate: "2024-06-30T23:59:59.999Z",
+    });
+
+    expect(result.scoreCard?.engineerId).toBe("2");
+    expect(result.drilldown.length).toBeGreaterThan(0);
+    expect(result.drilldown[0].jobSheetId).toBe(1);
+  });
+
+  it("rejects unauthenticated engineer summary", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(caller.analytics.getEngineerSummary()).rejects.toThrow();
   });
 });
 
