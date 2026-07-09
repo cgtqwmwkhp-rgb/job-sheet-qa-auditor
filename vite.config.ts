@@ -8,38 +8,47 @@ import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 import { VitePWA } from "vite-plugin-pwa";
 
 const plugins = [
-  react(), 
-  tailwindcss(), 
-  jsxLocPlugin(), 
+  react(),
+  tailwindcss(),
+  jsxLocPlugin(),
   vitePluginManusRuntime(),
   VitePWA({
-    registerType: 'autoUpdate',
-    includeAssets: ['favicon.svg'],
+    registerType: "autoUpdate",
+    includeAssets: ["favicon.svg"],
     manifest: {
-      name: 'Job Sheet QA Auditor',
-      short_name: 'JobQA',
-      description: 'Enterprise Job Sheet QA Auditor',
-      theme_color: '#4F46E5',
-      background_color: '#ffffff',
+      name: "Job Sheet QA Auditor",
+      short_name: "JobQA",
+      description: "Enterprise Job Sheet QA Auditor",
+      theme_color: "#4F46E5",
+      background_color: "#ffffff",
       icons: [
         {
-          src: 'pwa-192x192.svg',
-          sizes: '192x192',
-          type: 'image/svg+xml',
-          purpose: 'any'
+          src: "pwa-192x192.svg",
+          sizes: "192x192",
+          type: "image/svg+xml",
+          purpose: "any",
         },
         {
-          src: 'pwa-512x512.svg',
-          sizes: '512x512',
-          type: 'image/svg+xml',
-          purpose: 'any maskable'
-        }
-      ]
+          src: "pwa-512x512.svg",
+          sizes: "512x512",
+          type: "image/svg+xml",
+          purpose: "any maskable",
+        },
+      ],
     },
     workbox: {
-      maximumFileSizeToCacheInBytes: 4 * 1024 * 1024 // 4MB
-    }
-  })
+      maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4MB
+      // Never SPA-fallback Easy Auth / API / probes — SW was intercepting
+      // /.auth/login/aad and serving index.html (404 + framed login.windows.net).
+      navigateFallbackDenylist: [
+        /^\/\.auth(?:\/|$)/,
+        /^\/api(?:\/|$)/,
+        /^\/healthz$/,
+        /^\/readyz$/,
+        /^\/metrics$/,
+      ],
+    },
+  }),
 ];
 
 export default defineConfig({
