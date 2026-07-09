@@ -9,7 +9,11 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleHealthz, handleReadyz } from "./health";
 import { handleMetrics } from "./metrics";
-import { initializeDefaultTemplate, hasDefaultTemplate } from "../services/templateRegistry";
+import {
+  initializeDefaultTemplate,
+  hasDefaultTemplate,
+} from "../services/templateRegistry";
+import { hydrateDeadLetterQueueFromDb } from "../utils/deadLetterQueue";
 import { pdfProxyRouter } from "./pdfProxy";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -41,31 +45,45 @@ async function startServer() {
   // Initialize default template for document processing
   // This ensures SSOT compliance even in strict mode (production)
   if (!hasDefaultTemplate()) {
-    console.log("[Templates] Initializing default template for SSOT compliance...");
+    console.log(
+      "[Templates] Initializing default template for SSOT compliance..."
+    );
     const versionId = initializeDefaultTemplate();
     if (versionId) {
-      console.log(`[Templates] Default template initialized (version ID: ${versionId})`);
+      console.log(
+        `[Templates] Default template initialized (version ID: ${versionId})`
+      );
     }
   } else {
     console.log("[Templates] Default template already exists");
+  }
+
+  // Phase 1.10: restore in-memory DLQ from durable failed_jobs (fail-safe)
+  try {
+    const hydrated = await hydrateDeadLetterQueueFromDb();
+    if (hydrated > 0) {
+      console.log(`[DLQ] Boot hydrate restored ${hydrated} job(s)`);
+    }
+  } catch (error) {
+    console.warn("[DLQ] Boot hydrate skipped:", error);
   }
 
   // Health check endpoints (before auth, before static files)
   // These must be accessible without authentication for container orchestration
   app.get("/healthz", handleHealthz);
   app.get("/readyz", handleReadyz);
-  
+
   // Prometheus metrics endpoint (ADR-003)
   // MUST be before SPA fallback to return text/plain, not HTML
   app.get("/metrics", handleMetrics);
 
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
-  
+
   // PDF proxy endpoint (before tRPC, requires auth)
   // Provides same-origin PDF streaming to avoid CORS issues with Azure Blob
   app.use("/api/documents", pdfProxyRouter);
-  
+
   // tRPC API
   app.use(
     "/api/trpc",

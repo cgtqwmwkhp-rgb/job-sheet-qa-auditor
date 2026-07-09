@@ -4,12 +4,13 @@
  *
  * PR-3: Write-through to `failed_jobs` when getDb() is available.
  * In-memory Map remains the primary store for tests / no-DB environments.
+ * Phase 1.10: hydrate from `failed_jobs` on boot; retry via reprocessJobSheet.
  */
 
 import { v4 as uuidv4 } from "uuid";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
-import { failedJobs } from "../../drizzle/schema";
+import { failedJobs, type FailedJobRow } from "../../drizzle/schema";
 
 export interface FailedJob {
   id: string;
@@ -339,4 +340,98 @@ export function importDLQ(jobs: FailedJob[]): number {
   }
   console.log(`[DLQ] Imported ${imported} jobs`);
   return imported;
+}
+
+/**
+ * Map a durable `failed_jobs` row into the in-memory FailedJob shape.
+ */
+function rowToFailedJob(row: FailedJobRow): FailedJob {
+  return {
+    id: row.id,
+    jobSheetId: row.jobSheetId,
+    correlationId: row.correlationId ?? undefined,
+    stage: row.stage,
+    error: {
+      message: row.errorMessage,
+      code: row.errorCode ?? undefined,
+      stack: row.errorStack ?? undefined,
+    },
+    attempts: row.attempts,
+    maxAttempts: row.maxAttempts,
+    lastAttemptAt: row.lastAttemptAt,
+    createdAt: row.createdAt,
+    metadata: (row.metadata as Record<string, unknown>) || {},
+    recoverable: row.recoverable,
+  };
+}
+
+/**
+ * Hydrate the in-memory DLQ from unresolved `failed_jobs` rows.
+ * Fail-safe: returns 0 and never throws when DB is unavailable / table missing.
+ */
+export async function hydrateDeadLetterQueueFromDb(): Promise<number> {
+  try {
+    const db = await getDb();
+    if (!db) return 0;
+
+    const rows = await db
+      .select()
+      .from(failedJobs)
+      .where(isNull(failedJobs.resolvedAt))
+      .limit(MAX_DLQ_SIZE);
+
+    const imported = importDLQ(rows.map(rowToFailedJob));
+    if (imported > 0) {
+      console.log(
+        `[DLQ] Hydrated ${imported} unresolved failed job(s) from database`
+      );
+    }
+    return imported;
+  } catch (error) {
+    console.warn(
+      "[DLQ] Failed to hydrate from database (continuing with empty in-memory DLQ):",
+      error
+    );
+    return 0;
+  }
+}
+
+function resolveGoldSpecId(job: FailedJob): number {
+  const fromMeta = job.metadata?.goldSpecId;
+  return typeof fromMeta === "number" && Number.isFinite(fromMeta)
+    ? fromMeta
+    : 1;
+}
+
+/**
+ * Retry a single DLQ job by calling reprocessJobSheet.
+ * On success the job is marked recovered; on failure attempts are incremented.
+ * Uses dynamic import to avoid a circular dependency with documentProcessor.
+ */
+export async function retryDeadLetterJob(id: string): Promise<boolean> {
+  const job = deadLetterQueue.get(id);
+  if (!job) {
+    console.warn(`[DLQ] Retry skipped — job not found: ${id}`);
+    return false;
+  }
+  if (!job.recoverable) {
+    console.warn(`[DLQ] Retry skipped — job not recoverable: ${id}`);
+    return false;
+  }
+
+  const goldSpecId = resolveGoldSpecId(job);
+
+  try {
+    const { reprocessJobSheet } = await import("../services/documentProcessor");
+    await reprocessJobSheet(job.jobSheetId, goldSpecId);
+    console.log(`[DLQ] Retry succeeded via reprocessJobSheet: ${id}`, {
+      jobSheetId: job.jobSheetId,
+      goldSpecId,
+    });
+    return markAsRecovered(id);
+  } catch (error) {
+    incrementAttempts(id);
+    console.warn(`[DLQ] Retry failed for job ${id}:`, error);
+    return false;
+  }
 }

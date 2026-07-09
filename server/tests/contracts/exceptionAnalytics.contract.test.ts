@@ -21,6 +21,8 @@ import {
   addToDeadLetterQueue,
   clearDeadLetterQueue,
   getFailedJob,
+  importDLQ,
+  type FailedJob,
 } from "../../utils/deadLetterQueue";
 import { RATE_LIMITS } from "../../utils/rateLimiter";
 
@@ -305,6 +307,27 @@ describe("Exception Management - PR-17 Contract Tests", () => {
       });
       expect(result.recovered).toBe(1);
       expect(result.scanned).toBe(1);
+    });
+
+    it("importDLQ hydrates in-memory queue without duplicates", () => {
+      clearDeadLetterQueue();
+      const seed: FailedJob[] = [
+        {
+          id: "hydrate-1",
+          jobSheetId: 7,
+          stage: "ocr",
+          error: { message: "timeout" },
+          attempts: 1,
+          maxAttempts: 3,
+          lastAttemptAt: new Date("2024-01-01T00:00:00Z"),
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          metadata: {},
+          recoverable: true,
+        },
+      ];
+      expect(importDLQ(seed)).toBe(1);
+      expect(importDLQ(seed)).toBe(0);
+      expect(getFailedJob("hydrate-1")?.jobSheetId).toBe(7);
     });
   });
 
