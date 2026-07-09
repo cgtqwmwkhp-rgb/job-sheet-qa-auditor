@@ -8,8 +8,8 @@
 
 export type ShadowMode = "off" | "shadow" | "canary";
 
-/** Challenger strategies — mocks/deterministic only overnight (no live OCR/LLM). */
-export type ChallengerStrategy = "rule_based";
+/** Challenger strategies. real_model is separately gated and default-off. */
+export type ChallengerStrategy = "rule_based" | "real_model";
 
 export type AuditOutcome = "PASS" | "FAIL" | "REVIEW_QUEUE";
 
