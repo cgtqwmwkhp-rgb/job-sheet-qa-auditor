@@ -19,8 +19,6 @@ import "react-pdf/dist/Page/TextLayer.css";
 // Set worker source to CDN to avoid build-time resolution issues
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-type PdfFileSource = string | { data: ArrayBuffer };
-
 /**
  * Guard: Throw in dev if blob.core.windows.net URL is used
  * This prevents CORS issues with Azure Blob SAS URLs
@@ -85,22 +83,33 @@ export function DocumentViewer({
     width: number;
     height: number;
   } | null>(null);
-  /** Authenticated bytes for Easy Auth — pdf.js URL fetch omits cookies by default. */
-  const [pdfFile, setPdfFile] = useState<PdfFileSource | null>(null);
+  /**
+   * Blob object URL from an authenticated fetch.
+   * Do NOT pass ArrayBuffer/{ data } into react-pdf — pdf.js transfers/detaches
+   * the buffer, then React re-renders throw:
+   * "Cannot perform Construct on a detached ArrayBuffer" (Hold Queue crash).
+   */
+  const [pdfFile, setPdfFile] = useState<string | null>(null);
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
-  // Guard: prevent direct blob URLs
+  // Guard: prevent direct Azure blob URLs
   useEffect(() => {
     assertNoDirectBlobUrl(url);
   }, [url]);
 
-  // Fetch via credentials:include so AppServiceAuthSession reaches /api/documents/:id/pdf
+  // Fetch with credentials, then hand react-pdf a stable blob: URL
   useEffect(() => {
     let cancelled = false;
     setPdfFile(null);
     setPdfLoadError(null);
     setNumPages(0);
+
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
 
     if (!url) return;
 
@@ -114,13 +123,16 @@ export function DocumentViewer({
           throw new Error(`PDF fetch failed (${res.status})`);
         }
         const buffer = await res.arrayBuffer();
-        if (!cancelled) {
-          setPdfFile({ data: buffer });
-        }
+        if (cancelled) return;
+        // Copy so the response buffer can be GC'd; blob owns its own bytes
+        const blob = new Blob([buffer.slice(0)], { type: "application/pdf" });
+        const objectUrl = URL.createObjectURL(blob);
+        objectUrlRef.current = objectUrl;
+        setPdfFile(objectUrl);
       } catch (err) {
         console.error("[DocumentViewer] Authenticated PDF fetch failed:", err);
         if (!cancelled) {
-          // Fallback: let react-pdf try with withCredentials
+          // Last resort: same-origin URL with cookies (may still fail under Easy Auth)
           setPdfFile(url);
           setPdfLoadError(
             err instanceof Error ? err.message : "PDF fetch failed"
@@ -131,6 +143,10 @@ export function DocumentViewer({
 
     return () => {
       cancelled = true;
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
     };
   }, [url]);
 
@@ -305,7 +321,12 @@ export function DocumentViewer({
         ) : (
           <Document
             file={pdfFile}
-            options={{ withCredentials: true }}
+            // blob: URLs are same-document; withCredentials only matters for http(s) fallback
+            options={
+              pdfFile.startsWith("blob:")
+                ? undefined
+                : { withCredentials: true }
+            }
             onLoadSuccess={onDocumentLoadSuccess}
             className="shadow-lg"
             loading={
