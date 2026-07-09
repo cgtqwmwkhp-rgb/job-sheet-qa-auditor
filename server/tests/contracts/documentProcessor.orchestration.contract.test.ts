@@ -40,4 +40,22 @@ describe("documentProcessor orchestration contract", () => {
     expect(router).not.toContain("processWithIntegration(");
     expect(deadLetterQueue).not.toContain("processWithIntegration(");
   });
+
+  it("wires phase helper artifacts behind default-off feature flags", () => {
+    const documentProcessor = readRepoFile(
+      "server/services/documentProcessor.ts"
+    );
+    const router = readRepoFile("server/routers.ts");
+
+    expect(documentProcessor).toContain("buildFlaggedProcessorArtifacts");
+    expect(documentProcessor).toContain("isCalibrationEnabled()");
+    expect(documentProcessor).toContain("isOpsAlertsEnabled()");
+    expect(documentProcessor).toContain("isRiskRoutingEnabled()");
+    expect(documentProcessor).toContain("isStageSloEnabled()");
+    expect(documentProcessor).toContain("isTemplateCollisionEnabled()");
+    expect(documentProcessor).toContain("isVlmVerificationEnabled()");
+    expect(documentProcessor).toContain("feature artifact failed (non-fatal)");
+    expect(documentProcessor).toContain("featureFlagArtifacts");
+    expect(router).not.toContain("buildFlaggedProcessorArtifacts");
+  });
 });
