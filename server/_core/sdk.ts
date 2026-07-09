@@ -286,27 +286,80 @@ class SDKServer {
     const azureClientPrincipal = req.headers["x-ms-client-principal"] as
       | string
       | undefined;
+    const azurePrincipalId = req.headers["x-ms-client-principal-id"] as
+      | string
+      | undefined;
+    const azurePrincipalName = req.headers["x-ms-client-principal-name"] as
+      | string
+      | undefined;
+    const cookieHeader = req.headers.cookie ?? "";
+    const hasEasyAuthSession = /AppServiceAuthSession=/i.test(cookieHeader);
 
     // Log Azure auth status (info level so it appears in production)
     authLogger.info("Checking authentication", {
       hasAzurePrincipal: !!azureClientPrincipal,
+      hasPrincipalId: !!azurePrincipalId,
+      hasPrincipalName: !!azurePrincipalName,
+      hasEasyAuthSession,
       hasCookie: !!req.headers.cookie,
       path: req.path,
     });
 
-    if (azureClientPrincipal) {
+    if (azureClientPrincipal || azurePrincipalId || azurePrincipalName) {
       try {
-        const decoded = Buffer.from(azureClientPrincipal, "base64").toString(
-          "utf8"
-        );
-        const principal = JSON.parse(decoded);
-        const userId =
-          principal.userId || principal.nameIdentifier || principal.userDetails;
-        const email = principal.userDetails || principal.userId;
-        const name =
-          principal.name ||
-          principal.userDetails?.split("@")[0] ||
-          "Azure User";
+        let userId = azurePrincipalId || "";
+        let email = azurePrincipalName || "";
+        let name = "";
+
+        if (azureClientPrincipal) {
+          const decoded = Buffer.from(azureClientPrincipal, "base64").toString(
+            "utf8"
+          );
+          const principal = JSON.parse(decoded) as {
+            userId?: string;
+            nameIdentifier?: string;
+            userDetails?: string;
+            name?: string;
+            claims?: Array<{ typ?: string; val?: string }>;
+          };
+          const claim = (types: string[]) =>
+            principal.claims?.find(c => types.includes(String(c.typ)))?.val;
+
+          userId =
+            principal.userId ||
+            principal.nameIdentifier ||
+            claim([
+              "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier",
+              "oid",
+              "sub",
+            ]) ||
+            userId;
+          email =
+            principal.userDetails ||
+            claim([
+              "preferred_username",
+              "email",
+              "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+              "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+            ]) ||
+            email;
+          name =
+            principal.name ||
+            claim([
+              "name",
+              "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
+            ]) ||
+            (email.includes("@") ? email.split("@")[0] : "") ||
+            "Azure User";
+        } else {
+          name = email.includes("@")
+            ? email.split("@")[0]!
+            : email || "Azure User";
+        }
+
+        if (!userId) {
+          throw new Error("Easy Auth principal missing user id");
+        }
 
         authLogger.debug("Azure Easy Auth - user authenticated via Azure AD", {
           userId,
@@ -318,8 +371,8 @@ class SDKServer {
         if (!user) {
           await db.upsertUser({
             openId: `azure-${userId}`,
-            name: name,
-            email: email,
+            name: name || "Azure User",
+            email: email || null,
             loginMethod: "azure-easy-auth",
             lastSignedIn: new Date(),
           });
@@ -331,6 +384,10 @@ class SDKServer {
       } catch (e) {
         authLogger.warn("Failed to parse Azure Easy Auth header", { error: e });
       }
+    } else if (hasEasyAuthSession) {
+      authLogger.warn(
+        "Easy Auth session cookie present but no principal headers — auth sidecar may not be injecting claims"
+      );
     }
 
     // Dev bypass: return mock user for local development when OAuth not configured
