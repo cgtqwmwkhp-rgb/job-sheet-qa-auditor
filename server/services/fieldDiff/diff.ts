@@ -19,9 +19,11 @@ export function diffFields(
   before: Record<string, string>,
   after: Record<string, string>
 ): FieldDiff[] {
-  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  const keys = Array.from(
+    new Set([...Object.keys(before), ...Object.keys(after)])
+  );
 
-  return [...keys].sort().map(fieldKey => {
+  return keys.sort().map(fieldKey => {
     const beforeVal = before[fieldKey] ?? "";
     const afterVal = after[fieldKey] ?? "";
     const changed = normalize(beforeVal) !== normalize(afterVal);
