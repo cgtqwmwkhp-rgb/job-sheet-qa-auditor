@@ -37,6 +37,9 @@ const FirstFixAnalysis = lazy(
 );
 const AIAnalyst = lazy(() => import("./pages/analytics/AIAnalyst"));
 const ReportStudio = lazy(() => import("./pages/analytics/ReportStudio"));
+const SiteIntelligence = lazy(
+  () => import("./pages/analytics/SiteIntelligence")
+);
 const PortalLogin = lazy(() => import("./pages/portal/PortalLogin"));
 const TechnicianDashboard = lazy(
   () => import("./pages/portal/TechnicianDashboard")
@@ -79,6 +82,7 @@ function Router() {
           path={"/analytics/technicians"}
           component={TechnicianPerformance}
         />
+        <Route path={"/analytics/sites"} component={SiteIntelligence} />
         <Route path={"/analytics/first-fix"} component={FirstFixAnalysis} />
         <Route path={"/analytics/ai"} component={AIAnalyst} />
         <Route path={"/analytics/reports"} component={ReportStudio} />

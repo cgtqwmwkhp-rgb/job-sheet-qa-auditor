@@ -109,6 +109,28 @@ vi.mock("./db", () => ({
       occurredAt: new Date("2024-06-10T11:00:00Z"),
     },
   ]),
+  getCohortAnalyticsDocuments: vi.fn().mockResolvedValue([
+    {
+      jobSheetId: 1,
+      siteInfo: "London HQ",
+      assetType: "generator",
+      workType: "service",
+      templateSlug: "gen-service",
+      result: "pass",
+      confidenceScore: 90,
+      processedAt: new Date("2024-06-10T10:00:00Z"),
+    },
+  ]),
+  getCohortAnalyticsFindings: vi.fn().mockResolvedValue([
+    {
+      findingId: 1,
+      jobSheetId: 1,
+      severity: "S2",
+      reasonCode: "MISSING_FIELD",
+      fieldName: "signature",
+      occurredAt: new Date("2024-06-10T11:00:00Z"),
+    },
+  ]),
 }));
 
 // Mock storage module

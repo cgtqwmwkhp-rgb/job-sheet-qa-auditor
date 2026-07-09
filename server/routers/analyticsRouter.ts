@@ -3,6 +3,7 @@
  *
  * PR-I: selection analytics / ops dashboard.
  * PR-15: engineer scorecards, trends, and drill-through.
+ * PR-16: cohort analytics (site/asset/workType) + template collision governance.
  */
 
 import { z } from "zod";
@@ -22,6 +23,20 @@ import {
   resolvePeriod,
 } from "../services/engineerAnalytics/aggregateFromDb";
 import type { RawFindingRow } from "../services/engineerAnalytics/mapFindings";
+import {
+  buildCohortAnalyticsSummary,
+  buildCohortDrilldown,
+  resolveCohortPeriod,
+  type CohortDocumentRow,
+  type CohortFindingRow,
+} from "../services/cohortAnalytics";
+import {
+  detectAllTemplateCollisions,
+  listTemplateFingerprints,
+  getTemplateVersion,
+  fingerprintFromSelectionConfig,
+  detectTemplateCollisions,
+} from "../services/templateRegistry";
 
 const periodInput = z
   .object({
@@ -72,6 +87,32 @@ async function loadEngineerAnalyticsInputs(input?: {
     })),
     documents,
     findings: findings as RawFindingRow[],
+  };
+}
+
+async function loadCohortAnalyticsInputs(input?: {
+  startDate?: string;
+  endDate?: string;
+}) {
+  const period = resolveCohortPeriod(input?.startDate, input?.endDate);
+  const fetchStart = new Date(period.start);
+  const fetchEnd = new Date(period.end);
+
+  const [documents, findings] = await Promise.all([
+    db.getCohortAnalyticsDocuments({
+      startDate: fetchStart,
+      endDate: fetchEnd,
+    }),
+    db.getCohortAnalyticsFindings({
+      startDate: fetchStart,
+      endDate: fetchEnd,
+    }),
+  ]);
+
+  return {
+    period,
+    documents: documents as CohortDocumentRow[],
+    findings: findings as CohortFindingRow[],
   };
 }
 
@@ -258,6 +299,115 @@ export const analyticsRouter = router({
         startDate: loaded.period.start,
         endDate: loaded.period.end,
       });
+    }),
+
+  // ============ PR-16: COHORT ANALYTICS + COLLISION GOVERNANCE ============
+
+  /**
+   * Cohort summary by site / assetType / workType from DB-backed audits.
+   */
+  getCohortSummary: protectedProcedure
+    .input(periodInput)
+    .query(async ({ input }) => {
+      const loaded = await loadCohortAnalyticsInputs(input);
+      return buildCohortAnalyticsSummary({
+        documents: loaded.documents,
+        findings: loaded.findings,
+        startDate: loaded.period.start,
+        endDate: loaded.period.end,
+      });
+    }),
+
+  /**
+   * Finding-level drill-through for a single cohort bucket.
+   */
+  getCohortDrilldown: protectedProcedure
+    .input(
+      z.object({
+        dimension: z.enum(["site", "assetType", "workType"]),
+        key: z.string().min(1),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        limit: z.number().min(1).max(100).optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const loaded = await loadCohortAnalyticsInputs(input);
+      return buildCohortDrilldown({
+        documents: loaded.documents,
+        findings: loaded.findings,
+        dimension: input.dimension,
+        key: input.key,
+        startDate: loaded.period.start,
+        endDate: loaded.period.end,
+        limit: input.limit,
+      });
+    }),
+
+  /**
+   * Template fingerprint collision governance report (in-memory registry).
+   */
+  getTemplateCollisionReport: adminProcedure.query(() => {
+    const fingerprints = listTemplateFingerprints();
+    const report = detectAllTemplateCollisions(fingerprints);
+    return {
+      templateCount: fingerprints.length,
+      allowed: report.allowed,
+      blockingCount: report.blocking.length,
+      warningCount: report.warnings.length,
+      message: report.message,
+      blocking: report.blocking,
+      warnings: report.warnings,
+      fingerprints: fingerprints.map(f => ({
+        templateSlug: f.templateSlug,
+        requiredTokensAll: f.requiredTokensAll,
+        requiredTokensAny: f.requiredTokensAny,
+        formCodeRegex: f.formCodeRegex ?? null,
+      })),
+    };
+  }),
+
+  /**
+   * Check a candidate selection config against the live catalog (pre-activation).
+   */
+  checkTemplateCollision: adminProcedure
+    .input(
+      z.object({
+        templateSlug: z.string().min(1),
+        versionId: z.number().optional(),
+        selectionConfigJson: z
+          .object({
+            requiredTokensAll: z.array(z.string()),
+            requiredTokensAny: z.array(z.string()),
+            optionalTokens: z.array(z.string()).optional(),
+            formCodeRegex: z.string().optional(),
+          })
+          .optional(),
+      })
+    )
+    .query(({ input }) => {
+      let selection = input.selectionConfigJson;
+      if (!selection && input.versionId != null) {
+        const version = getTemplateVersion(input.versionId);
+        if (!version) {
+          throw new Error(`Version not found: ${input.versionId}`);
+        }
+        selection = version.selectionConfigJson;
+      }
+      if (!selection) {
+        throw new Error(
+          "Provide selectionConfigJson or versionId for collision check"
+        );
+      }
+
+      const candidate = fingerprintFromSelectionConfig(input.templateSlug, {
+        requiredTokensAll: selection.requiredTokensAll,
+        requiredTokensAny: selection.requiredTokensAny,
+        optionalTokens: selection.optionalTokens ?? [],
+        formCodeRegex: selection.formCodeRegex,
+      });
+      const existing = listTemplateFingerprints();
+      return detectTemplateCollisions(candidate, existing);
     }),
 });
 

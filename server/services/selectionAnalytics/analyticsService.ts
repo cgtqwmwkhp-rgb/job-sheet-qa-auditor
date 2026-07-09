@@ -1,12 +1,12 @@
 /**
  * Selection Analytics Service
- * 
+ *
  * PR-I: Provides analytics and aggregations for template selection.
  * Helps maintain stability when scaling to 20-30 templates.
  */
 
-import type { ConfidenceBand, SelectionScore } from '../templateRegistry/types';
-import type { SelectionTraceArtifact } from '../templateRegistry/selectionTraceWriter';
+import type { ConfidenceBand, SelectionScore } from "../templateRegistry/types";
+import type { SelectionTraceArtifact } from "../templateRegistry/selectionTraceWriter";
 
 /**
  * Selection record for analytics
@@ -22,6 +22,8 @@ export interface SelectionRecord {
   templateId: number | null;
   /** Template slug */
   templateSlug: string | null;
+  /** Runner-up template slug (from candidates) */
+  runnerUpSlug: string | null;
   /** Confidence band */
   confidenceBand: ConfidenceBand;
   /** Top score */
@@ -113,7 +115,7 @@ const selectionRecords: SelectionRecord[] = [];
 let nextRecordId = 1;
 
 // Constants
-const AMBIGUITY_THRESHOLD = 0.10; // Score gap < 10% is ambiguous
+const AMBIGUITY_THRESHOLD = 0.1; // Score gap < 10% is ambiguous
 
 /**
  * Record a selection for analytics
@@ -122,17 +124,28 @@ export function recordSelection(
   trace: SelectionTraceArtifact,
   wasOverridden: boolean = false
 ): SelectionRecord {
+  const sortedCandidates = [...trace.candidates].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.templateId - b.templateId;
+  });
+  const topSlug =
+    trace.outcome.templateSlug ?? sortedCandidates[0]?.templateSlug ?? null;
+  const runnerUp =
+    sortedCandidates.find(c => c.templateSlug !== topSlug) ?? null;
+
   const record: SelectionRecord = {
     id: nextRecordId++,
     jobSheetId: trace.jobSheetId,
     timestamp: new Date(trace.timestamp),
     templateId: trace.outcome.templateId,
-    templateSlug: trace.outcome.templateSlug,
+    templateSlug: topSlug,
+    runnerUpSlug: runnerUp?.templateSlug ?? null,
     confidenceBand: trace.outcome.confidenceBand,
     topScore: trace.outcome.topScore,
     runnerUpScore: trace.outcome.runnerUpScore,
     scoreGap: trace.outcome.scoreDelta,
-    autoProcessed: trace.outcome.autoProcessingAllowed && trace.outcome.selected,
+    autoProcessed:
+      trace.outcome.autoProcessingAllowed && trace.outcome.selected,
     wasOverridden,
     matchedTokens: trace.inputSignals.tokenSample,
     candidateCount: trace.candidates.length,
@@ -153,8 +166,8 @@ export function getSelectionAnalytics(
   const start = startDate ?? new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
   const end = endDate ?? now;
 
-  const filteredRecords = selectionRecords.filter(r =>
-    r.timestamp >= start && r.timestamp <= end
+  const filteredRecords = selectionRecords.filter(
+    r => r.timestamp >= start && r.timestamp <= end
   );
 
   const distribution: Record<ConfidenceBand, number> = {
@@ -190,32 +203,34 @@ export function getSelectionAnalytics(
 /**
  * Get top ambiguous template pairs
  */
-export function getAmbiguousTemplatePairs(limit: number = 10): AmbiguousTemplatePair[] {
+export function getAmbiguousTemplatePairs(
+  limit: number = 10
+): AmbiguousTemplatePair[] {
   // Track pairs that appear together in ambiguous selections
   const pairMap = new Map<string, { count: number; totalGap: number }>();
 
   // Find ambiguous selections with multiple candidates
-  const ambiguousRecords = selectionRecords.filter(r =>
-    r.scoreGap < AMBIGUITY_THRESHOLD && r.candidateCount > 1
+  const ambiguousRecords = selectionRecords.filter(
+    r => r.scoreGap < AMBIGUITY_THRESHOLD && r.candidateCount > 1
   );
 
-  // For demo, we'll simulate pairs based on template slugs
-  // In real implementation, this would analyze candidate lists from traces
   for (const record of ambiguousRecords) {
-    if (record.templateSlug) {
-      const pairKey = `${record.templateSlug}|runner-up`;
-      const existing = pairMap.get(pairKey) ?? { count: 0, totalGap: 0 };
-      pairMap.set(pairKey, {
-        count: existing.count + 1,
-        totalGap: existing.totalGap + record.scoreGap,
-      });
-    }
+    if (!record.templateSlug || !record.runnerUpSlug) continue;
+    const [t1, t2] = [record.templateSlug, record.runnerUpSlug].sort((a, b) =>
+      a.localeCompare(b)
+    );
+    const pairKey = `${t1}|${t2}`;
+    const existing = pairMap.get(pairKey) ?? { count: 0, totalGap: 0 };
+    pairMap.set(pairKey, {
+      count: existing.count + 1,
+      totalGap: existing.totalGap + record.scoreGap,
+    });
   }
 
   // Convert to array and sort
   const pairs: AmbiguousTemplatePair[] = [];
   for (const [key, data] of Array.from(pairMap.entries())) {
-    const [t1, t2] = key.split('|');
+    const [t1, t2] = key.split("|");
     pairs.push({
       template1: t1,
       template2: t2,
@@ -224,9 +239,7 @@ export function getAmbiguousTemplatePairs(limit: number = 10): AmbiguousTemplate
     });
   }
 
-  return pairs
-    .sort((a, b) => b.count - a.count)
-    .slice(0, limit);
+  return pairs.sort((a, b) => b.count - a.count).slice(0, limit);
 }
 
 /**
@@ -236,13 +249,16 @@ export function getTokenCollisions(limit: number = 20): TokenCollision[] {
   // Track token frequency in ambiguous selections
   const tokenMap = new Map<string, { templates: Set<string>; count: number }>();
 
-  const ambiguousRecords = selectionRecords.filter(r =>
-    r.scoreGap < AMBIGUITY_THRESHOLD && r.candidateCount > 1
+  const ambiguousRecords = selectionRecords.filter(
+    r => r.scoreGap < AMBIGUITY_THRESHOLD && r.candidateCount > 1
   );
 
   for (const record of ambiguousRecords) {
     for (const token of record.matchedTokens) {
-      const existing = tokenMap.get(token) ?? { templates: new Set(), count: 0 };
+      const existing = tokenMap.get(token) ?? {
+        templates: new Set(),
+        count: 0,
+      };
       if (record.templateSlug) {
         existing.templates.add(record.templateSlug);
       }
@@ -254,7 +270,8 @@ export function getTokenCollisions(limit: number = 20): TokenCollision[] {
   // Convert to array
   const collisions: TokenCollision[] = [];
   for (const [token, data] of Array.from(tokenMap.entries())) {
-    if (data.templates.size > 1) { // Only tokens in multiple templates
+    if (data.templates.size > 1) {
+      // Only tokens in multiple templates
       collisions.push({
         token,
         templates: Array.from(data.templates),
@@ -272,15 +289,18 @@ export function getTokenCollisions(limit: number = 20): TokenCollision[] {
  * Get per-template analytics summary
  */
 export function getTemplateAnalyticsSummary(): TemplateAnalyticsSummary[] {
-  const templateMap = new Map<string, {
-    total: number;
-    high: number;
-    medium: number;
-    low: number;
-    overrides: number;
-    totalScore: number;
-    runnerUp: number;
-  }>();
+  const templateMap = new Map<
+    string,
+    {
+      total: number;
+      high: number;
+      medium: number;
+      low: number;
+      overrides: number;
+      totalScore: number;
+      runnerUp: number;
+    }
+  >();
 
   // Track selections per template
   for (const record of selectionRecords) {
@@ -298,9 +318,9 @@ export function getTemplateAnalyticsSummary(): TemplateAnalyticsSummary[] {
 
     existing.total++;
     existing.totalScore += record.topScore;
-    if (record.confidenceBand === 'HIGH') existing.high++;
-    if (record.confidenceBand === 'MEDIUM') existing.medium++;
-    if (record.confidenceBand === 'LOW') existing.low++;
+    if (record.confidenceBand === "HIGH") existing.high++;
+    if (record.confidenceBand === "MEDIUM") existing.medium++;
+    if (record.confidenceBand === "LOW") existing.low++;
     if (record.wasOverridden) existing.overrides++;
 
     templateMap.set(record.templateSlug, existing);
@@ -328,13 +348,15 @@ export function getTemplateAnalyticsSummary(): TemplateAnalyticsSummary[] {
 /**
  * Check if ambiguity rate exceeds threshold (for alerting)
  */
-export function checkAmbiguityAlert(
-  thresholdPercent: number = 15
-): { alert: boolean; rate: number; message: string } {
+export function checkAmbiguityAlert(thresholdPercent: number = 15): {
+  alert: boolean;
+  rate: number;
+  message: string;
+} {
   const analytics = getSelectionAnalytics();
-  
+
   if (analytics.totalSelections === 0) {
-    return { alert: false, rate: 0, message: 'No selections recorded' };
+    return { alert: false, rate: 0, message: "No selections recorded" };
   }
 
   const rate = (analytics.ambiguousCount / analytics.totalSelections) * 100;
@@ -366,11 +388,15 @@ export function getSelectionRecords(options: {
   }
 
   if (options.confidenceBand) {
-    filtered = filtered.filter(r => r.confidenceBand === options.confidenceBand);
+    filtered = filtered.filter(
+      r => r.confidenceBand === options.confidenceBand
+    );
   }
 
   if (options.onlyAmbiguous) {
-    filtered = filtered.filter(r => r.scoreGap < AMBIGUITY_THRESHOLD && r.candidateCount > 1);
+    filtered = filtered.filter(
+      r => r.scoreGap < AMBIGUITY_THRESHOLD && r.candidateCount > 1
+    );
   }
 
   // Sort by timestamp desc
