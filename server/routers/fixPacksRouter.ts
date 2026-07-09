@@ -1,8 +1,7 @@
 /**
  * Fix Packs Workflow Router (Phase 1.9)
  *
- * Standalone export only for now. Mount in appRouter after #145 lands to avoid
- * competing edits in server/routers.ts.
+ * Mounted on appRouter as `fixPacks` behind FEATURE_FIX_PACK_WORKFLOW.
  */
 
 import { TRPCError } from "@trpc/server";
@@ -120,8 +119,7 @@ export function resetFixPackWorkflowStore(): void {
 export const fixPacksRouter = router({
   status: protectedProcedure.query(() => ({
     enabled: isFixPackWorkflowEnabled(),
-    mounted: false,
-    mountDeferredUntil: "#145 routers.ts changes land",
+    mounted: true,
     persistedIn: "memory",
   })),
 

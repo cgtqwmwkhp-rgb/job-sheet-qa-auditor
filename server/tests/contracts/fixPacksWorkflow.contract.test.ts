@@ -98,7 +98,7 @@ describe("Fix packs workflow router", () => {
 
     await expect(caller.fixPacks.status()).resolves.toMatchObject({
       enabled: false,
-      mounted: false,
+      mounted: true,
       persistedIn: "memory",
     });
   });
