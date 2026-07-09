@@ -12,6 +12,10 @@ import * as db from "./db";
 import { getStorageAdapter } from "./storage";
 import { nanoid } from "nanoid";
 import { orchestrateJobSheetProcessing } from "./services/documentProcessor";
+import {
+  enqueueJobSheetProcessing,
+  isAsyncProcessingEnabled,
+} from "./services/jobQueue";
 import { validateMistralApiKey } from "./services/ocr";
 import { resolveProcessStatus } from "./services/processStatus";
 import { templateRouter } from "./routers/templateRouter";
@@ -286,6 +290,16 @@ export const appRouter = router({
         const jobSheet = await db.getJobSheetById(input.id);
         if (!jobSheet) {
           throw new Error("Job sheet not found");
+        }
+
+        if (isAsyncProcessingEnabled()) {
+          return enqueueJobSheetProcessing({
+            source: "primary",
+            jobSheetId: input.id,
+            documentUrl: jobSheet.fileUrl,
+            goldSpecId: input.goldSpecId,
+            userId: ctx.user.id,
+          });
         }
 
         const result = await orchestrateJobSheetProcessing({
