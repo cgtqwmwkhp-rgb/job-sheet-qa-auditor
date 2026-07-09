@@ -21,6 +21,7 @@ import { resolveProcessStatus } from "./services/processStatus";
 import { templateRouter } from "./routers/templateRouter";
 import { analyticsRouter } from "./routers/analyticsRouter";
 import { auditActionsRouter } from "./routers/auditActionsRouter";
+import { fixPacksRouter } from "./routers/fixPacksRouter";
 import { TRPCError } from "@trpc/server";
 import {
   enforceRateLimit,
@@ -53,6 +54,8 @@ export const appRouter = router({
   system: systemRouter,
   templates: templateRouter,
   analytics: analyticsRouter,
+  /** Phase 1.9: fix pack export / assign / acknowledge */
+  fixPacks: fixPacksRouter,
   /** PR-10: waive / override / flag / approve / undo */
   auditActions: auditActionsRouter,
 
