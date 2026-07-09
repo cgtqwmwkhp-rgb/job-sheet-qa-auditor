@@ -52,6 +52,11 @@ import {
   isEnsembleExtractionEnabled,
   type EnsembleAdapterResult,
 } from "./ensembleExtraction";
+import {
+  evaluateShadowChallenger,
+  isShadowChallengerEnabled,
+  type ShadowComparison,
+} from "./shadowChallenger";
 import * as db from "../db";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -823,6 +828,73 @@ export async function processJobSheetWithOptions(
     };
   }
 
+  // =========================================================================
+  // Stage 2.5: Shadow / champion-challenger (PR-21)
+  // Runs challenger without affecting canonical results unless canary samples.
+  // Fail-soft: errors never fail the pipeline. Persisted on reportJson only.
+  // =========================================================================
+  const shadowStartTime = Date.now();
+  let shadowComparison: ShadowComparison | null = null;
+
+  if (isShadowChallengerEnabled()) {
+    try {
+      const shadowEval = evaluateShadowChallenger({
+        extractedText,
+        goldSpec: spec,
+        pageCount: ocrResult.totalPages,
+        champion: analysisResult,
+        jobSheetId,
+        sampleKey: runId,
+      });
+      shadowComparison = shadowEval.comparison;
+      if (shadowEval.canaryApplied && shadowEval.servedAnalysis) {
+        console.log(
+          "[DocumentProcessor] Shadow canary applied challenger result",
+          {
+            jobSheetId,
+            champion: analysisResult.overallResult,
+            challenger: shadowEval.servedAnalysis.overallResult,
+          }
+        );
+        analysisResult = shadowEval.servedAnalysis;
+      }
+      recordStage(
+        {
+          stage: "Shadow Challenger",
+          status: shadowComparison ? "success" : "skipped",
+          durationMs: Date.now() - shadowStartTime,
+        },
+        "Store Results"
+      );
+    } catch (shadowError) {
+      console.warn(
+        "[DocumentProcessor] Shadow challenger failed (non-fatal):",
+        shadowError
+      );
+      recordStage(
+        {
+          stage: "Shadow Challenger",
+          status: "failed",
+          durationMs: Date.now() - shadowStartTime,
+          error:
+            shadowError instanceof Error
+              ? shadowError.message
+              : "Shadow challenger failed",
+        },
+        "Store Results"
+      );
+    }
+  } else {
+    recordStage(
+      {
+        stage: "Shadow Challenger",
+        status: "skipped",
+        durationMs: Date.now() - shadowStartTime,
+      },
+      "Store Results"
+    );
+  }
+
   // Stage 3: Store Results
   const storageStartTime = Date.now();
   let auditResultId: number | undefined;
@@ -878,6 +950,7 @@ export async function processJobSheetWithOptions(
         ...(ensembleResult
           ? { ensembleExtraction: ensembleResult.artifact }
           : {}),
+        ...(shadowComparison ? { shadowComparison } : {}),
         ...ocrResilienceReportFields(ocrResult),
         ...(selectionResult ? { selectionResult } : {}),
         selectionCohort: buildSelectionCohortMeta(

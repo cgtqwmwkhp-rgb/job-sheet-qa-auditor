@@ -632,7 +632,11 @@ export function resetAnalyzerCircuitBreaker() {
  * - If document is empty or OCR failed: FAIL
  * - NEVER return REVIEW_QUEUE from this function (fail-closed path is separate)
  */
-function performRuleBasedAnalysis(
+/**
+ * Rule-based analysis (exported for PR-21 shadow challenger).
+ * Deterministic, no LLM — safe for parallel shadow evaluation.
+ */
+export function performRuleBasedAnalysis(
   extractedText: string,
   goldSpec: GoldSpec,
   pageCount: number

@@ -52,6 +52,17 @@ Enterprise-grade document auditing system for job sheet validation with OCR extr
 Pinned models are exposed via `system.modelCurrency` / `ai.modelRegistry` (no secrets).
 Roles: `ocr`, `judgment`, `interpreter`, optional `fallback_ocr`. Currency metadata is env-sourced (`source: "env"`).
 
+### Shadow / Champion-Challenger (PR-21)
+
+| Variable                     | Description                                              | Default      |
+| ---------------------------- | -------------------------------------------------------- | ------------ |
+| `FEATURE_SHADOW_CHALLENGER`  | Enable shadow/canary evaluation on live traffic          | unset (off)  |
+| `SHADOW_MODE`                | `shadow` (compare only), `canary`, or `off`              | `shadow`     |
+| `SHADOW_CANARY_PERCENT`      | 0–100; fraction of traffic served by challenger (canary) | `0`          |
+| `SHADOW_CHALLENGER_STRATEGY` | Challenger strategy (`rule_based` overnight)             | `rule_based` |
+
+Shadow comparisons persist on `reportJson.shadowComparison` and never change canonical results unless canary samples the request. Disagreement reporting: `analytics.getShadowChallengerSummary` / `getShadowDisagreements`.
+
 ### Testing
 
 | Variable               | Description                               | Default  |

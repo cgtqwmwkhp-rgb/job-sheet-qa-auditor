@@ -1,0 +1,378 @@
+/**
+ * Shadow / champion-challenger Contract Tests (PR-21)
+ *
+ * Fixtures/mocks only — no live OCR, LLM, or DB.
+ * Verifies feature flags, comparison metrics, canary sampling,
+ * fail-soft evaluation, and disagreement reporting.
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import type { AnalysisResult, GoldSpec } from "../../services/analyzer";
+import {
+  FEATURE_FLAG,
+  isShadowChallengerEnabled,
+  getShadowChallengerConfig,
+  shouldApplyCanary,
+  DEFAULT_SHADOW_CONFIG,
+  evaluateShadowChallenger,
+  buildShadowComparison,
+  buildDisagreementReport,
+  buildShadowChallengerSummary,
+  toJudgmentSnapshot,
+  compareExtractedFields,
+  extractShadowComparisonsFromReports,
+  SHADOW_COMPARISON_SCHEMA_VERSION,
+  type ShadowComparison,
+} from "../../services/shadowChallenger";
+
+const SAMPLE_SPEC: GoldSpec = {
+  name: "Shadow Test Spec",
+  version: "1.0.0",
+  rules: [
+    {
+      id: "R1",
+      field: "Job Number",
+      type: "presence",
+      required: true,
+      description: "Job number required",
+    },
+    {
+      id: "R2",
+      field: "Customer",
+      type: "presence",
+      required: true,
+      description: "Customer required",
+    },
+  ],
+};
+
+const RICH_TEXT = `
+--- Page 1 ---
+Job Number: JS-12345
+Customer: Acme Corp
+Engineer: Jane Doe
+Date: 2026-07-08
+Work completed successfully with signature present.
+Additional notes about the site visit and asset condition.
+`.repeat(2);
+
+function championPass(): AnalysisResult {
+  return {
+    success: true,
+    overallResult: "PASS",
+    score: 92,
+    findings: [],
+    extractedFields: {
+      "Job Number": { value: "JS-12345", confidence: 95, pageNumber: 1 },
+      Customer: { value: "Acme Corp", confidence: 90, pageNumber: 1 },
+    },
+    summary: "Champion pass",
+    processingTimeMs: 10,
+    model: "gemini-3.1-pro",
+  };
+}
+
+function championFail(): AnalysisResult {
+  return {
+    success: true,
+    overallResult: "FAIL",
+    score: 20,
+    findings: [
+      {
+        ruleId: "R1",
+        fieldName: "Job Number",
+        severity: "S1",
+        reasonCode: "MISSING_FIELD",
+        rawSnippet: "",
+        normalisedSnippet: "",
+        confidence: 100,
+        pageNumber: 1,
+        whyItMatters: "Missing",
+        suggestedFix: "Add job number",
+      },
+    ],
+    extractedFields: {},
+    summary: "Champion fail",
+    processingTimeMs: 10,
+    model: "gemini-3.1-pro",
+  };
+}
+
+describe("Shadow Challenger Contract Tests (PR-21)", () => {
+  const prevFlag = process.env[FEATURE_FLAG];
+  const prevMode = process.env.SHADOW_MODE;
+  const prevCanary = process.env.SHADOW_CANARY_PERCENT;
+  const prevStrategy = process.env.SHADOW_CHALLENGER_STRATEGY;
+
+  beforeEach(() => {
+    delete process.env[FEATURE_FLAG];
+    delete process.env.SHADOW_MODE;
+    delete process.env.SHADOW_CANARY_PERCENT;
+    delete process.env.SHADOW_CHALLENGER_STRATEGY;
+  });
+
+  afterEach(() => {
+    if (prevFlag === undefined) delete process.env[FEATURE_FLAG];
+    else process.env[FEATURE_FLAG] = prevFlag;
+    if (prevMode === undefined) delete process.env.SHADOW_MODE;
+    else process.env.SHADOW_MODE = prevMode;
+    if (prevCanary === undefined) delete process.env.SHADOW_CANARY_PERCENT;
+    else process.env.SHADOW_CANARY_PERCENT = prevCanary;
+    if (prevStrategy === undefined)
+      delete process.env.SHADOW_CHALLENGER_STRATEGY;
+    else process.env.SHADOW_CHALLENGER_STRATEGY = prevStrategy;
+  });
+
+  describe("feature flag", () => {
+    it("defaults to disabled when FEATURE_SHADOW_CHALLENGER is unset", () => {
+      expect(isShadowChallengerEnabled()).toBe(false);
+      expect(getShadowChallengerConfig()).toEqual(DEFAULT_SHADOW_CONFIG);
+    });
+
+    it("enables shadow mode when FEATURE_SHADOW_CHALLENGER=true", () => {
+      process.env[FEATURE_FLAG] = "true";
+      const cfg = getShadowChallengerConfig();
+      expect(cfg.enabled).toBe(true);
+      expect(cfg.mode).toBe("shadow");
+      expect(cfg.strategy).toBe("rule_based");
+    });
+
+    it("respects SHADOW_MODE=canary and canary percent", () => {
+      process.env[FEATURE_FLAG] = "true";
+      process.env.SHADOW_MODE = "canary";
+      process.env.SHADOW_CANARY_PERCENT = "25";
+      const cfg = getShadowChallengerConfig();
+      expect(cfg.mode).toBe("canary");
+      expect(cfg.canaryPercent).toBe(25);
+    });
+
+    it("treats SHADOW_MODE=off as disabled even when flag is true", () => {
+      process.env[FEATURE_FLAG] = "true";
+      process.env.SHADOW_MODE = "off";
+      const cfg = getShadowChallengerConfig();
+      expect(cfg.enabled).toBe(false);
+      expect(cfg.mode).toBe("off");
+    });
+  });
+
+  describe("canary sampling", () => {
+    it("is deterministic for the same key", () => {
+      const a = shouldApplyCanary("job-42", 50);
+      const b = shouldApplyCanary("job-42", 50);
+      expect(a).toBe(b);
+    });
+
+    it("never applies at 0% and always at 100%", () => {
+      expect(shouldApplyCanary("anything", 0)).toBe(false);
+      expect(shouldApplyCanary("anything", 100)).toBe(true);
+    });
+  });
+
+  describe("comparison metrics", () => {
+    it("detects result agreement and field mismatches", () => {
+      const champion = toJudgmentSnapshot({
+        overallResult: "PASS",
+        score: 90,
+        model: "champion",
+        findings: [],
+        extractedFields: {
+          jobNumber: { value: "A-1", confidence: 90, pageNumber: 1 },
+        },
+      });
+      const challenger = toJudgmentSnapshot({
+        overallResult: "PASS",
+        score: 80,
+        model: "challenger",
+        findings: [],
+        extractedFields: {
+          jobNumber: { value: "B-2", confidence: 70, pageNumber: 1 },
+        },
+      });
+      const comparison = buildShadowComparison({
+        mode: "shadow",
+        strategy: "rule_based",
+        champion,
+        challenger,
+        latencyMs: 5,
+        canaryApplied: false,
+        sampled: true,
+        jobSheetId: 1,
+        createdAt: "2026-07-09T00:00:00.000Z",
+      });
+      expect(comparison.schemaVersion).toBe(SHADOW_COMPARISON_SCHEMA_VERSION);
+      expect(comparison.resultAgreed).toBe(true);
+      expect(comparison.hasDisagreement).toBe(true);
+      expect(comparison.fieldDisagreements).toHaveLength(1);
+      expect(comparison.fieldDisagreements[0].kind).toBe("value_mismatch");
+      expect(comparison.scoreDelta).toBe(-10);
+    });
+
+    it("classifies only_champion / only_challenger field kinds", () => {
+      const disagreements = compareExtractedFields(
+        { a: { value: "1", confidence: 1, pageNumber: 1 } },
+        { b: { value: "2", confidence: 1, pageNumber: 1 } }
+      );
+      expect(disagreements.map(d => d.kind).sort()).toEqual([
+        "only_challenger",
+        "only_champion",
+      ]);
+    });
+
+    it("builds disagreement report rates from fixtures", () => {
+      const mk = (agreed: boolean, createdAt: string): ShadowComparison =>
+        buildShadowComparison({
+          mode: "shadow",
+          strategy: "rule_based",
+          champion: toJudgmentSnapshot({
+            overallResult: "PASS",
+            score: 90,
+            model: "c",
+            findings: [],
+            extractedFields: {},
+          }),
+          challenger: toJudgmentSnapshot({
+            overallResult: agreed ? "PASS" : "FAIL",
+            score: agreed ? 90 : 10,
+            model: "t",
+            findings: [],
+            extractedFields: {},
+          }),
+          latencyMs: 1,
+          canaryApplied: false,
+          sampled: true,
+          createdAt,
+        });
+
+      const report = buildDisagreementReport([
+        mk(true, "2026-07-01T00:00:00.000Z"),
+        mk(false, "2026-07-02T00:00:00.000Z"),
+        mk(false, "2026-07-03T00:00:00.000Z"),
+      ]);
+      expect(report.totalComparisons).toBe(3);
+      expect(report.disagreementCount).toBe(2);
+      expect(report.disagreementRate).toBeCloseTo(2 / 3, 5);
+      expect(report.resultDisagreementCount).toBe(2);
+      expect(report.byOutcomePair["PASS->FAIL"]).toBe(2);
+      expect(report.byOutcomePair["PASS->PASS"]).toBe(1);
+    });
+  });
+
+  describe("evaluateShadowChallenger (mocks only)", () => {
+    it("returns null when feature flag disabled", () => {
+      const result = evaluateShadowChallenger({
+        extractedText: RICH_TEXT,
+        goldSpec: SAMPLE_SPEC,
+        pageCount: 1,
+        champion: championPass(),
+        jobSheetId: 1,
+      });
+      expect(result.comparison).toBeNull();
+      expect(result.servedAnalysis).toBeNull();
+      expect(result.canaryApplied).toBe(false);
+    });
+
+    it("runs rule-based challenger without mutating champion in shadow mode", () => {
+      process.env[FEATURE_FLAG] = "true";
+      process.env.SHADOW_MODE = "shadow";
+      const champion = championFail();
+      const result = evaluateShadowChallenger({
+        extractedText: RICH_TEXT,
+        goldSpec: SAMPLE_SPEC,
+        pageCount: 1,
+        champion,
+        jobSheetId: 7,
+      });
+      expect(result.comparison).not.toBeNull();
+      expect(result.comparison!.mode).toBe("shadow");
+      expect(result.comparison!.strategy).toBe("rule_based");
+      expect(result.comparison!.champion.overallResult).toBe("FAIL");
+      // Rule-based challenger PASSes rich content — disagreement expected
+      expect(result.comparison!.challenger.overallResult).toBe("PASS");
+      expect(result.comparison!.resultDisagreement).toBe(true);
+      expect(result.canaryApplied).toBe(false);
+      expect(result.servedAnalysis).toBeNull();
+      // Champion object unchanged
+      expect(champion.overallResult).toBe("FAIL");
+    });
+
+    it("applies canary when sampled at 100%", () => {
+      process.env[FEATURE_FLAG] = "true";
+      process.env.SHADOW_MODE = "canary";
+      process.env.SHADOW_CANARY_PERCENT = "100";
+      const result = evaluateShadowChallenger({
+        extractedText: RICH_TEXT,
+        goldSpec: SAMPLE_SPEC,
+        pageCount: 1,
+        champion: championFail(),
+        jobSheetId: 99,
+        sampleKey: "always",
+      });
+      expect(result.canaryApplied).toBe(true);
+      expect(result.servedAnalysis).not.toBeNull();
+      expect(result.servedAnalysis!.model).toBe("shadow-challenger-rule-based");
+      expect(result.comparison!.canaryApplied).toBe(true);
+    });
+
+    it("never applies canary at 0%", () => {
+      process.env[FEATURE_FLAG] = "true";
+      process.env.SHADOW_MODE = "canary";
+      process.env.SHADOW_CANARY_PERCENT = "0";
+      const result = evaluateShadowChallenger({
+        extractedText: RICH_TEXT,
+        goldSpec: SAMPLE_SPEC,
+        pageCount: 1,
+        champion: championPass(),
+        jobSheetId: 1,
+      });
+      expect(result.canaryApplied).toBe(false);
+      expect(result.servedAnalysis).toBeNull();
+      expect(result.comparison).not.toBeNull();
+    });
+  });
+
+  describe("persistence extraction + summary", () => {
+    it("extracts shadowComparison from reportJson fixtures", () => {
+      process.env[FEATURE_FLAG] = "true";
+      const comparison = buildShadowComparison({
+        mode: "shadow",
+        strategy: "rule_based",
+        champion: toJudgmentSnapshot({
+          overallResult: "PASS",
+          score: 90,
+          model: "c",
+          findings: [],
+          extractedFields: {},
+        }),
+        challenger: toJudgmentSnapshot({
+          overallResult: "FAIL",
+          score: 10,
+          model: "t",
+          findings: [],
+          extractedFields: {},
+        }),
+        latencyMs: 2,
+        canaryApplied: false,
+        sampled: true,
+        createdAt: "2026-07-09T01:00:00.000Z",
+      });
+      const extracted = extractShadowComparisonsFromReports([
+        { summary: "no shadow" },
+        { shadowComparison: comparison },
+        null,
+        { shadowComparison: { schemaVersion: "0.0.1" } },
+      ]);
+      expect(extracted).toHaveLength(1);
+      expect(extracted[0].resultDisagreement).toBe(true);
+
+      const summary = buildShadowChallengerSummary({
+        comparisons: extracted,
+        asOf: "2026-07-09T02:00:00.000Z",
+      });
+      expect(summary.enabled).toBe(true);
+      expect(summary.mode).toBe("shadow");
+      expect(summary.report.totalComparisons).toBe(1);
+      expect(summary.report.disagreementCount).toBe(1);
+      expect(summary.asOf).toBe("2026-07-09T02:00:00.000Z");
+    });
+  });
+});

@@ -7,6 +7,7 @@
  * PR-17: exception management — review SLAs, ageing, overturn rates, DLQ retry.
  * PR-18: drift detection — EWMA/CUSUM, calibration histograms, alerting.
  * PR-19: predictive risk scoring — leading indicators, attention queue, fix packs.
+ * PR-21: shadow / champion-challenger — disagreement reporting, canary switches.
  */
 
 import { z } from "zod";
@@ -65,6 +66,11 @@ import {
   type PredictiveFindingRow,
   type PredictiveUserRow,
 } from "../services/predictiveRiskAnalytics";
+import {
+  buildShadowChallengerSummary,
+  resolveShadowPeriod,
+  getShadowChallengerConfig,
+} from "../services/shadowChallenger";
 import {
   enforceRateLimit,
   RateLimitError,
@@ -225,6 +231,18 @@ async function loadPredictiveRiskInputs(input?: {
       email: u.email,
     })) as PredictiveUserRow[],
   };
+}
+
+async function loadShadowChallengerInputs(input?: {
+  startDate?: string;
+  endDate?: string;
+}) {
+  const period = resolveShadowPeriod(input);
+  const reportJsons = await db.getShadowComparisonReportJsons({
+    startDate: new Date(period.start),
+    endDate: new Date(period.end),
+  });
+  return { period, reportJsons };
 }
 
 function throwIfRateLimited(fn: () => unknown): void {
@@ -744,6 +762,54 @@ export const analyticsRouter = router({
         count: summary.fixPacks.length,
       };
     }),
+
+  // ============ PR-21: SHADOW / CHAMPION-CHALLENGER ============
+
+  /**
+   * Shadow comparison disagreement report + feature-flag status.
+   */
+  getShadowChallengerSummary: protectedProcedure
+    .input(periodInput)
+    .query(async ({ input }) => {
+      const loaded = await loadShadowChallengerInputs(input);
+      const summary = buildShadowChallengerSummary({
+        reportJsons: loaded.reportJsons,
+      });
+      return {
+        ...summary,
+        period: loaded.period,
+      };
+    }),
+
+  /**
+   * Disagreement-only slice for weekly review.
+   */
+  getShadowDisagreements: protectedProcedure
+    .input(periodInput)
+    .query(async ({ input }) => {
+      const loaded = await loadShadowChallengerInputs(input);
+      const summary = buildShadowChallengerSummary({
+        reportJsons: loaded.reportJsons,
+      });
+      return {
+        period: loaded.period,
+        asOf: summary.asOf,
+        enabled: summary.enabled,
+        mode: summary.mode,
+        disagreementRate: summary.report.disagreementRate,
+        resultDisagreementRate: summary.report.resultDisagreementRate,
+        topFieldDisagreements: summary.report.topFieldDisagreements,
+        recentDisagreements: summary.report.recentDisagreements,
+        byOutcomePair: summary.report.byOutcomePair,
+      };
+    }),
+
+  /**
+   * Current shadow/canary feature-flag config (no secrets).
+   */
+  getShadowChallengerConfig: protectedProcedure.query(() => {
+    return getShadowChallengerConfig();
+  }),
 });
 
 export type AnalyticsRouter = typeof analyticsRouter;

@@ -1,0 +1,44 @@
+/**
+ * Shadow disagreement summary builder (PR-21)
+ */
+
+import {
+  buildDisagreementReport,
+  extractShadowComparisonsFromReports,
+} from "./compare";
+import { getShadowChallengerConfig } from "./config";
+import type { ShadowChallengerSummary, ShadowComparison } from "./types";
+
+export function resolveShadowPeriod(input?: {
+  startDate?: string;
+  endDate?: string;
+}): { start: string; end: string } {
+  const end = input?.endDate ? new Date(input.endDate) : new Date();
+  const start = input?.startDate
+    ? new Date(input.startDate)
+    : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+  };
+}
+
+export function buildShadowChallengerSummary(input: {
+  reportJsons?: unknown[];
+  comparisons?: ShadowComparison[];
+  asOf?: string;
+}): ShadowChallengerSummary {
+  const config = getShadowChallengerConfig();
+  const comparisons =
+    input.comparisons ??
+    extractShadowComparisonsFromReports(input.reportJsons ?? []);
+  const report = buildDisagreementReport(comparisons);
+
+  return {
+    enabled: config.enabled,
+    mode: config.mode,
+    canaryPercent: config.canaryPercent,
+    asOf: input.asOf ?? new Date().toISOString(),
+    report,
+  };
+}
