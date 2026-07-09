@@ -25,7 +25,7 @@ export function estimateOverturnCost(
   const usdPerMinute = opts?.usdPerMinute ?? DEFAULT_USD_PER_MINUTE;
 
   const total = events.length;
-  const overturned = events.filter((event) => event.overturned).length;
+  const overturned = events.filter(event => event.overturned).length;
 
   const overturnRate = total === 0 ? 0 : overturned / total;
   const estimatedMinutes = overturned * minutesPerOverturn;
