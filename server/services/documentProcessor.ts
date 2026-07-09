@@ -1038,7 +1038,7 @@ async function processJobSheetWithOptions(
       extractedFields: {},
       summary: "Analysis failed",
       processingTimeMs: Date.now() - analysisStartTime,
-      model: "gemini-3.1-pro",
+      model: "gemini-2.5-pro",
       error: error instanceof Error ? error.message : "Analysis failed",
     };
     recordStage(

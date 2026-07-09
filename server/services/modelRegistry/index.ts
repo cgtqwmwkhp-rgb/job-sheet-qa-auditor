@@ -22,7 +22,7 @@ export type {
   ModelRoleEntry,
 } from "./types";
 
-const DEFAULT_JUDGMENT_MODEL = "gemini-3.1-pro";
+const DEFAULT_JUDGMENT_MODEL = "gemini-2.5-pro";
 const DEFAULT_JUDGMENT_PROVIDER = "gemini";
 
 function judgmentModelFromEnv(): string {

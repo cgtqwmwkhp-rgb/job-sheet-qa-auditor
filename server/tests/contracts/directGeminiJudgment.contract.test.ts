@@ -5,7 +5,7 @@
  * - LLM_PROVIDER=mock returns fixture without network
  * - Zero fetch calls under mock
  * - No forge.manus.im in llm.ts
- * - Default judgment model is gemini-3.1-pro
+ * - Default judgment model is gemini-2.5-pro
  *
  * Mocks only — no live Gemini API calls.
  */
@@ -47,7 +47,7 @@ describe("Direct Gemini Judgment Contract (PR-6)", () => {
     resetMockLlm();
     process.env.LLM_PROVIDER = "mock";
     process.env.GEMINI_API_KEY = "test-mock-key";
-    process.env.JUDGMENT_MODEL = "gemini-3.1-pro";
+    process.env.JUDGMENT_MODEL = "gemini-2.5-pro";
     delete process.env.BUILT_IN_FORGE_API_KEY;
     delete process.env.APP_ENV;
     process.env.NODE_ENV = "test";
@@ -78,7 +78,7 @@ describe("Direct Gemini Judgment Contract (PR-6)", () => {
 
       expect(envContent).toContain("geminiApiKey");
       expect(envContent).toContain("judgmentModel");
-      expect(envContent).toContain("gemini-3.1-pro");
+      expect(envContent).toContain("gemini-2.5-pro");
     });
 
     it("judgment-pass fixture matches analyzer schema shape", () => {
@@ -143,7 +143,7 @@ describe("Direct Gemini Judgment Contract (PR-6)", () => {
       expect(result.success).toBe(true);
       expect(result.overallResult).toBe("PASS");
       expect(result.score).toBe(92);
-      expect(result.model).toBe("gemini-3.1-pro");
+      expect(result.model).toBe("gemini-2.5-pro");
     });
 
     it("isLLMConfigured uses GEMINI_API_KEY not Forge", async () => {

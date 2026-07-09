@@ -72,7 +72,7 @@ describe("Model Registry Contract (PR-9)", () => {
 
       expect(registry.roles.judgment.role).toBe("judgment");
       expect(registry.roles.judgment.provider).toBe("gemini");
-      expect(registry.roles.judgment.model).toBe("gemini-3.1-pro");
+      expect(registry.roles.judgment.model).toBe("gemini-2.5-pro");
 
       expect(registry.roles.interpreter.role).toBe("interpreter");
       expect(registry.roles.interpreter.provider).toBe("gemini");
