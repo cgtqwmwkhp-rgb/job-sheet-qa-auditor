@@ -6,7 +6,17 @@ import {
   type JobSheetProcessingPayload,
 } from "./inMemoryQueue";
 
-type JobSheetProcessor = (
+interface OrchestrateRequest {
+  source: string;
+  jobSheetId: number;
+  documentUrl?: string;
+  goldSpecId?: number;
+  userId?: number;
+  templateVersionId?: number;
+}
+
+type OrchestrateFn = (request: OrchestrateRequest) => Promise<unknown>;
+type LegacyProcessFn = (
   jobSheetId: number,
   documentUrl: string,
   goldSpecId?: number,
@@ -14,42 +24,57 @@ type JobSheetProcessor = (
 ) => Promise<unknown>;
 
 interface JobSheetProcessorModule {
-  orchestrateJobSheetProcessing?: JobSheetProcessor;
-  processJobSheet?: JobSheetProcessor;
+  orchestrateJobSheetProcessing?: OrchestrateFn;
+  processJobSheet?: LegacyProcessFn;
 }
 
 let activeDrain: Promise<void> | null = null;
 
 export function selectJobSheetProcessor(
   processorModule: JobSheetProcessorModule
-): JobSheetProcessor {
-  const orchestrator =
-    "orchestrateJobSheetProcessing" in processorModule
-      ? processorModule.orchestrateJobSheetProcessing
-      : undefined;
-  const processor =
-    orchestrator ??
-    ("processJobSheet" in processorModule
-      ? processorModule.processJobSheet
-      : undefined);
-
-  if (!processor) {
-    throw new Error("No job sheet processor export is available");
+): {
+  mode: "orchestrate" | "legacy";
+  orchestrate?: OrchestrateFn;
+  legacy?: LegacyProcessFn;
+} {
+  if (typeof processorModule.orchestrateJobSheetProcessing === "function") {
+    return {
+      mode: "orchestrate",
+      orchestrate: processorModule.orchestrateJobSheetProcessing,
+    };
   }
-
-  return processor;
+  if (typeof processorModule.processJobSheet === "function") {
+    return { mode: "legacy", legacy: processorModule.processJobSheet };
+  }
+  throw new Error("No job sheet processor export is available");
 }
 
-async function loadJobSheetProcessor(): Promise<JobSheetProcessor> {
-  const processorModule = (await import(
-    "../documentProcessor"
-  )) as JobSheetProcessorModule;
-  return selectJobSheetProcessor(processorModule);
+async function loadProcessorModule(): Promise<JobSheetProcessorModule> {
+  const processorModule = (await import("../documentProcessor")) as unknown;
+  return processorModule as JobSheetProcessorModule;
 }
 
 async function runJob(payload: JobSheetProcessingPayload): Promise<void> {
-  const processor = await loadJobSheetProcessor();
-  await processor(
+  const processorModule = await loadProcessorModule();
+  const selected = selectJobSheetProcessor(processorModule);
+
+  if (selected.mode === "orchestrate" && selected.orchestrate) {
+    await selected.orchestrate({
+      source: payload.source ?? "async-queue",
+      jobSheetId: payload.jobSheetId,
+      documentUrl: payload.documentUrl,
+      goldSpecId: payload.goldSpecId,
+      userId: payload.userId,
+      templateVersionId: payload.templateVersionId,
+    });
+    return;
+  }
+
+  if (!selected.legacy) {
+    throw new Error("No job sheet processor export is available");
+  }
+
+  await selected.legacy(
     payload.jobSheetId,
     payload.documentUrl,
     payload.goldSpecId,

@@ -7,9 +7,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const processJobSheet = vi.hoisted(() => vi.fn());
+const orchestrateJobSheetProcessing = vi.hoisted(() => vi.fn());
 
 vi.mock("../../services/documentProcessor", () => ({
   processJobSheet: (...args: unknown[]) => processJobSheet(...args),
+  orchestrateJobSheetProcessing: (...args: unknown[]) =>
+    orchestrateJobSheetProcessing(...args),
 }));
 
 import {
@@ -27,7 +30,9 @@ describe("Async job queue — Phase 1.2", () => {
   beforeEach(() => {
     clearInMemoryJobSheetProcessingQueue();
     processJobSheet.mockReset();
+    orchestrateJobSheetProcessing.mockReset();
     processJobSheet.mockResolvedValue({ success: true });
+    orchestrateJobSheetProcessing.mockResolvedValue({ success: true });
   });
 
   afterEach(async () => {
@@ -54,12 +59,14 @@ describe("Async job queue — Phase 1.2", () => {
 
   it("dedupes queued work by jobSheetId", async () => {
     const first = enqueueJobSheetProcessing({
+      source: "primary",
       jobSheetId: 12,
       documentUrl: "https://example.test/job-sheet.pdf",
       goldSpecId: 3,
       userId: 7,
     });
     const second = enqueueJobSheetProcessing({
+      source: "primary",
       jobSheetId: 12,
       documentUrl: "https://example.test/job-sheet.pdf",
       goldSpecId: 3,
@@ -74,12 +81,13 @@ describe("Async job queue — Phase 1.2", () => {
 
     await drainJobSheetProcessingQueue();
 
-    expect(processJobSheet).toHaveBeenCalledTimes(1);
+    expect(orchestrateJobSheetProcessing).toHaveBeenCalledTimes(1);
     expect(getJobSheetProcessingJob(first.jobId)?.status).toBe("completed");
   });
 
-  it("runs processJobSheet with the enqueued processing payload", async () => {
+  it("runs orchestrateJobSheetProcessing with the enqueued payload", async () => {
     enqueueJobSheetProcessing({
+      source: "primary",
       jobSheetId: 31,
       documentUrl: "https://example.test/job-sheet-31.pdf",
       goldSpecId: 4,
@@ -88,31 +96,26 @@ describe("Async job queue — Phase 1.2", () => {
 
     await drainJobSheetProcessingQueue();
 
-    expect(processJobSheet).toHaveBeenCalledWith(
-      31,
-      "https://example.test/job-sheet-31.pdf",
-      4,
-      9
-    );
+    expect(orchestrateJobSheetProcessing).toHaveBeenCalledWith({
+      source: "primary",
+      jobSheetId: 31,
+      documentUrl: "https://example.test/job-sheet-31.pdf",
+      goldSpecId: 4,
+      userId: 9,
+      templateVersionId: undefined,
+    });
   });
 
-  it("prefers orchestrateJobSheetProcessing when that export exists", async () => {
-    const orchestrateJobSheetProcessing = vi.fn();
-    const fallbackProcessJobSheet = vi.fn();
+  it("prefers orchestrateJobSheetProcessing when that export exists", () => {
+    const orchestrate = vi.fn();
+    const legacy = vi.fn();
 
-    const processor = selectJobSheetProcessor({
-      orchestrateJobSheetProcessing,
-      processJobSheet: fallbackProcessJobSheet,
+    const selected = selectJobSheetProcessor({
+      orchestrateJobSheetProcessing: orchestrate,
+      processJobSheet: legacy,
     });
 
-    await processor(44, "https://example.test/job-sheet-44.pdf", 5, 10);
-
-    expect(orchestrateJobSheetProcessing).toHaveBeenCalledWith(
-      44,
-      "https://example.test/job-sheet-44.pdf",
-      5,
-      10
-    );
-    expect(fallbackProcessJobSheet).not.toHaveBeenCalled();
+    expect(selected.mode).toBe("orchestrate");
+    expect(selected.orchestrate).toBe(orchestrate);
   });
 });

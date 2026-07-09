@@ -1,8 +1,17 @@
+export type JobSheetProcessingSource =
+  | "primary"
+  | "reprocess"
+  | "template-reprocess"
+  | "dlq-retry"
+  | "async-queue";
+
 export interface JobSheetProcessingPayload {
+  source?: JobSheetProcessingSource;
   jobSheetId: number;
   documentUrl: string;
   goldSpecId?: number;
   userId?: number;
+  templateVersionId?: number;
 }
 
 export type JobSheetQueueStatus = "queued" | "running" | "completed" | "failed";
@@ -80,20 +89,22 @@ export function dequeueJobSheetProcessingJob(): JobSheetQueueJob | undefined {
 export function completeJobSheetProcessingJob(jobId: string): void {
   const job = jobsById.get(jobId);
   if (!job) return;
-
   job.status = "completed";
   job.finishedAt = new Date();
-  clearActiveJob(job);
+  if (activeJobByJobSheetId.get(job.payload.jobSheetId) === jobId) {
+    activeJobByJobSheetId.delete(job.payload.jobSheetId);
+  }
 }
 
 export function failJobSheetProcessingJob(jobId: string, error: unknown): void {
   const job = jobsById.get(jobId);
   if (!job) return;
-
   job.status = "failed";
   job.finishedAt = new Date();
   job.error = error instanceof Error ? error.message : String(error);
-  clearActiveJob(job);
+  if (activeJobByJobSheetId.get(job.payload.jobSheetId) === jobId) {
+    activeJobByJobSheetId.delete(job.payload.jobSheetId);
+  }
 }
 
 export function hasQueuedJobSheetProcessingJobs(): boolean {
@@ -111,10 +122,4 @@ export function clearInMemoryJobSheetProcessingQueue(): void {
   activeJobByJobSheetId.clear();
   queue.length = 0;
   sequence = 0;
-}
-
-function clearActiveJob(job: JobSheetQueueJob): void {
-  if (activeJobByJobSheetId.get(job.payload.jobSheetId) === job.id) {
-    activeJobByJobSheetId.delete(job.payload.jobSheetId);
-  }
 }
