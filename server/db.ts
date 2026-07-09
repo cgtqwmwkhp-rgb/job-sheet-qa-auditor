@@ -1457,3 +1457,45 @@ export async function getPredictiveRiskDisputes(options?: {
     createdAt: r.createdAt,
   }));
 }
+
+// ============ PR-21: SHADOW / CHAMPION-CHALLENGER ============
+
+/**
+ * Latest audit reportJson blobs for shadow disagreement reporting.
+ * Returns raw reportJson so callers can extract shadowComparison artifacts.
+ */
+export async function getShadowComparisonReportJsons(options?: {
+  startDate?: Date;
+  endDate?: Date;
+}): Promise<unknown[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [];
+  if (options?.startDate) {
+    conditions.push(gte(jobSheets.createdAt, options.startDate));
+  }
+  if (options?.endDate) {
+    conditions.push(lte(jobSheets.createdAt, options.endDate));
+  }
+
+  const rows = await db
+    .select({
+      jobSheetId: jobSheets.id,
+      reportJson: auditResults.reportJson,
+      processedAt: jobSheets.createdAt,
+    })
+    .from(jobSheets)
+    .innerJoin(auditResults, eq(auditResults.jobSheetId, jobSheets.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  const latest = new Map<number, (typeof rows)[number]>();
+  for (const row of rows) {
+    const existing = latest.get(row.jobSheetId);
+    if (!existing || row.processedAt > existing.processedAt) {
+      latest.set(row.jobSheetId, row);
+    }
+  }
+
+  return Array.from(latest.values()).map(r => r.reportJson);
+}
