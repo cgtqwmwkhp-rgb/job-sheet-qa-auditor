@@ -31,9 +31,7 @@ export function computeEce(
         ? inBin.reduce((sum, sample) => sum + sample.confidence, 0) / count
         : 0;
     const accuracy =
-      count > 0
-        ? inBin.filter(sample => sample.correct).length / count
-        : 0;
+      count > 0 ? inBin.filter(sample => sample.correct).length / count : 0;
 
     bins.push({ lower, upper, avgConfidence, accuracy, count });
 

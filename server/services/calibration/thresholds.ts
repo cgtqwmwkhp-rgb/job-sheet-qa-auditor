@@ -2,7 +2,11 @@
  * Threshold tuning helpers for auto-pass / overturn baselines (Phase 3.3)
  */
 
-import type { PredictionSample, ThresholdOptions, ThresholdSuggestion } from "./types";
+import type {
+  PredictionSample,
+  ThresholdOptions,
+  ThresholdSuggestion,
+} from "./types";
 
 export const DEFAULT_CURRENT_THRESHOLD = 0.85;
 const THRESHOLD_MIN = 0.5;
@@ -11,7 +15,11 @@ const THRESHOLD_STEP = 0.01;
 
 function buildThresholdSweep(): number[] {
   const thresholds: number[] = [];
-  for (let value = THRESHOLD_MIN; value <= THRESHOLD_MAX + 1e-9; value += THRESHOLD_STEP) {
+  for (
+    let value = THRESHOLD_MIN;
+    value <= THRESHOLD_MAX + 1e-9;
+    value += THRESHOLD_STEP
+  ) {
     thresholds.push(Math.round(value * 100) / 100);
   }
   return thresholds;
