@@ -1,5 +1,5 @@
 /**
- * Azure Document Intelligence fallback + cross-check (PR-4).
+ * Azure Document Intelligence fallback + cross-check (Phase 1.8).
  * Mocks only — no live Azure / Mistral HTTP.
  */
 
@@ -11,6 +11,9 @@ import {
   createMockAdapter,
   createMockAzureDiAdapter,
   createResilientOcrAdapter,
+  FEATURE_OCR_CROSS_CHECK,
+  FEATURE_OCR_FAILOVER,
+  getOCRConfig,
   getOCREngineVersion,
   ocrResilienceReportFields,
   parseAzureDiResponse,
@@ -47,14 +50,18 @@ function testConfig(overrides: Partial<OCRConfig> = {}): OCRConfig {
   };
 }
 
-describe("Azure DI Fallback Contract (PR-4, mocks only)", () => {
+describe("Azure DI Fallback Contract (Phase 1.8, mocks only)", () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
     resetMockAdapter();
     resetMockAzureDiAdapter();
-    delete process.env.OCR_FAILOVER_ENABLED;
-    delete process.env.OCR_CROSS_CHECK_SAMPLE_RATE;
+    delete process.env[FEATURE_OCR_FAILOVER];
+    delete process.env[FEATURE_OCR_CROSS_CHECK];
+    delete process.env.OCR_CROSS_CHECK_PERCENT;
+    delete process.env.OCR_PROVIDER;
+    delete process.env.OCR_FALLBACK_PROVIDER;
+    delete process.env.MISTRAL_API_KEY;
     delete process.env.AZURE_DI_KEY;
     delete process.env.AZURE_DI_ENDPOINT;
   });
@@ -63,6 +70,38 @@ describe("Azure DI Fallback Contract (PR-4, mocks only)", () => {
     process.env = { ...originalEnv };
     resetMockAdapter();
     resetMockAzureDiAdapter();
+  });
+
+  it("defaults Phase 1.8 failover and cross-check flags to off", async () => {
+    process.env.OCR_PROVIDER = "mock";
+
+    const config = getOCRConfig();
+    expect(config.failoverEnabled).toBe(false);
+    expect(config.crossCheckSampleRate).toBe(0);
+
+    const { getOCRAdapter } = await import("../../services/ocrAdapter");
+    const adapter = getOCRAdapter();
+    expect(adapter.providerName).toBe("mock");
+
+    const result = await adapter.extractFromUrl("mock://doc.pdf");
+    expect(result.success).toBe(true);
+    expect(result.failover).toBeUndefined();
+    expect(result.crossCheck).toBeUndefined();
+  });
+
+  it("uses 5 percent cross-check sample when FEATURE_OCR_CROSS_CHECK is enabled", () => {
+    process.env[FEATURE_OCR_CROSS_CHECK] = "true";
+    const config = getOCRConfig();
+    expect(config.failoverEnabled).toBe(false);
+    expect(config.crossCheckSampleRate).toBe(0.05);
+  });
+
+  it("honours OCR_CROSS_CHECK_PERCENT only behind FEATURE_OCR_CROSS_CHECK", () => {
+    process.env.OCR_CROSS_CHECK_PERCENT = "25";
+    expect(getOCRConfig().crossCheckSampleRate).toBe(0);
+
+    process.env[FEATURE_OCR_CROSS_CHECK] = "true";
+    expect(getOCRConfig().crossCheckSampleRate).toBe(0.25);
   });
 
   it("primary mock fails → fallback mock succeeds; engine version reflects fallback", async () => {
@@ -205,7 +244,7 @@ describe("Azure DI Fallback Contract (PR-4, mocks only)", () => {
 
   it("failover disabled leaves primary-only path (no wrap side effects)", async () => {
     process.env.OCR_PROVIDER = "mock";
-    process.env.OCR_FAILOVER_ENABLED = "false";
+    process.env[FEATURE_OCR_FAILOVER] = "false";
     const { getOCRAdapter } = await import("../../services/ocrAdapter");
     const adapter = getOCRAdapter();
     expect(adapter.providerName).toBe("mock");
@@ -213,5 +252,25 @@ describe("Azure DI Fallback Contract (PR-4, mocks only)", () => {
     expect(result.success).toBe(true);
     expect(result.failover).toBeUndefined();
     expect(result.crossCheck).toBeUndefined();
+  });
+
+  it("does not use mock Azure for live primary when Azure is unconfigured", async () => {
+    process.env.OCR_PROVIDER = "mistral";
+    process.env[FEATURE_OCR_FAILOVER] = "true";
+    delete process.env.MISTRAL_API_KEY;
+    delete process.env.AZURE_DI_ENDPOINT;
+    delete process.env.AZURE_DI_KEY;
+
+    const { getOCRAdapter } = await import("../../services/ocrAdapter");
+    const adapter = getOCRAdapter();
+    const result = await adapter.extractFromUrl("https://example.com/doc.pdf", {
+      skipRetry: true,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.errorCode).toBe("CONFIG_ERROR");
+    expect(result.failover?.used).toBe(true);
+    expect(result.failover?.fallbackErrorCode).toBe("AZURE_DI_NOT_CONFIGURED");
+    expect(result.pages).toEqual([]);
   });
 });

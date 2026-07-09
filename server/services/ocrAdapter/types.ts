@@ -5,7 +5,8 @@
  * Primary implementation: Mistral OCR (pinned via DEFAULT_OCR_MODEL).
  *
  * PR-2: Optional OCR-4 deep features (blocks, word confidence, signatures).
- * PR-4: Azure Document Intelligence fallback + optional cross-check sampling.
+ * Phase 1.8: Azure Document Intelligence fallback + optional cross-check
+ * sampling behind default-off feature flags.
  */
 
 /**
@@ -156,6 +157,8 @@ export interface OCRFailoverMetadata {
   fallbackProvider: string;
   primaryErrorCode?: string;
   primaryError?: string;
+  fallbackErrorCode?: string;
+  fallbackError?: string;
 }
 
 /**
@@ -303,7 +306,9 @@ export interface OCRConfig {
   fallbackProvider: OCRProvider;
   /**
    * Fraction of successful primary runs that also invoke fallback for
-   * advisory cross-check (0–1). Default 0 (off).
+   * advisory cross-check (0–1). Default 0 (off). When
+   * FEATURE_OCR_CROSS_CHECK=true and OCR_CROSS_CHECK_PERCENT is unset,
+   * this resolves to 0.05.
    */
   crossCheckSampleRate: number;
   /** Azure Document Intelligence endpoint (unused in CI / mocks-only). */
@@ -369,35 +374,53 @@ function resolveConfidenceGranularity(
 
 export const DEFAULT_AZURE_DI_MODEL = "prebuilt-read";
 export const DEFAULT_AZURE_DI_API_VERSION = "2024-11-30";
+export const FEATURE_OCR_FAILOVER = "FEATURE_OCR_FAILOVER";
+export const FEATURE_OCR_CROSS_CHECK = "FEATURE_OCR_CROSS_CHECK";
+export const DEFAULT_OCR_CROSS_CHECK_PERCENT = 5;
 
 function resolveBoolEnv(
   raw: string | undefined,
   defaultValue: boolean
 ): boolean {
   if (raw === undefined || raw === "") return defaultValue;
-  if (raw === "true" || raw === "1") return true;
-  if (raw === "false" || raw === "0") return false;
+  const value = raw.toLowerCase();
+  if (value === "true" || value === "1") return true;
+  if (value === "false" || value === "0") return false;
   return defaultValue;
 }
 
-function resolveSampleRate(raw: string | undefined): number {
-  if (raw === undefined || raw === "") return 0;
+function resolvePercentEnv(
+  raw: string | undefined,
+  defaultPercent: number
+): number {
+  if (raw === undefined || raw === "") return defaultPercent;
   const n = Number(raw);
-  if (!Number.isFinite(n)) return 0;
-  return Math.min(1, Math.max(0, n));
+  if (!Number.isFinite(n)) return defaultPercent;
+  return Math.min(100, Math.max(0, n));
 }
 
 /**
  * Get OCR configuration from environment
  *
- * PR-4 env (documented; AZURE_DI_* unused in CI / mocks-only overnight):
- * - OCR_FAILOVER_ENABLED (default false)
- * - OCR_CROSS_CHECK_SAMPLE_RATE (default 0)
+ * Phase 1.8 env (AZURE_DI_* optional; absent creds fail soft):
+ * - FEATURE_OCR_FAILOVER (default false)
+ * - FEATURE_OCR_CROSS_CHECK (default false)
+ * - OCR_CROSS_CHECK_PERCENT (default 5 when FEATURE_OCR_CROSS_CHECK=true)
  * - OCR_FALLBACK_PROVIDER (default azure)
  * - AZURE_DI_ENDPOINT, AZURE_DI_KEY, AZURE_DI_MODEL, AZURE_DI_API_VERSION
  */
 export function getOCRConfig(): OCRConfig {
   const model = process.env.MISTRAL_OCR_MODEL || DEFAULT_OCR_MODEL;
+  const crossCheckEnabled = resolveBoolEnv(
+    process.env[FEATURE_OCR_CROSS_CHECK],
+    false
+  );
+  const crossCheckPercent = crossCheckEnabled
+    ? resolvePercentEnv(
+        process.env.OCR_CROSS_CHECK_PERCENT,
+        DEFAULT_OCR_CROSS_CHECK_PERCENT
+      )
+    : 0;
   const fallbackRaw = (
     process.env.OCR_FALLBACK_PROVIDER || "azure"
   ).toLowerCase() as OCRProvider;
@@ -417,11 +440,9 @@ export function getOCRConfig(): OCRConfig {
     maxDelayMs: parseInt(process.env.OCR_MAX_DELAY_MS || "30000", 10),
     deepFeaturesEnabled: resolveDeepFeaturesEnabled(model),
     confidenceGranularity: resolveConfidenceGranularity(),
-    failoverEnabled: resolveBoolEnv(process.env.OCR_FAILOVER_ENABLED, false),
+    failoverEnabled: resolveBoolEnv(process.env[FEATURE_OCR_FAILOVER], false),
     fallbackProvider,
-    crossCheckSampleRate: resolveSampleRate(
-      process.env.OCR_CROSS_CHECK_SAMPLE_RATE
-    ),
+    crossCheckSampleRate: crossCheckPercent / 100,
     azureEndpoint: process.env.AZURE_DI_ENDPOINT,
     azureKey: process.env.AZURE_DI_KEY,
     azureModel: process.env.AZURE_DI_MODEL || DEFAULT_AZURE_DI_MODEL,

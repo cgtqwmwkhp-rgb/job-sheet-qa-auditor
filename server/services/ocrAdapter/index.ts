@@ -3,7 +3,7 @@
  *
  * Provides pluggable OCR adapter for document text extraction.
  * Primary: Mistral OCR (pinned via DEFAULT_OCR_MODEL, currently mistral-ocr-4-0)
- * Fallback: Azure Document Intelligence (PR-4, when OCR_FAILOVER_ENABLED)
+ * Fallback: Azure Document Intelligence (Phase 1.8, when FEATURE_OCR_FAILOVER)
  * Testing: Mock adapter (no-secrets CI)
  */
 
@@ -54,7 +54,7 @@ function createLeafAdapter(provider: OCRProvider): OCRAdapter {
  * - 'mock': Mock adapter for testing
  * - 'azure': Azure Document Intelligence (primary when selected)
  *
- * When OCR_FAILOVER_ENABLED=true, wraps primary with resilient failover
+ * When FEATURE_OCR_FAILOVER=true, wraps primary with resilient failover
  * to OCR_FALLBACK_PROVIDER (default azure). Does not replace primary.
  */
 export function getOCRAdapter(): OCRAdapter {
@@ -73,13 +73,13 @@ export function getOCRAdapter(): OCRAdapter {
         : "mock"
       : config.fallbackProvider;
 
-  // In CI / mocks-only: when primary is mock and fallback is azure, use mock Azure
+  // In CI / mocks-only: when primary is mock and fallback is azure, use mock Azure.
+  // Real providers must fail soft if Azure credentials are absent, never use
+  // fixture content for live staging traffic.
   const fallback =
     config.provider === "mock" && fallbackProvider === "azure"
       ? createMockAzureDiAdapter()
-      : fallbackProvider === "azure" && !config.azureKey
-        ? createMockAzureDiAdapter()
-        : createLeafAdapter(fallbackProvider);
+      : createLeafAdapter(fallbackProvider);
 
   return createResilientOcrAdapter(primary, fallback, {
     failoverEnabled: config.failoverEnabled,

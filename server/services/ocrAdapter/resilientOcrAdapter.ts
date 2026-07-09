@@ -5,10 +5,12 @@
  * - Failover to a fallback provider when primary fails
  * - Cross-check sampling (advisory dual-run; never merges conflicting text)
  *
- * Enabled only when OCR_FAILOVER_ENABLED=true (default false).
- * Cross-check sample rate defaults to 0.
+ * Enabled only when FEATURE_OCR_FAILOVER=true or
+ * FEATURE_OCR_CROSS_CHECK=true (both default false).
+ * Cross-check defaults to a 5% sample when enabled.
  *
- * Mocks-only overnight: inject mock primary + mockAzure fallback in tests.
+ * Contract tests inject mock primary + mock Azure fallback; live staging uses
+ * configured providers and fails soft when fallback credentials are absent.
  */
 
 import { createHash } from "crypto";
@@ -98,6 +100,18 @@ export function computeTextSimilarity(
 
 const AGREEMENT_THRESHOLD = 0.85;
 
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function errorCode(error: unknown, fallback: string): string {
+  if (error && typeof error === "object" && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string" && code.trim() !== "") return code;
+  }
+  return fallback;
+}
+
 export function buildCrossCheckMetadata(
   primary: OCRResult,
   fallback: OCRResult,
@@ -179,11 +193,28 @@ export class ResilientOCRAdapter implements OCRAdapter {
       return invoke(this.primary);
     }
 
-    const primaryResult = await invoke(this.primary);
     const primaryProvider =
       this.primaryProviderName || this.primary.providerName;
     const fallbackProvider =
       this.fallbackProviderName || this.fallback.providerName;
+
+    let primaryResult: OCRResult;
+    try {
+      primaryResult = await invoke(this.primary);
+    } catch (error) {
+      if (!this.failoverEnabled) {
+        throw error;
+      }
+      primaryResult = {
+        success: false,
+        pages: [],
+        totalPages: 0,
+        model: this.primary.modelId,
+        provider: primaryProvider,
+        error: errorMessage(error, "Primary OCR threw before returning"),
+        errorCode: errorCode(error, "PRIMARY_OCR_ERROR"),
+      };
+    }
 
     if (
       this.failoverEnabled &&
@@ -195,13 +226,43 @@ export class ResilientOCRAdapter implements OCRAdapter {
         primaryErrorCode: primaryResult.errorCode,
       });
 
-      const fallbackResult = await invoke(this.fallback);
+      let fallbackResult: OCRResult;
+      try {
+        fallbackResult = await invoke(this.fallback);
+      } catch (error) {
+        logger.warn("Fallback OCR failed; keeping primary failure", {
+          primaryProvider,
+          fallbackProvider,
+          fallbackErrorCode: errorCode(error, "FALLBACK_OCR_ERROR"),
+        });
+        return {
+          success: false,
+          pages: [],
+          totalPages: 0,
+          model: primaryResult.model || this.primary.modelId,
+          provider: primaryProvider,
+          error: primaryResult.error || "Primary OCR failed before fallback",
+          errorCode: primaryResult.errorCode || "PRIMARY_OCR_ERROR",
+          failover: {
+            used: true,
+            primaryProvider,
+            fallbackProvider,
+            primaryErrorCode: primaryResult.errorCode,
+            primaryError: primaryResult.error,
+            fallbackErrorCode: errorCode(error, "FALLBACK_OCR_ERROR"),
+            fallbackError: errorMessage(error, "Fallback OCR failed"),
+          },
+          processingTimeMs: primaryResult.processingTimeMs || 0,
+        };
+      }
       const failover: OCRFailoverMetadata = {
         used: true,
         primaryProvider,
         fallbackProvider,
         primaryErrorCode: primaryResult.errorCode,
         primaryError: primaryResult.error,
+        fallbackErrorCode: fallbackResult.errorCode,
+        fallbackError: fallbackResult.error,
       };
 
       if (fallbackResult.success && fallbackResult.pages.length > 0) {
