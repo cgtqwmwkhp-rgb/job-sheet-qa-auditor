@@ -2,7 +2,7 @@ import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch } from "wouter";
+import { Route, Switch, Redirect } from "wouter";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -18,6 +18,7 @@ function ProcessingWatchdog() {
 }
 
 // Lazy load pages for performance optimization
+const Login = lazy(() => import("./pages/Login"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const UploadPage = lazy(() => import("./pages/Upload"));
 const AuditResults = lazy(() => import("./pages/AuditResults"));
@@ -43,6 +44,7 @@ const SiteIntelligence = lazy(
 const DriftDetection = lazy(() => import("./pages/analytics/DriftDetection"));
 const PredictiveRisk = lazy(() => import("./pages/analytics/PredictiveRisk"));
 const PortalLogin = lazy(() => import("./pages/portal/PortalLogin"));
+const DemoGateway = lazy(() => import("./pages/DemoGateway"));
 const TechnicianDashboard = lazy(
   () => import("./pages/portal/TechnicianDashboard")
 );
@@ -52,46 +54,127 @@ const Settings = lazy(() => import("./pages/Settings"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
-// Loading fallback component
+// Loading fallback — no app chrome (Phase 0 portal cleanliness)
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-background">
+  <div className="min-h-screen flex items-center justify-center bg-[#ececec]">
     <div className="flex flex-col items-center gap-4">
-      <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      <p className="text-muted-foreground text-sm animate-pulse">
-        Loading application...
-      </p>
+      <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+      <p className="text-muted-foreground text-sm">Loading…</p>
     </div>
   </div>
 );
+
+/** Staff routes require auth; unauthenticated users see Entra screen only. */
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <PageLoader />;
+  if (!user) return <Redirect to="/login" />;
+  return <>{children}</>;
+}
+
 function Router() {
-  const { isLoading } = useAuth();
+  const { isLoading, user } = useAuth();
 
   if (isLoading) return <PageLoader />;
 
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>
-        <Route path={"/"} component={Dashboard} />
-        <Route path={"/upload"} component={UploadPage} />
-        <Route path={"/audits"} component={AuditResults} />
-        <Route path={"/hold-queue"} component={HoldQueue} />
-        <Route path={"/specs"} component={SpecManagement} />
-        <Route path={"/search"} component={SearchPage} />
-        <Route path={"/users"} component={UserManagement} />
-        <Route path={"/analytics"} component={ExecutiveDashboard} />
-        <Route path={"/analytics/defects"} component={DefectAnalysis} />
-        <Route
-          path={"/analytics/technicians"}
-          component={TechnicianPerformance}
-        />
-        <Route path={"/analytics/sites"} component={SiteIntelligence} />
-        <Route path={"/analytics/drift"} component={DriftDetection} />
-        <Route path={"/analytics/predictive"} component={PredictiveRisk} />
-        <Route path={"/analytics/first-fix"} component={FirstFixAnalysis} />
-        <Route path={"/analytics/ai"} component={AIAnalyst} />
-        <Route path={"/analytics/reports"} component={ReportStudio} />
-        <Route path={"/portal/login"} component={PortalLogin} />
-        <Route path={"/portal/dashboard"} component={TechnicianDashboard} />
+        <Route path="/login">
+          {user ? <Redirect to="/" /> : <Login />}
+        </Route>
+        <Route path="/portal/login">
+          {user ? <Redirect to="/portal/dashboard" /> : <PortalLogin />}
+        </Route>
+        {/* /demo retained for Playwright E2E helpers — not linked in product nav */}
+        <Route path="/demo" component={DemoGateway} />
+
+        <Route path="/">
+          <RequireAuth>
+            <Dashboard />
+          </RequireAuth>
+        </Route>
+        <Route path="/upload">
+          <RequireAuth>
+            <UploadPage />
+          </RequireAuth>
+        </Route>
+        <Route path="/audits">
+          <RequireAuth>
+            <AuditResults />
+          </RequireAuth>
+        </Route>
+        <Route path="/hold-queue">
+          <RequireAuth>
+            <HoldQueue />
+          </RequireAuth>
+        </Route>
+        <Route path="/specs">
+          <RequireAuth>
+            <SpecManagement />
+          </RequireAuth>
+        </Route>
+        <Route path="/search">
+          <RequireAuth>
+            <SearchPage />
+          </RequireAuth>
+        </Route>
+        <Route path="/users">
+          <RequireAuth>
+            <UserManagement />
+          </RequireAuth>
+        </Route>
+        <Route path="/analytics">
+          <RequireAuth>
+            <ExecutiveDashboard />
+          </RequireAuth>
+        </Route>
+        <Route path="/analytics/defects">
+          <RequireAuth>
+            <DefectAnalysis />
+          </RequireAuth>
+        </Route>
+        <Route path="/analytics/technicians">
+          <RequireAuth>
+            <TechnicianPerformance />
+          </RequireAuth>
+        </Route>
+        <Route path="/analytics/sites">
+          <RequireAuth>
+            <SiteIntelligence />
+          </RequireAuth>
+        </Route>
+        <Route path="/analytics/drift">
+          <RequireAuth>
+            <DriftDetection />
+          </RequireAuth>
+        </Route>
+        <Route path="/analytics/predictive">
+          <RequireAuth>
+            <PredictiveRisk />
+          </RequireAuth>
+        </Route>
+        {/* Coming Soon pages kept routable but out of nav */}
+        <Route path="/analytics/first-fix">
+          <RequireAuth>
+            <FirstFixAnalysis />
+          </RequireAuth>
+        </Route>
+        <Route path="/analytics/ai">
+          <RequireAuth>
+            <AIAnalyst />
+          </RequireAuth>
+        </Route>
+        <Route path="/analytics/reports">
+          <RequireAuth>
+            <ReportStudio />
+          </RequireAuth>
+        </Route>
+        <Route path="/portal/dashboard">
+          <RequireAuth>
+            <TechnicianDashboard />
+          </RequireAuth>
+        </Route>
         <Route path="/disputes">
           <ProtectedRoute
             component={DisputeManagement}
@@ -107,9 +190,12 @@ function Router() {
             allowedRoles={["admin", "qa_lead"]}
           />
         </Route>
-        <Route path="/help" component={HelpCenter} />
-        <Route path={"/404"} component={NotFound} />
-        {/* Final fallback route */}
+        <Route path="/help">
+          <RequireAuth>
+            <HelpCenter />
+          </RequireAuth>
+        </Route>
+        <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

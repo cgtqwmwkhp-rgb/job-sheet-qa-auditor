@@ -99,12 +99,17 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="h-16 flex items-center justify-center border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 w-full">
-          <div className="h-8 w-8 rounded bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-bold font-mono">
-            QA
+          <div className="h-8 w-8 rounded bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-bold text-xs tracking-tight">
+            PE
           </div>
-          <span className="font-heading font-bold text-lg truncate group-data-[collapsible=icon]:hidden">
-            Job Sheet QA
-          </span>
+          <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
+            <span className="font-heading font-bold text-sm truncate leading-tight">
+              PlantExpand
+            </span>
+            <span className="text-xs text-muted-foreground truncate">
+              Job Sheet QA
+            </span>
+          </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
