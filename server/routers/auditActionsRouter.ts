@@ -6,7 +6,12 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { protectedProcedure, adminProcedure, router } from "../_core/trpc";
+import {
+  protectedProcedure,
+  adminProcedure,
+  qaLeadProcedure,
+  router,
+} from "../_core/trpc";
 import * as db from "../db";
 import {
   applyFindingAction,
@@ -128,7 +133,7 @@ export const auditActionsRouter = router({
     }),
 
   /** Override a finding (reviewer overturns the automated result). */
-  override: protectedProcedure
+  override: qaLeadProcedure
     .input(findingActionInput)
     .mutation(async ({ ctx, input }) => {
       enforceReviewLimit(ctx.user.id);
@@ -148,7 +153,7 @@ export const auditActionsRouter = router({
     }),
 
   /** Flag a finding — moves job sheet into review_queue. */
-  flag: protectedProcedure
+  flag: qaLeadProcedure
     .input(findingActionInput)
     .mutation(async ({ ctx, input }) => {
       enforceReviewLimit(ctx.user.id);
@@ -168,7 +173,7 @@ export const auditActionsRouter = router({
     }),
 
   /** Approve a finding (mark as accepted / no further action). */
-  approve: protectedProcedure
+  approve: qaLeadProcedure
     .input(findingActionInput)
     .mutation(async ({ ctx, input }) => {
       enforceReviewLimit(ctx.user.id);
@@ -188,7 +193,7 @@ export const auditActionsRouter = router({
     }),
 
   /** Soft-undo the last finding action (status revert + waiver delete if needed). */
-  undo: protectedProcedure
+  undo: qaLeadProcedure
     .input(z.object({ findingId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       try {
@@ -205,7 +210,7 @@ export const auditActionsRouter = router({
     }),
 
   /** Bulk-approve findings (e.g. from hold queue / findings panel). */
-  bulkApprove: protectedProcedure
+  bulkApprove: qaLeadProcedure
     .input(
       z.object({
         findingIds: z.array(z.number().int().positive()).min(1).max(100),
@@ -221,7 +226,7 @@ export const auditActionsRouter = router({
     }),
 
   /** Approve a job sheet out of the hold queue. */
-  approveJobSheet: protectedProcedure
+  approveJobSheet: qaLeadProcedure
     .input(
       z.object({
         jobSheetId: z.number().int().positive(),
@@ -245,7 +250,7 @@ export const auditActionsRouter = router({
     }),
 
   /** Undo job sheet approve — restore to prior status (default review_queue). */
-  undoJobSheetApprove: protectedProcedure
+  undoJobSheetApprove: qaLeadProcedure
     .input(
       z.object({
         jobSheetId: z.number().int().positive(),
@@ -272,7 +277,7 @@ export const auditActionsRouter = router({
    * Capture a reviewer field correction (PR-13).
    * Writes normalisedSnippet + FIELD_CORRECTION audit log — no new migration.
    */
-  captureFieldCorrection: protectedProcedure
+  captureFieldCorrection: qaLeadProcedure
     .input(
       z.object({
         findingId: z.number().int().positive(),
@@ -300,7 +305,7 @@ export const auditActionsRouter = router({
     }),
 
   /** Soft-undo a field correction (restore previous normalisedSnippet). */
-  undoFieldCorrection: protectedProcedure
+  undoFieldCorrection: qaLeadProcedure
     .input(
       z.object({
         findingId: z.number().int().positive(),

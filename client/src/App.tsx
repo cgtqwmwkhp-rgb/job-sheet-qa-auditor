@@ -5,12 +5,19 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, Redirect } from "wouter";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { AuthProvider } from "./contexts/AuthContext";
+import {
+  AuthProvider,
+  isDemoAuthAllowed,
+  useAuth,
+  type UserRole,
+} from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Loader2 } from "lucide-react";
 import { OnboardingTour } from "@/components/OnboardingTour";
-import { useAuth } from "@/contexts/AuthContext";
 import { useProcessingWatchdog } from "@/hooks/useProcessingWatch";
+
+const STAFF_ROLES: UserRole[] = ["admin", "qa_lead", "viewer"];
+const TECH_ROLES: UserRole[] = ["technician"];
 
 function ProcessingWatchdog() {
   useProcessingWatchdog();
@@ -64,11 +71,13 @@ const PageLoader = () => (
   </div>
 );
 
-/** Staff routes require auth; unauthenticated users see Entra screen only. */
-function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+/** Authenticated staff (admin / qa_lead / viewer). Technicians → portal. */
+function RequireStaff({ children }: { children: React.ReactNode }) {
+  const { user, isLoading, hasRole } = useAuth();
   if (isLoading) return <PageLoader />;
   if (!user) return <Redirect to="/login" />;
+  if (hasRole(TECH_ROLES)) return <Redirect to="/portal/dashboard" />;
+  if (!hasRole(STAFF_ROLES)) return <Redirect to="/login" />;
   return <>{children}</>;
 }
 
@@ -77,101 +86,106 @@ function Router() {
 
   if (isLoading) return <PageLoader />;
 
+  const homeRedirect = user?.role === "technician" ? "/portal/dashboard" : "/";
+
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>
-        <Route path="/login">{user ? <Redirect to="/" /> : <Login />}</Route>
-        <Route path="/portal/login">
-          {user ? <Redirect to="/portal/dashboard" /> : <PortalLogin />}
+        <Route path="/login">
+          {user ? <Redirect to={homeRedirect} /> : <Login />}
         </Route>
-        {/* /demo retained for Playwright E2E helpers — not linked in product nav */}
-        <Route path="/demo" component={DemoGateway} />
+        <Route path="/portal/login">
+          {user ? <Redirect to={homeRedirect} /> : <PortalLogin />}
+        </Route>
+        {/* /demo — Playwright / local DEV only; not linked in product nav */}
+        <Route path="/demo">
+          {isDemoAuthAllowed() ? <DemoGateway /> : <Redirect to="/login" />}
+        </Route>
 
         <Route path="/">
-          <RequireAuth>
+          <RequireStaff>
             <Dashboard />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         <Route path="/upload">
-          <RequireAuth>
+          <RequireStaff>
             <UploadPage />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         <Route path="/audits">
-          <RequireAuth>
+          <RequireStaff>
             <AuditResults />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         <Route path="/hold-queue">
-          <RequireAuth>
+          <RequireStaff>
             <HoldQueue />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         <Route path="/specs">
-          <RequireAuth>
+          <RequireStaff>
             <SpecManagement />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         <Route path="/search">
-          <RequireAuth>
+          <RequireStaff>
             <SearchPage />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         <Route path="/users">
-          <RequireAuth>
-            <UserManagement />
-          </RequireAuth>
+          <ProtectedRoute component={UserManagement} allowedRoles={["admin"]} />
         </Route>
         <Route path="/analytics">
-          <RequireAuth>
+          <RequireStaff>
             <ExecutiveDashboard />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         <Route path="/analytics/defects">
-          <RequireAuth>
+          <RequireStaff>
             <DefectAnalysis />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         <Route path="/analytics/technicians">
-          <RequireAuth>
+          <RequireStaff>
             <TechnicianPerformance />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         <Route path="/analytics/sites">
-          <RequireAuth>
+          <RequireStaff>
             <SiteIntelligence />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         <Route path="/analytics/drift">
-          <RequireAuth>
+          <RequireStaff>
             <DriftDetection />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         <Route path="/analytics/predictive">
-          <RequireAuth>
+          <RequireStaff>
             <PredictiveRisk />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         {/* Coming Soon pages kept routable but out of nav */}
         <Route path="/analytics/first-fix">
-          <RequireAuth>
+          <RequireStaff>
             <FirstFixAnalysis />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         <Route path="/analytics/ai">
-          <RequireAuth>
+          <RequireStaff>
             <AIAnalyst />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         <Route path="/analytics/reports">
-          <RequireAuth>
+          <RequireStaff>
             <ReportStudio />
-          </RequireAuth>
+          </RequireStaff>
         </Route>
         <Route path="/portal/dashboard">
-          <RequireAuth>
-            <TechnicianDashboard />
-          </RequireAuth>
+          <ProtectedRoute
+            component={TechnicianDashboard}
+            allowedRoles={["technician"]}
+          />
         </Route>
         <Route path="/disputes">
           <ProtectedRoute

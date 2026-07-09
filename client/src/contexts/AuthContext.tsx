@@ -20,22 +20,28 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function normalizeRole(raw: unknown): UserRole {
-  if (
-    raw === "admin" ||
-    raw === "qa_lead" ||
-    raw === "technician" ||
-    raw === "viewer"
-  ) {
-    return raw;
-  }
-  // Phase 0 UI: preserve prior behaviour (authenticated staff = admin) until
-  // Phase 0 security maps roles from auth.me / Entra claims for real.
-  return "admin";
+/** Demo / Playwright escape hatch — never in production builds. */
+export function isDemoAuthAllowed(): boolean {
+  return Boolean(import.meta.env.DEV);
 }
 
-/** Playwright / local E2E escape hatch — not used in production Easy Auth. */
+/**
+ * Map DB / auth.me roles onto client UserRole.
+ * DB enum is user|admin|qa_lead|technician — client uses viewer for DB "user".
+ */
+function normalizeRole(raw: unknown): UserRole {
+  if (raw === "admin" || raw === "qa_lead" || raw === "technician") {
+    return raw;
+  }
+  if (raw === "viewer" || raw === "user") {
+    return "viewer";
+  }
+  // Unknown / missing role → least privilege (never elevate to admin).
+  return "viewer";
+}
+
 function checkDemoAuth(): User | null {
+  if (!isDemoAuthAllowed()) return null;
   try {
     const role = localStorage.getItem("demo_user_role") as UserRole | null;
     if (!role) return null;
@@ -105,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = (role: UserRole) => {
-    // Demo / E2E only — production uses Entra via /login.
+    if (!isDemoAuthAllowed()) return;
     try {
       localStorage.setItem("demo_user_role", role);
       localStorage.setItem(

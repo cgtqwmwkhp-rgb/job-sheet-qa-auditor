@@ -42,9 +42,12 @@ class OAuthService {
       oauthLogger.info("Initialized", { baseURL: ENV.oAuthServerUrl });
     } else {
       // WARN (not ERROR) when OAuth is not configured
-      oauthLogger.warn("OAuth not configured - authentication features disabled", {
-        hint: "Set OAUTH_SERVER_URL environment variable to enable OAuth",
-      });
+      oauthLogger.warn(
+        "OAuth not configured - authentication features disabled",
+        {
+          hint: "Set OAUTH_SERVER_URL environment variable to enable OAuth",
+        }
+      );
     }
   }
 
@@ -60,7 +63,7 @@ class OAuthService {
     if (!ENV.oauthEnabled) {
       throw ForbiddenError("OAuth is not configured");
     }
-    
+
     const payload: ExchangeTokenRequest = {
       clientId: ENV.appId,
       grantType: "authorization_code",
@@ -82,7 +85,7 @@ class OAuthService {
     if (!ENV.oauthEnabled) {
       throw ForbiddenError("OAuth is not configured");
     }
-    
+
     const { data } = await this.client.post<GetUserInfoResponse>(
       GET_USER_INFO_PATH,
       {
@@ -256,7 +259,7 @@ class SDKServer {
     if (!ENV.oauthEnabled) {
       throw ForbiddenError("OAuth is not configured");
     }
-    
+
     const payload: GetUserInfoWithJwtRequest = {
       jwtToken,
       projectId: ENV.appId,
@@ -280,25 +283,36 @@ class SDKServer {
 
   async authenticateRequest(req: Request): Promise<User> {
     // Azure Easy Auth: Check for Azure AD authentication headers
-    const azureClientPrincipal = req.headers['x-ms-client-principal'] as string | undefined;
-    
+    const azureClientPrincipal = req.headers["x-ms-client-principal"] as
+      | string
+      | undefined;
+
     // Log Azure auth status (info level so it appears in production)
     authLogger.info("Checking authentication", {
       hasAzurePrincipal: !!azureClientPrincipal,
       hasCookie: !!req.headers.cookie,
-      path: req.path
+      path: req.path,
     });
-    
+
     if (azureClientPrincipal) {
       try {
-        const decoded = Buffer.from(azureClientPrincipal, 'base64').toString('utf8');
+        const decoded = Buffer.from(azureClientPrincipal, "base64").toString(
+          "utf8"
+        );
         const principal = JSON.parse(decoded);
-        const userId = principal.userId || principal.nameIdentifier || principal.userDetails;
+        const userId =
+          principal.userId || principal.nameIdentifier || principal.userDetails;
         const email = principal.userDetails || principal.userId;
-        const name = principal.name || principal.userDetails?.split('@')[0] || 'Azure User';
-        
-        authLogger.debug("Azure Easy Auth - user authenticated via Azure AD", { userId, email });
-        
+        const name =
+          principal.name ||
+          principal.userDetails?.split("@")[0] ||
+          "Azure User";
+
+        authLogger.debug("Azure Easy Auth - user authenticated via Azure AD", {
+          userId,
+          email,
+        });
+
         // Find or create user from Azure auth
         let user = await db.getUserByOpenId(`azure-${userId}`);
         if (!user) {
@@ -332,6 +346,7 @@ class SDKServer {
         name: "Local Developer",
         email: "dev@local.test",
         loginMethod: "dev-bypass",
+        role: "admin",
         lastSignedIn: new Date(),
       });
       const newDevUser = await db.getUserByOpenId("dev-user-local");
@@ -359,7 +374,7 @@ class SDKServer {
       if (!ENV.oauthEnabled) {
         throw ForbiddenError("OAuth is not configured - cannot sync user");
       }
-      
+
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
         await db.upsertUser({
@@ -371,7 +386,9 @@ class SDKServer {
         });
         user = await db.getUserByOpenId(userInfo.openId);
       } catch (error) {
-        authLogger.error("Failed to sync user from OAuth", { error: String(error) });
+        authLogger.error("Failed to sync user from OAuth", {
+          error: String(error),
+        });
         throw ForbiddenError("Failed to sync user info");
       }
     }

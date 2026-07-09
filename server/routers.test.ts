@@ -746,6 +746,37 @@ describe("auditActions (PR-10)", () => {
     ).rejects.toThrow();
   });
 
+  it("allows qa_lead to override a finding", async () => {
+    const { ctx } = createAuthContext("qa_lead");
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.auditActions.override({
+      findingId: 1,
+      reason: "QA lead override",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.resolutionStatus).toBe("overridden");
+  });
+
+  it("rejects technician from override", async () => {
+    const { ctx } = createAuthContext("technician");
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(
+      caller.auditActions.override({ findingId: 1, reason: "nope" })
+    ).rejects.toThrow();
+  });
+
+  it("rejects default user role from approveJobSheet", async () => {
+    const { ctx } = createAuthContext("user");
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(
+      caller.auditActions.approveJobSheet({ jobSheetId: 1, reason: "nope" })
+    ).rejects.toThrow();
+  });
+
   it("approves a job sheet", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
