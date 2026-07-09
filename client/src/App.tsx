@@ -63,7 +63,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Loading fallback — no app chrome (Phase 0 portal cleanliness)
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-[#ececec]">
+  <div className="min-h-screen flex items-center justify-center bg-muted">
     <div className="flex flex-col items-center gap-4">
       <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
       <p className="text-muted-foreground text-sm">Loading…</p>
