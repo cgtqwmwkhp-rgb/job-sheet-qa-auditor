@@ -1045,3 +1045,173 @@ export async function getCohortAnalyticsFindings(options?: {
     occurredAt: r.occurredAt,
   }));
 }
+
+// ============ PR-17: EXCEPTION MANAGEMENT ============
+
+export type ExceptionSlaSeverity = "S0" | "S1" | "S2" | "S3" | "unknown";
+
+export interface ExceptionHoldQueueRow {
+  jobSheetId: number;
+  referenceNumber: string | null;
+  siteInfo: string | null;
+  queuedAt: Date;
+  highestSeverity: ExceptionSlaSeverity;
+  openFindingCount: number;
+  technicianId: number | null;
+}
+
+export interface ExceptionOverturnFindingRow {
+  findingId: number;
+  jobSheetId: number;
+  ruleId: string | null;
+  reasonCode: string;
+  severity: "S0" | "S1" | "S2" | "S3";
+  fieldName: string;
+  resolutionStatus: "open" | "waived" | "overridden" | "flagged" | "approved";
+  siteInfo: string | null;
+  occurredAt: Date;
+  resolvedAt: Date | null;
+}
+
+const SEVERITY_RANK: Record<ExceptionSlaSeverity, number> = {
+  S0: 0,
+  S1: 1,
+  S2: 2,
+  S3: 3,
+  unknown: 4,
+};
+
+function worseSeverity(
+  a: ExceptionSlaSeverity,
+  b: ExceptionSlaSeverity
+): ExceptionSlaSeverity {
+  return SEVERITY_RANK[a] <= SEVERITY_RANK[b] ? a : b;
+}
+
+/**
+ * Hold-queue sheets with open-finding severity for SLA / ageing.
+ */
+export async function getExceptionHoldQueueItems(): Promise<
+  ExceptionHoldQueueRow[]
+> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const sheets = await db
+    .select({
+      jobSheetId: jobSheets.id,
+      referenceNumber: jobSheets.referenceNumber,
+      siteInfo: jobSheets.siteInfo,
+      queuedAt: jobSheets.updatedAt,
+      technicianId: jobSheets.technicianId,
+    })
+    .from(jobSheets)
+    .where(eq(jobSheets.status, "review_queue"))
+    .orderBy(desc(jobSheets.updatedAt));
+
+  if (sheets.length === 0) return [];
+
+  const findingRows = await db
+    .select({
+      jobSheetId: jobSheets.id,
+      severity: auditFindings.severity,
+      resolutionStatus: auditFindings.resolutionStatus,
+    })
+    .from(auditFindings)
+    .innerJoin(auditResults, eq(auditFindings.auditResultId, auditResults.id))
+    .innerJoin(jobSheets, eq(auditResults.jobSheetId, jobSheets.id))
+    .where(eq(jobSheets.status, "review_queue"));
+
+  const bySheet = new Map<
+    number,
+    { highest: ExceptionSlaSeverity; openCount: number }
+  >();
+
+  for (const s of sheets) {
+    bySheet.set(s.jobSheetId, { highest: "unknown", openCount: 0 });
+  }
+
+  for (const row of findingRows) {
+    const entry = bySheet.get(row.jobSheetId);
+    if (!entry) continue;
+    const status = row.resolutionStatus ?? "open";
+    if (status === "open" || status === "flagged") {
+      entry.openCount++;
+      entry.highest = worseSeverity(
+        entry.highest,
+        (row.severity as ExceptionSlaSeverity) ?? "unknown"
+      );
+    }
+  }
+
+  return sheets.map(s => {
+    const agg = bySheet.get(s.jobSheetId) ?? {
+      highest: "unknown" as ExceptionSlaSeverity,
+      openCount: 0,
+    };
+    return {
+      jobSheetId: s.jobSheetId,
+      referenceNumber: s.referenceNumber,
+      siteInfo: s.siteInfo,
+      queuedAt: s.queuedAt,
+      highestSeverity: agg.highest,
+      openFindingCount: agg.openCount,
+      technicianId: s.technicianId,
+    };
+  });
+}
+
+/**
+ * Findings with resolution status for per-rule overturn analytics.
+ */
+export async function getExceptionOverturnFindings(options?: {
+  startDate?: Date;
+  endDate?: Date;
+}): Promise<ExceptionOverturnFindingRow[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [];
+  if (options?.startDate) {
+    conditions.push(gte(auditFindings.createdAt, options.startDate));
+  }
+  if (options?.endDate) {
+    conditions.push(lte(auditFindings.createdAt, options.endDate));
+  }
+
+  const rows = await db
+    .select({
+      findingId: auditFindings.id,
+      jobSheetId: jobSheets.id,
+      ruleId: auditFindings.ruleId,
+      reasonCode: auditFindings.reasonCode,
+      severity: auditFindings.severity,
+      fieldName: auditFindings.fieldName,
+      resolutionStatus: auditFindings.resolutionStatus,
+      siteInfo: jobSheets.siteInfo,
+      occurredAt: auditFindings.createdAt,
+      resolvedAt: auditFindings.resolvedAt,
+    })
+    .from(auditFindings)
+    .innerJoin(auditResults, eq(auditFindings.auditResultId, auditResults.id))
+    .innerJoin(jobSheets, eq(auditResults.jobSheetId, jobSheets.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  return rows.map(r => ({
+    findingId: r.findingId,
+    jobSheetId: r.jobSheetId,
+    ruleId: r.ruleId,
+    reasonCode: r.reasonCode,
+    severity: r.severity,
+    fieldName: r.fieldName,
+    resolutionStatus: (r.resolutionStatus ?? "open") as
+      | "open"
+      | "waived"
+      | "overridden"
+      | "flagged"
+      | "approved",
+    siteInfo: r.siteInfo,
+    occurredAt: r.occurredAt,
+    resolvedAt: r.resolvedAt ?? null,
+  }));
+}

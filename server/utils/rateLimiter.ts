@@ -183,6 +183,12 @@ export const RATE_LIMITS = {
     windowMs: 60 * 1000,
     maxRequests: 30,
   },
+  // Review / exception actions (override, waive, DLQ retry)
+  review: {
+    windowMs: 60 * 1000,
+    maxRequests: 40,
+    message: "Review action rate limit exceeded. Please wait before retrying.",
+  },
   // Webhook delivery
   webhook: {
     windowMs: 60 * 1000,

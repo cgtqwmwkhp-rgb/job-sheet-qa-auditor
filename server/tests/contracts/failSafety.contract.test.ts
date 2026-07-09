@@ -237,6 +237,25 @@ describe("Fail-Safety Contract (PR-3)", () => {
       expect(routers).toContain("enforceRateLimit");
     });
 
+    it("review rate limit is applied on audit actions and DLQ retry", () => {
+      expect(RATE_LIMITS.review.maxRequests).toBe(40);
+      const auditPath = path.resolve(
+        __dirname,
+        "../../routers/auditActionsRouter.ts"
+      );
+      const audit = fs.readFileSync(auditPath, "utf-8");
+      expect(audit).toContain("RATE_LIMITS.review");
+      expect(audit).toContain("enforceReviewLimit");
+
+      const analyticsPath = path.resolve(
+        __dirname,
+        "../../routers/analyticsRouter.ts"
+      );
+      const analytics = fs.readFileSync(analyticsPath, "utf-8");
+      expect(analytics).toContain("RATE_LIMITS.review");
+      expect(analytics).toContain("runDlqRetry");
+    });
+
     it("resetRateLimit clears a key for subsequent requests", () => {
       const key = "user:pr3-reset";
       for (let i = 0; i < RATE_LIMITS.upload.maxRequests; i++) {
