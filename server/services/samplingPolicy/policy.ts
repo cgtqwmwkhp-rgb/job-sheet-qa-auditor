@@ -26,7 +26,8 @@ export function decideSampling(
   opts: SamplingPolicyOptions = {}
 ): SamplingDecision {
   const baseRate = opts.baseRate ?? DEFAULT_BASE_RATE;
-  const lowConfidenceRate = opts.lowConfidenceRate ?? DEFAULT_LOW_CONFIDENCE_RATE;
+  const lowConfidenceRate =
+    opts.lowConfidenceRate ?? DEFAULT_LOW_CONFIDENCE_RATE;
   const lowConfidenceThreshold =
     opts.lowConfidenceThreshold ?? DEFAULT_LOW_CONFIDENCE_THRESHOLD;
 
