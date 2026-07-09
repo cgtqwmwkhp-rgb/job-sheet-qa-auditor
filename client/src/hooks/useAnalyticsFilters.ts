@@ -6,6 +6,7 @@ export type AnalyticsFilters = {
   preset: AnalyticsPeriodPreset;
   startDate: string;
   endDate: string;
+  site: string;
 };
 
 const PRESET_DAYS: Record<AnalyticsPeriodPreset, number> = {
@@ -14,7 +15,10 @@ const PRESET_DAYS: Record<AnalyticsPeriodPreset, number> = {
   "90d": 90,
 };
 
-function rangeForPreset(preset: AnalyticsPeriodPreset): AnalyticsFilters {
+function rangeForPreset(
+  preset: AnalyticsPeriodPreset,
+  site = ""
+): AnalyticsFilters {
   const end = new Date();
   const start = new Date(
     end.getTime() - PRESET_DAYS[preset] * 24 * 60 * 60 * 1000
@@ -23,6 +27,7 @@ function rangeForPreset(preset: AnalyticsPeriodPreset): AnalyticsFilters {
     preset,
     startDate: start.toISOString(),
     endDate: end.toISOString(),
+    site,
   };
 }
 
@@ -59,7 +64,7 @@ export function useAnalyticsFilters() {
   );
 
   const setPreset = useCallback((preset: AnalyticsPeriodPreset) => {
-    filtersState = rangeForPreset(preset);
+    filtersState = rangeForPreset(preset, filtersState.site);
     emit();
   }, []);
 
@@ -68,6 +73,15 @@ export function useAnalyticsFilters() {
       preset: filtersState.preset,
       startDate,
       endDate,
+      site: filtersState.site,
+    };
+    emit();
+  }, []);
+
+  const setSite = useCallback((site: string) => {
+    filtersState = {
+      ...filtersState,
+      site,
     };
     emit();
   }, []);
@@ -76,5 +90,6 @@ export function useAnalyticsFilters() {
     ...filters,
     setPreset,
     setPeriod,
+    setSite,
   };
 }

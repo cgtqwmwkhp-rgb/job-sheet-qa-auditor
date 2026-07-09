@@ -662,6 +662,7 @@ export async function getDashboardStats() {
 export async function getExecutiveSummaryStats(options?: {
   startDate?: Date;
   endDate?: Date;
+  site?: string;
 }) {
   const db = await getDb();
   if (!db) return null;
@@ -675,32 +676,59 @@ export async function getExecutiveSummaryStats(options?: {
     lte(auditResults.createdAt, end)
   );
 
-  const totalAudits = await db
-    .select({ count: count() })
-    .from(auditResults)
-    .where(auditPeriod);
+  const site = options?.site;
 
-  const passedAudits = await db
-    .select({ count: count() })
-    .from(auditResults)
-    .where(and(auditPeriod, eq(auditResults.result, "pass")));
+  const totalAudits = site
+    ? await db
+        .select({ count: count() })
+        .from(auditResults)
+        .innerJoin(jobSheets, eq(auditResults.jobSheetId, jobSheets.id))
+        .where(and(auditPeriod, eq(jobSheets.siteInfo, site)))
+    : await db.select({ count: count() }).from(auditResults).where(auditPeriod);
+
+  const passedAudits = site
+    ? await db
+        .select({ count: count() })
+        .from(auditResults)
+        .innerJoin(jobSheets, eq(auditResults.jobSheetId, jobSheets.id))
+        .where(
+          and(
+            auditPeriod,
+            eq(auditResults.result, "pass"),
+            eq(jobSheets.siteInfo, site)
+          )
+        )
+    : await db
+        .select({ count: count() })
+        .from(auditResults)
+        .where(and(auditPeriod, eq(auditResults.result, "pass")));
 
   // Live snapshot — not filtered by the selected analytics period.
+  const reviewQueueConditions = [eq(jobSheets.status, "review_queue")];
+  if (site) {
+    reviewQueueConditions.push(eq(jobSheets.siteInfo, site));
+  }
   const reviewQueue = await db
     .select({ count: count() })
     .from(jobSheets)
-    .where(eq(jobSheets.status, "review_queue"));
+    .where(and(...reviewQueueConditions));
 
-  const criticalIssues = await db
+  const criticalIssueConditions = [
+    sql`${auditFindings.severity} IN ('S0', 'S1')`,
+    gte(auditFindings.createdAt, start),
+    lte(auditFindings.createdAt, end),
+  ];
+  if (site) {
+    criticalIssueConditions.push(eq(jobSheets.siteInfo, site));
+  }
+  const criticalIssuesQuery = db
     .select({ count: count() })
     .from(auditFindings)
-    .where(
-      and(
-        sql`${auditFindings.severity} IN ('S0', 'S1')`,
-        gte(auditFindings.createdAt, start),
-        lte(auditFindings.createdAt, end)
-      )
-    );
+    .innerJoin(auditResults, eq(auditFindings.auditResultId, auditResults.id))
+    .innerJoin(jobSheets, eq(auditResults.jobSheetId, jobSheets.id));
+  const criticalIssues = await criticalIssuesQuery.where(
+    and(...criticalIssueConditions)
+  );
 
   const total = totalAudits[0]?.count ?? 0;
   const passed = passedAudits[0]?.count ?? 0;
@@ -848,6 +876,7 @@ export async function getEngineerAnalyticsDocuments(options?: {
   startDate?: Date;
   endDate?: Date;
   technicianId?: number;
+  site?: string;
 }): Promise<EngineerAnalyticsDocumentRow[]> {
   const db = await getDb();
   if (!db) return [];
@@ -861,6 +890,9 @@ export async function getEngineerAnalyticsDocuments(options?: {
   }
   if (options?.technicianId != null) {
     conditions.push(eq(jobSheets.technicianId, options.technicianId));
+  }
+  if (options?.site) {
+    conditions.push(eq(jobSheets.siteInfo, options.site));
   }
 
   const rows = await db
@@ -894,6 +926,7 @@ export async function getEngineerAnalyticsFindings(options?: {
   startDate?: Date;
   endDate?: Date;
   technicianId?: number;
+  site?: string;
 }): Promise<EngineerAnalyticsFindingRow[]> {
   const db = await getDb();
   if (!db) return [];
@@ -907,6 +940,9 @@ export async function getEngineerAnalyticsFindings(options?: {
   }
   if (options?.technicianId != null) {
     conditions.push(eq(jobSheets.technicianId, options.technicianId));
+  }
+  if (options?.site) {
+    conditions.push(eq(jobSheets.siteInfo, options.site));
   }
 
   const rows = await db
@@ -1009,6 +1045,7 @@ function parseReportCohort(reportJson: unknown): {
 export async function getCohortAnalyticsDocuments(options?: {
   startDate?: Date;
   endDate?: Date;
+  site?: string;
 }): Promise<CohortAnalyticsDocumentRow[]> {
   const db = await getDb();
   if (!db) return [];
@@ -1019,6 +1056,9 @@ export async function getCohortAnalyticsDocuments(options?: {
   }
   if (options?.endDate) {
     conditions.push(lte(jobSheets.createdAt, options.endDate));
+  }
+  if (options?.site) {
+    conditions.push(eq(jobSheets.siteInfo, options.site));
   }
 
   const rows = await db
@@ -1070,6 +1110,7 @@ export async function getCohortAnalyticsDocuments(options?: {
 export async function getCohortAnalyticsFindings(options?: {
   startDate?: Date;
   endDate?: Date;
+  site?: string;
 }): Promise<CohortAnalyticsFindingRow[]> {
   const db = await getDb();
   if (!db) return [];
@@ -1080,6 +1121,9 @@ export async function getCohortAnalyticsFindings(options?: {
   }
   if (options?.endDate) {
     conditions.push(lte(auditFindings.createdAt, options.endDate));
+  }
+  if (options?.site) {
+    conditions.push(eq(jobSheets.siteInfo, options.site));
   }
 
   const rows = await db
@@ -1151,11 +1195,16 @@ function worseSeverity(
 /**
  * Hold-queue sheets with open-finding severity for SLA / ageing.
  */
-export async function getExceptionHoldQueueItems(): Promise<
-  ExceptionHoldQueueRow[]
-> {
+export async function getExceptionHoldQueueItems(options?: {
+  site?: string;
+}): Promise<ExceptionHoldQueueRow[]> {
   const db = await getDb();
   if (!db) return [];
+
+  const conditions = [eq(jobSheets.status, "review_queue")];
+  if (options?.site) {
+    conditions.push(eq(jobSheets.siteInfo, options.site));
+  }
 
   const sheets = await db
     .select({
@@ -1166,7 +1215,7 @@ export async function getExceptionHoldQueueItems(): Promise<
       technicianId: jobSheets.technicianId,
     })
     .from(jobSheets)
-    .where(eq(jobSheets.status, "review_queue"))
+    .where(and(...conditions))
     .orderBy(desc(jobSheets.updatedAt));
 
   if (sheets.length === 0) return [];
@@ -1180,7 +1229,7 @@ export async function getExceptionHoldQueueItems(): Promise<
     .from(auditFindings)
     .innerJoin(auditResults, eq(auditFindings.auditResultId, auditResults.id))
     .innerJoin(jobSheets, eq(auditResults.jobSheetId, jobSheets.id))
-    .where(eq(jobSheets.status, "review_queue"));
+    .where(and(...conditions));
 
   const bySheet = new Map<
     number,
@@ -1227,6 +1276,7 @@ export async function getExceptionHoldQueueItems(): Promise<
 export async function getExceptionOverturnFindings(options?: {
   startDate?: Date;
   endDate?: Date;
+  site?: string;
 }): Promise<ExceptionOverturnFindingRow[]> {
   const db = await getDb();
   if (!db) return [];
@@ -1237,6 +1287,9 @@ export async function getExceptionOverturnFindings(options?: {
   }
   if (options?.endDate) {
     conditions.push(lte(auditFindings.createdAt, options.endDate));
+  }
+  if (options?.site) {
+    conditions.push(eq(jobSheets.siteInfo, options.site));
   }
 
   const rows = await db
@@ -1301,6 +1354,7 @@ export interface DriftAnalyticsFindingRow {
 export async function getDriftAnalyticsDocuments(options?: {
   startDate?: Date;
   endDate?: Date;
+  site?: string;
 }): Promise<DriftAnalyticsDocumentRow[]> {
   const db = await getDb();
   if (!db) return [];
@@ -1311,6 +1365,9 @@ export async function getDriftAnalyticsDocuments(options?: {
   }
   if (options?.endDate) {
     conditions.push(lte(jobSheets.createdAt, options.endDate));
+  }
+  if (options?.site) {
+    conditions.push(eq(jobSheets.siteInfo, options.site));
   }
 
   const rows = await db
@@ -1355,6 +1412,7 @@ export async function getDriftAnalyticsDocuments(options?: {
 export async function getDriftAnalyticsFindings(options?: {
   startDate?: Date;
   endDate?: Date;
+  site?: string;
 }): Promise<DriftAnalyticsFindingRow[]> {
   const db = await getDb();
   if (!db) return [];
@@ -1365,6 +1423,9 @@ export async function getDriftAnalyticsFindings(options?: {
   }
   if (options?.endDate) {
     conditions.push(lte(auditFindings.createdAt, options.endDate));
+  }
+  if (options?.site) {
+    conditions.push(eq(jobSheets.siteInfo, options.site));
   }
 
   const rows = await db
@@ -1425,6 +1486,7 @@ export interface PredictiveRiskDisputeRow {
 export async function getPredictiveRiskDocuments(options?: {
   startDate?: Date;
   endDate?: Date;
+  site?: string;
 }): Promise<PredictiveRiskDocumentRow[]> {
   return getDriftAnalyticsDocuments(options);
 }
@@ -1435,6 +1497,7 @@ export async function getPredictiveRiskDocuments(options?: {
 export async function getPredictiveRiskFindings(options?: {
   startDate?: Date;
   endDate?: Date;
+  site?: string;
 }): Promise<PredictiveRiskFindingRow[]> {
   const db = await getDb();
   if (!db) return [];
@@ -1445,6 +1508,9 @@ export async function getPredictiveRiskFindings(options?: {
   }
   if (options?.endDate) {
     conditions.push(lte(auditFindings.createdAt, options.endDate));
+  }
+  if (options?.site) {
+    conditions.push(eq(jobSheets.siteInfo, options.site));
   }
 
   const rows = await db
@@ -1486,6 +1552,7 @@ export async function getPredictiveRiskFindings(options?: {
 export async function getPredictiveRiskDisputes(options?: {
   startDate?: Date;
   endDate?: Date;
+  site?: string;
 }): Promise<PredictiveRiskDisputeRow[]> {
   const db = await getDb();
   if (!db) return [];
@@ -1498,16 +1565,29 @@ export async function getPredictiveRiskDisputes(options?: {
     conditions.push(lte(disputes.createdAt, options.endDate));
   }
 
-  const rows = await db
-    .select({
-      id: disputes.id,
-      auditFindingId: disputes.auditFindingId,
-      raisedBy: disputes.raisedBy,
-      status: disputes.status,
-      createdAt: disputes.createdAt,
-    })
-    .from(disputes)
-    .where(conditions.length > 0 ? and(...conditions) : undefined);
+  const baseSelect = {
+    id: disputes.id,
+    auditFindingId: disputes.auditFindingId,
+    raisedBy: disputes.raisedBy,
+    status: disputes.status,
+    createdAt: disputes.createdAt,
+  };
+
+  const rows = options?.site
+    ? await db
+        .select(baseSelect)
+        .from(disputes)
+        .innerJoin(auditFindings, eq(disputes.auditFindingId, auditFindings.id))
+        .innerJoin(
+          auditResults,
+          eq(auditFindings.auditResultId, auditResults.id)
+        )
+        .innerJoin(jobSheets, eq(auditResults.jobSheetId, jobSheets.id))
+        .where(and(...conditions, eq(jobSheets.siteInfo, options.site)))
+    : await db
+        .select(baseSelect)
+        .from(disputes)
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
 
   return rows.map(r => ({
     id: r.id,
@@ -1527,6 +1607,7 @@ export async function getPredictiveRiskDisputes(options?: {
 export async function getShadowComparisonReportJsons(options?: {
   startDate?: Date;
   endDate?: Date;
+  site?: string;
 }): Promise<unknown[]> {
   const db = await getDb();
   if (!db) return [];
@@ -1537,6 +1618,9 @@ export async function getShadowComparisonReportJsons(options?: {
   }
   if (options?.endDate) {
     conditions.push(lte(jobSheets.createdAt, options.endDate));
+  }
+  if (options?.site) {
+    conditions.push(eq(jobSheets.siteInfo, options.site));
   }
 
   const rows = await db
