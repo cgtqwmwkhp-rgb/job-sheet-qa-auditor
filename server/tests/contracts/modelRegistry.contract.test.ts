@@ -2,7 +2,7 @@
  * Model Registry Contract Tests (PR-9)
  *
  * Verifies env-driven pinned models for ocr / judgment / interpreter /
- * fallback_ocr roles, currency metadata, and that no live API calls occur.
+ * fallback_ocr / vlm_verification roles, currency metadata, and that no live API calls occur.
  * Mocks only — no network.
  */
 
@@ -22,6 +22,9 @@ describe("Model Registry Contract (PR-9)", () => {
     delete process.env.GEMINI_MODEL;
     delete process.env.OCR_FALLBACK_PROVIDER;
     delete process.env.AZURE_DI_MODEL;
+    delete process.env.VLM_PROVIDER;
+    delete process.env.ANTHROPIC_VLM_MODEL;
+    delete process.env.ANTHROPIC_API_KEY;
   });
 
   afterEach(() => {
@@ -79,6 +82,12 @@ describe("Model Registry Contract (PR-9)", () => {
       expect(registry.roles.fallback_ocr?.provider).toBe("azure");
       expect(registry.roles.fallback_ocr?.model).toBe("prebuilt-read");
 
+      expect(registry.roles.vlm_verification?.role).toBe("vlm_verification");
+      expect(registry.roles.vlm_verification?.provider).toBe("mock");
+      expect(registry.roles.vlm_verification?.model).toBe(
+        "claude-3-5-sonnet-20241022"
+      );
+
       expect(registry.currency.source).toBe("env");
       expect(registry.currency.lastChecked).toBe("2026-07-09T00:00:00.000Z");
     });
@@ -87,6 +96,7 @@ describe("Model Registry Contract (PR-9)", () => {
       process.env.MISTRAL_API_KEY = "sk-secret-mistral";
       process.env.GEMINI_API_KEY = "sk-secret-gemini";
       process.env.AZURE_DI_KEY = "sk-secret-azure";
+      process.env.ANTHROPIC_API_KEY = "sk-secret-anthropic";
 
       const { getModelRegistry } = await import("../../services/modelRegistry");
       const registry = getModelRegistry();
@@ -138,6 +148,19 @@ describe("Model Registry Contract (PR-9)", () => {
       expect(registry.roles.fallback_ocr?.provider).toBe("azure");
       expect(registry.roles.fallback_ocr?.model).toBe("prebuilt-layout");
     });
+
+    it("honours VLM_PROVIDER and ANTHROPIC_VLM_MODEL", async () => {
+      process.env.VLM_PROVIDER = "anthropic";
+      process.env.ANTHROPIC_VLM_MODEL = "claude-3-7-sonnet-20250219";
+
+      const { getModelRegistry } = await import("../../services/modelRegistry");
+      const registry = getModelRegistry();
+
+      expect(registry.roles.vlm_verification?.provider).toBe("anthropic");
+      expect(registry.roles.vlm_verification?.model).toBe(
+        "claude-3-7-sonnet-20250219"
+      );
+    });
   });
 
   describe("modelRegistryStamp", () => {
@@ -156,6 +179,7 @@ describe("Model Registry Contract (PR-9)", () => {
       expect(stamp.judgment).toBe("gemini/gemini-3.1-pro");
       expect(stamp.interpreter).toBe("gemini/gemini-2.5-pro");
       expect(stamp.fallback_ocr).toMatch(/^azure\//);
+      expect(stamp.vlm_verification).toBe("mock/claude-3-5-sonnet-20241022");
     });
   });
 

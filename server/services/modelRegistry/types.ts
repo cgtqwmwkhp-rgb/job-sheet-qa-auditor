@@ -6,7 +6,12 @@
  */
 
 /** Pipeline roles that pin a model/provider. */
-export type ModelRole = "ocr" | "judgment" | "interpreter" | "fallback_ocr";
+export type ModelRole =
+  | "ocr"
+  | "judgment"
+  | "interpreter"
+  | "fallback_ocr"
+  | "vlm_verification";
 
 /** One role's pinned provider + model. */
 export interface ModelRoleEntry {
@@ -35,6 +40,8 @@ export interface ModelRegistry {
     interpreter: ModelRoleEntry;
     /** Present when OCR failover / fallback is configured. */
     fallback_ocr?: ModelRoleEntry;
+    /** Present when VLM verification config is available. */
+    vlm_verification?: ModelRoleEntry;
   };
   currency: ModelCurrencyMeta;
 }

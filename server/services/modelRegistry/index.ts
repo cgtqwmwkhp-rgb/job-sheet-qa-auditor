@@ -11,6 +11,7 @@ import {
   getOCRConfig,
 } from "../ocrAdapter/types";
 import { getInterpreterConfig } from "../interpreterAdapter/types";
+import { getVlmConfig } from "../vlmAdapter/types";
 import type { ModelRegistry, ModelRoleEntry } from "./types";
 
 export type {
@@ -53,6 +54,7 @@ function fallbackOcrEntry(
 export function getModelRegistry(now: Date = new Date()): ModelRegistry {
   const ocr = getOCRConfig();
   const interpreter = getInterpreterConfig();
+  const vlm = getVlmConfig();
 
   const roles: ModelRegistry["roles"] = {
     ocr: {
@@ -75,6 +77,11 @@ export function getModelRegistry(now: Date = new Date()): ModelRegistry {
   if (ocr.fallbackProvider) {
     roles.fallback_ocr = fallbackOcrEntry(ocr.fallbackProvider, ocr.azureModel);
   }
+  roles.vlm_verification = {
+    role: "vlm_verification",
+    provider: vlm.provider,
+    model: vlm.model,
+  };
 
   return {
     roles,
@@ -98,6 +105,9 @@ export function modelRegistryStamp(
   };
   if (registry.roles.fallback_ocr) {
     stamp.fallback_ocr = `${registry.roles.fallback_ocr.provider}/${registry.roles.fallback_ocr.model}`;
+  }
+  if (registry.roles.vlm_verification) {
+    stamp.vlm_verification = `${registry.roles.vlm_verification.provider}/${registry.roles.vlm_verification.model}`;
   }
   return stamp;
 }
