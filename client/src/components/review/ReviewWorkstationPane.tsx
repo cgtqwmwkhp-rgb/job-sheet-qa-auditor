@@ -274,6 +274,7 @@ export function ReviewWorkstationPane({
 
   return (
     <ReviewWorkstationContent
+      key={jobSheetId}
       auditData={auditData}
       documentUrl={documentUrl}
       jobSheetId={jobSheetId}
@@ -330,7 +331,8 @@ function ReviewWorkstationContent({
     null
   );
   const [correctedValue, setCorrectedValue] = useState("");
-  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  // Default true = auto-load PDF. Remount via key={jobSheetId} on parent resets state.
+  const [showPdfViewer, setShowPdfViewer] = useState(true);
   const localPaneRef = useRef<HTMLDivElement>(null);
   const resolvedPaneRef = paneRef ?? localPaneRef;
 
