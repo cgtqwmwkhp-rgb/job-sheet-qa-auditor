@@ -34,24 +34,12 @@ export default function EntraSignIn({
   subtitle = "Job Sheet QA Auditor",
   redirectPath,
 }: EntraSignInProps) {
-  const handleSignIn = async () => {
+  const handleSignIn = () => {
     const current =
       `${window.location.pathname}${window.location.search}` || "/";
     const redirect = redirectPath ?? current;
     const url = `${ENTRA_LOGIN_PATH}?post_login_redirect_uri=${encodeURIComponent(redirect)}`;
-
-    // Drop any stale service worker that may have cached SPA fallback for /.auth/*
-    // (old builds used NavigationRoute → index.html for all navigations).
-    try {
-      if ("serviceWorker" in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map(r => r.unregister()));
-      }
-    } catch {
-      // ignore — still attempt top-level login
-    }
-
-    // Top-level navigation only — never load login.windows.net inside a frame/SW shell.
+    // Top-level navigation only — never load login.windows.net inside a frame.
     const target = window.top ?? window;
     target.location.assign(url);
   };
