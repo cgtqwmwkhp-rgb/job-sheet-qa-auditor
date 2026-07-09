@@ -1,31 +1,37 @@
 /**
  * ROI Extraction Service
- * 
+ *
  * PR-J: ROI-targeted processing for critical fields.
  * Improves accuracy and speed by extracting from specific regions.
  */
 
-import type { RoiConfig, RoiRegion } from '../templateRegistry/types';
+import type { RoiConfig, RoiRegion } from "../templateRegistry/types";
+import {
+  getVlmAdapter,
+  getVlmConfig,
+  isVlmVerificationEnabled,
+  type VlmCropImage,
+} from "../vlmAdapter";
 
 /**
  * Critical field IDs that benefit from ROI-targeted extraction
  */
 export const CRITICAL_ROI_FIELDS = [
-  'jobReference',
-  'assetId',
-  'date',
-  'expiryDate',
-  'tickboxBlock',
-  'signatureBlock',
+  "jobReference",
+  "assetId",
+  "date",
+  "expiryDate",
+  "tickboxBlock",
+  "signatureBlock",
 ] as const;
 
-export type CriticalRoiField = typeof CRITICAL_ROI_FIELDS[number];
+export type CriticalRoiField = (typeof CRITICAL_ROI_FIELDS)[number];
 
 /**
  * Fields requiring image QA (visual verification)
  */
-export const IMAGE_QA_FIELDS = ['tickboxBlock', 'signatureBlock'] as const;
-export type ImageQaField = typeof IMAGE_QA_FIELDS[number];
+export const IMAGE_QA_FIELDS = ["tickboxBlock", "signatureBlock"] as const;
+export type ImageQaField = (typeof IMAGE_QA_FIELDS)[number];
 
 /**
  * ROI extraction result for a single field
@@ -35,7 +41,7 @@ export interface RoiExtractionResult {
   extracted: boolean;
   value: string | null;
   confidence: number;
-  source: 'roi' | 'fullpage' | 'reprocessed';
+  source: "roi" | "fullpage" | "reprocessed";
   roiRegion?: RoiRegion;
   reprocessAttempts: number;
   imageQaResult?: ImageQaResult;
@@ -47,9 +53,20 @@ export interface RoiExtractionResult {
 export interface ImageQaResult {
   fieldId: string;
   passed: boolean;
-  checkType: 'signature_present' | 'tickboxes_checked';
+  checkType: "signature_present" | "tickboxes_checked";
   confidence: number;
   details: string;
+  vlmProvider?: string;
+  vlmModel?: string;
+  vlmUsed?: boolean;
+}
+
+export interface RoiImageQaOptions {
+  /** Base64 crop for VLM; without this, heuristic only */
+  cropImage?: VlmCropImage;
+  disputed?: boolean;
+  extractionConfidence?: number;
+  disputeReason?: string;
 }
 
 /**
@@ -93,7 +110,9 @@ export const DEFAULT_PERFORMANCE_CAPS: PerformanceCaps = {
 /**
  * Check if a field is a critical ROI field
  */
-export function isCriticalRoiField(fieldId: string): fieldId is CriticalRoiField {
+export function isCriticalRoiField(
+  fieldId: string
+): fieldId is CriticalRoiField {
   return CRITICAL_ROI_FIELDS.includes(fieldId as CriticalRoiField);
 }
 
@@ -122,7 +141,7 @@ export function getMissingCriticalRois(
   roiConfig: RoiConfig | null
 ): CriticalRoiField[] {
   if (!roiConfig) return [...CRITICAL_ROI_FIELDS];
-  
+
   const presentRois = new Set(roiConfig.regions.map(r => r.name));
   return CRITICAL_ROI_FIELDS.filter(f => !presentRois.has(f));
 }
@@ -138,15 +157,15 @@ export function extractFromRoi(
 ): { value: string | null; confidence: number } {
   // Simulate ROI-based extraction with higher confidence
   // In production: crop image to ROI bounds, run OCR on crop
-  
+
   // Mock: return placeholder value with high confidence
   const mockValues: Record<string, string> = {
-    jobReference: 'JOB-ROI-001',
-    assetId: 'ASSET-ROI-001',
-    date: '2024-01-15',
-    expiryDate: '2025-01-15',
-    tickboxBlock: 'all_checked',
-    signatureBlock: 'signed',
+    jobReference: "JOB-ROI-001",
+    assetId: "ASSET-ROI-001",
+    date: "2024-01-15",
+    expiryDate: "2025-01-15",
+    tickboxBlock: "all_checked",
+    signatureBlock: "signed",
   };
 
   return {
@@ -155,18 +174,9 @@ export function extractFromRoi(
   };
 }
 
-/**
- * Mock image QA for visual fields
- */
-export function runImageQa(
-  _roi: RoiRegion,
-  fieldId: ImageQaField
-): ImageQaResult {
-  // In production: run vision model on ROI crop
-  
-  const checkType = fieldId === 'signatureBlock' 
-    ? 'signature_present' 
-    : 'tickboxes_checked';
+function heuristicImageQa(fieldId: ImageQaField): ImageQaResult {
+  const checkType =
+    fieldId === "signatureBlock" ? "signature_present" : "tickboxes_checked";
 
   return {
     fieldId,
@@ -174,20 +184,87 @@ export function runImageQa(
     checkType,
     confidence: 0.88,
     details: `${checkType} verified in ROI region`,
+    vlmUsed: false,
   };
+}
+
+/**
+ * Image QA for visual fields.
+ * When FEATURE_VLM_VERIFICATION is on and a crop is provided for a disputed /
+ * low-confidence field, calls the VLM adapter (Anthropic or mock). Fail-soft:
+ * VLM errors fall back to the heuristic result.
+ */
+export async function runImageQa(
+  _roi: RoiRegion,
+  fieldId: ImageQaField,
+  options: RoiImageQaOptions = {}
+): Promise<ImageQaResult> {
+  const heuristic = heuristicImageQa(fieldId);
+
+  if (!isVlmVerificationEnabled()) {
+    return heuristic;
+  }
+
+  const config = getVlmConfig();
+  const lowConfidence =
+    typeof options.extractionConfidence === "number" &&
+    options.extractionConfidence < config.confidenceThreshold;
+  const shouldUseVlm =
+    Boolean(options.cropImage) && (options.disputed === true || lowConfidence);
+
+  if (!shouldUseVlm || !options.cropImage) {
+    return heuristic;
+  }
+
+  try {
+    const adapter = getVlmAdapter();
+    const vlm = await adapter.verify({
+      fieldId,
+      checkType: heuristic.checkType,
+      cropImage: options.cropImage,
+      disputeReason: options.disputeReason,
+    });
+
+    if (!vlm.success) {
+      return {
+        ...heuristic,
+        details: `${heuristic.details} (vlm fail-soft: ${vlm.error || vlm.reasoning})`,
+        vlmProvider: vlm.provider,
+        vlmModel: vlm.model,
+        vlmUsed: false,
+      };
+    }
+
+    return {
+      fieldId,
+      passed: vlm.present && vlm.confidence >= config.confidenceThreshold,
+      checkType: heuristic.checkType,
+      confidence: vlm.confidence,
+      details: vlm.reasoning || heuristic.details,
+      vlmProvider: vlm.provider,
+      vlmModel: vlm.model,
+      vlmUsed: true,
+    };
+  } catch {
+    return {
+      ...heuristic,
+      details: `${heuristic.details} (vlm exception fail-soft)`,
+      vlmUsed: false,
+    };
+  }
 }
 
 /**
  * Process a document using ROI-targeted extraction
  */
-export function processWithRoi(
+export async function processWithRoi(
   documentId: number,
   documentText: string,
   templateVersionId: number,
   roiConfig: RoiConfig | null,
   fieldIds: string[],
   caps: PerformanceCaps = DEFAULT_PERFORMANCE_CAPS
-): RoiProcessingTrace {
+): Promise<RoiProcessingTrace> {
   const startTime = Date.now();
   const results: RoiExtractionResult[] = [];
   const warnings: string[] = [];
@@ -196,7 +273,7 @@ export function processWithRoi(
   // Check for missing critical ROIs
   const missingCritical = getMissingCriticalRois(roiConfig);
   if (missingCritical.length > 0) {
-    warnings.push(`Missing critical ROIs: ${missingCritical.join(', ')}`);
+    warnings.push(`Missing critical ROIs: ${missingCritical.join(", ")}`);
   }
 
   for (const fieldId of fieldIds) {
@@ -204,7 +281,7 @@ export function processWithRoi(
     let extracted = false;
     let value: string | null = null;
     let confidence = 0;
-    let source: 'roi' | 'fullpage' | 'reprocessed' = 'fullpage';
+    let source: "roi" | "fullpage" | "reprocessed" = "fullpage";
     let reprocessAttempts = 0;
     let imageQaResult: ImageQaResult | undefined;
 
@@ -213,16 +290,22 @@ export function processWithRoi(
       const roiResult = extractFromRoi(documentText, roi, fieldId);
       value = roiResult.value;
       confidence = roiResult.confidence;
-      source = 'roi';
+      source = "roi";
       extracted = confidence >= caps.minConfidenceThreshold;
 
       // Run image QA for visual fields
       if (requiresImageQa(fieldId)) {
-        imageQaResult = runImageQa(roi, fieldId as ImageQaField);
+        imageQaResult = await runImageQa(roi, fieldId as ImageQaField, {
+          extractionConfidence: confidence,
+          disputed: !extracted,
+        });
       }
 
       // Reprocess if low confidence (respecting caps)
-      if (!extracted && totalReprocessAttempts < caps.maxReprocessAttemptsPerDoc) {
+      if (
+        !extracted &&
+        totalReprocessAttempts < caps.maxReprocessAttemptsPerDoc
+      ) {
         while (
           !extracted &&
           reprocessAttempts < caps.maxReprocessAttemptsPerRoi &&
@@ -230,12 +313,12 @@ export function processWithRoi(
         ) {
           reprocessAttempts++;
           totalReprocessAttempts++;
-          
+
           // Simulate reprocessing with slightly better result
           const reprocessResult = extractFromRoi(documentText, roi, fieldId);
           value = reprocessResult.value;
           confidence = Math.min(reprocessResult.confidence + 0.05, 0.95);
-          source = 'reprocessed';
+          source = "reprocessed";
           extracted = confidence >= caps.minConfidenceThreshold;
         }
       }
@@ -278,23 +361,23 @@ export function processWithRoi(
 
 /**
  * Canonical reason codes (from parity/runner/types.ts)
- * 
+ *
  * PR-P Semantic Correction for Analytics:
  * - MISSING_CRITICAL_ROI → SPEC_GAP (config issue, not document fault)
  * - IMAGE_QA_FAILED → OCR_FAILURE (processing failure, not document fault)
  * - LOW_CONFIDENCE → LOW_CONFIDENCE (document extraction issue)
- * 
+ *
  * This ensures analytics won't misattribute system/config faults to documents/engineers.
  */
 export const CANONICAL_REASON_CODE_MAP = {
-  MISSING_CRITICAL_ROI: 'SPEC_GAP',    // Config issue - ROI not defined
-  IMAGE_QA_FAILED: 'OCR_FAILURE',       // Processing failure - image QA failed
-  LOW_CONFIDENCE: 'LOW_CONFIDENCE',     // Document issue - extraction uncertain
+  MISSING_CRITICAL_ROI: "SPEC_GAP", // Config issue - ROI not defined
+  IMAGE_QA_FAILED: "OCR_FAILURE", // Processing failure - image QA failed
+  LOW_CONFIDENCE: "LOW_CONFIDENCE", // Document issue - extraction uncertain
 } as const;
 
 /**
  * Check if processing result requires review queue
- * 
+ *
  * Returns semantically correct canonical reason codes:
  * - SPEC_GAP: Template ROI configuration incomplete (system issue)
  * - OCR_FAILURE: Image QA processing failed (system issue)
@@ -309,14 +392,17 @@ export function requiresReviewQueue(trace: RoiProcessingTrace): {
   // Check for missing critical ROIs → SPEC_GAP (config/system issue)
   const missingCritical = getMissingCriticalRois(trace.roiConfig);
   if (missingCritical.length > 0) {
-    reasonCodes.add('SPEC_GAP');
+    reasonCodes.add("SPEC_GAP");
   }
 
   // Check for low confidence critical fields → LOW_CONFIDENCE (document issue)
   for (const result of trace.results) {
     if (isCriticalRoiField(result.fieldId)) {
-      if (!result.extracted || result.confidence < DEFAULT_PERFORMANCE_CAPS.minConfidenceThreshold) {
-        reasonCodes.add('LOW_CONFIDENCE');
+      if (
+        !result.extracted ||
+        result.confidence < DEFAULT_PERFORMANCE_CAPS.minConfidenceThreshold
+      ) {
+        reasonCodes.add("LOW_CONFIDENCE");
         break;
       }
     }
@@ -325,7 +411,7 @@ export function requiresReviewQueue(trace: RoiProcessingTrace): {
   // Check for failed image QA → OCR_FAILURE (processing issue)
   for (const result of trace.results) {
     if (result.imageQaResult && !result.imageQaResult.passed) {
-      reasonCodes.add('OCR_FAILURE');
+      reasonCodes.add("OCR_FAILURE");
       break;
     }
   }
