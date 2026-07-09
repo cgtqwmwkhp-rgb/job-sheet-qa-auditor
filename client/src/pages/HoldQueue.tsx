@@ -57,24 +57,61 @@ export default function HoldQueue() {
     limit: 50,
   });
 
+  const { data: slaSummary } = trpc.analytics.getHoldQueueSla.useQuery(
+    undefined,
+    { refetchInterval: 60_000 }
+  );
+
+  const slaById = useMemo(() => {
+    const map = new Map<
+      number,
+      {
+        breached: boolean;
+        ageHours: number;
+        ageingBucket: string;
+        hoursUntilBreach: number;
+        highestSeverity: string;
+      }
+    >();
+    for (const item of slaSummary?.items ?? []) {
+      map.set(item.jobSheetId, {
+        breached: item.breached,
+        ageHours: item.ageHours,
+        ageingBucket: item.ageingBucket,
+        hoursUntilBreach: item.hoursUntilBreach,
+        highestSeverity: item.highestSeverity,
+      });
+    }
+    return map;
+  }, [slaSummary]);
+
   const approveJobSheet = trpc.auditActions.approveJobSheet.useMutation();
   const undoApprove = trpc.auditActions.undoJobSheetApprove.useMutation();
   const updateStatus = trpc.jobSheets.updateStatus.useMutation();
 
   const holdItems = useMemo(
     () =>
-      (jobSheets || []).map(sheet => ({
-        id: sheet.id,
-        referenceNumber: sheet.referenceNumber || `JS-${sheet.id}`,
-        technician: `User ${sheet.uploadedBy}`,
-        site: sheet.siteInfo || "Unknown Site",
-        date: new Date(sheet.createdAt).toLocaleString(),
-        reason: "Review Required",
-        severity: "warning" as "critical" | "warning" | "info",
-        status: "pending" as const,
-        fileName: sheet.fileName,
-      })),
-    [jobSheets]
+      (jobSheets || []).map(sheet => {
+        const sla = slaById.get(sheet.id);
+        return {
+          id: sheet.id,
+          referenceNumber: sheet.referenceNumber || `JS-${sheet.id}`,
+          technician: `User ${sheet.uploadedBy}`,
+          site: sheet.siteInfo || "Unknown Site",
+          date: new Date(sheet.createdAt).toLocaleString(),
+          reason: "Review Required",
+          severity: (sla?.highestSeverity === "S0" ||
+          sla?.highestSeverity === "S1"
+            ? "critical"
+            : "warning") as "critical" | "warning" | "info",
+          status: "pending" as const,
+          fileName: sheet.fileName,
+          slaBreached: sla?.breached ?? false,
+          ageHours: sla?.ageHours,
+          hoursUntilBreach: sla?.hoursUntilBreach,
+        };
+      }),
+    [jobSheets, slaById]
   );
 
   const filteredItems = useMemo(() => {
@@ -88,7 +125,11 @@ export default function HoldQueue() {
       // Basic filter chips — overnight scope: All vs Critical/Low confidence
       // placeholders until finding severity is joined on the list query.
       if (filterChip === "critical") {
-        return item.severity === "critical" || item.severity === "warning";
+        return (
+          item.slaBreached ||
+          item.severity === "critical" ||
+          item.severity === "warning"
+        );
       }
       if (filterChip === "low_confidence") {
         return true;
@@ -404,6 +445,18 @@ export default function HoldQueue() {
             >
               Low confidence
             </Badge>
+            {slaSummary && slaSummary.breachedCount > 0 && (
+              <Badge variant="destructive" className="gap-1">
+                <Clock className="h-3 w-3" />
+                {slaSummary.breachedCount} SLA breached
+              </Badge>
+            )}
+            <Link
+              href="/analytics/defects"
+              className="text-sm text-primary hover:underline ml-1"
+            >
+              Exception analytics
+            </Link>
           </div>
         </div>
 
@@ -495,9 +548,27 @@ export default function HoldQueue() {
                                   <span className="font-mono font-medium text-sm">
                                     {item.referenceNumber}
                                   </span>
-                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Clock className="w-3 h-3" />
-                                    pending
+                                  <div className="flex items-center gap-1 text-xs">
+                                    {item.slaBreached ? (
+                                      <Badge
+                                        variant="destructive"
+                                        className="text-[10px] px-1.5 py-0"
+                                      >
+                                        SLA
+                                      </Badge>
+                                    ) : item.ageHours != null ? (
+                                      <span className="text-muted-foreground flex items-center gap-1">
+                                        <Clock className="w-3 h-3" />
+                                        {item.ageHours < 24
+                                          ? `${Math.round(item.ageHours)}h`
+                                          : `${Math.round(item.ageHours / 24)}d`}
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground flex items-center gap-1">
+                                        <Clock className="w-3 h-3" />
+                                        pending
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                                 <div

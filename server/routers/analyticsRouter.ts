@@ -4,9 +4,11 @@
  * PR-I: selection analytics / ops dashboard.
  * PR-15: engineer scorecards, trends, and drill-through.
  * PR-16: cohort analytics (site/asset/workType) + template collision governance.
+ * PR-17: exception management — review SLAs, ageing, overturn rates, DLQ retry.
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { protectedProcedure, adminProcedure, router } from "../_core/trpc";
 import {
   getSelectionAnalytics,
@@ -37,6 +39,22 @@ import {
   fingerprintFromSelectionConfig,
   detectTemplateCollisions,
 } from "../services/templateRegistry";
+import {
+  buildExceptionManagementSummary,
+  buildHoldQueueSlaSummary,
+  buildOverturnAnalytics,
+  buildRecurrenceSummary,
+  resolveExceptionPeriod,
+  runDlqRetryPass,
+  type HoldQueueItemRow,
+  type OverturnFindingRow,
+} from "../services/exceptionAnalytics";
+import {
+  enforceRateLimit,
+  RateLimitError,
+  RATE_LIMITS,
+} from "../utils/rateLimiter";
+import { getDLQStats, getRecoverableJobs } from "../utils/deadLetterQueue";
 
 const periodInput = z
   .object({
@@ -114,6 +132,40 @@ async function loadCohortAnalyticsInputs(input?: {
     documents: documents as CohortDocumentRow[],
     findings: findings as CohortFindingRow[],
   };
+}
+
+async function loadExceptionAnalyticsInputs(input?: {
+  startDate?: string;
+  endDate?: string;
+}) {
+  const period = resolveExceptionPeriod(input?.startDate, input?.endDate);
+  const [holdItems, findings] = await Promise.all([
+    db.getExceptionHoldQueueItems(),
+    db.getExceptionOverturnFindings({
+      startDate: new Date(period.start),
+      endDate: new Date(period.end),
+    }),
+  ]);
+
+  return {
+    period,
+    holdItems: holdItems as HoldQueueItemRow[],
+    findings: findings as OverturnFindingRow[],
+  };
+}
+
+function throwIfRateLimited(fn: () => unknown): void {
+  try {
+    fn();
+  } catch (err) {
+    if (err instanceof RateLimitError) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: err.message,
+      });
+    }
+    throw err;
+  }
 }
 
 /**
@@ -408,6 +460,113 @@ export const analyticsRouter = router({
       });
       const existing = listTemplateFingerprints();
       return detectTemplateCollisions(candidate, existing);
+    }),
+
+  // ============ PR-17: EXCEPTION MANAGEMENT ============
+
+  /**
+   * Hold-queue SLA timers + ageing buckets.
+   */
+  getHoldQueueSla: protectedProcedure.query(async () => {
+    const holdItems = await db.getExceptionHoldQueueItems();
+    return buildHoldQueueSlaSummary({
+      items: holdItems as HoldQueueItemRow[],
+    });
+  }),
+
+  /**
+   * Per-rule overturn / waiver rates from resolved findings.
+   */
+  getOverturnAnalytics: protectedProcedure
+    .input(periodInput)
+    .query(async ({ input }) => {
+      const period = resolveExceptionPeriod(input?.startDate, input?.endDate);
+      const findings = await db.getExceptionOverturnFindings({
+        startDate: new Date(period.start),
+        endDate: new Date(period.end),
+      });
+      return buildOverturnAnalytics({
+        findings: findings as OverturnFindingRow[],
+        startDate: period.start,
+        endDate: period.end,
+      });
+    }),
+
+  /**
+   * Recurring rule+site clusters in the period.
+   */
+  getRecurrence: protectedProcedure
+    .input(
+      z
+        .object({
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+          threshold: z.number().min(2).max(50).optional(),
+        })
+        .optional()
+    )
+    .query(async ({ input }) => {
+      const period = resolveExceptionPeriod(input?.startDate, input?.endDate);
+      const findings = await db.getExceptionOverturnFindings({
+        startDate: new Date(period.start),
+        endDate: new Date(period.end),
+      });
+      return buildRecurrenceSummary({
+        findings: findings as OverturnFindingRow[],
+        startDate: period.start,
+        endDate: period.end,
+        threshold: input?.threshold,
+      });
+    }),
+
+  /**
+   * Combined exception management dashboard payload.
+   */
+  getExceptionSummary: protectedProcedure
+    .input(periodInput)
+    .query(async ({ input }) => {
+      const loaded = await loadExceptionAnalyticsInputs(input);
+      return buildExceptionManagementSummary({
+        holdItems: loaded.holdItems,
+        findings: loaded.findings,
+        startDate: loaded.period.start,
+        endDate: loaded.period.end,
+      });
+    }),
+
+  /**
+   * DLQ status + light retry pass (no live OCR/LLM). Rate-limited.
+   */
+  getDlqStatus: adminProcedure.query(() => {
+    const stats = getDLQStats();
+    return {
+      ...stats,
+      oldestJob: stats.oldestJob?.toISOString() ?? null,
+      recoverableJobs: getRecoverableJobs().map(j => ({
+        id: j.id,
+        jobSheetId: j.jobSheetId,
+        stage: j.stage,
+        attempts: j.attempts,
+        maxAttempts: j.maxAttempts,
+        errorMessage: j.error.message,
+        createdAt: j.createdAt.toISOString(),
+      })),
+    };
+  }),
+
+  runDlqRetry: adminProcedure
+    .input(
+      z
+        .object({
+          limit: z.number().min(1).max(100).optional(),
+        })
+        .optional()
+    )
+    .mutation(async ({ ctx, input }) => {
+      throwIfRateLimited(() =>
+        enforceRateLimit(`user:${ctx.user.id}:review`, RATE_LIMITS.review)
+      );
+      return runDlqRetryPass({ limit: input?.limit });
     }),
 });
 

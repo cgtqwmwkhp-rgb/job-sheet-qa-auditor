@@ -19,6 +19,31 @@ import {
   type AuditActionDeps,
 } from "../services/auditActions";
 import { FINDING_ACTIONS } from "../services/auditActions/types";
+import {
+  enforceRateLimit,
+  RateLimitError,
+  RATE_LIMITS,
+} from "../utils/rateLimiter";
+
+function throwIfRateLimited(fn: () => void): void {
+  try {
+    fn();
+  } catch (err) {
+    if (err instanceof RateLimitError) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: err.message,
+      });
+    }
+    throw err;
+  }
+}
+
+function enforceReviewLimit(userId: number): void {
+  throwIfRateLimited(() =>
+    enforceRateLimit(`user:${userId}:review`, RATE_LIMITS.review)
+  );
+}
 
 function createDbDeps(): AuditActionDeps {
   return {
@@ -86,6 +111,7 @@ export const auditActionsRouter = router({
   waive: adminProcedure
     .input(findingActionInput)
     .mutation(async ({ ctx, input }) => {
+      enforceReviewLimit(ctx.user.id);
       try {
         return await applyFindingAction(createDbDeps(), {
           findingId: input.findingId,
@@ -105,6 +131,7 @@ export const auditActionsRouter = router({
   override: protectedProcedure
     .input(findingActionInput)
     .mutation(async ({ ctx, input }) => {
+      enforceReviewLimit(ctx.user.id);
       try {
         return await applyFindingAction(createDbDeps(), {
           findingId: input.findingId,
@@ -124,6 +151,7 @@ export const auditActionsRouter = router({
   flag: protectedProcedure
     .input(findingActionInput)
     .mutation(async ({ ctx, input }) => {
+      enforceReviewLimit(ctx.user.id);
       try {
         return await applyFindingAction(createDbDeps(), {
           findingId: input.findingId,
@@ -143,6 +171,7 @@ export const auditActionsRouter = router({
   approve: protectedProcedure
     .input(findingActionInput)
     .mutation(async ({ ctx, input }) => {
+      enforceReviewLimit(ctx.user.id);
       try {
         return await applyFindingAction(createDbDeps(), {
           findingId: input.findingId,
