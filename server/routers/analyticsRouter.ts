@@ -6,6 +6,7 @@
  * PR-16: cohort analytics (site/asset/workType) + template collision governance.
  * PR-17: exception management — review SLAs, ageing, overturn rates, DLQ retry.
  * PR-18: drift detection — EWMA/CUSUM, calibration histograms, alerting.
+ * PR-19: predictive risk scoring — leading indicators, attention queue, fix packs.
  */
 
 import { z } from "zod";
@@ -56,6 +57,14 @@ import {
   type DriftDocumentRow,
   type DriftFindingRow,
 } from "../services/driftAnalytics";
+import {
+  buildPredictiveRiskSummary,
+  resolvePredictivePeriod,
+  type PredictiveDisputeRow,
+  type PredictiveDocumentRow,
+  type PredictiveFindingRow,
+  type PredictiveUserRow,
+} from "../services/predictiveRiskAnalytics";
 import {
   enforceRateLimit,
   RateLimitError,
@@ -181,6 +190,40 @@ async function loadDriftAnalyticsInputs(input?: {
     period,
     documents: documents as DriftDocumentRow[],
     findings: findings as DriftFindingRow[],
+  };
+}
+
+async function loadPredictiveRiskInputs(input?: {
+  startDate?: string;
+  endDate?: string;
+}) {
+  const period = resolvePredictivePeriod(input?.startDate, input?.endDate);
+  const [documents, findings, disputes, users] = await Promise.all([
+    db.getPredictiveRiskDocuments({
+      startDate: new Date(period.start),
+      endDate: new Date(period.end),
+    }),
+    db.getPredictiveRiskFindings({
+      startDate: new Date(period.start),
+      endDate: new Date(period.end),
+    }),
+    db.getPredictiveRiskDisputes({
+      startDate: new Date(period.start),
+      endDate: new Date(period.end),
+    }),
+    db.getAllUsers(),
+  ]);
+
+  return {
+    period,
+    documents: documents as PredictiveDocumentRow[],
+    findings: findings as PredictiveFindingRow[],
+    disputes: disputes as PredictiveDisputeRow[],
+    users: users.map(u => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+    })) as PredictiveUserRow[],
   };
 }
 
@@ -634,6 +677,71 @@ export const analyticsRouter = router({
         asOf: summary.asOf,
         alerts: summary.alerts,
         summary: summary.summary,
+      };
+    }),
+
+  // ============ PR-19: PREDICTIVE RISK ============
+
+  /**
+   * Leading-indicator risk scores, attention queue, and fix packs.
+   */
+  getPredictiveRiskSummary: protectedProcedure
+    .input(periodInput)
+    .query(async ({ input }) => {
+      const loaded = await loadPredictiveRiskInputs(input);
+      return buildPredictiveRiskSummary({
+        documents: loaded.documents,
+        findings: loaded.findings,
+        disputes: loaded.disputes,
+        users: loaded.users,
+        startDate: loaded.period.start,
+        endDate: loaded.period.end,
+      });
+    }),
+
+  /**
+   * Attention queue only (entities above risk threshold), sorted by score.
+   */
+  getAttentionQueue: protectedProcedure
+    .input(periodInput)
+    .query(async ({ input }) => {
+      const loaded = await loadPredictiveRiskInputs(input);
+      const summary = buildPredictiveRiskSummary({
+        documents: loaded.documents,
+        findings: loaded.findings,
+        disputes: loaded.disputes,
+        users: loaded.users,
+        startDate: loaded.period.start,
+        endDate: loaded.period.end,
+      });
+      return {
+        period: summary.period,
+        asOf: summary.asOf,
+        attentionQueue: summary.attentionQueue,
+        summary: summary.summary,
+      };
+    }),
+
+  /**
+   * Fix packs for engineers in the attention queue.
+   */
+  getPredictiveFixPacks: protectedProcedure
+    .input(periodInput)
+    .query(async ({ input }) => {
+      const loaded = await loadPredictiveRiskInputs(input);
+      const summary = buildPredictiveRiskSummary({
+        documents: loaded.documents,
+        findings: loaded.findings,
+        disputes: loaded.disputes,
+        users: loaded.users,
+        startDate: loaded.period.start,
+        endDate: loaded.period.end,
+      });
+      return {
+        period: summary.period,
+        asOf: summary.asOf,
+        fixPacks: summary.fixPacks,
+        count: summary.fixPacks.length,
       };
     }),
 });

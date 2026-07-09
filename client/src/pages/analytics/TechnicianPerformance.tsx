@@ -280,6 +280,54 @@ export default function TechnicianPerformance() {
                 </Card>
               )}
 
+              {detail?.fixPack && detail.fixPack.summary.totalIssues > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Fix pack</CardTitle>
+                    <CardDescription>
+                      Targeted coaching pack from in-period findings (also
+                      surfaced on Predictive Risk).
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex flex-wrap gap-2 text-sm">
+                      <Badge variant="outline">
+                        {detail.fixPack.summary.totalIssues} issues
+                      </Badge>
+                      <Badge variant="secondary">
+                        {detail.fixPack.summary.criticalIssues} critical
+                      </Badge>
+                      <span className="text-muted-foreground">
+                        Focus:{" "}
+                        {detail.fixPack.summary.focusAreas.join(", ") || "—"}
+                      </span>
+                    </div>
+                    {detail.fixPack.issues.slice(0, 5).map((issue, i) => (
+                      <div
+                        key={`${issue.issueType}-${issue.fieldName}-${i}`}
+                        className="border rounded-lg p-3"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium text-sm">
+                            {issue.issueType} · {issue.fieldName}
+                          </p>
+                          <Badge
+                            variant="outline"
+                            className={severityBadgeClass(issue.severity)}
+                          >
+                            {issue.severity}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {issue.occurrenceCount}× ·{" "}
+                          {issue.correctProcedure.split("\n")[0]}
+                        </p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
               <Card>
                 <CardHeader>
                   <CardTitle>Findings drill-through</CardTitle>

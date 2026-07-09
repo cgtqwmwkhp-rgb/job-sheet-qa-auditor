@@ -202,6 +202,85 @@ vi.mock("./db", () => ({
       occurredAt: new Date("2024-06-01T11:00:00Z"),
     },
   ]),
+  getPredictiveRiskDocuments: vi.fn().mockResolvedValue([
+    {
+      jobSheetId: 1,
+      technicianId: 2,
+      templateSlug: "gen-service",
+      assetType: "generator",
+      result: "review_queue",
+      confidenceScore: 40,
+      processedAt: new Date("2024-06-01T10:00:00Z"),
+    },
+    {
+      jobSheetId: 2,
+      technicianId: 2,
+      templateSlug: "gen-service",
+      assetType: "generator",
+      result: "fail",
+      confidenceScore: 35,
+      processedAt: new Date("2024-06-05T10:00:00Z"),
+    },
+    {
+      jobSheetId: 3,
+      technicianId: 2,
+      templateSlug: "gen-service",
+      assetType: "generator",
+      result: "review_queue",
+      confidenceScore: 45,
+      processedAt: new Date("2024-06-20T10:00:00Z"),
+    },
+    {
+      jobSheetId: 4,
+      technicianId: 2,
+      templateSlug: "gen-service",
+      assetType: "generator",
+      result: "fail",
+      confidenceScore: 30,
+      processedAt: new Date("2024-06-25T10:00:00Z"),
+    },
+  ]),
+  getPredictiveRiskFindings: vi.fn().mockResolvedValue([
+    {
+      findingId: 1,
+      jobSheetId: 1,
+      technicianId: 2,
+      severity: "S2",
+      reasonCode: "MISSING_FIELD",
+      fieldName: "notes",
+      resolutionStatus: "open",
+      occurredAt: new Date("2024-06-01T11:00:00Z"),
+    },
+    {
+      findingId: 2,
+      jobSheetId: 2,
+      technicianId: 2,
+      severity: "S1",
+      reasonCode: "MISSING_FIELD",
+      fieldName: "signature",
+      resolutionStatus: "open",
+      occurredAt: new Date("2024-06-05T11:00:00Z"),
+    },
+    {
+      findingId: 3,
+      jobSheetId: 3,
+      technicianId: 2,
+      severity: "S3",
+      reasonCode: "LOW_CONFIDENCE",
+      fieldName: "serial",
+      resolutionStatus: "open",
+      occurredAt: new Date("2024-06-20T11:00:00Z"),
+    },
+  ]),
+  getPredictiveRiskDisputes: vi.fn().mockResolvedValue([
+    {
+      id: 1,
+      auditFindingId: 2,
+      raisedBy: 2,
+      status: "open",
+      createdAt: new Date("2024-06-06T10:00:00Z"),
+    },
+  ]),
 }));
 
 // Mock storage module
@@ -377,6 +456,57 @@ describe("analytics.drift (PR-18)", () => {
     const caller = appRouter.createCaller(ctx);
 
     await expect(caller.analytics.getDriftSummary()).rejects.toThrow();
+  });
+});
+
+describe("analytics.predictiveRisk (PR-19)", () => {
+  it("returns predictive risk summary for authenticated users", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.analytics.getPredictiveRiskSummary({
+      startDate: "2024-06-01T00:00:00.000Z",
+      endDate: "2024-06-30T23:59:59.999Z",
+    });
+
+    expect(result.summary).toHaveProperty("entitiesScored");
+    expect(result.summary).toHaveProperty("needingAttention");
+    expect(Array.isArray(result.attentionQueue)).toBe(true);
+    expect(Array.isArray(result.predictions)).toBe(true);
+    expect(Array.isArray(result.fixPacks)).toBe(true);
+  });
+
+  it("returns attention queue payload", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.analytics.getAttentionQueue({
+      startDate: "2024-06-01T00:00:00.000Z",
+      endDate: "2024-06-30T23:59:59.999Z",
+    });
+
+    expect(result).toHaveProperty("attentionQueue");
+    expect(result.summary).toHaveProperty("needingAttention");
+  });
+
+  it("returns predictive fix packs", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.analytics.getPredictiveFixPacks({
+      startDate: "2024-06-01T00:00:00.000Z",
+      endDate: "2024-06-30T23:59:59.999Z",
+    });
+
+    expect(result).toHaveProperty("fixPacks");
+    expect(typeof result.count).toBe("number");
+  });
+
+  it("rejects unauthenticated predictive risk summary", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(caller.analytics.getPredictiveRiskSummary()).rejects.toThrow();
   });
 });
 
