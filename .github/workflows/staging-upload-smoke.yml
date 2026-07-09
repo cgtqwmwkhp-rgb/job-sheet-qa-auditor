@@ -1,0 +1,53 @@
+name: Staging Authenticated Upload Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_url:
+        description: "Staging URL override"
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  upload-smoke:
+    name: Authenticated upload smoke
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      BASE_URL: ${{ inputs.staging_url || vars.STAGING_URL }}
+      STORAGE_STATE_B64: ${{ secrets.STAGING_E2E_STORAGE_STATE_B64 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Skip when auth state is unavailable
+        if: ${{ env.STORAGE_STATE_B64 == '' }}
+        run: |
+          echo "STAGING_E2E_STORAGE_STATE_B64 is not configured; authenticated upload smoke skipped." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup pnpm
+        if: ${{ env.STORAGE_STATE_B64 != '' }}
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        if: ${{ env.STORAGE_STATE_B64 != '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        if: ${{ env.STORAGE_STATE_B64 != '' }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        if: ${{ env.STORAGE_STATE_B64 != '' }}
+        run: npx playwright install --with-deps chromium
+
+      - name: Run upload smoke
+        if: ${{ env.STORAGE_STATE_B64 != '' }}
+        run: |
+          mkdir -p test-results/staging-upload-smoke
+          printf '%s' "$STORAGE_STATE_B64" | base64 -d > test-results/staging-upload-smoke/storage-state.json
+          node scripts/staging-upload-smoke.mjs
