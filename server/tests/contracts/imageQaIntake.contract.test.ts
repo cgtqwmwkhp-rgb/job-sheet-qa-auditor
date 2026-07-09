@@ -2,12 +2,27 @@
  * Image QA Intake Gate Contract Tests
  *
  * Verifies upload-time quality scoring + retake feedback.
- * Uses fixture markdown proxies only — no OCR adapter / live API calls.
+ * Production path OCRs the real buffer (mocked here); fixture proxy
+ * remains covered as a test-only helper.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
+import type { OCRResult } from "../../services/ocr";
+
+const { extractTextFromBase64Mock } = vi.hoisted(() => ({
+  extractTextFromBase64Mock: vi.fn(),
+}));
+
+vi.mock("../../services/ocr", async importOriginal => {
+  const actual = await importOriginal<typeof import("../../services/ocr")>();
+  return {
+    ...actual,
+    extractTextFromBase64: extractTextFromBase64Mock,
+  };
+});
+
 import {
   runIntakeGate,
   resolveIntakeMarkdownProxy,
@@ -23,11 +38,25 @@ function loadFixture(name: string): Buffer {
   return readFileSync(join(FIXTURE_DIR, name));
 }
 
+function loadFixtureText(name: string): string {
+  return readFileSync(join(FIXTURE_DIR, name), "utf8");
+}
+
+function mockOcrSuccess(markdown: string): OCRResult {
+  return {
+    success: true,
+    pages: [{ pageNumber: 1, markdown }],
+    totalPages: 1,
+    model: "mock-ocr",
+  };
+}
+
 describe("Image QA Intake Gate Contract Tests", () => {
   const prevFlag = process.env.FEATURE_IMAGE_QA_INTAKE;
 
   beforeEach(() => {
     process.env.FEATURE_IMAGE_QA_INTAKE = "true";
+    extractTextFromBase64Mock.mockReset();
   });
 
   afterEach(() => {
@@ -50,7 +79,7 @@ describe("Image QA Intake Gate Contract Tests", () => {
     });
   });
 
-  describe("markdown proxy (no OCR)", () => {
+  describe("markdown proxy (test-only, no OCR)", () => {
     it("maps good-scan filename to good fixture", () => {
       const pages = resolveIntakeMarkdownProxy({
         buffer: Buffer.from("ignored"),
@@ -76,17 +105,26 @@ describe("Image QA Intake Gate Contract Tests", () => {
         fileName: "upload.bin",
       });
       expect(pages[0]!.markdown).toContain("ACME Corp");
+      expect(extractTextFromBase64Mock).not.toHaveBeenCalled();
     });
   });
 
-  describe("runIntakeGate", () => {
-    it("passes good fixture with score >= threshold and empty retakeFeedback", () => {
-      const buffer = loadFixture("good-scan.md");
-      const result = runIntakeGate({
+  describe("runIntakeGate (OCR path)", () => {
+    it("passes good OCR markdown with score >= threshold and empty retakeFeedback", async () => {
+      const markdown = loadFixtureText("good-scan.md");
+      extractTextFromBase64Mock.mockResolvedValue(mockOcrSuccess(markdown));
+
+      const buffer = Buffer.from("fake-pdf-bytes");
+      const result = await runIntakeGate({
         buffer,
         fileName: "good-scan.pdf",
         mimeType: "application/pdf",
       });
+
+      expect(extractTextFromBase64Mock).toHaveBeenCalledWith(
+        buffer.toString("base64"),
+        "application/pdf"
+      );
 
       const threshold = getDefaultImageQaConfig().reviewQualityThreshold;
       expect(result.skipped).toBe(false);
@@ -97,10 +135,12 @@ describe("Image QA Intake Gate Contract Tests", () => {
       expect(result.grade).toMatch(/^[ABCDF]$/);
     });
 
-    it("rejects blurry fixture with score < threshold and actionable retakeFeedback", () => {
-      const buffer = loadFixture("blurry-scan.md");
-      const result = runIntakeGate({
-        buffer,
+    it("rejects blurry OCR markdown with score < threshold and actionable retakeFeedback", async () => {
+      const markdown = loadFixtureText("blurry-scan.md");
+      extractTextFromBase64Mock.mockResolvedValue(mockOcrSuccess(markdown));
+
+      const result = await runIntakeGate({
+        buffer: Buffer.from("fake-image-bytes"),
         fileName: "blurry-scan.jpg",
         mimeType: "image/jpeg",
       });
@@ -116,8 +156,8 @@ describe("Image QA Intake Gate Contract Tests", () => {
       ).toBe(true);
     });
 
-    it("fail-opens on empty buffer (skipped:true, passed:true)", () => {
-      const result = runIntakeGate({
+    it("fail-opens on empty buffer (skipped:true, passed:true)", async () => {
+      const result = await runIntakeGate({
         buffer: Buffer.alloc(0),
         fileName: "empty.pdf",
       });
@@ -127,18 +167,55 @@ describe("Image QA Intake Gate Contract Tests", () => {
       expect(result.qualityScore).toBeNull();
       expect(result.retakeFeedback).toEqual([]);
       expect(result.error).toBeDefined();
+      expect(extractTextFromBase64Mock).not.toHaveBeenCalled();
     });
 
-    it("is deterministic for the same input", () => {
-      const buffer = loadFixture("blurry-scan.md");
+    it("fail-opens when OCR throws", async () => {
+      extractTextFromBase64Mock.mockRejectedValue(new Error("OCR unavailable"));
+
+      const result = await runIntakeGate({
+        buffer: Buffer.from("bytes"),
+        fileName: "upload.pdf",
+        mimeType: "application/pdf",
+      });
+
+      expect(result.passed).toBe(true);
+      expect(result.skipped).toBe(true);
+      expect(result.qualityScore).toBeNull();
+      expect(result.error).toMatch(/OCR unavailable/);
+    });
+
+    it("fail-opens when OCR returns success:false", async () => {
+      extractTextFromBase64Mock.mockResolvedValue({
+        success: false,
+        pages: [],
+        totalPages: 0,
+        model: "mock-ocr",
+        error: "provider timeout",
+      });
+
+      const result = await runIntakeGate({
+        buffer: Buffer.from("bytes"),
+        fileName: "upload.pdf",
+      });
+
+      expect(result.passed).toBe(true);
+      expect(result.skipped).toBe(true);
+      expect(result.error).toMatch(/provider timeout|OCR extraction failed/);
+    });
+
+    it("is deterministic for the same OCR output", async () => {
+      const markdown = loadFixtureText("blurry-scan.md");
+      extractTextFromBase64Mock.mockResolvedValue(mockOcrSuccess(markdown));
+
       const input = {
-        buffer,
+        buffer: Buffer.from("same-bytes"),
         fileName: "blurry-scan.png",
         mimeType: "image/png",
       };
 
-      const a = runIntakeGate(input);
-      const b = runIntakeGate(input);
+      const a = await runIntakeGate(input);
+      const b = await runIntakeGate(input);
 
       expect(a.qualityScore).toBe(b.qualityScore);
       expect(a.grade).toBe(b.grade);

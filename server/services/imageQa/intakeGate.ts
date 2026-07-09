@@ -1,11 +1,14 @@
 /**
  * Image QA Intake Gate
  *
- * Runs lightweight, CPU-only quality checks at upload time.
- * Uses a deterministic mock markdown proxy (filename/buffer → fixture text)
- * so intake never calls live OCR adapters.
+ * Runs lightweight quality checks at upload time by OCRing the real upload
+ * buffer, then scoring OCR markdown via analyzeDocumentQuality.
  *
- * Fail-open: unexpected errors return passed:true + skipped:true.
+ * Fail-open: unexpected errors (including OCR failures) return
+ * passed:true + skipped:true.
+ *
+ * resolveIntakeMarkdownProxy remains available for deterministic unit tests
+ * of the fixture map itself — it is not used on the production path.
  */
 
 import { createHash } from "crypto";
@@ -16,6 +19,7 @@ import type { ImageQaConfig, IntakeGateInput, IntakeGateResult } from "./types";
 import { getDefaultImageQaConfig } from "./types";
 import { analyzeDocumentQuality, type OcrPageInput } from "./imageQaService";
 import { buildRetakeFeedback } from "./retakeFeedback";
+import { extractTextFromBase64 } from "../ocr";
 
 const FEATURE_FLAG = "FEATURE_IMAGE_QA_INTAKE";
 
@@ -56,7 +60,8 @@ function loadFixtureMarkdown(fixtureName: string): string {
 
 /**
  * Deterministic mock map: filename / buffer → OCR-like markdown pages.
- * Never calls getOCRAdapter or extractTextFromDocument.
+ * Test-only / internal — production intake uses OCR on the real buffer.
+ * Never calls getOCRAdapter or extractTextFromBase64.
  */
 export function resolveIntakeMarkdownProxy(input: {
   buffer: Buffer;
@@ -101,20 +106,48 @@ function failOpenResult(reason: string): IntakeGateResult {
 }
 
 /**
- * Run the intake quality gate. Never throws.
+ * OCR the upload buffer and map pages to OcrPageInput[].
+ * Throws / returns empty on failure — caller fail-opens.
  */
-export function runIntakeGate(
+async function resolveIntakePagesFromBuffer(input: {
+  buffer: Buffer;
+  mimeType?: string;
+}): Promise<OcrPageInput[]> {
+  const ocrResult = await extractTextFromBase64(
+    input.buffer.toString("base64"),
+    input.mimeType || "application/pdf"
+  );
+
+  if (!ocrResult.success) {
+    throw new Error(ocrResult.error || "OCR extraction failed");
+  }
+
+  if (!ocrResult.pages || ocrResult.pages.length === 0) {
+    throw new Error("OCR returned no pages");
+  }
+
+  return ocrResult.pages.map(page => ({
+    pageNumber: page.pageNumber,
+    markdown: page.markdown ?? "",
+  }));
+}
+
+/**
+ * Run the intake quality gate on the real upload buffer via OCR.
+ * Never throws — fail-open on OCR or analysis errors.
+ */
+export async function runIntakeGate(
   input: IntakeGateInput,
   config: ImageQaConfig = getDefaultImageQaConfig()
-): IntakeGateResult {
+): Promise<IntakeGateResult> {
   try {
     if (!input.buffer || input.buffer.length === 0) {
       return failOpenResult("Empty buffer — intake gate skipped");
     }
 
-    const pages = resolveIntakeMarkdownProxy({
+    const pages = await resolveIntakePagesFromBuffer({
       buffer: input.buffer,
-      fileName: input.fileName || "upload.bin",
+      mimeType: input.mimeType,
     });
 
     const documentId =
