@@ -330,10 +330,16 @@ Customer Name: Acme Corp
       );
     });
 
-    it("does not import pipelineIntegrator or criticalFieldExtractor", () => {
-      expect(dp).not.toContain("pipelineIntegrator");
+    it("gates pipelineIntegration behind master flag and keeps it fail-soft", () => {
+      expect(dp).toContain("processWithIntegration");
+      expect(dp).toContain("getFeatureFlagsFromEnv");
+      expect(dp).toContain(
+        'process.env.FEATURE_PIPELINE_INTEGRATION === "true"'
+      );
+      expect(dp).toContain('stage: "Pipeline Integration"');
+      expect(dp).toContain("Pipeline integration failed (non-fatal)");
+      expect(dp).toContain("pipelineIntegrationResult");
       expect(dp).not.toContain("criticalFieldExtractor");
-      expect(dp).not.toContain("processWithIntegration");
     });
 
     it("preserves PR-3 fail-closed gates", () => {

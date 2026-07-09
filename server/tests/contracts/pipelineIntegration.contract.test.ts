@@ -1,35 +1,43 @@
 /**
  * Pipeline Integration Contract Tests - PR-6
- * 
+ *
  * Tests for:
  * - Feature flag behavior
  * - Critical field extractor integration
- * - Image QA fusion integration  
+ * - Image QA fusion integration
  * - Deterministic cache behavior (byte-identical outputs)
  * - Validation trace artifact generation
  * - Fusion evidence attachment
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   processWithIntegration,
   generateValidationTraceArtifact,
   getCacheStats,
   ENGINE_VERSIONS,
   getFeatureFlagsFromEnv,
-} from '../../services/pipelineIntegration';
-import { DEFAULT_FEATURE_FLAGS, type PipelineFeatureFlags, type PipelineInput } from '../../services/pipelineIntegration/types';
-import { resetCache } from '../../services/cache/deterministicCache';
-import type { OcrFieldResult, ImageQaResult, RoiBbox } from '../../services/imageQaFusion/fusionService';
+} from "../../services/pipelineIntegration";
+import {
+  DEFAULT_FEATURE_FLAGS,
+  type PipelineFeatureFlags,
+  type PipelineInput,
+} from "../../services/pipelineIntegration/types";
+import { resetCache } from "../../services/cache/deterministicCache";
+import type {
+  OcrFieldResult,
+  ImageQaResult,
+  RoiBbox,
+} from "../../services/imageQaFusion/fusionService";
 
-describe('Pipeline Integration Contract Tests', () => {
+describe("Pipeline Integration Contract Tests", () => {
   const mockInput: PipelineInput = {
-    documentId: 'test-doc-001',
-    fileContent: Buffer.from('test content'),
-    fileHash: 'abc123def456',
+    documentId: "test-doc-001",
+    fileContent: Buffer.from("test content"),
+    fileHash: "abc123def456",
     templateId: 1,
     templateVersionId: 1,
-    templateHash: 'template-hash-001',
+    templateHash: "template-hash-001",
   };
 
   const mockOcrText = `
@@ -42,18 +50,57 @@ describe('Pipeline Integration Contract Tests', () => {
   `;
 
   const mockOcrResults = new Map<string, OcrFieldResult>([
-    ['signatureBlock', { fieldId: 'signatureBlock', extracted: true, value: 'Present', confidence: 0.9, source: 'roi' }],
-    ['tickboxBlock', { fieldId: 'tickboxBlock', extracted: true, value: 'Checked', confidence: 0.85, source: 'roi' }],
+    [
+      "signatureBlock",
+      {
+        fieldId: "signatureBlock",
+        extracted: true,
+        value: "Present",
+        confidence: 0.9,
+        source: "roi",
+      },
+    ],
+    [
+      "tickboxBlock",
+      {
+        fieldId: "tickboxBlock",
+        extracted: true,
+        value: "Checked",
+        confidence: 0.85,
+        source: "roi",
+      },
+    ],
   ]);
 
   const mockImageQaResults = new Map<string, ImageQaResult>([
-    ['signatureBlock', { fieldId: 'signatureBlock', present: true, confidence: 0.92, quality: 'high', issues: [] }],
-    ['tickboxBlock', { fieldId: 'tickboxBlock', present: true, confidence: 0.88, quality: 'high', issues: [] }],
+    [
+      "signatureBlock",
+      {
+        fieldId: "signatureBlock",
+        present: true,
+        confidence: 0.92,
+        quality: "high",
+        issues: [],
+      },
+    ],
+    [
+      "tickboxBlock",
+      {
+        fieldId: "tickboxBlock",
+        present: true,
+        confidence: 0.88,
+        quality: "high",
+        issues: [],
+      },
+    ],
   ]);
 
   const mockRoiBboxes = new Map<string, RoiBbox>([
-    ['signatureBlock', { pageIndex: 0, x: 0.1, y: 0.8, width: 0.3, height: 0.1 }],
-    ['tickboxBlock', { pageIndex: 0, x: 0.1, y: 0.5, width: 0.3, height: 0.2 }],
+    [
+      "signatureBlock",
+      { pageIndex: 0, x: 0.1, y: 0.8, width: 0.3, height: 0.1 },
+    ],
+    ["tickboxBlock", { pageIndex: 0, x: 0.1, y: 0.5, width: 0.3, height: 0.2 }],
   ]);
 
   beforeEach(() => {
@@ -64,16 +111,20 @@ describe('Pipeline Integration Contract Tests', () => {
     resetCache();
   });
 
-  describe('Feature Flags', () => {
-    it('should have all features disabled by default', () => {
+  describe("Feature Flags", () => {
+    it("should have all features disabled by default", () => {
       expect(DEFAULT_FEATURE_FLAGS.useCriticalFieldExtractor).toBe(false);
       expect(DEFAULT_FEATURE_FLAGS.useImageQaFusion).toBe(false);
       expect(DEFAULT_FEATURE_FLAGS.useDeterministicCache).toBe(false);
       expect(DEFAULT_FEATURE_FLAGS.useEngineerFeedback).toBe(false);
     });
 
-    it('should return empty results when all features disabled', async () => {
-      const result = await processWithIntegration(mockInput, DEFAULT_FEATURE_FLAGS, mockOcrText);
+    it("should return empty results when all features disabled", async () => {
+      const result = await processWithIntegration(
+        mockInput,
+        DEFAULT_FEATURE_FLAGS,
+        mockOcrText
+      );
 
       expect(result.criticalFields).toHaveLength(0);
       expect(result.fusionResults).toHaveLength(0);
@@ -81,13 +132,31 @@ describe('Pipeline Integration Contract Tests', () => {
       expect(result.fromCache).toBe(false);
     });
 
-    it('should read feature flags from environment', () => {
+    it("should ignore sub-flags unless master integration flag is enabled", () => {
       const originalEnv = { ...process.env };
-      
-      process.env.FEATURE_CRITICAL_FIELD_EXTRACTOR = 'true';
-      process.env.FEATURE_IMAGE_QA_FUSION = 'true';
-      process.env.FEATURE_DETERMINISTIC_CACHE = 'false';
-      process.env.FEATURE_ENGINEER_FEEDBACK = 'true';
+
+      process.env.FEATURE_PIPELINE_INTEGRATION = "false";
+      process.env.FEATURE_CRITICAL_FIELD_EXTRACTOR = "true";
+      process.env.FEATURE_IMAGE_QA_FUSION = "true";
+      process.env.FEATURE_DETERMINISTIC_CACHE = "true";
+      process.env.FEATURE_ENGINEER_FEEDBACK = "true";
+
+      const flags = getFeatureFlagsFromEnv();
+
+      expect(flags).toEqual(DEFAULT_FEATURE_FLAGS);
+
+      // Restore environment
+      process.env = originalEnv;
+    });
+
+    it("should read feature flags from environment when master flag is enabled", () => {
+      const originalEnv = { ...process.env };
+
+      process.env.FEATURE_PIPELINE_INTEGRATION = "true";
+      process.env.FEATURE_CRITICAL_FIELD_EXTRACTOR = "true";
+      process.env.FEATURE_IMAGE_QA_FUSION = "true";
+      process.env.FEATURE_DETERMINISTIC_CACHE = "false";
+      process.env.FEATURE_ENGINEER_FEEDBACK = "true";
 
       const flags = getFeatureFlagsFromEnv();
 
@@ -101,13 +170,13 @@ describe('Pipeline Integration Contract Tests', () => {
     });
   });
 
-  describe('Critical Field Extractor Integration', () => {
+  describe("Critical Field Extractor Integration", () => {
     const flagsWithExtractor: PipelineFeatureFlags = {
       ...DEFAULT_FEATURE_FLAGS,
       useCriticalFieldExtractor: true,
     };
 
-    it('should extract critical fields when enabled', async () => {
+    it("should extract critical fields when enabled", async () => {
       const result = await processWithIntegration(
         mockInput,
         flagsWithExtractor,
@@ -118,7 +187,7 @@ describe('Pipeline Integration Contract Tests', () => {
       expect(result.validationTrace).not.toBeNull();
     });
 
-    it('should produce validation trace artifact', async () => {
+    it("should produce validation trace artifact", async () => {
       const result = await processWithIntegration(
         mockInput,
         flagsWithExtractor,
@@ -131,27 +200,31 @@ describe('Pipeline Integration Contract Tests', () => {
       expect(result.validationTrace?.engineVersion).toBeDefined();
     });
 
-    it('should extract job reference correctly', async () => {
+    it("should extract job reference correctly", async () => {
       const result = await processWithIntegration(
         mockInput,
         flagsWithExtractor,
         mockOcrText
       );
 
-      const jobRefField = result.criticalFields.find(f => f.fieldId === 'jobReference');
+      const jobRefField = result.criticalFields.find(
+        f => f.fieldId === "jobReference"
+      );
       expect(jobRefField).toBeDefined();
       expect(jobRefField?.extracted).toBe(true);
       expect(jobRefField?.value).toMatch(/JOB-2026-001/i);
     });
 
-    it('should have status PASS and reasonCode null for successful extractions', async () => {
+    it("should have status PASS and reasonCode null for successful extractions", async () => {
       const result = await processWithIntegration(
         mockInput,
         flagsWithExtractor,
         mockOcrText
       );
 
-      const passedFields = result.criticalFields.filter(f => f.status === 'PASS');
+      const passedFields = result.criticalFields.filter(
+        f => f.status === "PASS"
+      );
       for (const field of passedFields) {
         expect(field.reasonCode).toBeNull();
       }
@@ -165,18 +238,18 @@ describe('Pipeline Integration Contract Tests', () => {
       );
 
       for (const field of result.criticalFields) {
-        expect(field.reasonCode).not.toBe('VALID');
+        expect(field.reasonCode).not.toBe("VALID");
       }
     });
   });
 
-  describe('Image QA Fusion Integration', () => {
+  describe("Image QA Fusion Integration", () => {
     const flagsWithFusion: PipelineFeatureFlags = {
       ...DEFAULT_FEATURE_FLAGS,
       useImageQaFusion: true,
     };
 
-    it('should fuse OCR and Image QA results when enabled', async () => {
+    it("should fuse OCR and Image QA results when enabled", async () => {
       const result = await processWithIntegration(
         mockInput,
         flagsWithFusion,
@@ -190,7 +263,7 @@ describe('Pipeline Integration Contract Tests', () => {
       expect(result.fusionEvidence).not.toBeNull();
     });
 
-    it('should include fusion evidence with crop references', async () => {
+    it("should include fusion evidence with crop references", async () => {
       const result = await processWithIntegration(
         mockInput,
         flagsWithFusion,
@@ -202,14 +275,16 @@ describe('Pipeline Integration Contract Tests', () => {
 
       expect(result.fusionEvidence).toBeDefined();
       expect(result.fusionEvidence?.fields).toBeDefined();
-      
+
       // Check that crop references are included
-      const signatureResult = result.fusionResults.find(f => f.fieldId === 'signatureBlock');
+      const signatureResult = result.fusionResults.find(
+        f => f.fieldId === "signatureBlock"
+      );
       expect(signatureResult?.cropReference).toBeDefined();
       expect(signatureResult?.cropReference?.bbox).toBeDefined();
     });
 
-    it('should not alter pass/fail logic from fusion', async () => {
+    it("should not alter pass/fail logic from fusion", async () => {
       const result = await processWithIntegration(
         mockInput,
         flagsWithFusion,
@@ -220,18 +295,18 @@ describe('Pipeline Integration Contract Tests', () => {
       );
 
       // Fusion should add evidence but not change overall status unexpectedly
-      expect(['PASS', 'FAIL', 'REVIEW_QUEUE']).toContain(result.status);
+      expect(["PASS", "FAIL", "REVIEW_QUEUE"]).toContain(result.status);
     });
   });
 
-  describe('Deterministic Cache Integration', () => {
+  describe("Deterministic Cache Integration", () => {
     const flagsWithCache: PipelineFeatureFlags = {
       ...DEFAULT_FEATURE_FLAGS,
       useCriticalFieldExtractor: true,
       useDeterministicCache: true,
     };
 
-    it('should cache results and return from cache on second call', async () => {
+    it("should cache results and return from cache on second call", async () => {
       // First call - cache miss
       const result1 = await processWithIntegration(
         mockInput,
@@ -251,10 +326,10 @@ describe('Pipeline Integration Contract Tests', () => {
 
       // Key outputs should match (cache should preserve the data)
       expect(result2.documentId).toBe(result1.documentId);
-      expect(result2.status).toBe('PASS'); // Cached results are considered valid
+      expect(result2.status).toBe("PASS"); // Cached results are considered valid
     });
 
-    it('should track cache statistics', async () => {
+    it("should track cache statistics", async () => {
       await processWithIntegration(mockInput, flagsWithCache, mockOcrText);
       await processWithIntegration(mockInput, flagsWithCache, mockOcrText);
 
@@ -263,7 +338,7 @@ describe('Pipeline Integration Contract Tests', () => {
       expect(stats.misses).toBeGreaterThanOrEqual(1);
     });
 
-    it('should invalidate cache when template hash changes', async () => {
+    it("should invalidate cache when template hash changes", async () => {
       const result1 = await processWithIntegration(
         mockInput,
         flagsWithCache,
@@ -274,7 +349,7 @@ describe('Pipeline Integration Contract Tests', () => {
       // Different template hash
       const inputWithDifferentTemplate = {
         ...mockInput,
-        templateHash: 'different-template-hash',
+        templateHash: "different-template-hash",
       };
 
       const result2 = await processWithIntegration(
@@ -286,14 +361,14 @@ describe('Pipeline Integration Contract Tests', () => {
     });
   });
 
-  describe('Validation Trace Artifact', () => {
-    it('should generate properly structured validation trace artifact', () => {
+  describe("Validation Trace Artifact", () => {
+    it("should generate properly structured validation trace artifact", () => {
       const mockFields = [
         {
-          fieldId: 'jobReference' as const,
-          status: 'PASS' as const,
+          fieldId: "jobReference" as const,
+          status: "PASS" as const,
           extracted: true,
-          value: 'JOB-001',
+          value: "JOB-001",
           confidence: 0.95,
           candidates: [],
           selectedCandidate: 0,
@@ -301,34 +376,38 @@ describe('Pipeline Integration Contract Tests', () => {
           validationNotes: [],
         },
         {
-          fieldId: 'assetId' as const,
-          status: 'FAIL' as const,
+          fieldId: "assetId" as const,
+          status: "FAIL" as const,
           extracted: false,
           value: null,
           confidence: 0,
           candidates: [],
           selectedCandidate: -1,
-          reasonCode: 'MISSING_FIELD' as const,
-          validationNotes: ['No candidates found'],
+          reasonCode: "MISSING_FIELD" as const,
+          validationNotes: ["No candidates found"],
         },
       ];
 
-      const artifact = generateValidationTraceArtifact('doc-001', 'run-001', mockFields);
+      const artifact = generateValidationTraceArtifact(
+        "doc-001",
+        "run-001",
+        mockFields
+      );
 
-      expect(artifact.version).toBe('1.0.0');
-      expect(artifact.documentId).toBe('doc-001');
-      expect(artifact.runId).toBe('run-001');
+      expect(artifact.version).toBe("1.0.0");
+      expect(artifact.documentId).toBe("doc-001");
+      expect(artifact.runId).toBe("run-001");
       expect(artifact.timestamp).toBeDefined();
       expect(artifact.fields).toEqual(mockFields);
       expect(artifact.summary.totalFields).toBe(2);
       expect(artifact.summary.passed).toBe(1);
       expect(artifact.summary.failed).toBe(1);
-      expect(artifact.summary.missingFields).toContain('assetId');
+      expect(artifact.summary.missingFields).toContain("assetId");
     });
   });
 
-  describe('Engine Versions', () => {
-    it('should include engine versions in output', async () => {
+  describe("Engine Versions", () => {
+    it("should include engine versions in output", async () => {
       const result = await processWithIntegration(
         mockInput,
         DEFAULT_FEATURE_FLAGS,
@@ -342,7 +421,7 @@ describe('Pipeline Integration Contract Tests', () => {
     });
   });
 
-  describe('Combined Pipeline', () => {
+  describe("Combined Pipeline", () => {
     const allFlagsEnabled: PipelineFeatureFlags = {
       useCriticalFieldExtractor: true,
       useImageQaFusion: true,
@@ -350,7 +429,7 @@ describe('Pipeline Integration Contract Tests', () => {
       useEngineerFeedback: true,
     };
 
-    it('should run all integrations together', async () => {
+    it("should run all integrations together", async () => {
       const result = await processWithIntegration(
         mockInput,
         allFlagsEnabled,
@@ -372,7 +451,7 @@ describe('Pipeline Integration Contract Tests', () => {
       expect(result.cacheKey).toBeDefined();
     });
 
-    it('should maintain determinism with all features enabled', async () => {
+    it("should maintain determinism with all features enabled", async () => {
       const result1 = await processWithIntegration(
         mockInput,
         allFlagsEnabled,

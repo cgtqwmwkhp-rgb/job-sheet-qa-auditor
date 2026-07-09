@@ -13,6 +13,7 @@
  * - Pipeline fails explicitly if no template matches
  */
 
+import { createHash } from "crypto";
 import { extractTextFromDocument, OCRResult } from "./ocr";
 import {
   getOCRConfig,
@@ -57,6 +58,11 @@ import {
   isShadowChallengerEnabled,
   type ShadowComparison,
 } from "./shadowChallenger";
+import {
+  getFeatureFlagsFromEnv,
+  processWithIntegration,
+  type PipelineOutput,
+} from "./pipelineIntegration";
 import * as db from "../db";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -146,6 +152,10 @@ function buildSelectionCohortMeta(
 }
 
 const PIPELINE_VERSION = "2.1.0"; // PR-8: ensemble extraction stage
+
+function sha256(input: string | Buffer): string {
+  return createHash("sha256").update(input).digest("hex");
+}
 
 /**
  * Process a job sheet document through the full pipeline
@@ -710,6 +720,65 @@ export async function processJobSheetWithOptions(
     );
   }
 
+  // =========================================================================
+  // Stage 1.85: Pipeline Integration (Phase 1.4) — FULL path only
+  // Master-flagged and fail-soft; sub-flags are no-ops unless enabled.
+  // Persists artifacts on reportJson without changing canonical analysis.
+  // =========================================================================
+  const pipelineIntegrationStartTime = Date.now();
+  let pipelineIntegrationResult: PipelineOutput | null = null;
+
+  if (process.env.FEATURE_PIPELINE_INTEGRATION === "true") {
+    try {
+      const fileContent = Buffer.from(extractedText, "utf-8");
+      pipelineIntegrationResult = await processWithIntegration(
+        {
+          documentId: String(jobSheetId),
+          fileContent,
+          fileHash: sha256(fileContent),
+          templateVersionId: usedTemplateVersionId,
+          templateHash: sha256(JSON.stringify(spec)),
+        },
+        getFeatureFlagsFromEnv(),
+        extractedText
+      );
+      recordStage(
+        {
+          stage: "Pipeline Integration",
+          status: "success",
+          durationMs: Date.now() - pipelineIntegrationStartTime,
+        },
+        "AI Analysis"
+      );
+    } catch (pipelineIntegrationError) {
+      console.warn(
+        "[DocumentProcessor] Pipeline integration failed (non-fatal):",
+        pipelineIntegrationError
+      );
+      recordStage(
+        {
+          stage: "Pipeline Integration",
+          status: "failed",
+          durationMs: Date.now() - pipelineIntegrationStartTime,
+          error:
+            pipelineIntegrationError instanceof Error
+              ? pipelineIntegrationError.message
+              : "Pipeline integration failed",
+        },
+        "AI Analysis"
+      );
+    }
+  } else {
+    recordStage(
+      {
+        stage: "Pipeline Integration",
+        status: "skipped",
+        durationMs: Date.now() - pipelineIntegrationStartTime,
+      },
+      "AI Analysis"
+    );
+  }
+
   // Stage 2: AI Analysis
   const analysisStartTime = Date.now();
   let analysisResult: AnalysisResult;
@@ -949,6 +1018,9 @@ export async function processJobSheetWithOptions(
         modelRegistry: modelRegistryStamp(),
         ...(ensembleResult
           ? { ensembleExtraction: ensembleResult.artifact }
+          : {}),
+        ...(pipelineIntegrationResult
+          ? { pipelineIntegration: pipelineIntegrationResult }
           : {}),
         ...(shadowComparison ? { shadowComparison } : {}),
         ...ocrResilienceReportFields(ocrResult),
