@@ -54,9 +54,7 @@ export function computeCohortBias(
       cohortKey,
       disagreements: entry.disagreements,
       agreementRate:
-        entry.total > 0
-          ? (entry.total - entry.disagreements) / entry.total
-          : 0,
+        entry.total > 0 ? (entry.total - entry.disagreements) / entry.total : 0,
       overturnRate:
         entry.disagreements > 0 ? entry.overturned / entry.disagreements : 0,
     }))
