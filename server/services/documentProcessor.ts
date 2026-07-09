@@ -63,6 +63,24 @@ import {
   processWithIntegration,
   type PipelineOutput,
 } from "./pipelineIntegration";
+import {
+  computeEce,
+  isCalibrationEnabled,
+  suggestThreshold,
+} from "./calibration";
+import {
+  buildDriftAlert,
+  formatAlertForChannel,
+  isOpsAlertsEnabled,
+  rankAttention,
+} from "./opsAlerts";
+import { isRiskRoutingEnabled, routeByRisk } from "./riskRouting";
+import { evaluateStageSlo, isStageSloEnabled } from "./slo";
+import {
+  checkCollision,
+  isTemplateCollisionEnabled,
+} from "./templateCollision";
+import { getVlmConfig, isVlmVerificationEnabled } from "./vlmAdapter";
 import * as db from "../db";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -167,6 +185,175 @@ const PIPELINE_VERSION = "2.1.0"; // PR-8: ensemble extraction stage
 
 function sha256(input: string | Buffer): string {
   return createHash("sha256").update(input).digest("hex");
+}
+
+function confidenceToUnit(score: number): number {
+  const unitScore = score > 1 ? score / 100 : score;
+  return Math.max(0, Math.min(1, unitScore));
+}
+
+type FlaggedProcessorArtifacts = Record<string, unknown>;
+
+function buildFlaggedProcessorArtifacts(input: {
+  jobSheetId: number;
+  ocrResult: OCRResult;
+  analysisResult: AnalysisResult;
+  stages: ProcessingResult["processingStages"];
+  processingSettings: Awaited<ReturnType<typeof db.getProcessingSettings>>;
+  selectionResult?: SelectionResult;
+  usedTemplateVersionId?: number;
+}): FlaggedProcessorArtifacts | null {
+  const artifacts: FlaggedProcessorArtifacts = {};
+  const confidence = confidenceToUnit(input.analysisResult.score);
+
+  const addArtifact = <T>(
+    key: string,
+    enabled: boolean,
+    build: () => T
+  ): void => {
+    if (!enabled) return;
+
+    try {
+      artifacts[key] = build();
+    } catch (error) {
+      console.warn(
+        `[DocumentProcessor] ${key} feature artifact failed (non-fatal):`,
+        error
+      );
+    }
+  };
+
+  addArtifact("calibration", isCalibrationEnabled(), () => {
+    const currentThreshold = confidenceToUnit(
+      input.processingSettings.llmConfidenceThreshold ?? 70
+    );
+    const labelledSamples: [] = [];
+
+    return {
+      sampleCount: labelledSamples.length,
+      ece: computeEce(labelledSamples),
+      thresholdSuggestion: suggestThreshold(labelledSamples, {
+        currentThreshold,
+      }),
+      note: "No reviewed outcome labels are available during upload processing.",
+    };
+  });
+
+  addArtifact("riskRouting", isRiskRoutingEnabled(), () =>
+    routeByRisk({
+      jobSheetId: input.jobSheetId,
+      confidence,
+      findings: input.analysisResult.findings.map(finding => ({
+        severity: finding.severity,
+        reasonCode: finding.reasonCode,
+        fieldName: finding.fieldName,
+      })),
+    })
+  );
+
+  addArtifact("opsAlerts", isOpsAlertsEnabled(), () => {
+    const reasons = [
+      `result=${input.analysisResult.overallResult}`,
+      `confidence=${confidence.toFixed(2)}`,
+      `findings=${input.analysisResult.findings.length}`,
+    ];
+    const attentionScore = Math.max(
+      0,
+      Math.min(
+        1,
+        1 - confidence + (input.analysisResult.findings.length > 0 ? 0.15 : 0)
+      )
+    );
+    const attentionQueue = rankAttention(
+      [
+        {
+          jobSheetId: input.jobSheetId,
+          score: Number(attentionScore.toFixed(4)),
+          reasons,
+        },
+      ],
+      1
+    );
+    const alert =
+      attentionScore >= 0.5
+        ? buildDriftAlert({
+            metric: "processor_attention_score",
+            severity: attentionScore >= 0.8 ? "critical" : "warn",
+            message: `Job sheet ${input.jobSheetId} has elevated processor attention score ${attentionScore.toFixed(2)}`,
+          })
+        : null;
+
+    return {
+      attentionQueue,
+      alert,
+      formattedLog: alert ? formatAlertForChannel(alert, "log") : null,
+    };
+  });
+
+  addArtifact("stageSlo", isStageSloEnabled(), () => {
+    const stageMap = [
+      ["OCR Text Extraction", "ocr"],
+      ["Ensemble Extraction", "ensemble"],
+      ["AI Analysis", "judgment"],
+    ] as const;
+
+    return stageMap
+      .map(([processorStage, sloStage]) => {
+        const observed = input.stages.find(
+          stage => stage.stage === processorStage && stage.status !== "skipped"
+        );
+        if (!observed) return null;
+        return evaluateStageSlo({
+          stage: sloStage,
+          latencyMs: observed.durationMs,
+          ok: observed.status === "success",
+        });
+      })
+      .filter(Boolean);
+  });
+
+  addArtifact("templateCollision", isTemplateCollisionEnabled(), () => {
+    const version = input.usedTemplateVersionId
+      ? getTemplateVersion(input.usedTemplateVersionId)
+      : null;
+    const selectedTemplate = version ? getTemplate(version.templateId) : null;
+    const candidate = {
+      templateId:
+        selectedTemplate?.templateId ??
+        input.selectionResult?.candidates?.[0]?.templateSlug ??
+        `version-${input.usedTemplateVersionId ?? "unknown"}`,
+      fingerprint: version?.hashSha256 ?? "",
+      version: version?.version,
+    };
+    const existing = getActiveTemplates()
+      .filter(template => template.templateId !== candidate.templateId)
+      .map(template => {
+        const activeVersion = template.activeVersionId
+          ? getTemplateVersion(template.activeVersionId)
+          : null;
+        return {
+          templateId: template.templateId,
+          fingerprint: activeVersion?.hashSha256 ?? "",
+          version: template.activeVersion ?? undefined,
+        };
+      });
+
+    return checkCollision(candidate, existing);
+  });
+
+  addArtifact("vlmVerification", isVlmVerificationEnabled(), () => {
+    const config = getVlmConfig();
+    return {
+      enabled: config.enabled,
+      provider: config.provider,
+      model: config.model,
+      maxCropsPerDoc: config.maxCropsPerDoc,
+      confidenceThreshold: config.confidenceThreshold,
+      note: "Document processor has no crop image at this stage; ROI paths invoke VLM when crop data is present.",
+    };
+  });
+
+  return Object.keys(artifacts).length > 0 ? artifacts : null;
 }
 
 /**
@@ -1004,6 +1191,16 @@ async function processJobSheetWithOptions(
     );
   }
 
+  const flaggedProcessorArtifacts = buildFlaggedProcessorArtifacts({
+    jobSheetId,
+    ocrResult,
+    analysisResult,
+    stages,
+    processingSettings,
+    selectionResult,
+    usedTemplateVersionId,
+  });
+
   // Stage 3: Store Results
   const storageStartTime = Date.now();
   let auditResultId: number | undefined;
@@ -1063,6 +1260,9 @@ async function processJobSheetWithOptions(
           ? { pipelineIntegration: pipelineIntegrationResult }
           : {}),
         ...(shadowComparison ? { shadowComparison } : {}),
+        ...(flaggedProcessorArtifacts
+          ? { featureFlagArtifacts: flaggedProcessorArtifacts }
+          : {}),
         ...ocrResilienceReportFields(ocrResult),
         ...(selectionResult ? { selectionResult } : {}),
         selectionCohort: buildSelectionCohortMeta(
