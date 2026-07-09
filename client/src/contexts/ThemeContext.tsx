@@ -1,9 +1,21 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-
-type Theme = "light" | "dark";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import {
+  THEME_STORAGE_KEY,
+  type Theme,
+  applyThemeClass,
+  nextTheme,
+  parseStoredTheme,
+} from "@/lib/theme";
 
 interface ThemeContextType {
   theme: Theme;
+  setTheme: (theme: Theme) => void;
   toggleTheme?: () => void;
   switchable: boolean;
 }
@@ -21,35 +33,40 @@ export function ThemeProvider({
   defaultTheme = "light",
   switchable = false,
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (switchable) {
-      const stored = localStorage.getItem("theme");
-      return (stored as Theme) || defaultTheme;
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (switchable && typeof localStorage !== "undefined") {
+      return parseStoredTheme(
+        localStorage.getItem(THEME_STORAGE_KEY),
+        defaultTheme
+      );
     }
     return defaultTheme;
   });
 
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
+    applyThemeClass(document.documentElement, theme);
 
     if (switchable) {
-      localStorage.setItem("theme", theme);
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
     }
   }, [theme, switchable]);
 
+  const setTheme = useCallback(
+    (next: Theme) => {
+      if (!switchable) return;
+      setThemeState(next);
+    },
+    [switchable]
+  );
+
   const toggleTheme = switchable
     ? () => {
-        setTheme(prev => (prev === "light" ? "dark" : "light"));
+        setThemeState(prev => nextTheme(prev));
       }
     : undefined;
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, switchable }}>
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, switchable }}>
       {children}
     </ThemeContext.Provider>
   );

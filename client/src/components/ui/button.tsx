@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Button Component - Plantexpand Style Guide
- * 
+ *
  * Primary: Lime Green (#BEDA41) with Charcoal text
  * Secondary: White with border
  * Ghost: Transparent with hover background
@@ -18,22 +18,21 @@ const buttonVariants = cva(
     variants: {
       variant: {
         // Primary - Lime Green with Charcoal text
-        default: 
+        default:
           "bg-primary text-primary-foreground hover:bg-[#A8C038] hover:-translate-y-0.5 active:translate-y-0",
         // Destructive - Crimson Red
         destructive:
           "bg-destructive text-white hover:bg-[#962C2C] focus-visible:ring-destructive/50",
-        // Outline/Secondary - White with border
+        // Outline/Secondary - surface with border (token-aware for dark mode)
         outline:
-          "border border-[#EBE8E8] bg-white text-foreground hover:bg-[#33303008] hover:border-foreground font-medium",
+          "border border-border bg-background text-foreground hover:bg-muted hover:border-foreground font-medium",
         // Secondary - Same as outline for Plantexpand
         secondary:
-          "border border-[#EBE8E8] bg-white text-foreground hover:bg-[#33303008] hover:border-foreground font-medium",
+          "border border-border bg-background text-foreground hover:bg-muted hover:border-foreground font-medium",
         // Ghost - Transparent
-        ghost:
-          "bg-transparent text-foreground hover:bg-[#33303008] font-medium",
+        ghost: "bg-transparent text-foreground hover:bg-muted font-medium",
         // Link - Blue underline
-        link: "text-[#2868CE] underline-offset-4 hover:underline hover:text-[#1E52A3] font-medium",
+        link: "text-[#2868CE] underline-offset-4 hover:underline hover:text-[#1E52A3] dark:text-[#4A85E0] dark:hover:text-[#2868CE] font-medium",
       },
       size: {
         // Small: 36px height
