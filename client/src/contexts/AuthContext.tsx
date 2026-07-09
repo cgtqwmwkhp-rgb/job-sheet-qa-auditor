@@ -67,15 +67,25 @@ async function checkAuth(): Promise<User | null> {
   if (demo) return demo;
 
   try {
+    // redirect:manual — Easy Auth must not follow 302→login.windows.net on this
+    // XHR (that triggers a CORS failure and breaks the SPA). Treat opaqueredirect
+    // / non-OK as signed-out so /login can render the Entra CTA.
     const response = await fetch("/api/trpc/auth.me", {
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      redirect: "manual",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
     });
 
+    if (response.type === "opaqueredirect" || response.status === 0) {
+      return null;
+    }
     if (!response.ok) return null;
 
     const data = await response.json();
-    const user = data?.result?.data;
+    const user = data?.result?.data?.json ?? data?.result?.data;
 
     if (user?.id || user?.openId) {
       return {
