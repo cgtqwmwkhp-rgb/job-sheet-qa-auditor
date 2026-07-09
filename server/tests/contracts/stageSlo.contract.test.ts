@@ -153,8 +153,8 @@ describe("Stage SLO Contract (Phase 3.7)", () => {
       expect(result.withinCost).toBe(false);
       expect(result.withinBudget).toBe(false);
       expect(result.breaches).toHaveLength(2);
-      expect(result.breaches.some((b) => b.includes("latency"))).toBe(true);
-      expect(result.breaches.some((b) => b.includes("cost"))).toBe(true);
+      expect(result.breaches.some(b => b.includes("latency"))).toBe(true);
+      expect(result.breaches.some(b => b.includes("cost"))).toBe(true);
     });
 
     it("accepts custom budget overrides", async () => {

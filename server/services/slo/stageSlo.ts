@@ -3,11 +3,7 @@
  */
 
 import { DEFAULT_STAGE_BUDGETS } from "./budgets";
-import type {
-  StageBudgetMap,
-  StageObservation,
-  StageSloResult,
-} from "./types";
+import type { StageBudgetMap, StageObservation, StageSloResult } from "./types";
 
 export function evaluateStageSlo(
   obs: StageObservation,
