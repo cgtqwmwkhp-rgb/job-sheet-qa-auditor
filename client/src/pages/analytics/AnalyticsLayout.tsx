@@ -17,6 +17,7 @@ import {
   FileText,
   Wrench,
   Activity,
+  BrainCircuit,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
@@ -44,6 +45,11 @@ export function AnalyticsLayout({
     { href: "/analytics/first-fix", label: "First Fix Rate", icon: Wrench },
     { href: "/analytics/sites", label: "Site Intelligence", icon: Map },
     { href: "/analytics/drift", label: "Drift Detection", icon: Activity },
+    {
+      href: "/analytics/predictive",
+      label: "Predictive Risk",
+      icon: BrainCircuit,
+    },
     { href: "/analytics/reports", label: "Custom Reports", icon: FileText },
   ];
 

@@ -1326,3 +1326,134 @@ export async function getDriftAnalyticsFindings(options?: {
     occurredAt: r.occurredAt,
   }));
 }
+
+// ============ PR-19: PREDICTIVE RISK ANALYTICS ============
+
+export interface PredictiveRiskDocumentRow {
+  jobSheetId: number;
+  technicianId: number | null;
+  templateSlug: string | null;
+  assetType: string | null;
+  result: "pass" | "fail" | "review_queue" | "waived";
+  confidenceScore: number | null;
+  processedAt: Date;
+}
+
+export interface PredictiveRiskFindingRow {
+  findingId: number;
+  jobSheetId: number;
+  technicianId: number | null;
+  severity: "S0" | "S1" | "S2" | "S3";
+  reasonCode: string;
+  fieldName: string;
+  resolutionStatus: "open" | "waived" | "overridden" | "flagged" | "approved";
+  occurredAt: Date;
+}
+
+export interface PredictiveRiskDisputeRow {
+  id: number;
+  auditFindingId: number;
+  raisedBy: number;
+  status: string;
+  createdAt: Date;
+}
+
+/**
+ * Job sheets + latest audit for predictive risk scoring (PR-19).
+ * Reuses the same join shape as drift analytics.
+ */
+export async function getPredictiveRiskDocuments(options?: {
+  startDate?: Date;
+  endDate?: Date;
+}): Promise<PredictiveRiskDocumentRow[]> {
+  return getDriftAnalyticsDocuments(options);
+}
+
+/**
+ * Findings with technician + reason metadata for leading indicators (PR-19).
+ */
+export async function getPredictiveRiskFindings(options?: {
+  startDate?: Date;
+  endDate?: Date;
+}): Promise<PredictiveRiskFindingRow[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [];
+  if (options?.startDate) {
+    conditions.push(gte(auditFindings.createdAt, options.startDate));
+  }
+  if (options?.endDate) {
+    conditions.push(lte(auditFindings.createdAt, options.endDate));
+  }
+
+  const rows = await db
+    .select({
+      findingId: auditFindings.id,
+      jobSheetId: jobSheets.id,
+      technicianId: jobSheets.technicianId,
+      severity: auditFindings.severity,
+      reasonCode: auditFindings.reasonCode,
+      fieldName: auditFindings.fieldName,
+      resolutionStatus: auditFindings.resolutionStatus,
+      occurredAt: auditFindings.createdAt,
+    })
+    .from(auditFindings)
+    .innerJoin(auditResults, eq(auditFindings.auditResultId, auditResults.id))
+    .innerJoin(jobSheets, eq(auditResults.jobSheetId, jobSheets.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  return rows.map(r => ({
+    findingId: r.findingId,
+    jobSheetId: r.jobSheetId,
+    technicianId: r.technicianId,
+    severity: r.severity,
+    reasonCode: r.reasonCode,
+    fieldName: r.fieldName ?? "",
+    resolutionStatus: (r.resolutionStatus ?? "open") as
+      | "open"
+      | "waived"
+      | "overridden"
+      | "flagged"
+      | "approved",
+    occurredAt: r.occurredAt,
+  }));
+}
+
+/**
+ * Disputes in-window for dispute-rate leading indicator (PR-19).
+ */
+export async function getPredictiveRiskDisputes(options?: {
+  startDate?: Date;
+  endDate?: Date;
+}): Promise<PredictiveRiskDisputeRow[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [];
+  if (options?.startDate) {
+    conditions.push(gte(disputes.createdAt, options.startDate));
+  }
+  if (options?.endDate) {
+    conditions.push(lte(disputes.createdAt, options.endDate));
+  }
+
+  const rows = await db
+    .select({
+      id: disputes.id,
+      auditFindingId: disputes.auditFindingId,
+      raisedBy: disputes.raisedBy,
+      status: disputes.status,
+      createdAt: disputes.createdAt,
+    })
+    .from(disputes)
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  return rows.map(r => ({
+    id: r.id,
+    auditFindingId: r.auditFindingId,
+    raisedBy: r.raisedBy,
+    status: r.status,
+    createdAt: r.createdAt,
+  }));
+}
