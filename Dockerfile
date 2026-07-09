@@ -49,6 +49,7 @@ COPY --from=builder --chown=appuser:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=appuser:nodejs /app/drizzle ./drizzle
 COPY --from=builder --chown=appuser:nodejs /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=builder --chown=appuser:nodejs /app/scripts/ensure-failed-jobs-table.mjs ./scripts/ensure-failed-jobs-table.mjs
+COPY --from=builder --chown=appuser:nodejs /app/scripts/ensure-audit-findings-resolution.mjs ./scripts/ensure-audit-findings-resolution.mjs
 
 # Migrate-on-start entrypoint (runs drizzle-kit migrate when DATABASE_URL is set)
 COPY scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
