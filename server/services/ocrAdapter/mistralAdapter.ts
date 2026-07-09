@@ -320,11 +320,14 @@ export class MistralOCRAdapter implements OCRAdapter {
 
     let retryAttempts = 0;
 
-    const documentPayload = {
-      type: "base64",
-      base64: base64Data,
-      mime_type: mimeType,
-    };
+    // Mistral OCR expects DocumentURLChunk / ImageURLChunk — not a custom "base64" type.
+    // Local bytes must be sent as a data URI in document_url (PDF) or image_url (images).
+    const rawBase64 = base64Data.replace(/^data:[^;]+;base64,/, "");
+    const isImage = mimeType.startsWith("image/");
+    const dataUri = `data:${mimeType};base64,${rawBase64}`;
+    const documentPayload = isImage
+      ? { type: "image_url" as const, image_url: dataUri }
+      : { type: "document_url" as const, document_url: dataUri };
 
     try {
       const result = await withResiliency(

@@ -19,6 +19,8 @@ import "react-pdf/dist/Page/TextLayer.css";
 // Set worker source to CDN to avoid build-time resolution issues
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
+type PdfFileSource = string | { data: ArrayBuffer };
+
 /**
  * Guard: Throw in dev if blob.core.windows.net URL is used
  * This prevents CORS issues with Azure Blob SAS URLs
@@ -83,11 +85,53 @@ export function DocumentViewer({
     width: number;
     height: number;
   } | null>(null);
+  /** Authenticated bytes for Easy Auth — pdf.js URL fetch omits cookies by default. */
+  const [pdfFile, setPdfFile] = useState<PdfFileSource | null>(null);
+  const [pdfLoadError, setPdfLoadError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Guard: prevent direct blob URLs
   useEffect(() => {
     assertNoDirectBlobUrl(url);
+  }, [url]);
+
+  // Fetch via credentials:include so AppServiceAuthSession reaches /api/documents/:id/pdf
+  useEffect(() => {
+    let cancelled = false;
+    setPdfFile(null);
+    setPdfLoadError(null);
+    setNumPages(0);
+
+    if (!url) return;
+
+    (async () => {
+      try {
+        const res = await fetch(url, {
+          credentials: "include",
+          headers: { Accept: "application/pdf" },
+        });
+        if (!res.ok) {
+          throw new Error(`PDF fetch failed (${res.status})`);
+        }
+        const buffer = await res.arrayBuffer();
+        if (!cancelled) {
+          setPdfFile({ data: buffer });
+        }
+      } catch (err) {
+        console.error("[DocumentViewer] Authenticated PDF fetch failed:", err);
+        if (!cancelled) {
+          // Fallback: let react-pdf try with withCredentials
+          setPdfFile(url);
+          setPdfLoadError(
+            err instanceof Error ? err.message : "PDF fetch failed"
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [url]);
 
   // Sync page from finding selection during render (avoids setState-in-effect)
@@ -254,98 +298,106 @@ export function DocumentViewer({
       </CardHeader>
 
       <div className="flex-1 bg-muted/50 overflow-auto p-4 flex items-center justify-center relative">
-        <Document
-          file={url}
-          onLoadSuccess={onDocumentLoadSuccess}
-          className="shadow-lg"
-          loading={
-            <div className="flex items-center justify-center h-64 w-full">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          }
-          error={
-            <div className="flex flex-col items-center justify-center h-64 w-full text-destructive">
-              <p>Failed to load document.</p>
-              <p className="text-xs mt-2">
-                Please check if the file exists and is a valid PDF.
-              </p>
-            </div>
-          }
-        >
-          <div
-            className={`relative inline-block ${isDrawing ? "cursor-crosshair" : ""}`}
-            ref={containerRef}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-          >
-            <Page
-              pageNumber={pageNumber}
-              scale={scale}
-              rotate={rotation}
-              renderTextLayer={true}
-              renderAnnotationLayer={true}
-              className="bg-white shadow-md"
-            />
-
-            {/* Current Drawing Box */}
-            {currentBox && (
-              <div
-                className="absolute border-2 border-blue-500 bg-blue-500/20 z-20"
-                style={{
-                  left: `${currentBox.x}%`,
-                  top: `${currentBox.y}%`,
-                  width: `${currentBox.width}%`,
-                  height: `${currentBox.height}%`,
-                }}
-              />
-            )}
-
-            {/* Bounding Boxes Overlay */}
-            {currentPageBoxes.map(box => {
-              const isActive = activeBoxId != null && box.id === activeBoxId;
-              const isPulsing = isActive;
-              return (
-                <div
-                  key={box.id}
-                  data-box-id={String(box.id)}
-                  data-active={isActive ? "true" : undefined}
-                  onClick={e => {
-                    e.stopPropagation();
-                    onBoxClick?.(box.id);
-                  }}
-                  className={`absolute border-2 cursor-pointer transition-all hover:bg-opacity-20 z-10 ${
-                    isActive
-                      ? "scale-[1.02] z-20 ring-2 ring-offset-1 ring-primary"
-                      : "hover:scale-[1.02]"
-                  } ${isPulsing ? "animate-pulse" : ""}`}
-                  style={{
-                    left: `${box.x}%`,
-                    top: `${box.y}%`,
-                    width: `${box.width}%`,
-                    height: `${box.height}%`,
-                    borderColor: box.color || "#ef4444",
-                    backgroundColor: isActive
-                      ? `${box.color || "#ef4444"}40`
-                      : `${box.color || "#ef4444"}1A`, // 10% opacity
-                    borderWidth: isActive ? 3 : 2,
-                  }}
-                  title={box.label}
-                >
-                  {box.label && (
-                    <span
-                      className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
-                      style={{ backgroundColor: box.color || "#ef4444" }}
-                    >
-                      {box.label}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+        {!pdfFile ? (
+          <div className="flex items-center justify-center h-64 w-full">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
-        </Document>
+        ) : (
+          <Document
+            file={pdfFile}
+            options={{ withCredentials: true }}
+            onLoadSuccess={onDocumentLoadSuccess}
+            className="shadow-lg"
+            loading={
+              <div className="flex items-center justify-center h-64 w-full">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            }
+            error={
+              <div className="flex flex-col items-center justify-center h-64 w-full text-destructive">
+                <p>Failed to load document.</p>
+                <p className="text-xs mt-2">
+                  {pdfLoadError ||
+                    "Please check if the file exists and is a valid PDF."}
+                </p>
+              </div>
+            }
+          >
+            <div
+              className={`relative inline-block ${isDrawing ? "cursor-crosshair" : ""}`}
+              ref={containerRef}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
+              <Page
+                pageNumber={pageNumber}
+                scale={scale}
+                rotate={rotation}
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+                className="bg-white shadow-md"
+              />
+
+              {/* Current Drawing Box */}
+              {currentBox && (
+                <div
+                  className="absolute border-2 border-blue-500 bg-blue-500/20 z-20"
+                  style={{
+                    left: `${currentBox.x}%`,
+                    top: `${currentBox.y}%`,
+                    width: `${currentBox.width}%`,
+                    height: `${currentBox.height}%`,
+                  }}
+                />
+              )}
+
+              {/* Bounding Boxes Overlay */}
+              {currentPageBoxes.map(box => {
+                const isActive = activeBoxId != null && box.id === activeBoxId;
+                const isPulsing = isActive;
+                return (
+                  <div
+                    key={box.id}
+                    data-box-id={String(box.id)}
+                    data-active={isActive ? "true" : undefined}
+                    onClick={e => {
+                      e.stopPropagation();
+                      onBoxClick?.(box.id);
+                    }}
+                    className={`absolute border-2 cursor-pointer transition-all hover:bg-opacity-20 z-10 ${
+                      isActive
+                        ? "scale-[1.02] z-20 ring-2 ring-offset-1 ring-primary"
+                        : "hover:scale-[1.02]"
+                    } ${isPulsing ? "animate-pulse" : ""}`}
+                    style={{
+                      left: `${box.x}%`,
+                      top: `${box.y}%`,
+                      width: `${box.width}%`,
+                      height: `${box.height}%`,
+                      borderColor: box.color || "#ef4444",
+                      backgroundColor: isActive
+                        ? `${box.color || "#ef4444"}40`
+                        : `${box.color || "#ef4444"}1A`, // 10% opacity
+                      borderWidth: isActive ? 3 : 2,
+                    }}
+                    title={box.label}
+                  >
+                    {box.label && (
+                      <span
+                        className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
+                        style={{ backgroundColor: box.color || "#ef4444" }}
+                      >
+                        {box.label}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Document>
+        )}
       </div>
     </Card>
   );

@@ -519,88 +519,29 @@ async function processJobSheetWithOptions(
   // Load processing thresholds (OCR / LLM confidence)
   const processingSettings = await db.getProcessingSettings();
 
-  // Threshold: low OCR page confidence → review_queue (do not auto-complete)
+  // Soft gate: low OCR page confidence must NOT abort before template selection /
+  // Gemini judgment. Earlier hard-abort produced score≈OCR% with 0 findings in ~1s
+  // (e.g. JOB-20260709-3AZPKT). Continue the pipeline and force review_queue later.
   const pageConfidencePrior = computePageConfidencePrior(ocrResult);
   const ocrThreshold = (processingSettings.ocrConfidenceThreshold ?? 60) / 100;
-  if (
+  const lowOcrConfidence =
     typeof pageConfidencePrior === "number" &&
-    pageConfidencePrior < ocrThreshold
-  ) {
-    console.warn(`[DocumentProcessor] OCR confidence below threshold`, {
-      jobSheetId,
-      pageConfidencePrior,
-      ocrThreshold,
-    });
-
-    try {
-      await db.updateJobSheetStatus(jobSheetId, "review_queue");
-    } catch (error) {
-      console.warn(
-        "[DocumentProcessor] Could not update job sheet status:",
-        error
-      );
-    }
-
+    pageConfidencePrior < ocrThreshold;
+  if (lowOcrConfidence) {
+    console.warn(
+      `[DocumentProcessor] OCR confidence below threshold — continuing to judgment`,
+      {
+        jobSheetId,
+        pageConfidencePrior,
+        ocrThreshold,
+      }
+    );
     recordStage({
       stage: "OCR Confidence Gate",
-      status: "failed",
+      status: "skipped",
       durationMs: 0,
       error: "LOW_OCR_CONFIDENCE",
     });
-
-    let auditResultId: number | undefined;
-    try {
-      const auditResult = await db.createAuditResult({
-        jobSheetId,
-        goldSpecId: options.goldSpecId || 1,
-        runId,
-        result: "review_queue",
-        confidenceScore: String(Math.round(pageConfidencePrior * 100)),
-        documentStrategy: "ocr",
-        ocrEngineVersion: getOCREngineVersion(
-          ocrResult.model,
-          getOCRConfig(),
-          ocrResult.provider
-        ),
-        pipelineVersion: PIPELINE_VERSION,
-        reportJson: {
-          summary:
-            "OCR confidence below configured threshold. Manual review required.",
-          reasonCode: "LOW_OCR_CONFIDENCE",
-          pageConfidencePrior,
-          ocrConfidenceThreshold: processingSettings.ocrConfidenceThreshold,
-          pageCount: ocrResult.totalPages,
-          processingStages: stages,
-          modelRegistry: modelRegistryStamp(),
-          ...ocrResilienceReportFields(ocrResult),
-        },
-        processingTimeMs: Date.now() - startTime,
-      });
-      auditResultId = auditResult.id;
-    } catch (dbError) {
-      console.error(
-        "[DocumentProcessor] Failed to store low-OCR-confidence result:",
-        dbError
-      );
-      finishProgress("failed");
-      return {
-        success: false,
-        jobSheetId,
-        ocrResult,
-        processingStages: stages,
-        totalDurationMs: Date.now() - startTime,
-      };
-    }
-
-    finishProgress("review_queue");
-    return {
-      success: true,
-      jobSheetId,
-      auditResultId,
-      ocrResult,
-      processingStages: stages,
-      totalDurationMs: Date.now() - startTime,
-    };
   }
 
   // Combine all page text
@@ -1092,6 +1033,35 @@ async function processJobSheetWithOptions(
     };
   }
 
+  // Soft OCR gate: after judgment, still force human review when page OCR prior was low.
+  // Never skip Gemini — only demote PASS/FAIL → REVIEW_QUEUE with an explicit finding.
+  if (lowOcrConfidence && analysisResult.overallResult !== "FAIL") {
+    const ocrPct = Math.round((pageConfidencePrior ?? 0) * 100);
+    analysisResult = {
+      ...analysisResult,
+      overallResult: "REVIEW_QUEUE",
+      summary:
+        `${analysisResult.summary} ` +
+        `[LOW_OCR_CONFIDENCE] Page OCR confidence ${ocrPct}% is below threshold ${processingSettings.ocrConfidenceThreshold}; queued for human review after judgment.`,
+      findings: [
+        ...analysisResult.findings,
+        {
+          ruleId: "SYSTEM",
+          fieldName: "OCR Confidence",
+          severity: "S2" as const,
+          reasonCode: "LOW_CONFIDENCE" as const,
+          rawSnippet: "",
+          normalisedSnippet: "",
+          confidence: ocrPct,
+          pageNumber: 1,
+          whyItMatters: `OCR page confidence prior ${pageConfidencePrior} is below ocrConfidenceThreshold ${ocrThreshold}.`,
+          suggestedFix:
+            "Review the scan quality and extracted fields before accepting the result.",
+        },
+      ],
+    };
+  }
+
   // Ensemble consensus → review_queue on CONFLICT / low confidence required fields
   // Does not override FAIL; never promotes to PASS.
   if (
@@ -1251,6 +1221,13 @@ async function processJobSheetWithOptions(
             )
           : analysisResult.extractedFields,
         pageCount: ocrResult.totalPages,
+        ...(typeof pageConfidencePrior === "number"
+          ? {
+              pageConfidencePrior,
+              ocrConfidenceThreshold: processingSettings.ocrConfidenceThreshold,
+              lowOcrConfidence,
+            }
+          : {}),
         processingStages: stages,
         modelRegistry: modelRegistryStamp(),
         ...(ensembleResult
