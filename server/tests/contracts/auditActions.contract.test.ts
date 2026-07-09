@@ -14,6 +14,8 @@ import {
   bulkApproveFindings,
   approveJobSheet,
   undoJobSheetApprove,
+  captureFieldCorrection,
+  undoFieldCorrection,
   mapActionToStatus,
   canUndo,
   buildUndoToken,
@@ -36,11 +38,17 @@ function createMemoryDeps() {
     id: 1,
     auditResultId: 10,
     resolutionStatus: "open",
+    fieldName: "site_name",
+    rawSnippet: "Acme Site",
+    normalisedSnippet: "Acme Site",
   });
   findings.set(2, {
     id: 2,
     auditResultId: 10,
     resolutionStatus: "open",
+    fieldName: "date",
+    rawSnippet: "01/01/2024",
+    normalisedSnippet: "01/01/2024",
   });
   audits.set(10, {
     id: 10,
@@ -61,6 +69,14 @@ function createMemoryDeps() {
         resolvedBy: data.resolvedBy,
         resolvedAt: data.resolvedAt ?? null,
         previousResolutionStatus: data.previousResolutionStatus,
+      });
+    },
+    updateFindingSnippet: async (id, data) => {
+      const existing = findings.get(id);
+      if (!existing) throw new Error("not found");
+      findings.set(id, {
+        ...existing,
+        normalisedSnippet: data.normalisedSnippet,
       });
     },
     getAuditResult: async id => audits.get(id),
@@ -129,12 +145,18 @@ describe("Audit Actions Contract (PR-10)", () => {
         __dirname,
         "../../../client/src/pages/AuditResults.tsx"
       );
-      const content = fs.readFileSync(pagePath, "utf-8");
-      expect(content).toContain("auditActions.flag");
-      expect(content).toContain("auditActions.override");
-      expect(content).toContain("handleFlagForReview");
-      expect(content).toContain("onOverride");
-      expect(content).toContain('label: "Undo"');
+      const panePath = path.resolve(
+        __dirname,
+        "../../../client/src/components/review/ReviewWorkstationPane.tsx"
+      );
+      const page = fs.readFileSync(pagePath, "utf-8");
+      const pane = fs.readFileSync(panePath, "utf-8");
+      expect(page).toContain("ReviewWorkstationPane");
+      expect(pane).toContain("auditActions.flag");
+      expect(pane).toContain("auditActions.override");
+      expect(pane).toContain("handleFlagForReview");
+      expect(pane).toContain("onOverride");
+      expect(pane).toContain('label: "Undo"');
     });
 
     it("HoldQueue wires Approve and Bulk Approve", () => {
@@ -351,6 +373,58 @@ describe("Audit Actions Contract (PR-10)", () => {
 
       expect(undone.newStatus).toBe("review_queue");
       expect(mem.jobSheetStatuses.get(100)).toBe("review_queue");
+    });
+  });
+
+  describe("captureFieldCorrection (PR-13)", () => {
+    it("updates normalisedSnippet and logs FIELD_CORRECTION", async () => {
+      const mem = createMemoryDeps();
+      const result = await captureFieldCorrection(mem.deps, {
+        findingId: 1,
+        fieldName: "site_name",
+        originalValue: "Acme Site",
+        correctedValue: "ACME Industrial Site",
+        userId: 7,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.correctedValue).toBe("ACME Industrial Site");
+      expect(result.previousSnippet).toBe("Acme Site");
+      expect(mem.findings.get(1)?.normalisedSnippet).toBe(
+        "ACME Industrial Site"
+      );
+      expect(mem.logs.some(l => l.action === "FIELD_CORRECTION")).toBe(true);
+    });
+
+    it("undoes a field correction", async () => {
+      const mem = createMemoryDeps();
+      const captured = await captureFieldCorrection(mem.deps, {
+        findingId: 1,
+        correctedValue: "Fixed value",
+        userId: 1,
+      });
+
+      await undoFieldCorrection(mem.deps, {
+        findingId: 1,
+        previousSnippet: captured.previousSnippet,
+        userId: 1,
+      });
+
+      expect(mem.findings.get(1)?.normalisedSnippet).toBe("Acme Site");
+      expect(mem.logs.some(l => l.action === "FIELD_CORRECTION_UNDO")).toBe(
+        true
+      );
+    });
+
+    it("rejects empty corrected values", async () => {
+      const mem = createMemoryDeps();
+      await expect(
+        captureFieldCorrection(mem.deps, {
+          findingId: 1,
+          correctedValue: "   ",
+          userId: 1,
+        })
+      ).rejects.toThrow(/required/i);
     });
   });
 

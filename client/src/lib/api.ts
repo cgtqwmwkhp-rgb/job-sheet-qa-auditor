@@ -284,6 +284,24 @@ export function useBulkApproveFindings() {
   });
 }
 
+export function useCaptureFieldCorrection() {
+  const utils = trpc.useUtils();
+  return trpc.auditActions.captureFieldCorrection.useMutation({
+    onSuccess: () => {
+      utils.audits.list.invalidate();
+    },
+  });
+}
+
+export function useUndoFieldCorrection() {
+  const utils = trpc.useUtils();
+  return trpc.auditActions.undoFieldCorrection.useMutation({
+    onSuccess: () => {
+      utils.audits.list.invalidate();
+    },
+  });
+}
+
 export function useApproveJobSheet() {
   const utils = trpc.useUtils();
   return trpc.auditActions.approveJobSheet.useMutation({

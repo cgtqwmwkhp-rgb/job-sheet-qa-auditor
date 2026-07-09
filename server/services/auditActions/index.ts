@@ -22,6 +22,10 @@ export interface FindingRecord {
   resolvedBy?: number | null;
   resolvedAt?: Date | null;
   previousResolutionStatus?: ResolutionStatus | null;
+  /** Optional — used by captureFieldCorrection (PR-13) */
+  fieldName?: string | null;
+  rawSnippet?: string | null;
+  normalisedSnippet?: string | null;
 }
 
 export interface AuditResultRecord {
@@ -70,6 +74,11 @@ export interface AuditActionDeps {
     entityId: number;
     details: Record<string, unknown>;
   }) => Promise<void>;
+  /** PR-13: update normalisedSnippet for field corrections */
+  updateFindingSnippet?: (
+    id: number,
+    data: { normalisedSnippet: string }
+  ) => Promise<void>;
 }
 
 export function mapActionToStatus(action: FindingAction): ResolutionStatus {
@@ -331,6 +340,121 @@ async function applySideEffects(
   }
 
   return {};
+}
+
+export interface FieldCorrectionResult {
+  success: true;
+  findingId: number;
+  fieldName: string;
+  previousSnippet: string | null;
+  correctedValue: string;
+  undoToken: string;
+}
+
+/**
+ * Capture a reviewer field correction (PR-13).
+ * Persists corrected value to normalisedSnippet + system_audit_log.
+ * No new migration / table — overnight-scoped ground truth.
+ */
+export async function captureFieldCorrection(
+  deps: AuditActionDeps,
+  input: {
+    findingId: number;
+    fieldName?: string;
+    originalValue?: string;
+    correctedValue: string;
+    userId: number;
+  }
+): Promise<FieldCorrectionResult> {
+  const finding = await deps.getFinding(input.findingId);
+  if (!finding) {
+    throw new Error(`Finding ${input.findingId} not found`);
+  }
+  if (!deps.updateFindingSnippet) {
+    throw new Error("updateFindingSnippet is not configured");
+  }
+
+  const corrected = input.correctedValue.trim();
+  if (!corrected) {
+    throw new Error("Corrected value is required");
+  }
+
+  const previousSnippet = finding.normalisedSnippet ?? null;
+  const fieldName =
+    input.fieldName?.trim() || finding.fieldName || "Unknown Field";
+  const originalValue =
+    input.originalValue ?? finding.rawSnippet ?? previousSnippet ?? "";
+
+  await deps.updateFindingSnippet(input.findingId, {
+    normalisedSnippet: corrected,
+  });
+
+  await deps.logAction({
+    userId: input.userId,
+    action: "FIELD_CORRECTION",
+    entityType: "audit_finding",
+    entityId: input.findingId,
+    details: {
+      fieldName,
+      originalValue,
+      correctedValue: corrected,
+      previousSnippet,
+    },
+  });
+
+  return {
+    success: true,
+    findingId: input.findingId,
+    fieldName,
+    previousSnippet,
+    correctedValue: corrected,
+    undoToken: `undo-fc:${input.findingId}:${encodeURIComponent(previousSnippet ?? "")}`,
+  };
+}
+
+/**
+ * Soft-undo a field correction by restoring previous normalisedSnippet.
+ */
+export async function undoFieldCorrection(
+  deps: AuditActionDeps,
+  input: {
+    findingId: number;
+    previousSnippet: string | null;
+    userId: number;
+  }
+): Promise<FieldCorrectionResult> {
+  const finding = await deps.getFinding(input.findingId);
+  if (!finding) {
+    throw new Error(`Finding ${input.findingId} not found`);
+  }
+  if (!deps.updateFindingSnippet) {
+    throw new Error("updateFindingSnippet is not configured");
+  }
+
+  const current = finding.normalisedSnippet ?? null;
+  await deps.updateFindingSnippet(input.findingId, {
+    normalisedSnippet: input.previousSnippet ?? "",
+  });
+
+  await deps.logAction({
+    userId: input.userId,
+    action: "FIELD_CORRECTION_UNDO",
+    entityType: "audit_finding",
+    entityId: input.findingId,
+    details: {
+      restoredSnippet: input.previousSnippet,
+      undoneSnippet: current,
+    },
+  });
+
+  return {
+    success: true,
+    findingId: input.findingId,
+    fieldName: finding.fieldName || "Unknown Field",
+    previousSnippet: current,
+    correctedValue: input.previousSnippet ?? "",
+    undoToken: `undo-fc:${input.findingId}:${encodeURIComponent(input.previousSnippet ?? "")}`,
+  };
 }
 
 /**

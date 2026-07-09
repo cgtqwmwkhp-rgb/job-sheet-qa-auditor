@@ -382,6 +382,22 @@ export async function updateFindingResolution(
     .where(eq(auditFindings.id, id));
 }
 
+/** PR-13: persist reviewer field correction into normalisedSnippet (no new migration). */
+export async function updateFindingSnippet(
+  id: number,
+  data: { normalisedSnippet: string }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(auditFindings)
+    .set({
+      normalisedSnippet: data.normalisedSnippet,
+    })
+    .where(eq(auditFindings.id, id));
+}
+
 export async function getAuditResultById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
