@@ -10,6 +10,12 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Loader2 } from "lucide-react";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProcessingWatchdog } from "@/hooks/useProcessingWatch";
+
+function ProcessingWatchdog() {
+  useProcessingWatchdog();
+  return null;
+}
 
 // Lazy load pages for performance optimization
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -19,14 +25,22 @@ const HoldQueue = lazy(() => import("./pages/HoldQueue"));
 const SpecManagement = lazy(() => import("./pages/SpecManagement"));
 const SearchPage = lazy(() => import("./pages/Search"));
 const UserManagement = lazy(() => import("./pages/UserManagement"));
-const ExecutiveDashboard = lazy(() => import("./pages/analytics/ExecutiveDashboard"));
+const ExecutiveDashboard = lazy(
+  () => import("./pages/analytics/ExecutiveDashboard")
+);
 const DefectAnalysis = lazy(() => import("./pages/analytics/DefectAnalysis"));
-const TechnicianPerformance = lazy(() => import("./pages/analytics/TechnicianPerformance"));
-const FirstFixAnalysis = lazy(() => import("./pages/analytics/FirstFixAnalysis"));
+const TechnicianPerformance = lazy(
+  () => import("./pages/analytics/TechnicianPerformance")
+);
+const FirstFixAnalysis = lazy(
+  () => import("./pages/analytics/FirstFixAnalysis")
+);
 const AIAnalyst = lazy(() => import("./pages/analytics/AIAnalyst"));
 const ReportStudio = lazy(() => import("./pages/analytics/ReportStudio"));
 const PortalLogin = lazy(() => import("./pages/portal/PortalLogin"));
-const TechnicianDashboard = lazy(() => import("./pages/portal/TechnicianDashboard"));
+const TechnicianDashboard = lazy(
+  () => import("./pages/portal/TechnicianDashboard")
+);
 const DisputeManagement = lazy(() => import("./pages/DisputeManagement"));
 const AuditLog = lazy(() => import("./pages/AuditLog"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -38,7 +52,9 @@ const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
     <div className="flex flex-col items-center gap-4">
       <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      <p className="text-muted-foreground text-sm animate-pulse">Loading application...</p>
+      <p className="text-muted-foreground text-sm animate-pulse">
+        Loading application...
+      </p>
     </div>
   </div>
 );
@@ -59,20 +75,29 @@ function Router() {
         <Route path={"/users"} component={UserManagement} />
         <Route path={"/analytics"} component={ExecutiveDashboard} />
         <Route path={"/analytics/defects"} component={DefectAnalysis} />
-        <Route path={"/analytics/technicians"} component={TechnicianPerformance} />
+        <Route
+          path={"/analytics/technicians"}
+          component={TechnicianPerformance}
+        />
         <Route path={"/analytics/first-fix"} component={FirstFixAnalysis} />
         <Route path={"/analytics/ai"} component={AIAnalyst} />
         <Route path={"/analytics/reports"} component={ReportStudio} />
         <Route path={"/portal/login"} component={PortalLogin} />
         <Route path={"/portal/dashboard"} component={TechnicianDashboard} />
         <Route path="/disputes">
-          <ProtectedRoute component={DisputeManagement} allowedRoles={['admin', 'qa_lead']} />
+          <ProtectedRoute
+            component={DisputeManagement}
+            allowedRoles={["admin", "qa_lead"]}
+          />
         </Route>
         <Route path="/audit-log">
-          <ProtectedRoute component={AuditLog} allowedRoles={['admin']} />
+          <ProtectedRoute component={AuditLog} allowedRoles={["admin"]} />
         </Route>
         <Route path="/settings">
-          <ProtectedRoute component={Settings} allowedRoles={['admin', 'qa_lead']} />
+          <ProtectedRoute
+            component={Settings}
+            allowedRoles={["admin", "qa_lead"]}
+          />
         </Route>
         <Route path="/help" component={HelpCenter} />
         <Route path={"/404"} component={NotFound} />
@@ -98,6 +123,7 @@ function App() {
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
               <Toaster />
+              <ProcessingWatchdog />
               <Router />
               <OnboardingTour />
             </TooltipProvider>

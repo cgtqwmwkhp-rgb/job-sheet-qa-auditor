@@ -4,9 +4,10 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Bell, User } from "lucide-react";
+import { User } from "lucide-react";
 import { CommandCenter } from "./CommandCenter";
 import { Button } from "@/components/ui/button";
+import { NotificationsDropdown } from "@/components/Notifications";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,10 +32,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="flex-1" />
           <div className="flex items-center gap-2">
             <CommandCenter />
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive" />
-            </Button>
+            <NotificationsDropdown />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">
@@ -47,14 +45,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <DropdownMenuItem>Profile</DropdownMenuItem>
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive">Logout</DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive">
+                  Logout
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </header>
-        <main className="flex-1 p-6 overflow-auto">
-          {children}
-        </main>
+        <main className="flex-1 p-6 overflow-auto">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );

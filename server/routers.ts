@@ -13,6 +13,7 @@ import { getStorageAdapter } from "./storage";
 import { nanoid } from "nanoid";
 import { processJobSheet } from "./services/documentProcessor";
 import { validateMistralApiKey } from "./services/ocr";
+import { resolveProcessStatus } from "./services/processStatus";
 import { templateRouter } from "./routers/templateRouter";
 import { analyticsRouter } from "./routers/analyticsRouter";
 import { auditActionsRouter } from "./routers/auditActionsRouter";
@@ -96,6 +97,20 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         return db.getJobSheetById(input.id);
+      }),
+
+    /** PR-11: pollable per-stage processing progress (live → report → status). */
+    processStatus: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const status = await resolveProcessStatus(input.id);
+        if (!status) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Job sheet not found",
+          });
+        }
+        return status;
       }),
 
     // Get a fresh SAS URL for viewing/downloading the file

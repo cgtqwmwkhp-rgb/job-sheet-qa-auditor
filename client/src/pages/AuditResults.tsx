@@ -38,6 +38,12 @@ import {
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/lib/trpc";
+import { ProcessingProgressPanel } from "@/components/ProcessingProgressPanel";
+import { useJobSheetProcessStatus } from "@/hooks/useProcessingWatch";
+import {
+  isActiveJobSheetStatus,
+  isTerminalJobSheetStatus,
+} from "@shared/processingProgress";
 import { toast } from "sonner";
 import {
   perfMark,
@@ -129,8 +135,22 @@ export default function AuditResults() {
     error: jobSheetError,
   } = trpc.jobSheets.get.useQuery(
     { id: numericId },
-    { enabled: numericId > 0 }
+    {
+      enabled: numericId > 0,
+      refetchInterval: query => {
+        const status = query.state.data?.status;
+        if (status && isActiveJobSheetStatus(status)) return 1500;
+        return false;
+      },
+    }
   );
+
+  const { data: processProgress } = useJobSheetProcessStatus(numericId, {
+    enabled:
+      numericId > 0 &&
+      !!jobSheetData &&
+      isActiveJobSheetStatus(jobSheetData.status),
+  });
 
   // Log for debugging
   if (numericId > 0) {
@@ -141,15 +161,31 @@ export default function AuditResults() {
     });
   }
 
-  // Fetch all job sheets for the list view
+  // Fetch all job sheets for the list view — poll while any are processing
   const { data: allJobSheets, isLoading: listLoading } =
-    trpc.jobSheets.list.useQuery({ limit: 50 });
+    trpc.jobSheets.list.useQuery(
+      { limit: 50 },
+      {
+        refetchInterval: query => {
+          const rows = query.state.data;
+          if (!rows?.length) return false;
+          return rows.some(r => isActiveJobSheetStatus(r.status))
+            ? 2000
+            : false;
+        },
+      }
+    );
 
   // Fetch the audit result for this job sheet (always call, use enabled flag)
   const { data: auditResult, isLoading: auditLoading } =
     trpc.audits.getByJobSheet.useQuery(
       { jobSheetId: numericId },
-      { enabled: numericId > 0 && !!jobSheetData }
+      {
+        enabled:
+          numericId > 0 &&
+          !!jobSheetData &&
+          isTerminalJobSheetStatus(jobSheetData.status),
+      }
     );
 
   // Fetch findings if we have an audit result (always call, use enabled flag)
@@ -189,6 +225,49 @@ export default function AuditResults() {
           <h2 className="text-xl font-semibold mb-2">Failed to Load Audit</h2>
           <p className="text-muted-foreground mb-4">{jobSheetError.message}</p>
           <Button onClick={goBackToList}>Back to List</Button>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Deep link while still processing — show live stages instead of empty findings
+  if (
+    numericId > 0 &&
+    jobSheetData &&
+    isActiveJobSheetStatus(jobSheetData.status)
+  ) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6 max-w-2xl mx-auto">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-heading font-bold tracking-tight">
+                {jobSheetData.referenceNumber || `JS-${jobSheetData.id}`}
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                {jobSheetData.fileName} is still processing. This page updates
+                automatically.
+              </p>
+            </div>
+            <Button variant="outline" onClick={goBackToList}>
+              Back to List
+            </Button>
+          </div>
+          <ProcessingProgressPanel
+            progress={
+              processProgress ?? {
+                jobSheetId: numericId,
+                status: jobSheetData.status,
+                currentStage: "OCR Text Extraction",
+                stages: [],
+                percentComplete: jobSheetData.status === "processing" ? 10 : 0,
+                startedAt: null,
+                updatedAt: null,
+                source: "status_only",
+              }
+            }
+            title="Live processing"
+          />
         </div>
       </DashboardLayout>
     );
