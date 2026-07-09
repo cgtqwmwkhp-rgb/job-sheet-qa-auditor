@@ -5,8 +5,8 @@
  * unless canary mode samples the request. Fail-soft: never throws into the
  * main pipeline.
  *
- * MOCKS ONLY overnight — challenger uses deterministic rule-based analysis
- * (no live OCR/LLM). Champion is the already-computed pipeline result.
+ * Default path uses deterministic rule-based analysis. FEATURE_SHADOW_REAL_MODEL
+ * enables a shadow-only alternate model adapter; errors stay fail-soft.
  */
 
 import {
@@ -20,6 +20,7 @@ import {
   type ShadowChallengerConfig,
 } from "./config";
 import { buildShadowComparison, toJudgmentSnapshot } from "./compare";
+import { runShadowRealModelAnalysis } from "./modelAdapter";
 import type { ShadowComparison } from "./types";
 
 export interface ShadowEvalInput {
@@ -44,14 +45,23 @@ export interface ShadowEvalResult {
   canaryApplied: boolean;
 }
 
-function runChallenger(
-  strategy: ShadowChallengerConfig["strategy"],
+async function runChallenger(
+  config: ShadowChallengerConfig,
   extractedText: string,
   goldSpec: GoldSpec,
   pageCount: number
-): AnalysisResult {
+): Promise<AnalysisResult> {
   const start = Date.now();
-  if (strategy === "rule_based") {
+  if (config.strategy === "real_model") {
+    return runShadowRealModelAnalysis({
+      extractedText,
+      goldSpec,
+      pageCount,
+      modelId: config.realModelId,
+    });
+  }
+
+  if (config.strategy === "rule_based") {
     const base = performRuleBasedAnalysis(extractedText, goldSpec, pageCount);
     return {
       ...base,
@@ -72,9 +82,9 @@ function runChallenger(
  * Evaluate challenger against champion. Never mutates champion.
  * Returns null comparison when disabled or on failure (fail-soft).
  */
-export function evaluateShadowChallenger(
+export async function evaluateShadowChallenger(
   input: ShadowEvalInput
-): ShadowEvalResult {
+): Promise<ShadowEvalResult> {
   const empty: ShadowEvalResult = {
     comparison: null,
     servedAnalysis: null,
@@ -88,8 +98,8 @@ export function evaluateShadowChallenger(
     }
 
     const start = Date.now();
-    const challenger = runChallenger(
-      config.strategy,
+    const challenger = await runChallenger(
+      config,
       input.extractedText,
       input.goldSpec,
       input.pageCount

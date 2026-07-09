@@ -3,14 +3,17 @@
  *
  * Feature flags (default OFF for safe rollout):
  * - FEATURE_SHADOW_CHALLENGER=true → enable shadow or canary
+ * - FEATURE_SHADOW_REAL_MODEL=true → use real alternate model adapter
  * - SHADOW_MODE=shadow|canary|off (default shadow when flag on)
  * - SHADOW_CANARY_PERCENT=0–100 (default 0; only used in canary mode)
- * - SHADOW_CHALLENGER_STRATEGY=rule_based (default; mocks-only overnight)
+ * - SHADOW_REAL_MODEL_ID=gemini-2.0-flash (alternate model id)
  */
 
 import type { ChallengerStrategy, ShadowMode } from "./types";
 
 export const FEATURE_FLAG = "FEATURE_SHADOW_CHALLENGER";
+export const REAL_MODEL_FEATURE_FLAG = "FEATURE_SHADOW_REAL_MODEL";
+export const DEFAULT_SHADOW_REAL_MODEL_ID = "gemini-2.0-flash";
 
 export interface ShadowChallengerConfig {
   enabled: boolean;
@@ -18,6 +21,8 @@ export interface ShadowChallengerConfig {
   /** 0–100; fraction of traffic that serves challenger when mode=canary */
   canaryPercent: number;
   strategy: ChallengerStrategy;
+  realModelEnabled: boolean;
+  realModelId: string;
 }
 
 export const DEFAULT_SHADOW_CONFIG: ShadowChallengerConfig = {
@@ -25,6 +30,8 @@ export const DEFAULT_SHADOW_CONFIG: ShadowChallengerConfig = {
   mode: "off",
   canaryPercent: 0,
   strategy: "rule_based",
+  realModelEnabled: false,
+  realModelId: DEFAULT_SHADOW_REAL_MODEL_ID,
 };
 
 function parseMode(raw: string | undefined): ShadowMode {
@@ -43,7 +50,13 @@ function parseCanaryPercent(raw: string | undefined): number {
 function parseStrategy(raw: string | undefined): ChallengerStrategy {
   const v = (raw ?? "").trim().toLowerCase();
   if (v === "rule_based") return "rule_based";
+  if (v === "real_model") return "real_model";
   return "rule_based";
+}
+
+function parseRealModelId(raw: string | undefined): string {
+  const v = (raw ?? "").trim();
+  return v.length > 0 ? v : DEFAULT_SHADOW_REAL_MODEL_ID;
 }
 
 /**
@@ -54,18 +67,30 @@ export function isShadowChallengerEnabled(): boolean {
   return process.env[FEATURE_FLAG] === "true";
 }
 
+export function isShadowRealModelEnabled(): boolean {
+  return process.env[REAL_MODEL_FEATURE_FLAG] === "true";
+}
+
 export function getShadowChallengerConfig(): ShadowChallengerConfig {
   if (!isShadowChallengerEnabled()) {
     return { ...DEFAULT_SHADOW_CONFIG };
   }
 
   const mode = parseMode(process.env.SHADOW_MODE);
+  const realModelEnabled = isShadowRealModelEnabled();
+  const strategy: ChallengerStrategy = realModelEnabled
+    ? "real_model"
+    : parseStrategy(process.env.SHADOW_CHALLENGER_STRATEGY);
+  const realModelId = parseRealModelId(process.env.SHADOW_REAL_MODEL_ID);
+
   if (mode === "off") {
     return {
       enabled: false,
       mode: "off",
       canaryPercent: 0,
-      strategy: parseStrategy(process.env.SHADOW_CHALLENGER_STRATEGY),
+      strategy,
+      realModelEnabled,
+      realModelId,
     };
   }
 
@@ -73,7 +98,9 @@ export function getShadowChallengerConfig(): ShadowChallengerConfig {
     enabled: true,
     mode,
     canaryPercent: parseCanaryPercent(process.env.SHADOW_CANARY_PERCENT),
-    strategy: parseStrategy(process.env.SHADOW_CHALLENGER_STRATEGY),
+    strategy,
+    realModelEnabled,
+    realModelId,
   };
 }
 

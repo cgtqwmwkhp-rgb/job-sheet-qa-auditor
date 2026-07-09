@@ -947,7 +947,7 @@ async function processJobSheetWithOptions(
 
   if (isShadowChallengerEnabled()) {
     try {
-      const shadowEval = evaluateShadowChallenger({
+      const shadowEval = await evaluateShadowChallenger({
         extractedText,
         goldSpec: spec,
         pageCount: ocrResult.totalPages,

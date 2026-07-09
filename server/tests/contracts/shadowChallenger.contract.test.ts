@@ -10,7 +10,9 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { AnalysisResult, GoldSpec } from "../../services/analyzer";
 import {
   FEATURE_FLAG,
+  REAL_MODEL_FEATURE_FLAG,
   isShadowChallengerEnabled,
+  isShadowRealModelEnabled,
   getShadowChallengerConfig,
   shouldApplyCanary,
   DEFAULT_SHADOW_CONFIG,
@@ -103,12 +105,20 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
   const prevMode = process.env.SHADOW_MODE;
   const prevCanary = process.env.SHADOW_CANARY_PERCENT;
   const prevStrategy = process.env.SHADOW_CHALLENGER_STRATEGY;
+  const prevRealModelFlag = process.env[REAL_MODEL_FEATURE_FLAG];
+  const prevRealModelId = process.env.SHADOW_REAL_MODEL_ID;
+  const prevLlmProvider = process.env.LLM_PROVIDER;
+  const prevGeminiApiKey = process.env.GEMINI_API_KEY;
 
   beforeEach(() => {
     delete process.env[FEATURE_FLAG];
     delete process.env.SHADOW_MODE;
     delete process.env.SHADOW_CANARY_PERCENT;
     delete process.env.SHADOW_CHALLENGER_STRATEGY;
+    delete process.env[REAL_MODEL_FEATURE_FLAG];
+    delete process.env.SHADOW_REAL_MODEL_ID;
+    delete process.env.LLM_PROVIDER;
+    delete process.env.GEMINI_API_KEY;
   });
 
   afterEach(() => {
@@ -121,6 +131,15 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
     if (prevStrategy === undefined)
       delete process.env.SHADOW_CHALLENGER_STRATEGY;
     else process.env.SHADOW_CHALLENGER_STRATEGY = prevStrategy;
+    if (prevRealModelFlag === undefined)
+      delete process.env[REAL_MODEL_FEATURE_FLAG];
+    else process.env[REAL_MODEL_FEATURE_FLAG] = prevRealModelFlag;
+    if (prevRealModelId === undefined) delete process.env.SHADOW_REAL_MODEL_ID;
+    else process.env.SHADOW_REAL_MODEL_ID = prevRealModelId;
+    if (prevLlmProvider === undefined) delete process.env.LLM_PROVIDER;
+    else process.env.LLM_PROVIDER = prevLlmProvider;
+    if (prevGeminiApiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = prevGeminiApiKey;
   });
 
   describe("feature flag", () => {
@@ -135,6 +154,20 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
       expect(cfg.enabled).toBe(true);
       expect(cfg.mode).toBe("shadow");
       expect(cfg.strategy).toBe("rule_based");
+      expect(cfg.realModelEnabled).toBe(false);
+      expect(isShadowRealModelEnabled()).toBe(false);
+    });
+
+    it("uses real-model strategy only when FEATURE_SHADOW_REAL_MODEL=true", () => {
+      process.env[FEATURE_FLAG] = "true";
+      process.env[REAL_MODEL_FEATURE_FLAG] = "true";
+      process.env.SHADOW_REAL_MODEL_ID = "gemini-test-shadow";
+      const cfg = getShadowChallengerConfig();
+      expect(cfg.enabled).toBe(true);
+      expect(cfg.strategy).toBe("real_model");
+      expect(cfg.realModelEnabled).toBe(true);
+      expect(cfg.realModelId).toBe("gemini-test-shadow");
+      expect(isShadowRealModelEnabled()).toBe(true);
     });
 
     it("respects SHADOW_MODE=canary and canary percent", () => {
@@ -257,9 +290,9 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
     });
   });
 
-  describe("evaluateShadowChallenger (mocks only)", () => {
-    it("returns null when feature flag disabled", () => {
-      const result = evaluateShadowChallenger({
+  describe("evaluateShadowChallenger", () => {
+    it("returns null when feature flag disabled", async () => {
+      const result = await evaluateShadowChallenger({
         extractedText: RICH_TEXT,
         goldSpec: SAMPLE_SPEC,
         pageCount: 1,
@@ -271,11 +304,11 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
       expect(result.canaryApplied).toBe(false);
     });
 
-    it("runs rule-based challenger without mutating champion in shadow mode", () => {
+    it("runs rule-based challenger without mutating champion in shadow mode", async () => {
       process.env[FEATURE_FLAG] = "true";
       process.env.SHADOW_MODE = "shadow";
       const champion = championFail();
-      const result = evaluateShadowChallenger({
+      const result = await evaluateShadowChallenger({
         extractedText: RICH_TEXT,
         goldSpec: SAMPLE_SPEC,
         pageCount: 1,
@@ -295,11 +328,11 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
       expect(champion.overallResult).toBe("FAIL");
     });
 
-    it("applies canary when sampled at 100%", () => {
+    it("applies canary when sampled at 100%", async () => {
       process.env[FEATURE_FLAG] = "true";
       process.env.SHADOW_MODE = "canary";
       process.env.SHADOW_CANARY_PERCENT = "100";
-      const result = evaluateShadowChallenger({
+      const result = await evaluateShadowChallenger({
         extractedText: RICH_TEXT,
         goldSpec: SAMPLE_SPEC,
         pageCount: 1,
@@ -313,11 +346,11 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
       expect(result.comparison!.canaryApplied).toBe(true);
     });
 
-    it("never applies canary at 0%", () => {
+    it("never applies canary at 0%", async () => {
       process.env[FEATURE_FLAG] = "true";
       process.env.SHADOW_MODE = "canary";
       process.env.SHADOW_CANARY_PERCENT = "0";
-      const result = evaluateShadowChallenger({
+      const result = await evaluateShadowChallenger({
         extractedText: RICH_TEXT,
         goldSpec: SAMPLE_SPEC,
         pageCount: 1,
@@ -327,6 +360,45 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
       expect(result.canaryApplied).toBe(false);
       expect(result.servedAnalysis).toBeNull();
       expect(result.comparison).not.toBeNull();
+    });
+
+    it("runs mock alternate model when real-model flag is enabled", async () => {
+      process.env[FEATURE_FLAG] = "true";
+      process.env[REAL_MODEL_FEATURE_FLAG] = "true";
+      process.env.LLM_PROVIDER = "mock";
+      process.env.SHADOW_REAL_MODEL_ID = "gemini-shadow-mock";
+      const champion = championFail();
+      const result = await evaluateShadowChallenger({
+        extractedText: RICH_TEXT,
+        goldSpec: SAMPLE_SPEC,
+        pageCount: 1,
+        champion,
+        jobSheetId: 26,
+      });
+      expect(result.comparison).not.toBeNull();
+      expect(result.comparison!.strategy).toBe("real_model");
+      expect(result.comparison!.challenger.model).toBe("gemini-shadow-mock");
+      expect(result.comparison!.challenger.overallResult).toBe("PASS");
+      expect(result.comparison!.resultDisagreement).toBe(true);
+      expect(result.servedAnalysis).toBeNull();
+      expect(champion.overallResult).toBe("FAIL");
+    });
+
+    it("fails soft when real-model flag is enabled without model credentials", async () => {
+      process.env[FEATURE_FLAG] = "true";
+      process.env[REAL_MODEL_FEATURE_FLAG] = "true";
+      const champion = championPass();
+      const result = await evaluateShadowChallenger({
+        extractedText: RICH_TEXT,
+        goldSpec: SAMPLE_SPEC,
+        pageCount: 1,
+        champion,
+        jobSheetId: 27,
+      });
+      expect(result.comparison).toBeNull();
+      expect(result.servedAnalysis).toBeNull();
+      expect(result.canaryApplied).toBe(false);
+      expect(champion.overallResult).toBe("PASS");
     });
   });
 
