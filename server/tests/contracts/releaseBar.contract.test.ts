@@ -84,8 +84,18 @@ describe("Release Bar Contract (Phase 3.6)", () => {
       );
 
       const checks: SmokeCheck[] = [
-        { id: "health", name: "Health endpoint", required: true, passed: false },
-        { id: "version", name: "Version endpoint", required: true, passed: true },
+        {
+          id: "health",
+          name: "Health endpoint",
+          required: true,
+          passed: false,
+        },
+        {
+          id: "version",
+          name: "Version endpoint",
+          required: true,
+          passed: true,
+        },
       ];
 
       const result = evaluateReleaseBar(checks, DEFAULT_CRITERIA, {
@@ -105,7 +115,12 @@ describe("Release Bar Contract (Phase 3.6)", () => {
 
       const checks: SmokeCheck[] = [
         { id: "health", name: "Health endpoint", required: true },
-        { id: "version", name: "Version endpoint", required: true, passed: true },
+        {
+          id: "version",
+          name: "Version endpoint",
+          required: true,
+          passed: true,
+        },
       ];
 
       const result = evaluateReleaseBar(checks, DEFAULT_CRITERIA, {
@@ -152,8 +167,18 @@ describe("Release Bar Contract (Phase 3.6)", () => {
       const { evaluateReleaseBar } = await import("../../services/releaseBar");
 
       const checks: SmokeCheck[] = [
-        { id: "health", name: "Health endpoint", required: false, passed: true },
-        { id: "metrics", name: "Metrics snapshot", required: false, passed: false },
+        {
+          id: "health",
+          name: "Health endpoint",
+          required: false,
+          passed: true,
+        },
+        {
+          id: "metrics",
+          name: "Metrics snapshot",
+          required: false,
+          passed: false,
+        },
         { id: "cache", name: "Cache warm", required: false, passed: false },
       ];
 
@@ -174,7 +199,12 @@ describe("Release Bar Contract (Phase 3.6)", () => {
 
       const checks: SmokeCheck[] = [
         { id: "health", name: "Health endpoint", required: true, passed: true },
-        { id: "metrics", name: "Metrics snapshot", required: false, passed: false },
+        {
+          id: "metrics",
+          name: "Metrics snapshot",
+          required: false,
+          passed: false,
+        },
       ];
 
       const result = evaluateReleaseBar(

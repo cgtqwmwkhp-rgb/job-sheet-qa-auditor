@@ -4,11 +4,7 @@
  * Pure quarantine exit criteria — no CI, deploy, or network coupling.
  */
 
-import type {
-  QuarantineCriteria,
-  ReleaseBarResult,
-  SmokeCheck,
-} from "./types";
+import type { QuarantineCriteria, ReleaseBarResult, SmokeCheck } from "./types";
 
 export interface EvaluateReleaseBarOptions {
   openSev1?: number;
