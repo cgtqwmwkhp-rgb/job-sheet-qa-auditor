@@ -11,6 +11,16 @@ vi.mock("./db", () => ({
     reviewQueue: 12,
     criticalIssues: 5,
   }),
+  getExecutiveSummaryStats: vi.fn().mockResolvedValue({
+    totalAudits: 42,
+    passRate: "90.5",
+    reviewQueue: 12,
+    criticalIssues: 3,
+    period: {
+      start: "2024-06-01T00:00:00.000Z",
+      end: "2024-06-30T23:59:59.999Z",
+    },
+  }),
   getJobSheets: vi.fn().mockResolvedValue([
     { id: 1, fileName: "test.pdf", status: "completed" },
     { id: 2, fileName: "test2.pdf", status: "pending" },
@@ -379,6 +389,32 @@ describe("stats.dashboard", () => {
     const caller = appRouter.createCaller(ctx);
 
     await expect(caller.stats.dashboard()).rejects.toThrow();
+  });
+});
+
+describe("analytics.executiveSummary (Phase 1.6)", () => {
+  it("returns period-scoped executive KPIs", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.analytics.getExecutiveSummary({
+      startDate: "2024-06-01T00:00:00.000Z",
+      endDate: "2024-06-30T23:59:59.999Z",
+    });
+
+    expect(result.totalAudits).toBe(42);
+    expect(result.passRate).toBe("90.5");
+    expect(result.criticalIssues).toBe(3);
+    expect(result.reviewQueue).toBe(12);
+    expect(result.period.start).toBe("2024-06-01T00:00:00.000Z");
+    expect(result.period.end).toBe("2024-06-30T23:59:59.999Z");
+  });
+
+  it("rejects unauthenticated executive summary", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(caller.analytics.getExecutiveSummary()).rejects.toThrow();
   });
 });
 

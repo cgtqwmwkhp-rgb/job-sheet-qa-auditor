@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useAnalyticsFilters } from "@/hooks/useAnalyticsFilters";
 import { useMemo, useState } from "react";
 import {
   Bar,
@@ -46,6 +47,7 @@ function passRatePct(rate: number): string {
 }
 
 export default function SiteIntelligence() {
+  const { startDate, endDate } = useAnalyticsFilters();
   const [dimension, setDimension] = useState<CohortDimension>("site");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
@@ -53,7 +55,7 @@ export default function SiteIntelligence() {
     data: summary,
     isLoading,
     error,
-  } = trpc.analytics.getCohortSummary.useQuery();
+  } = trpc.analytics.getCohortSummary.useQuery({ startDate, endDate });
 
   const { data: collisionReport, isLoading: collisionLoading } =
     trpc.analytics.getTemplateCollisionReport.useQuery(undefined, {
@@ -65,6 +67,8 @@ export default function SiteIntelligence() {
       {
         dimension,
         key: selectedKey ?? "",
+        startDate,
+        endDate,
       },
       { enabled: !!selectedKey }
     );

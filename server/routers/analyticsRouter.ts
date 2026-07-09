@@ -398,6 +398,31 @@ export const analyticsRouter = router({
     };
   }),
 
+  /**
+   * Period-scoped executive KPIs (Phase 1.6).
+   * reviewQueue is a live hold-queue snapshot and is intentionally not
+   * filtered by startDate/endDate — document that in UI copy if needed.
+   */
+  getExecutiveSummary: protectedProcedure
+    .input(periodInput)
+    .query(async ({ input }) => {
+      const period = resolvePeriod(input?.startDate, input?.endDate);
+      const stats = await db.getExecutiveSummaryStats({
+        startDate: new Date(period.start),
+        endDate: new Date(period.end),
+      });
+      if (!stats) {
+        return {
+          totalAudits: 0,
+          passRate: "0",
+          criticalIssues: 0,
+          reviewQueue: 0,
+          period,
+        };
+      }
+      return stats;
+    }),
+
   // ============ PR-15: ENGINEER ANALYTICS ============
 
   /**

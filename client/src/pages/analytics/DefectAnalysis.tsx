@@ -26,6 +26,7 @@ import {
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useAnalyticsFilters } from "@/hooks/useAnalyticsFilters";
 import { useMemo } from "react";
 import {
   Bar,
@@ -49,12 +50,13 @@ function formatHours(h: number): string {
 }
 
 export default function DefectAnalysis() {
+  const { startDate, endDate } = useAnalyticsFilters();
   const {
     data: summary,
     isLoading,
     error,
     refetch,
-  } = trpc.analytics.getExceptionSummary.useQuery();
+  } = trpc.analytics.getExceptionSummary.useQuery({ startDate, endDate });
 
   const { data: dlqStatus } = trpc.analytics.getDlqStatus.useQuery(undefined, {
     retry: false,

@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useAnalyticsFilters } from "@/hooks/useAnalyticsFilters";
 import { useMemo, useState } from "react";
 import {
   Bar,
@@ -68,6 +69,7 @@ function severityBadgeClass(severity: string): string {
 }
 
 export default function TechnicianPerformance() {
+  const { startDate, endDate } = useAnalyticsFilters();
   const [selectedEngineerId, setSelectedEngineerId] = useState<string | null>(
     null
   );
@@ -76,11 +78,11 @@ export default function TechnicianPerformance() {
     data: summary,
     isLoading,
     error,
-  } = trpc.analytics.getEngineerSummary.useQuery();
+  } = trpc.analytics.getEngineerSummary.useQuery({ startDate, endDate });
 
   const { data: detail, isLoading: detailLoading } =
     trpc.analytics.getEngineerScoreCard.useQuery(
-      { engineerId: selectedEngineerId! },
+      { engineerId: selectedEngineerId!, startDate, endDate },
       { enabled: !!selectedEngineerId }
     );
 
