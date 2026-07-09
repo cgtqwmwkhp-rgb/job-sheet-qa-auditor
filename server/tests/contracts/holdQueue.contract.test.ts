@@ -77,4 +77,29 @@ describe("Hold Queue Contract", () => {
       expect(holdQueueContent).toContain("/audits?id=");
     });
   });
+
+  describe("PR-13 workstation", () => {
+    it("imports ReviewWorkstationPane and keyboard hook", () => {
+      expect(holdQueueContent).toContain("ReviewWorkstationPane");
+      expect(holdQueueContent).toContain("useReviewQueueKeyboard");
+    });
+
+    it("uses two-pane layout", () => {
+      expect(holdQueueContent).toMatch(/lg:grid-cols-\[380px_1fr\]/);
+    });
+
+    it("has controlled search", () => {
+      expect(holdQueueContent).toContain("searchQuery");
+      expect(holdQueueContent).toMatch(/value=\{searchQuery\}/);
+    });
+
+    it("references captureFieldCorrection via workstation pane", () => {
+      const panePath = path.resolve(
+        __dirname,
+        "../../../client/src/components/review/ReviewWorkstationPane.tsx"
+      );
+      const pane = fs.readFileSync(panePath, "utf-8");
+      expect(pane).toContain("captureFieldCorrection");
+    });
+  });
 });

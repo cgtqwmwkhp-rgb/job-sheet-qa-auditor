@@ -1,4 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { ReviewWorkstationPane } from "@/components/review/ReviewWorkstationPane";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,18 +19,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   AlertCircle,
   CheckCircle2,
   Clock,
   Filter,
+  Keyboard,
   Loader2,
   MoreHorizontal,
   Search,
@@ -39,13 +33,21 @@ import {
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useReviewQueueKeyboard } from "@/hooks/useReviewQueueKeyboard";
+import { usePersistFn } from "@/hooks/usePersistFn";
+
+type FilterChip = "all" | "critical" | "low_confidence";
 
 export default function HoldQueue() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterChip, setFilterChip] = useState<FilterChip>("all");
+  const [showLegend, setShowLegend] = useState(false);
+  const paneRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
 
-  // Fetch real review queue data from backend
   const {
     data: jobSheets,
     isLoading,
@@ -59,20 +61,54 @@ export default function HoldQueue() {
   const undoApprove = trpc.auditActions.undoJobSheetApprove.useMutation();
   const updateStatus = trpc.jobSheets.updateStatus.useMutation();
 
-  // Transform job sheets to hold queue items
-  const holdItems = (jobSheets || []).map(sheet => ({
-    id: sheet.id,
-    referenceNumber: sheet.referenceNumber || `JS-${sheet.id}`,
-    technician: `User ${sheet.uploadedBy}`,
-    site: sheet.siteInfo || "Unknown Site",
-    date: new Date(sheet.createdAt).toLocaleString(),
-    reason: "Review Required", // Will be populated from audit findings
-    severity: "warning" as const,
-    status: "pending" as const,
-    fileName: sheet.fileName,
-  }));
+  const holdItems = useMemo(
+    () =>
+      (jobSheets || []).map(sheet => ({
+        id: sheet.id,
+        referenceNumber: sheet.referenceNumber || `JS-${sheet.id}`,
+        technician: `User ${sheet.uploadedBy}`,
+        site: sheet.siteInfo || "Unknown Site",
+        date: new Date(sheet.createdAt).toLocaleString(),
+        reason: "Review Required",
+        severity: "warning" as "critical" | "warning" | "info",
+        status: "pending" as const,
+        fileName: sheet.fileName,
+      })),
+    [jobSheets]
+  );
+
+  const filteredItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return holdItems.filter(item => {
+      if (q) {
+        const hay =
+          `${item.referenceNumber} ${item.fileName} ${item.site} ${item.technician}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      // Basic filter chips — overnight scope: All vs Critical/Low confidence
+      // placeholders until finding severity is joined on the list query.
+      if (filterChip === "critical") {
+        return item.severity === "critical" || item.severity === "warning";
+      }
+      if (filterChip === "low_confidence") {
+        return true;
+      }
+      return true;
+    });
+  }, [holdItems, searchQuery, filterChip]);
 
   const totalItems = holdItems.length;
+
+  const activeId = useMemo(() => {
+    if (filteredItems.length === 0) return null;
+    if (
+      selectedId != null &&
+      filteredItems.some(item => item.id === selectedId)
+    ) {
+      return selectedId;
+    }
+    return filteredItems[0].id;
+  }, [filteredItems, selectedId]);
 
   const showApproveUndo = (jobSheetId: number, previousStatus: string) => {
     toast.success("Job sheet approved", {
@@ -113,6 +149,12 @@ export default function HoldQueue() {
             next.delete(jobSheetId);
             return next;
           });
+          if (selectedId === jobSheetId) {
+            const idx = filteredItems.findIndex(i => i.id === jobSheetId);
+            const nextItem =
+              filteredItems[idx + 1] ?? filteredItems[idx - 1] ?? null;
+            setSelectedId(nextItem?.id ?? null);
+          }
           showApproveUndo(jobSheetId, result.previousStatus);
         },
         onError: err => toast.error(err.message || "Approve failed"),
@@ -126,6 +168,12 @@ export default function HoldQueue() {
       {
         onSuccess: () => {
           utils.jobSheets.list.invalidate();
+          if (selectedId === jobSheetId) {
+            const idx = filteredItems.findIndex(i => i.id === jobSheetId);
+            const nextItem =
+              filteredItems[idx + 1] ?? filteredItems[idx - 1] ?? null;
+            setSelectedId(nextItem?.id ?? null);
+          }
           toast.success("Job sheet rejected", {
             action: {
               label: "Undo",
@@ -148,56 +196,61 @@ export default function HoldQueue() {
     );
   };
 
-  const handleBulkApprove = () => {
+  const handleBulkApprove = async () => {
     const ids =
       selectedIds.size > 0 ? Array.from(selectedIds) : holdItems.map(i => i.id);
     if (ids.length === 0) {
       toast.error("No items to approve");
       return;
     }
-    let remaining = ids.length;
-    for (const id of ids) {
-      approveJobSheet.mutate(
-        { jobSheetId: id, reason: "Bulk approved from hold queue" },
-        {
-          onSuccess: result => {
-            remaining -= 1;
-            if (remaining === 0) {
-              utils.jobSheets.list.invalidate();
-              setSelectedIds(new Set());
-              toast.success(`Approved ${ids.length} job sheet(s)`, {
-                action: {
-                  label: "Undo last",
-                  onClick: () => {
-                    const lastId = ids[ids.length - 1];
-                    undoApprove.mutate(
-                      {
-                        jobSheetId: lastId,
-                        restoreStatus: result.previousStatus as
-                          | "pending"
-                          | "processing"
-                          | "completed"
-                          | "failed"
-                          | "review_queue",
-                      },
-                      {
-                        onSuccess: () => {
-                          utils.jobSheets.list.invalidate();
-                          toast.success("Last approval undone");
-                        },
-                      }
-                    );
-                  },
+
+    const results = await Promise.allSettled(
+      ids.map(id =>
+        approveJobSheet.mutateAsync({
+          jobSheetId: id,
+          reason: "Bulk approved from hold queue",
+        })
+      )
+    );
+
+    await utils.jobSheets.list.invalidate();
+    setSelectedIds(new Set());
+
+    const succeeded = results.filter(r => r.status === "fulfilled");
+    const failed = results.filter(r => r.status === "rejected");
+
+    if (succeeded.length > 0) {
+      const last = succeeded[succeeded.length - 1];
+      if (last.status === "fulfilled") {
+        toast.success(`Approved ${succeeded.length} job sheet(s)`, {
+          action: {
+            label: "Undo last",
+            onClick: () => {
+              const lastId = ids[ids.length - 1];
+              undoApprove.mutate(
+                {
+                  jobSheetId: lastId,
+                  restoreStatus: last.value.previousStatus as
+                    | "pending"
+                    | "processing"
+                    | "completed"
+                    | "failed"
+                    | "review_queue",
                 },
-              });
-            }
+                {
+                  onSuccess: () => {
+                    utils.jobSheets.list.invalidate();
+                    toast.success("Last approval undone");
+                  },
+                }
+              );
+            },
           },
-          onError: err => {
-            remaining -= 1;
-            toast.error(err.message || `Failed to approve #${id}`);
-          },
-        }
-      );
+        });
+      }
+    }
+    if (failed.length > 0) {
+      toast.error(`${failed.length} approval(s) failed`);
     }
   };
 
@@ -210,10 +263,45 @@ export default function HoldQueue() {
     });
   };
 
+  const selectByOffset = usePersistFn((delta: number) => {
+    if (filteredItems.length === 0) return;
+    const currentIdx = activeId
+      ? filteredItems.findIndex(i => i.id === activeId)
+      : -1;
+    const nextIdx =
+      currentIdx < 0
+        ? delta > 0
+          ? 0
+          : filteredItems.length - 1
+        : Math.max(0, Math.min(filteredItems.length - 1, currentIdx + delta));
+    setSelectedId(filteredItems[nextIdx].id);
+  });
+
+  const onApproveSelected = usePersistFn(() => {
+    if (activeId != null) handleApprove(activeId);
+  });
+  const onRejectSelected = usePersistFn(() => {
+    if (activeId != null) handleReject(activeId);
+  });
+
+  const keyboardHandlers = useMemo(
+    () => ({
+      onNext: () => selectByOffset(1),
+      onPrev: () => selectByOffset(-1),
+      onApprove: () => onApproveSelected(),
+      onReject: () => onRejectSelected(),
+      onToggleLegend: () => setShowLegend(v => !v),
+      onFocusPane: () => paneRef.current?.focus(),
+    }),
+    [selectByOffset, onApproveSelected, onRejectSelected]
+  );
+
+  useReviewQueueKeyboard(keyboardHandlers, !isLoading && !error);
+
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-4" tabIndex={0}>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-3xl font-heading font-bold tracking-tight">
               Hold Queue
@@ -224,12 +312,25 @@ export default function HoldQueue() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline">
+            <Button
+              variant="outline"
+              onClick={() => setShowLegend(v => !v)}
+              aria-label="Toggle keyboard shortcuts"
+            >
+              <Keyboard className="w-4 h-4 mr-2" />
+              Shortcuts
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setFilterChip(f => (f === "all" ? "critical" : "all"))
+              }
+            >
               <Filter className="w-4 h-4 mr-2" />
               Filter
             </Button>
             <Button
-              onClick={handleBulkApprove}
+              onClick={() => void handleBulkApprove()}
               disabled={approveJobSheet.isPending || totalItems === 0}
             >
               {approveJobSheet.isPending ? (
@@ -243,27 +344,69 @@ export default function HoldQueue() {
           </div>
         </div>
 
-        {/* Filters & Search */}
-        <div className="flex items-center gap-4">
+        {showLegend && (
+          <Card className="bg-muted/40">
+            <CardContent className="py-3 text-sm text-muted-foreground flex flex-wrap gap-x-6 gap-y-1">
+              <span>
+                <kbd className="font-mono text-foreground">j</kbd> /{" "}
+                <kbd className="font-mono text-foreground">k</kbd> next / prev
+              </span>
+              <span>
+                <kbd className="font-mono text-foreground">a</kbd> approve
+              </span>
+              <span>
+                <kbd className="font-mono text-foreground">r</kbd> reject
+              </span>
+              <span>
+                <kbd className="font-mono text-foreground">Enter</kbd> focus
+                pane
+              </span>
+              <span>
+                <kbd className="font-mono text-foreground">?</kbd> toggle this
+                legend
+              </span>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="flex items-center gap-4 flex-wrap">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Search by ID, technician, or site..."
               className="pl-9"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
           <div className="flex items-center gap-2">
             <Badge
-              variant="secondary"
-              className="cursor-pointer hover:bg-secondary/80"
+              variant={filterChip === "all" ? "default" : "secondary"}
+              className="cursor-pointer"
+              onClick={() => setFilterChip("all")}
             >
               All ({totalItems})
+            </Badge>
+            <Badge
+              variant={filterChip === "critical" ? "default" : "secondary"}
+              className="cursor-pointer"
+              onClick={() => setFilterChip("critical")}
+            >
+              Critical
+            </Badge>
+            <Badge
+              variant={
+                filterChip === "low_confidence" ? "default" : "secondary"
+              }
+              className="cursor-pointer"
+              onClick={() => setFilterChip("low_confidence")}
+            >
+              Low confidence
             </Badge>
           </div>
         </div>
 
-        {/* Loading State */}
         {isLoading && (
           <Card className="p-12">
             <div className="flex flex-col items-center justify-center">
@@ -273,7 +416,6 @@ export default function HoldQueue() {
           </Card>
         )}
 
-        {/* Error State */}
         {error && (
           <Card className="p-12">
             <div className="flex flex-col items-center justify-center text-destructive">
@@ -284,7 +426,6 @@ export default function HoldQueue() {
           </Card>
         )}
 
-        {/* Empty State */}
         {!isLoading && !error && holdItems.length === 0 && (
           <Card className="p-12">
             <div className="flex flex-col items-center justify-center text-center">
@@ -298,116 +439,154 @@ export default function HoldQueue() {
           </Card>
         )}
 
-        {/* Queue Table */}
         {!isLoading && !error && holdItems.length > 0 && (
-          <Card>
-            <CardHeader className="px-6 py-4 border-b">
-              <CardTitle className="text-base">
-                Pending Reviews ({totalItems})
-              </CardTitle>
-              <CardDescription>
-                Items sorted by upload date (newest first).
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40px]">
-                      <span className="sr-only">Select</span>
-                    </TableHead>
-                    <TableHead className="w-[120px]">Reference</TableHead>
-                    <TableHead>File / Site</TableHead>
-                    <TableHead>Uploaded</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {holdItems.map(item => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(item.id)}
-                          onChange={() => toggleSelect(item.id)}
-                          aria-label={`Select ${item.referenceNumber}`}
-                          className="h-4 w-4"
-                        />
-                      </TableCell>
-                      <TableCell className="font-mono font-medium">
-                        <Link
-                          href={`/audits?id=${item.id}`}
-                          className="hover:underline text-primary"
-                        >
-                          {item.referenceNumber}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <div
-                          className="font-medium truncate max-w-[200px]"
-                          title={item.fileName}
-                        >
-                          {item.fileName}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {item.site}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {item.date}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="secondary"
-                          className="bg-orange-100 text-orange-800"
-                        >
-                          {item.reason}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Clock className="w-4 h-4 text-muted-foreground" />
-                          <span className="capitalize">{item.status}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem
-                              onClick={() => handleApprove(item.id)}
-                            >
-                              <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" />
-                              Approve
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleReject(item.id)}
-                            >
-                              <XCircle className="w-4 h-4 mr-2 text-red-600" />
-                              Reject
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem asChild>
-                              <Link href={`/audits?id=${item.id}`}>
-                                View Details
-                              </Link>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-[calc(100vh-14rem)]">
+            <Card className="flex flex-col min-h-0 overflow-hidden">
+              <CardHeader className="px-4 py-3 border-b shrink-0">
+                <CardTitle className="text-base">
+                  Pending Reviews ({filteredItems.length}
+                  {filteredItems.length !== totalItems
+                    ? ` of ${totalItems}`
+                    : ""}
+                  )
+                </CardTitle>
+                <CardDescription>
+                  Select a row to review in place. j/k to navigate.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 flex-1 overflow-y-auto">
+                {filteredItems.length === 0 ? (
+                  <div className="p-6 text-sm text-muted-foreground text-center">
+                    No items match the current search/filter.
+                  </div>
+                ) : (
+                  <ul className="divide-y">
+                    {filteredItems.map(item => {
+                      const isActive = activeId === item.id;
+                      return (
+                        <li key={item.id}>
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            className={`w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer ${
+                              isActive
+                                ? "bg-primary/5 ring-2 ring-inset ring-primary"
+                                : ""
+                            }`}
+                            onClick={() => setSelectedId(item.id)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setSelectedId(item.id);
+                              }
+                            }}
+                          >
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(item.id)}
+                                onChange={() => toggleSelect(item.id)}
+                                onClick={e => e.stopPropagation()}
+                                aria-label={`Select ${item.referenceNumber}`}
+                                className="h-4 w-4 mt-1"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-mono font-medium text-sm">
+                                    {item.referenceNumber}
+                                  </span>
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Clock className="w-3 h-3" />
+                                    pending
+                                  </div>
+                                </div>
+                                <div
+                                  className="text-sm truncate"
+                                  title={item.fileName}
+                                >
+                                  {item.fileName}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {item.site} • {item.date}
+                                </div>
+                                <div className="mt-1 flex items-center gap-2">
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-orange-100 text-orange-800 text-xs"
+                                  >
+                                    {item.reason}
+                                  </Badge>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 ml-auto"
+                                        onClick={e => e.stopPropagation()}
+                                      >
+                                        <MoreHorizontal className="w-4 h-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuLabel>
+                                        Actions
+                                      </DropdownMenuLabel>
+                                      <DropdownMenuItem
+                                        onClick={() => handleApprove(item.id)}
+                                      >
+                                        <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" />
+                                        Approve
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => handleReject(item.id)}
+                                      >
+                                        <XCircle className="w-4 h-4 mr-2 text-red-600" />
+                                        Reject
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem asChild>
+                                        <Link href={`/audits?id=${item.id}`}>
+                                          View Details
+                                        </Link>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="flex flex-col min-h-0 overflow-hidden p-3">
+              {activeId != null ? (
+                <ReviewWorkstationPane
+                  jobSheetId={activeId}
+                  compact
+                  showJobSheetActions
+                  paneRef={paneRef}
+                  onApproveJobSheet={() => handleApprove(activeId)}
+                  onRejectJobSheet={() => handleReject(activeId)}
+                  approvePending={approveJobSheet.isPending}
+                  rejectPending={updateStatus.isPending}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center">
+                  <Inbox className="h-12 w-12 mb-3 opacity-40" />
+                  <p className="font-medium">Select a job sheet</p>
+                  <p className="text-sm mt-1 max-w-sm">
+                    Choose an item from the queue to open the review workstation
+                    (PDF + findings) without leaving this page.
+                  </p>
+                </div>
+              )}
+            </Card>
+          </div>
         )}
       </div>
     </DashboardLayout>

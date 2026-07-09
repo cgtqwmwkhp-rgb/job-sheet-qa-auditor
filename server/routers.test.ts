@@ -374,6 +374,8 @@ describe("auditActions (PR-10)", () => {
     expect(result.findingActions).toContain("flag");
     expect(result.findingActions).toContain("approve");
     expect(result.undoSupported).toBe(true);
+    expect(result.bulkApproveSupported).toBe(true);
+    expect(result.fieldCorrectionSupported).toBe(true);
   });
 
   it("overrides a finding", async () => {

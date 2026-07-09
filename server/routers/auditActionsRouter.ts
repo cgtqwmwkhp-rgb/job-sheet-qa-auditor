@@ -14,6 +14,8 @@ import {
   bulkApproveFindings,
   approveJobSheet,
   undoJobSheetApprove,
+  captureFieldCorrection,
+  undoFieldCorrection,
   type AuditActionDeps,
 } from "../services/auditActions";
 import { FINDING_ACTIONS } from "../services/auditActions/types";
@@ -43,9 +45,13 @@ function createDbDeps(): AuditActionDeps {
           | "approved"
           | null
           | undefined,
+        fieldName: row.fieldName,
+        rawSnippet: row.rawSnippet,
+        normalisedSnippet: row.normalisedSnippet,
       };
     },
     updateFindingResolution: (id, data) => db.updateFindingResolution(id, data),
+    updateFindingSnippet: (id, data) => db.updateFindingSnippet(id, data),
     getAuditResult: async id => {
       const row = await db.getAuditResultById(id);
       if (!row) return undefined;
@@ -233,11 +239,67 @@ export const auditActionsRouter = router({
       });
     }),
 
+  /**
+   * Capture a reviewer field correction (PR-13).
+   * Writes normalisedSnippet + FIELD_CORRECTION audit log — no new migration.
+   */
+  captureFieldCorrection: protectedProcedure
+    .input(
+      z.object({
+        findingId: z.number().int().positive(),
+        fieldName: z.string().min(1).max(200).optional(),
+        originalValue: z.string().max(4000).optional(),
+        correctedValue: z.string().min(1).max(4000),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await captureFieldCorrection(createDbDeps(), {
+          findingId: input.findingId,
+          fieldName: input.fieldName,
+          originalValue: input.originalValue,
+          correctedValue: input.correctedValue,
+          userId: ctx.user.id,
+        });
+      } catch (err) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            err instanceof Error ? err.message : "Field correction failed",
+        });
+      }
+    }),
+
+  /** Soft-undo a field correction (restore previous normalisedSnippet). */
+  undoFieldCorrection: protectedProcedure
+    .input(
+      z.object({
+        findingId: z.number().int().positive(),
+        previousSnippet: z.string().max(4000).nullable(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await undoFieldCorrection(createDbDeps(), {
+          findingId: input.findingId,
+          previousSnippet: input.previousSnippet,
+          userId: ctx.user.id,
+        });
+      } catch (err) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            err instanceof Error ? err.message : "Undo field correction failed",
+        });
+      }
+    }),
+
   /** List supported actions (for UI / contract tests). */
   supportedActions: protectedProcedure.query(() => ({
     findingActions: [...FINDING_ACTIONS],
     undoSupported: true,
     bulkApproveSupported: true,
+    fieldCorrectionSupported: true,
   })),
 });
 
