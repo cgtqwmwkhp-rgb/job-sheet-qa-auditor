@@ -8,10 +8,7 @@
 export const FEATURE_FLAG = "FEATURE_CONFIDENCE_BANDS";
 
 export * from "./types";
-export {
-  classifyConfidence,
-  DEFAULT_BAND_THRESHOLDS,
-} from "./classify";
+export { classifyConfidence, DEFAULT_BAND_THRESHOLDS } from "./classify";
 
 /**
  * Default: disabled when FEATURE_CONFIDENCE_BANDS unset.
