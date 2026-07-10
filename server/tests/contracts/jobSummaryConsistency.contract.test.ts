@@ -155,6 +155,28 @@ Is the asset safe to use?: Yes
     ).toBe(true);
   });
 
+  it("does not false-fail when OCR flattens the page into one line", () => {
+    const flat = QSGGB1_WITH_COMMENTS.replace(/\n+/g, " ");
+    const signals = extractFailurePathSignals(flat, { failMarkCount: 0 });
+    expect(signals.returnVisit).toBe(true);
+    expect(signals.returnVisitNo).toBe(false);
+    expect(signals.incomplete).toBe(true);
+    expect(signals.worksCompleteYes).toBe(false);
+
+    const result = evaluateJobSummaryConsistency(flat, { failMarkCount: 0 });
+    const issues = result.findings.filter(f => f.severity === "S1");
+    expect(issues.map(f => f.fieldName)).toEqual([]);
+    expect(result.hasBlockingIssues).toBe(false);
+  });
+
+  it("on flattened text without comments, only engineer-comments is an Issue", () => {
+    const flat = QSGGB1_LIKE.replace(/\n+/g, " ");
+    const result = evaluateJobSummaryConsistency(flat, { failMarkCount: 0 });
+    const issues = result.findings.filter(f => f.severity === "S1");
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.fieldName).toBe("Engineer Comments (Failure Path)");
+  });
+
   it("documentProcessor wires FAILURE_PATH stage", () => {
     const src = fs.readFileSync(
       path.join(__dirname, "../../services/documentProcessor.ts"),
