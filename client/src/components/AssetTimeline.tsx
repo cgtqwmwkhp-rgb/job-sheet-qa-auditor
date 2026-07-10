@@ -27,7 +27,7 @@ export function AssetTimeline({ assetId, assetName, events }: AssetTimelineProps
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Clock className="h-5 w-5 text-blue-600" />
+              <Clock className="h-5 w-5 text-[#2868CE]" />
               Asset History Timeline
             </CardTitle>
             <CardDescription>Lifecycle events for {assetId}</CardDescription>
@@ -52,7 +52,7 @@ export function AssetTimeline({ assetId, assetName, events }: AssetTimelineProps
                     {event.date}
                   </div>
                   
-                  <div className="bg-slate-50 rounded-lg p-4 border border-slate-100 hover:border-blue-100 transition-colors">
+                  <div className="bg-[#F9F9F9] rounded-lg p-4 border border-slate-100 hover:border-blue-100 transition-colors">
                     <div className="flex items-start justify-between mb-2">
                       <h4 className="font-semibold text-slate-900 flex items-center gap-2">
                         {event.type === 'visit' && <Wrench className="h-4 w-4 text-blue-500" />}

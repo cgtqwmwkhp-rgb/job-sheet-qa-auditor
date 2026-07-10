@@ -23,6 +23,10 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
+/**
+ * Staff app shell — PlantExpand Portal chrome
+ * (white sidebar, lime header mark, gray-50 canvas).
+ */
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, logout } = useAuth();
 
@@ -32,10 +36,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         Skip to main content
       </a>
       <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 bg-background sticky top-0 z-10">
-          <SidebarTrigger className="-ml-1" />
-          <div className="w-px h-4 bg-border mx-1.5" aria-hidden="true" />
+      <SidebarInset className="bg-[#F9F9F9]">
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-[#EBE8E8] bg-white px-3 sticky top-0 z-10">
+          <SidebarTrigger className="-ml-1 text-[#333030] hover:bg-[#F5F4F4]" />
+          <div className="w-px h-4 bg-[#EBE8E8] mx-1.5" aria-hidden="true" />
           <div className="flex-1" />
           <div className="flex items-center gap-0.5">
             <ThemeToggle />
@@ -45,7 +49,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-full"
+                  className="rounded-full text-[#333030] hover:bg-[#F5F4F4]"
                   aria-label="Account menu"
                 >
                   <User className="h-5 w-5" aria-hidden="true" />
@@ -73,7 +77,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 p-6 overflow-auto outline-none"
+          className="flex-1 p-6 overflow-auto outline-none bg-[#F9F9F9] text-[#333030]"
         >
           {children}
         </main>

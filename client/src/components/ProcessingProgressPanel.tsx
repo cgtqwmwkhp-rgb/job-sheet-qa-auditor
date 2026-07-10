@@ -20,7 +20,7 @@ function StageIcon({ status }: { status: StageRunStatus }) {
     case "failed":
       return <XCircle className="h-4 w-4 text-red-600" />;
     case "running":
-      return <Loader2 className="h-4 w-4 animate-spin text-blue-600" />;
+      return <Loader2 className="h-4 w-4 animate-spin text-[#2868CE]" />;
     case "skipped":
       return <SkipForward className="h-4 w-4 text-muted-foreground" />;
     default:

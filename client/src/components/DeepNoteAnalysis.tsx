@@ -35,7 +35,7 @@ const MOCK_ANALYSIS: AnalysisResult = {
 
 export function DeepNoteAnalysis() {
   return (
-    <Card className="bg-slate-50 border-slate-200">
+    <Card className="bg-[#F9F9F9] border-[#EBE8E8]">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -58,26 +58,26 @@ export function DeepNoteAnalysis() {
               <span>Completeness</span>
               <span>{MOCK_ANALYSIS.completenessScore}%</span>
             </div>
-            <Progress value={MOCK_ANALYSIS.completenessScore} className="h-2 bg-slate-200" />
+            <Progress value={MOCK_ANALYSIS.completenessScore} className="h-2 bg-[#EBE8E8]" />
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-medium text-slate-600">
               <span>Tone & Professionalism</span>
               <span>{MOCK_ANALYSIS.toneScore}%</span>
             </div>
-            <Progress value={MOCK_ANALYSIS.toneScore} className="h-2 bg-slate-200" />
+            <Progress value={MOCK_ANALYSIS.toneScore} className="h-2 bg-[#EBE8E8]" />
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-medium text-slate-600">
               <span>Technical Clarity</span>
               <span>{MOCK_ANALYSIS.clarityScore}%</span>
             </div>
-            <Progress value={MOCK_ANALYSIS.clarityScore} className="h-2 bg-slate-200" />
+            <Progress value={MOCK_ANALYSIS.clarityScore} className="h-2 bg-[#EBE8E8]" />
           </div>
         </div>
 
         {/* Findings */}
-        <div className="space-y-3 bg-white p-4 rounded-lg border border-slate-200">
+        <div className="space-y-3 bg-white p-4 rounded-lg border border-[#EBE8E8]">
           <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Key Findings

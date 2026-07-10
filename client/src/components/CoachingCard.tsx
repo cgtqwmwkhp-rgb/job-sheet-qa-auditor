@@ -21,7 +21,7 @@ interface CoachingCardProps {
 export function CoachingCard({ engineerName, avatarUrl, firstFixRate, topIssues, recommendation }: CoachingCardProps) {
   return (
     <Card className="overflow-hidden border-l-4 border-l-blue-500">
-      <CardHeader className="pb-3 bg-slate-50/50">
+      <CardHeader className="pb-3 bg-[#F9F9F9]/50">
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
@@ -67,7 +67,7 @@ export function CoachingCard({ engineerName, avatarUrl, firstFixRate, topIssues,
           </p>
         </div>
       </CardContent>
-      <CardFooter className="bg-slate-50/50 py-3 flex justify-end gap-2">
+      <CardFooter className="bg-[#F9F9F9]/50 py-3 flex justify-end gap-2">
         <Button variant="outline" size="sm" className="h-8 text-xs">
           <CheckCircle2 className="h-3 w-3 mr-1.5" />
           Mark Reviewed

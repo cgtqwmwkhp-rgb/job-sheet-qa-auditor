@@ -396,7 +396,7 @@ export default function SiteIntelligence() {
                               <Link
                                 href={`/audits?jobSheetId=${row.jobSheetId}`}
                               >
-                                <a className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                                <a className="text-[#2868CE] hover:underline inline-flex items-center gap-1">
                                   <FileText className="h-3.5 w-3.5" />#
                                   {row.jobSheetId}
                                 </a>

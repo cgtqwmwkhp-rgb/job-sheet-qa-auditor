@@ -269,7 +269,7 @@ export default function AuditResults() {
                                 ? "bg-orange-100 text-orange-600"
                                 : sheet.status === "completed"
                                   ? "bg-lime-100 text-lime-700"
-                                  : "bg-blue-100 text-blue-600"
+                                  : "bg-[#DBEAFE] text-[#2868CE]"
                           }`}
                         >
                           {sheet.status === "failed" ? (
