@@ -30,7 +30,9 @@ export const ENSEMBLE_TO_GOLDSPEC: Record<string, string> = {
   // Do NOT map technician_signature → customerSignature (caused Present|assetId
   // conflicts to surface under Customer Signature). Keep unmapped for artifact.
   engineer_comments: "workDescription",
-  // safe_to_use, make_model, serial_no, technician_signature — artifact-only
+  make_model: "makeModel",
+  mileage_hours: "mileageHours",
+  // safe_to_use, serial_no, technician_signature — artifact-only
 };
 
 export const FEATURE_FLAG = "FEATURE_ENSEMBLE_EXTRACTION";

@@ -61,6 +61,8 @@ import {
 import {
   applyFindingHygiene,
   hasSignatureLabelEvidence,
+  hasVorBannerEvidence,
+  hasOnlyInformationalFindings,
   sanitizeExtractedFieldsForSignatures,
 } from "./findingHygiene";
 import {
@@ -1283,6 +1285,13 @@ async function processJobSheetWithOptions(
             base.customerSignature = vlmInkResult.preExtractedHint;
             base.engineerSignOff = vlmInkResult.preExtractedHint;
           }
+          if (hasVorBannerEvidence(extractedText) && !base.vorStatus) {
+            base.vorStatus = {
+              value: "Present",
+              confidence: 85,
+              pageNumber: 1,
+            };
+          }
           return Object.keys(base).length > 0 ? base : undefined;
         })(),
         preExtractedHintsBlock: (() => {
@@ -1307,6 +1316,13 @@ async function processJobSheetWithOptions(
             fields.customerSignature = vlmInkResult.preExtractedHint;
             fields.engineerSignOff = vlmInkResult.preExtractedHint;
           }
+          if (hasVorBannerEvidence(extractedText) && !fields.vorStatus) {
+            fields.vorStatus = {
+              value: "Present",
+              confidence: 85,
+              pageNumber: 1,
+            };
+          }
           const block = formatPreExtractedHints(
             fields,
             ensembleResult?.artifact.fieldDetails
@@ -1314,6 +1330,9 @@ async function processJobSheetWithOptions(
           const sigNote = hasSignatureLabelEvidence(extractedText)
             ? "\n\nNote: Signature label/box detected in text. Handwritten ink is usually invisible to OCR — do not mark signature Absent/MISSING solely for lack of ink text."
             : "";
+          const vorNote = hasVorBannerEvidence(extractedText)
+            ? "\n\nNote: VOR banner detected — record vorStatus as Present. Do not invent Engineer Comments / Work Notes as MISSING_FIELD when those fields are optional on this template."
+            : "\n\nNote: Do not emit MISSING_FIELD for optional Work Notes / Engineer Comments on Job Summary forms.";
           const vlmNote =
             vlmInkResult?.ran && vlmInkResult.imageQa?.vlmUsed
               ? `\n\nNote: Anthropic VLM ink verification → ${vlmInkResult.preExtractedHint?.value ?? "inconclusive"} @ ${Math.round((vlmInkResult.imageQa.confidence || 0) * 100)}% (${vlmInkResult.imageQa.details || ""}). Prefer this over OCR absence for signatures.`
@@ -1326,7 +1345,7 @@ async function processJobSheetWithOptions(
               ? "\n\nNote: The original PDF is attached for multimodal review — verify handwritten signatures and visual marks against the page image."
               : "";
           const combined =
-            `${block || ""}${sigNote}${vlmNote}${marksNote}${multimodalNote}`.trim();
+            `${block || ""}${sigNote}${vorNote}${vlmNote}${marksNote}${multimodalNote}`.trim();
           return combined || undefined;
         })(),
       }
@@ -1457,34 +1476,82 @@ async function processJobSheetWithOptions(
 
   // Ensemble consensus → review_queue on CONFLICT / low confidence required fields
   // Does not override FAIL; never promotes to PASS.
-  if (
-    ensembleResult?.reviewSignals.reviewRequired &&
-    analysisResult.overallResult !== "FAIL"
-  ) {
-    const ensembleFindings = buildEnsembleReviewFindings(
-      ensembleResult.reviewSignals,
-      ensembleResult.artifact.fieldDetails,
-      llmThreshold
+  // Filter optional template fields (e.g. workDescription) out of missingRequired.
+  {
+    const templateVersion = usedTemplateVersionId
+      ? getTemplateVersion(usedTemplateVersionId)
+      : null;
+    const optionalFieldIds = new Set(
+      (
+        (
+          templateVersion?.specJson as {
+            fields?: Array<{ field: string; required?: boolean }>;
+          }
+        )?.fields ?? []
+      )
+        .filter(f => f.required === false)
+        .map(f => f.field)
     );
-    const reasonTags = [
-      ...ensembleResult.reviewSignals.conflictFields.map(
-        () => "ENSEMBLE_CONFLICT"
-      ),
-      ...ensembleResult.reviewSignals.lowConfidenceFields.map(
-        () => "ENSEMBLE_LOW_CONFIDENCE"
-      ),
-      ...ensembleResult.reviewSignals.missingRequired.map(
-        () => "ENSEMBLE_MISSING_REQUIRED"
-      ),
-    ];
-    analysisResult = {
-      ...analysisResult,
-      overallResult: "REVIEW_QUEUE",
-      summary:
-        `${analysisResult.summary} ` +
-        `[ENSEMBLE] Consensus review required (${reasonTags.join(", ")}).`,
-      findings: [...analysisResult.findings, ...ensembleFindings],
-    };
+
+    if (
+      ensembleResult?.reviewSignals.reviewRequired &&
+      analysisResult.overallResult !== "FAIL"
+    ) {
+      const filteredMissing =
+        ensembleResult.reviewSignals.missingRequired.filter(
+          f => !optionalFieldIds.has(f)
+        );
+      const filteredLow =
+        ensembleResult.reviewSignals.lowConfidenceFields.filter(
+          f => !optionalFieldIds.has(f)
+        );
+      const stillRequired =
+        ensembleResult.reviewSignals.conflictFields.length > 0 ||
+        filteredMissing.length > 0 ||
+        filteredLow.length > 0;
+
+      if (stillRequired) {
+        const filteredSignals = {
+          ...ensembleResult.reviewSignals,
+          missingRequired: filteredMissing,
+          lowConfidenceFields: filteredLow,
+          reviewRequired: true,
+        };
+        const ensembleFindings = buildEnsembleReviewFindings(
+          filteredSignals,
+          ensembleResult.artifact.fieldDetails,
+          llmThreshold
+        ).filter(f => {
+          // Drop Engineer Comments / Work Notes when workDescription is optional
+          if (
+            optionalFieldIds.has("workDescription") &&
+            /engineer\s*comments|work\s*notes|workDescription|comments/i.test(
+              f.fieldName
+            )
+          ) {
+            return false;
+          }
+          return true;
+        });
+        const reasonTags = [
+          ...filteredSignals.conflictFields.map(() => "ENSEMBLE_CONFLICT"),
+          ...filteredSignals.lowConfidenceFields.map(
+            () => "ENSEMBLE_LOW_CONFIDENCE"
+          ),
+          ...filteredSignals.missingRequired.map(
+            () => "ENSEMBLE_MISSING_REQUIRED"
+          ),
+        ];
+        analysisResult = {
+          ...analysisResult,
+          overallResult: "REVIEW_QUEUE",
+          summary:
+            `${analysisResult.summary} ` +
+            `[ENSEMBLE] Consensus review required (${reasonTags.join(", ")}).`,
+          findings: [...analysisResult.findings, ...ensembleFindings],
+        };
+      }
+    }
   }
 
   // Finding hygiene: suppress garbage MISSING_FIELD / nonsense conflicts
@@ -1493,19 +1560,63 @@ async function processJobSheetWithOptions(
     const hasOcrSignature = hasOcrSignatureEvidence(ocrResult);
     const vlmSaysPresent = vlmInkResult?.preExtractedHint?.value === "Present";
     const vlmSaysAbsent = vlmInkResult?.preExtractedHint?.value === "Absent";
+    const templateVersion = usedTemplateVersionId
+      ? getTemplateVersion(usedTemplateVersionId)
+      : null;
+    const optionalTemplateFields = (
+      (
+        templateVersion?.specJson as {
+          fields?: Array<{
+            field: string;
+            required?: boolean;
+            aliases?: string[];
+          }>;
+        }
+      )?.fields ?? []
+    )
+      .filter(f => f.required === false)
+      .map(f => f.field);
+    const optionalFieldAliases = (
+      (
+        templateVersion?.specJson as {
+          fields?: Array<{
+            field: string;
+            required?: boolean;
+            aliases?: string[];
+          }>;
+        }
+      )?.fields ?? []
+    )
+      .filter(f => f.required === false)
+      .flatMap(f => f.aliases ?? []);
+
     const beforeCount = analysisResult.findings.length;
     const cleaned = applyFindingHygiene(analysisResult.findings, {
-      preExtractedFields: {
+      preExtractedFields: aliasCanonicalExtractedFields({
         ...(ensembleResult?.ensembleExtractedFields ?? {}),
         ...(selectionMarksResult?.preExtractedFields ?? {}),
         ...(vlmInkResult?.preExtractedHint
-          ? { customerSignature: vlmInkResult.preExtractedHint }
+          ? {
+              customerSignature: vlmInkResult.preExtractedHint,
+              engineerSignOff: vlmInkResult.preExtractedHint,
+            }
           : {}),
-      },
+        ...(hasVorBannerEvidence(extractedText)
+          ? {
+              vorStatus: {
+                value: "Present",
+                confidence: 85,
+                pageNumber: 1,
+              },
+            }
+          : {}),
+      }),
       confidenceThreshold: llmThreshold,
-      // If Anthropic VLM saw no ink, do not force Present from label alone
       signatureLabelPresent: signatureLabelPresent && !vlmSaysAbsent,
       hasOcrSignature: hasOcrSignature || vlmSaysPresent,
+      documentText: extractedText,
+      optionalTemplateFields,
+      optionalFieldAliases,
     });
     const sanitizedFields = sanitizeExtractedFieldsForSignatures(
       analysisResult.extractedFields,
@@ -1544,7 +1655,8 @@ async function processJobSheetWithOptions(
           `[FINDING_HYGIENE] Findings ${beforeCount}→${cleaned.length}` +
           (signatureLabelPresent || hasOcrSignature
             ? "; signature label/OCR evidence applied."
-            : "."),
+            : ".") +
+          (hasVorBannerEvidence(extractedText) ? " VOR banner recorded." : ""),
       };
       recordStage({
         stage: "Finding Hygiene",
@@ -1554,6 +1666,28 @@ async function processJobSheetWithOptions(
     } else {
       analysisResult = { ...analysisResult, findings: cleaned };
     }
+  }
+
+  // Promote REVIEW_QUEUE → PASS when only informational S3 findings remain
+  // (e.g. OCR Confidence soft-gate + Present field injections) and score is strong.
+  if (
+    analysisResult.overallResult === "REVIEW_QUEUE" &&
+    analysisResult.score >= llmThreshold &&
+    hasOnlyInformationalFindings(analysisResult.findings) &&
+    !hasBlockingFailMarks(selectionMarksResult?.artifact)
+  ) {
+    analysisResult = {
+      ...analysisResult,
+      overallResult: "PASS",
+      summary:
+        `${analysisResult.summary} ` +
+        `[AUTO_PASS] Only informational findings remain after hygiene; promoted to PASS.`,
+    };
+    recordStage({
+      stage: "Informational Pass Promotion",
+      status: "success",
+      durationMs: 0,
+    });
   }
 
   // =========================================================================

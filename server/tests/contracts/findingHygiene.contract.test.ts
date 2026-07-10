@@ -10,6 +10,9 @@ import {
   MAX_MISSING_FIELD_FINDINGS,
   isFindingHygieneEnabled,
   hasSignatureLabelEvidence,
+  hasVorBannerEvidence,
+  hasOnlyInformationalFindings,
+  injectPresentFieldFindings,
 } from "../../services/findingHygiene";
 import type { Finding } from "../../services/analyzer";
 import {
@@ -167,6 +170,99 @@ describe("findingHygiene", () => {
   });
 });
 
+describe("Job Summary judgment hygiene", () => {
+  afterEach(() => {
+    delete process.env.FEATURE_FINDING_HYGIENE;
+  });
+
+  it("suppresses Engineer Comments MISSING when workDescription is optional", () => {
+    const findings = [
+      finding({
+        fieldName: "Engineer Comments",
+        reasonCode: "MISSING_FIELD",
+        confidence: 0,
+        severity: "S1",
+      }),
+      finding({
+        fieldName: "assetId",
+        reasonCode: "MISSING_FIELD",
+        confidence: 0,
+        severity: "S1",
+      }),
+    ];
+    const cleaned = applyFindingHygiene(findings, {
+      optionalTemplateFields: new Set(["workDescription"]),
+      optionalFieldAliases: ["Engineer Comments", "Work Notes"],
+    });
+    expect(cleaned.some(f => /engineer comments/i.test(f.fieldName))).toBe(
+      false
+    );
+    expect(cleaned.some(f => f.fieldName === "assetId")).toBe(true);
+  });
+
+  it("detects VOR banner evidence", () => {
+    expect(
+      hasVorBannerEvidence(
+        "This Vehicle is marked as VOR\nAsset No: BN21ACO_TL"
+      )
+    ).toBe(true);
+    expect(hasVorBannerEvidence("Routine service completed")).toBe(false);
+  });
+
+  it("injects vorStatus, assetId, makeModel, mileageHours Present findings", () => {
+    const text = `
+Job Summary Report
+This Vehicle is marked as VOR
+Asset No: BN21ACO_TL
+Make/Model: TAILLIFT
+Asset Mileage/Hours: 74685
+Technician Signature
+`;
+    const injected = injectPresentFieldFindings([], text);
+    expect(injected.some(f => f.fieldName === "vorStatus")).toBe(true);
+    expect(injected.some(f => f.fieldName === "assetId")).toBe(true);
+    expect(
+      injected.find(f => f.fieldName === "assetId")?.normalisedSnippet
+    ).toBe("BN21ACO_TL");
+    expect(injected.some(f => f.fieldName === "makeModel")).toBe(true);
+    expect(injected.some(f => f.fieldName === "mileageHours")).toBe(true);
+    expect(
+      injected.find(f => f.fieldName === "mileageHours")?.normalisedSnippet
+    ).toBe("74685");
+  });
+
+  it("applyFindingHygiene injects Present fields from documentText", () => {
+    const cleaned = applyFindingHygiene([], {
+      documentText: `
+Job Summary Report
+This Vehicle is marked as VOR
+Asset No: BN21ACO_TL
+Make/Model: TAILLIFT
+Mileage/Hours: 74685
+Technician Signature
+`,
+      signatureLabelPresent: true,
+      optionalTemplateFields: ["workDescription"],
+    });
+    expect(cleaned.some(f => /signature/i.test(f.fieldName))).toBe(true);
+    expect(cleaned.some(f => f.fieldName === "vorStatus")).toBe(true);
+    expect(cleaned.some(f => f.fieldName === "assetId")).toBe(true);
+    expect(hasOnlyInformationalFindings(cleaned)).toBe(true);
+  });
+
+  it("hasOnlyInformationalFindings is false when S1 MISSING remains", () => {
+    expect(
+      hasOnlyInformationalFindings([
+        finding({
+          fieldName: "Engineer Comments",
+          reasonCode: "MISSING_FIELD",
+          severity: "S1",
+        }),
+      ])
+    ).toBe(false);
+  });
+});
+
 describe("ensemble signature conflict normalization", () => {
   it("detects asset-ID shaped tokens", () => {
     expect(isAssetIdShaped("BN21ACO_TL")).toBe(true);
@@ -250,7 +346,11 @@ describe("ensemble→Gemini wiring", () => {
     expect(dp).toContain("applyFindingHygiene");
     expect(dp).toContain("Finding Hygiene");
     expect(dp).toContain("hasSignatureLabelEvidence");
+    expect(dp).toContain("hasVorBannerEvidence");
+    expect(dp).toContain("hasOnlyInformationalFindings");
     expect(dp).toContain("sanitizeExtractedFieldsForSignatures");
+    expect(dp).toContain("optionalTemplateFields");
+    expect(dp).toContain("[AUTO_PASS]");
   });
 
   it("analyzer prompt path accepts preExtractedHintsBlock", () => {
