@@ -27,9 +27,10 @@ export const ENSEMBLE_TO_GOLDSPEC: Record<string, string> = {
   customer_name: "customerName",
   engineer_name: "technicianName",
   date: "dateOfService",
-  technician_signature: "customerSignature",
+  // Do NOT map technician_signature → customerSignature (caused Present|assetId
+  // conflicts to surface under Customer Signature). Keep unmapped for artifact.
   engineer_comments: "workDescription",
-  // safe_to_use, make_model, serial_no — artifact-only (no default GoldSpec rule)
+  // safe_to_use, make_model, serial_no, technician_signature — artifact-only
 };
 
 export const FEATURE_FLAG = "FEATURE_ENSEMBLE_EXTRACTION";
@@ -337,4 +338,32 @@ export function mergeExtractedFields(
     }
   }
   return merged;
+}
+
+/**
+ * Format ensemble consensus for Gemini advisory prompt injection.
+ */
+export function formatPreExtractedHints(
+  ensembleExtractedFields: EnsembleAdapterResult["ensembleExtractedFields"],
+  fieldDetails?: Record<string, EnsembleFieldArtifact>
+): string {
+  const entries = Object.entries(ensembleExtractedFields);
+  if (entries.length === 0) return "";
+
+  const lines = entries.map(([field, data]) => {
+    const detail = fieldDetails?.[field];
+    const meta: string[] = [`confidence=${data.confidence}`];
+    if (detail?.strategy) meta.push(`strategy=${detail.strategy}`);
+    if (detail?.conflictValues?.length) {
+      meta.push(`conflicts=${detail.conflictValues.join("|")}`);
+    }
+    return `- ${field}: "${data.value}" (${meta.join(", ")})`;
+  });
+
+  return `## Pre-extracted Fields (ensemble consensus — advisory)
+Use these as starting hypotheses. Validate against the raw text.
+Do NOT emit MISSING_FIELD when a high-confidence (≥70) pre-extraction exists unless the text clearly contradicts it.
+Do NOT treat asset/registration IDs as signature values.
+
+${lines.join("\n")}`;
 }
