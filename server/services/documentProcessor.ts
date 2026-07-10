@@ -66,6 +66,7 @@ import {
   sanitizeExtractedFieldsForSignatures,
 } from "./findingHygiene";
 import { evaluateJobSummaryConsistency } from "./jobSummaryConsistency";
+import { computeDocumentationQualityScore } from "./documentationQuality";
 import {
   runSelectionMarkDetection,
   isSelectionMarksEnabled,
@@ -1732,6 +1733,28 @@ async function processJobSheetWithOptions(
     });
   }
 
+  // Replace LLM self-confidence with engineer documentation quality (0–100).
+  // LLM confidence is retained in reportJson for ops; the stored/UI score is the mark.
+  const llmConfidenceForReport = analysisResult.score;
+  {
+    const quality = computeDocumentationQualityScore(analysisResult.findings, {
+      llmConfidence: llmConfidenceForReport,
+      overallResult: analysisResult.overallResult,
+    });
+    analysisResult = {
+      ...analysisResult,
+      score: quality.score,
+      summary:
+        `${analysisResult.summary} ` +
+        `[DOC_QUALITY] ${quality.summary} (LLM confidence was ${llmConfidenceForReport}).`,
+    };
+    recordStage({
+      stage: "Documentation Quality Score",
+      status: "success",
+      durationMs: 0,
+    });
+  }
+
   // =========================================================================
   // Stage 2.5: Shadow / champion-challenger (PR-21)
   // Runs challenger without affecting canonical results unless canary samples.
@@ -1852,6 +1875,8 @@ async function processJobSheetWithOptions(
       reportJson: {
         summary: analysisResult.summary,
         extractedText,
+        documentationQualityScore: analysisResult.score,
+        llmConfidenceScore: llmConfidenceForReport,
         extractedFields: ensembleResult
           ? mergeExtractedFields(
               analysisResult.extractedFields,

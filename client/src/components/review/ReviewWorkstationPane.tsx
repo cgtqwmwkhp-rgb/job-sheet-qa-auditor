@@ -799,8 +799,12 @@ function ReviewWorkstationContent({
             >
               {auditData.status.toUpperCase()}
             </Badge>
-            <Badge variant="outline" className="font-mono">
-              Score: {auditData.score}
+            <Badge
+              variant="outline"
+              className="font-mono bg-brand-charcoal text-white border-brand-charcoal"
+              title="Documentation quality out of 100 for this job sheet (engineer mark). Issues deduct points; Passed checks do not."
+            >
+              Doc quality: {auditData.score}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
