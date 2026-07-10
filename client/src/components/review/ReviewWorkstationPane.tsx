@@ -78,6 +78,8 @@ export interface Finding {
   severity?: "critical" | "major" | "minor";
   value?: string;
   message?: string;
+  whyItMatters?: string;
+  suggestedFix?: string;
   confidence: number;
   pageNumber?: number;
   box?: {
@@ -115,6 +117,8 @@ export function mapFindingsFromApi(
     confidence: string | null;
     pageNumber: number | null;
     boundingBox: unknown;
+    whyItMatters?: string | null;
+    suggestedFix?: string | null;
   }>
 ): Finding[] {
   return findingsData.map(f => {
@@ -155,6 +159,8 @@ export function mapFindingsFromApi(
       severity,
       value: f.rawSnippet || undefined,
       message: f.normalisedSnippet || undefined,
+      whyItMatters: f.whyItMatters || undefined,
+      suggestedFix: f.suggestedFix || undefined,
       confidence: parseFloat(f.confidence || "0") / 100,
       pageNumber: f.pageNumber || undefined,
       box: hasPercentBox
@@ -1282,10 +1288,24 @@ function FindingsList({
                 className={`text-sm ${
                   finding.status === "missing"
                     ? "text-red-700"
-                    : "text-orange-700"
+                    : finding.status === "warning"
+                      ? "text-orange-700"
+                      : "text-emerald-800"
                 }`}
               >
                 {finding.message}
+              </p>
+            )}
+
+            {finding.whyItMatters && (
+              <p className="mt-1.5 text-xs text-muted-foreground leading-snug">
+                {finding.whyItMatters}
+              </p>
+            )}
+
+            {finding.suggestedFix && finding.status !== "passed" && (
+              <p className="mt-1 text-xs text-slate-700">
+                Suggested fix: {finding.suggestedFix}
               </p>
             )}
 
