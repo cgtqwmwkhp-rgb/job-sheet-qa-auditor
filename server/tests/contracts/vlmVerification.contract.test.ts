@@ -98,6 +98,21 @@ describe("VLM Verification — Phase 2.5", () => {
     expect(result.passed).toBe(true);
   });
 
+  it("runImageQa uses VLM with PDF document when crop missing", async () => {
+    const result = await runImageQa(roi, "signatureBlock", {
+      documentPdf: {
+        data: Buffer.from("%PDF-1.4 mock").toString("base64"),
+        mediaType: "application/pdf",
+        encoding: "base64",
+      },
+      disputed: true,
+      disputeReason: "ink not in OCR",
+    });
+    expect(result.vlmUsed).toBe(true);
+    expect(result.vlmProvider).toBe("mock");
+    expect(result.passed).toBe(true);
+  });
+
   it("fail-soft: VLM failure falls back to heuristic", async () => {
     getMockVlmAdapter().setShouldFail(true);
     const result = await runImageQa(roi, "tickboxBlock", {

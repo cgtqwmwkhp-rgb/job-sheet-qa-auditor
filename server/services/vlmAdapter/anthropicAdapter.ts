@@ -1,5 +1,5 @@
 /**
- * Anthropic Messages API VLM adapter for ROI crop verification.
+ * Anthropic Messages API VLM adapter for ROI crop / PDF ink verification.
  * Fail-soft: network/API errors return success:false; caller keeps heuristic.
  */
 
@@ -14,6 +14,25 @@ import { getVlmConfig } from "./types";
 
 const logger = createSafeLogger("AnthropicVlm");
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+
+type AnthropicContentPart =
+  | {
+      type: "image";
+      source: {
+        type: "base64";
+        media_type: string;
+        data: string;
+      };
+    }
+  | {
+      type: "document";
+      source: {
+        type: "base64";
+        media_type: "application/pdf";
+        data: string;
+      };
+    }
+  | { type: "text"; text: string };
 
 export class AnthropicVlmAdapter implements VlmAdapter {
   readonly providerName = "anthropic" as const;
@@ -42,10 +61,46 @@ export class AnthropicVlmAdapter implements VlmAdapter {
       };
     }
 
+    if (!input.cropImage && !input.documentPdf) {
+      return {
+        success: false,
+        present: false,
+        confidence: 0,
+        reasoning: "No crop image or PDF document provided",
+        provider: "anthropic",
+        model: this.modelId,
+        processingTimeMs: Date.now() - start,
+        error: "MISSING_MEDIA",
+      };
+    }
+
     const prompt =
       input.checkType === "signature_present"
-        ? `Does this crop show a handwritten signature or clear mark of signing? Reply JSON only: {"present":boolean,"confidence":0-1,"reasoning":"short"}`
+        ? input.documentPdf && !input.cropImage
+          ? `Look at the Technician / Customer / Engineer Signature area on this job sheet PDF. Does it show handwritten ink (signature or clear mark of signing)? Reply JSON only: {"present":boolean,"confidence":0-1,"reasoning":"short"}`
+          : `Does this crop show a handwritten signature or clear mark of signing? Reply JSON only: {"present":boolean,"confidence":0-1,"reasoning":"short"}`
         : `Does this crop show one or more tickboxes that are checked/ticked? Reply JSON only: {"present":boolean,"confidence":0-1,"reasoning":"short"}`;
+
+    const mediaParts: AnthropicContentPart[] = [];
+    if (input.cropImage) {
+      mediaParts.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: input.cropImage.mediaType,
+          data: input.cropImage.data,
+        },
+      });
+    } else if (input.documentPdf) {
+      mediaParts.push({
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: "application/pdf",
+          data: input.documentPdf.data,
+        },
+      });
+    }
 
     try {
       const response = await fetch(ANTHROPIC_API_URL, {
@@ -62,14 +117,7 @@ export class AnthropicVlmAdapter implements VlmAdapter {
             {
               role: "user",
               content: [
-                {
-                  type: "image",
-                  source: {
-                    type: "base64",
-                    media_type: input.cropImage.mediaType,
-                    data: input.cropImage.data,
-                  },
-                },
+                ...mediaParts,
                 {
                   type: "text",
                   text: `${prompt}\nField: ${input.fieldId}\nDispute: ${input.disputeReason || "none"}`,

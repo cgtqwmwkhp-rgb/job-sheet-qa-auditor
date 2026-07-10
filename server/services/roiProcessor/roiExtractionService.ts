@@ -11,6 +11,7 @@ import {
   getVlmConfig,
   isVlmVerificationEnabled,
   type VlmCropImage,
+  type VlmDocumentPdf,
 } from "../vlmAdapter";
 
 /**
@@ -62,8 +63,10 @@ export interface ImageQaResult {
 }
 
 export interface RoiImageQaOptions {
-  /** Base64 crop for VLM; without this, heuristic only */
+  /** Base64 crop for VLM; without this, heuristic only unless documentPdf set */
   cropImage?: VlmCropImage;
+  /** Full PDF for Anthropic document ink verification when crop unavailable */
+  documentPdf?: VlmDocumentPdf;
   disputed?: boolean;
   extractionConfidence?: number;
   disputeReason?: string;
@@ -190,9 +193,9 @@ function heuristicImageQa(fieldId: ImageQaField): ImageQaResult {
 
 /**
  * Image QA for visual fields.
- * When FEATURE_VLM_VERIFICATION is on and a crop is provided for a disputed /
- * low-confidence field, calls the VLM adapter (Anthropic or mock). Fail-soft:
- * VLM errors fall back to the heuristic result.
+ * When FEATURE_VLM_VERIFICATION is on and a crop or PDF is provided for a
+ * disputed / low-confidence field, calls the VLM adapter (Anthropic or mock).
+ * Fail-soft: VLM errors fall back to the heuristic result.
  */
 export async function runImageQa(
   _roi: RoiRegion,
@@ -209,10 +212,10 @@ export async function runImageQa(
   const lowConfidence =
     typeof options.extractionConfidence === "number" &&
     options.extractionConfidence < config.confidenceThreshold;
-  const shouldUseVlm =
-    Boolean(options.cropImage) && (options.disputed === true || lowConfidence);
+  const hasMedia = Boolean(options.cropImage || options.documentPdf);
+  const shouldUseVlm = hasMedia && (options.disputed === true || lowConfidence);
 
-  if (!shouldUseVlm || !options.cropImage) {
+  if (!shouldUseVlm) {
     return heuristic;
   }
 
@@ -222,6 +225,7 @@ export async function runImageQa(
       fieldId,
       checkType: heuristic.checkType,
       cropImage: options.cropImage,
+      documentPdf: options.documentPdf,
       disputeReason: options.disputeReason,
     });
 

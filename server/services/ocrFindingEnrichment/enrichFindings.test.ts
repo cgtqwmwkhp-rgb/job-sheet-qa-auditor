@@ -103,6 +103,46 @@ describe("enrichFindingsWithOcrEvidence", () => {
     expect(enriched[0].confidence).toBeCloseTo(82, 0);
   });
 
+  it("attaches bbox via field-label aliases when snippet is empty", () => {
+    const ocr: OCRResult = {
+      success: true,
+      pages: [
+        {
+          pageNumber: 1,
+          markdown: "Time Out\n16:30",
+          blocks: [
+            {
+              type: "text",
+              content: "Time Out",
+              boundingBox: {
+                x: 12,
+                y: 40,
+                width: 18,
+                height: 4,
+                coordinateSpace: "percent",
+              },
+            },
+          ],
+        },
+      ],
+      totalPages: 1,
+      model: "mock",
+    };
+    const findings = [
+      baseFinding({
+        fieldName: "timeOut",
+        rawSnippet: "",
+        normalisedSnippet: "",
+      }),
+    ];
+    const enriched = enrichFindingsWithOcrEvidence(findings, ocr);
+    expect(enriched[0].boundingBox).toBeDefined();
+    expect((enriched[0].boundingBox as { source?: string }).source).toBe(
+      "ocr_block"
+    );
+    expect(enriched[0].boundingBox!.y).toBe(40);
+  });
+
   it("is a no-op for empty findings", () => {
     const ocr = fixtureOcrResult();
     expect(enrichFindingsWithOcrEvidence([], ocr)).toEqual([]);

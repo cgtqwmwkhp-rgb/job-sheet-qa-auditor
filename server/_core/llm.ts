@@ -123,6 +123,48 @@ const ensureArray = (
   value: MessageContent | MessageContent[]
 ): MessageContent[] => (Array.isArray(value) ? value : [value]);
 
+type GeminiPart =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } };
+
+function parseDataUrl(url: string): { mimeType: string; data: string } | null {
+  const match = /^data:([^;,]+);base64,([\s\S]+)$/.exec(url);
+  if (!match) return null;
+  return { mimeType: match[1], data: match[2] };
+}
+
+function contentPartToGeminiParts(part: MessageContent): GeminiPart[] {
+  if (typeof part === "string") {
+    return part ? [{ text: part }] : [];
+  }
+  if (part.type === "text") {
+    return part.text ? [{ text: part.text }] : [];
+  }
+  if (part.type === "image_url") {
+    const parsed = parseDataUrl(part.image_url.url);
+    if (parsed) {
+      return [{ inlineData: { mimeType: parsed.mimeType, data: parsed.data } }];
+    }
+    // Remote URLs are not fetched here — keep a text placeholder for the model.
+    return [{ text: `[image: ${part.image_url.url}]` }];
+  }
+  if (part.type === "file_url") {
+    const parsed = parseDataUrl(part.file_url.url);
+    if (parsed) {
+      return [
+        {
+          inlineData: {
+            mimeType: part.file_url.mime_type || parsed.mimeType,
+            data: parsed.data,
+          },
+        },
+      ];
+    }
+    return [{ text: `[file: ${part.file_url.url}]` }];
+  }
+  return [{ text: JSON.stringify(part) }];
+}
+
 const contentPartToText = (part: MessageContent): string => {
   if (typeof part === "string") {
     return part;
@@ -141,6 +183,10 @@ const contentPartToText = (part: MessageContent): string => {
 
 const messageToText = (message: Message): string =>
   ensureArray(message.content).map(contentPartToText).join("\n");
+
+function messageToGeminiParts(message: Message): GeminiPart[] {
+  return ensureArray(message.content).flatMap(contentPartToGeminiParts);
+}
 
 /**
  * Custom error for missing LLM API key configuration.
@@ -252,12 +298,13 @@ function sanitizeSchemaForGemini(
   return clone;
 }
 
-function buildGeminiContents(messages: Message[]): {
+/** @internal Exported for unit tests — builds Gemini generateContent payload parts. */
+export function buildGeminiContents(messages: Message[]): {
   systemInstruction?: { parts: Array<{ text: string }> };
-  contents: Array<{ role: string; parts: Array<{ text: string }> }>;
+  contents: Array<{ role: string; parts: GeminiPart[] }>;
 } {
   const systemParts: string[] = [];
-  const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+  const contents: Array<{ role: string; parts: GeminiPart[] }> = [];
 
   for (const message of messages) {
     if (message.role === "system") {
@@ -267,10 +314,12 @@ function buildGeminiContents(messages: Message[]): {
 
     // Gemini uses "user" | "model" (not "assistant")
     const role = message.role === "assistant" ? "model" : "user";
+    const parts = messageToGeminiParts(message);
+    if (parts.length === 0) continue;
 
     contents.push({
       role,
-      parts: [{ text: messageToText(message) }],
+      parts,
     });
   }
 

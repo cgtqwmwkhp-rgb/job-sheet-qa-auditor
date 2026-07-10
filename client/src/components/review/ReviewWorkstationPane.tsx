@@ -351,6 +351,8 @@ function ReviewWorkstationContent({
 }) {
   const [activeBoxId, setActiveBoxId] = useState<string | number | null>(null);
   const [focusPage, setFocusPage] = useState<number | null>(null);
+  const [focusNonce, setFocusNonce] = useState(0);
+  const [focusLabel, setFocusLabel] = useState<string | null>(null);
   const [annotationOpen, setAnnotationOpen] = useState(false);
   const [newBox, setNewBox] = useState<ViewerBoundingBox | null>(null);
   const [annotationLabel, setAnnotationLabel] = useState("");
@@ -581,10 +583,10 @@ function ReviewWorkstationContent({
     const { activeBoxId: nextId } = syncSelectionFromBox(id);
     setActiveBoxId(nextId);
     const finding = auditData.findings.find(f => f.id === id);
-    const page = finding?.box?.page ?? finding?.pageNumber;
-    if (page) {
-      setFocusPage(page);
-    }
+    const page = finding?.box?.page ?? finding?.pageNumber ?? 1;
+    setFocusPage(page);
+    setFocusLabel(finding?.field || finding?.box?.label || null);
+    setFocusNonce(n => n + 1);
     requestAnimationFrame(() => {
       const element = document.getElementById(`finding-${id}`);
       if (element) {
@@ -601,16 +603,28 @@ function ReviewWorkstationContent({
             id: finding.id,
             pageNumber: finding.pageNumber ?? finding.box?.page,
             box: finding.box,
+            boundingBox: finding.box
+              ? {
+                  x: finding.box.x,
+                  y: finding.box.y,
+                  width: finding.box.width,
+                  height: finding.box.height,
+                  coordinateSpace: "percent",
+                  page: finding.box.page,
+                }
+              : undefined,
             field: finding.field,
+            fieldName: finding.field,
+            label: finding.box?.label || finding.field,
             severity: finding.severity,
             status: finding.status,
           }
         : null
     );
     setActiveBoxId(sync.activeBoxId);
-    if (sync.focusPage != null) {
-      setFocusPage(sync.focusPage);
-    }
+    setFocusPage(sync.focusPage ?? 1);
+    setFocusLabel(sync.focusLabel);
+    setFocusNonce(n => n + 1);
     if (!showPdfViewer) {
       setShowPdfViewer(true);
     }
@@ -905,6 +919,8 @@ function ReviewWorkstationContent({
               boxes={boxes}
               activeBoxId={activeBoxId}
               focusPage={focusPage}
+              focusNonce={focusNonce}
+              focusLabel={focusLabel}
               onBoxClick={handleBoxClick}
               onBoxCreate={handleBoxCreate}
             />

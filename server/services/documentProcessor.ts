@@ -24,6 +24,7 @@ import { analyzeJobSheet, AnalysisResult, GoldSpec } from "./analyzer";
 import { selectTemplateMultiSignal } from "./templateSelector";
 import {
   enrichWithEmbeddedPdfText,
+  fetchPdfBuffer,
   isThinExtractedText,
   THIN_TEXT_CHAR_THRESHOLD,
 } from "./embeddedPdfText";
@@ -96,6 +97,12 @@ import {
   isTemplateCollisionEnabled,
 } from "./templateCollision";
 import { getVlmConfig, isVlmVerificationEnabled } from "./vlmAdapter";
+import {
+  isGeminiMultimodalEnabled,
+  verifySignatureInk,
+  VLM_PDF_MAX_BYTES,
+  type SignatureInkVerificationResult,
+} from "./vlmInkVerification";
 import * as db from "../db";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -364,7 +371,7 @@ function buildFlaggedProcessorArtifacts(input: {
       model: config.model,
       maxCropsPerDoc: config.maxCropsPerDoc,
       confidenceThreshold: config.confidenceThreshold,
-      note: "Document processor has no crop image at this stage; ROI paths invoke VLM when crop data is present.",
+      note: "Ink verification runs via PDF document path when FEATURE_VLM_VERIFICATION is on.",
     };
   });
 
@@ -1166,6 +1173,65 @@ async function processJobSheetWithOptions(
     );
   }
 
+  // Stage 1.9: Fetch PDF once for VLM ink + Gemini multimodal (fail-soft)
+  const pdfFetchStart = Date.now();
+  let sharedPdfBuffer: Buffer | null = null;
+  try {
+    sharedPdfBuffer = await fetchPdfBuffer(documentUrl);
+    recordStage({
+      stage: "PDF Buffer Fetch",
+      status: sharedPdfBuffer ? "success" : "skipped",
+      durationMs: Date.now() - pdfFetchStart,
+      error: sharedPdfBuffer ? undefined : "PDF_FETCH_EMPTY",
+    });
+  } catch (pdfErr) {
+    recordStage({
+      stage: "PDF Buffer Fetch",
+      status: "failed",
+      durationMs: Date.now() - pdfFetchStart,
+      error: pdfErr instanceof Error ? pdfErr.message : "pdf fetch failed",
+    });
+  }
+
+  // Stage 1.95: Anthropic VLM signature ink verification (fail-soft)
+  let vlmInkResult: SignatureInkVerificationResult | null = null;
+  const vlmStart = Date.now();
+  if (isVlmVerificationEnabled()) {
+    try {
+      vlmInkResult = await verifySignatureInk({
+        documentUrl,
+        pdfBuffer: sharedPdfBuffer,
+        disputed: true,
+        disputeReason:
+          "OCR cannot see handwritten ink; verify Technician/Customer Signature area",
+        extractionConfidence: 0.4,
+      });
+      recordStage({
+        stage: "VLM Ink Verification",
+        status: vlmInkResult.ran ? "success" : "skipped",
+        durationMs: Date.now() - vlmStart,
+        error: vlmInkResult.skippedReason,
+      });
+    } catch (vlmErr) {
+      console.warn(
+        "[DocumentProcessor] VLM ink verification failed (non-fatal):",
+        vlmErr
+      );
+      recordStage({
+        stage: "VLM Ink Verification",
+        status: "failed",
+        durationMs: Date.now() - vlmStart,
+        error: vlmErr instanceof Error ? vlmErr.message : "vlm failed",
+      });
+    }
+  } else {
+    recordStage({
+      stage: "VLM Ink Verification",
+      status: "skipped",
+      durationMs: 0,
+    });
+  }
+
   // Stage 2: AI Analysis
   const analysisStartTime = Date.now();
   let analysisResult: AnalysisResult;
@@ -1178,6 +1244,20 @@ async function processJobSheetWithOptions(
       {
         jobSheetId,
         confidenceThreshold: processingSettings.llmConfidenceThreshold,
+        documentAttachment: (() => {
+          if (!isGeminiMultimodalEnabled()) return undefined;
+          if (
+            !sharedPdfBuffer ||
+            sharedPdfBuffer.length === 0 ||
+            sharedPdfBuffer.length > VLM_PDF_MAX_BYTES
+          ) {
+            return undefined;
+          }
+          return {
+            dataBase64: sharedPdfBuffer.toString("base64"),
+            mimeType: "application/pdf" as const,
+          };
+        })(),
         preExtractedFields: (() => {
           const base = {
             ...(ensembleResult?.ensembleExtractedFields ?? {}),
@@ -1193,6 +1273,10 @@ async function processJobSheetWithOptions(
               confidence: 75,
               pageNumber: 1,
             };
+          }
+          // Anthropic VLM ink result overrides / strengthens signature hint
+          if (vlmInkResult?.preExtractedHint) {
+            base.customerSignature = vlmInkResult.preExtractedHint;
           }
           return Object.keys(base).length > 0 ? base : undefined;
         })(),
@@ -1211,6 +1295,9 @@ async function processJobSheetWithOptions(
               pageNumber: 1,
             };
           }
+          if (vlmInkResult?.preExtractedHint) {
+            fields.customerSignature = vlmInkResult.preExtractedHint;
+          }
           const block = formatPreExtractedHints(
             fields,
             ensembleResult?.artifact.fieldDetails
@@ -1218,10 +1305,19 @@ async function processJobSheetWithOptions(
           const sigNote = hasSignatureLabelEvidence(extractedText)
             ? "\n\nNote: Signature label/box detected in text. Handwritten ink is usually invisible to OCR — do not mark signature Absent/MISSING solely for lack of ink text."
             : "";
+          const vlmNote =
+            vlmInkResult?.ran && vlmInkResult.imageQa?.vlmUsed
+              ? `\n\nNote: Anthropic VLM ink verification → ${vlmInkResult.preExtractedHint?.value ?? "inconclusive"} @ ${Math.round((vlmInkResult.imageQa.confidence || 0) * 100)}% (${vlmInkResult.imageQa.details || ""}). Prefer this over OCR absence for signatures.`
+              : "";
           const marksNote = selectionMarksResult?.hintsBlock
             ? `\n\n${selectionMarksResult.hintsBlock}`
             : "";
-          const combined = `${block || ""}${sigNote}${marksNote}`.trim();
+          const multimodalNote =
+            isGeminiMultimodalEnabled() && sharedPdfBuffer
+              ? "\n\nNote: The original PDF is attached for multimodal review — verify handwritten signatures and visual marks against the page image."
+              : "";
+          const combined =
+            `${block || ""}${sigNote}${vlmNote}${marksNote}${multimodalNote}`.trim();
           return combined || undefined;
         })(),
       }
@@ -1386,19 +1482,28 @@ async function processJobSheetWithOptions(
   {
     const signatureLabelPresent = hasSignatureLabelEvidence(extractedText);
     const hasOcrSignature = hasOcrSignatureEvidence(ocrResult);
+    const vlmSaysPresent = vlmInkResult?.preExtractedHint?.value === "Present";
+    const vlmSaysAbsent = vlmInkResult?.preExtractedHint?.value === "Absent";
     const beforeCount = analysisResult.findings.length;
     const cleaned = applyFindingHygiene(analysisResult.findings, {
       preExtractedFields: {
         ...(ensembleResult?.ensembleExtractedFields ?? {}),
         ...(selectionMarksResult?.preExtractedFields ?? {}),
+        ...(vlmInkResult?.preExtractedHint
+          ? { customerSignature: vlmInkResult.preExtractedHint }
+          : {}),
       },
       confidenceThreshold: llmThreshold,
-      signatureLabelPresent,
-      hasOcrSignature,
+      // If Anthropic VLM saw no ink, do not force Present from label alone
+      signatureLabelPresent: signatureLabelPresent && !vlmSaysAbsent,
+      hasOcrSignature: hasOcrSignature || vlmSaysPresent,
     });
     const sanitizedFields = sanitizeExtractedFieldsForSignatures(
       analysisResult.extractedFields,
-      { signatureLabelPresent, hasOcrSignature }
+      {
+        signatureLabelPresent: signatureLabelPresent && !vlmSaysAbsent,
+        hasOcrSignature: hasOcrSignature || vlmSaysPresent,
+      }
     );
     const findingsChanged =
       JSON.stringify(cleaned) !== JSON.stringify(analysisResult.findings);
@@ -1584,6 +1689,17 @@ async function processJobSheetWithOptions(
         ...(selectionMarksResult
           ? { selectionMarks: selectionMarksResult.artifact }
           : {}),
+        ...(vlmInkResult ? { vlmInkVerification: vlmInkResult.artifact } : {}),
+        geminiMultimodal: {
+          enabled: isGeminiMultimodalEnabled(),
+          attached:
+            isGeminiMultimodalEnabled() &&
+            Boolean(
+              sharedPdfBuffer &&
+                sharedPdfBuffer.length > 0 &&
+                sharedPdfBuffer.length <= VLM_PDF_MAX_BYTES
+            ),
+        },
         ...(pipelineIntegrationResult
           ? { pipelineIntegration: pipelineIntegrationResult }
           : {}),

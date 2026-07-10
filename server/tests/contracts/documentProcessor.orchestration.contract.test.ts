@@ -54,6 +54,8 @@ describe("documentProcessor orchestration contract", () => {
     expect(documentProcessor).toContain("isStageSloEnabled()");
     expect(documentProcessor).toContain("isTemplateCollisionEnabled()");
     expect(documentProcessor).toContain("isVlmVerificationEnabled()");
+    expect(documentProcessor).toContain("verifySignatureInk");
+    expect(documentProcessor).toContain("isGeminiMultimodalEnabled");
     expect(documentProcessor).toContain("feature artifact failed (non-fatal)");
     expect(documentProcessor).toContain("featureFlagArtifacts");
     expect(router).not.toContain("buildFlaggedProcessorArtifacts");

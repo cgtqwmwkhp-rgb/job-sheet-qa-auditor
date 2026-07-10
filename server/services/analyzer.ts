@@ -102,6 +102,14 @@ export interface AnalysisOptions {
   >;
   /** Optional formatted hint block (preferred over serializing fields inline). */
   preExtractedHintsBlock?: string;
+  /**
+   * Optional PDF/image attachment for Gemini multimodal judgment.
+   * Base64 without data-URI prefix.
+   */
+  documentAttachment?: {
+    dataBase64: string;
+    mimeType: "application/pdf" | "image/png" | "image/jpeg" | "image/webp";
+  };
 }
 
 const ANALYSIS_SYSTEM_PROMPT = `You are an expert Job Sheet QA Auditor. Your task is to analyze extracted text from job sheets and validate them against a Gold Standard specification.
@@ -185,6 +193,11 @@ ${extractedText}
 4. Calculate an overall score (0-100)
 5. Determine if the job sheet PASSES, FAILS, or needs REVIEW_QUEUE
 6. Prefer pre-extracted high-confidence values when they match the text; avoid duplicate MISSING_FIELD noise
+${
+  options.documentAttachment
+    ? "7. A PDF/image of the job sheet is attached — use it to verify handwritten ink (signatures), visual marks, and layout that OCR text may miss"
+    : ""
+}
 
 Respond with a JSON object containing:
 - overallResult: "PASS" | "FAIL" | "REVIEW_QUEUE"
@@ -193,10 +206,41 @@ Respond with a JSON object containing:
 - extractedFields: object mapping field names to extracted values
 - summary: brief summary of the analysis`;
 
+  const userContent: Array<
+    | { type: "text"; text: string }
+    | {
+        type: "file_url";
+        file_url: {
+          url: string;
+          mime_type: "application/pdf";
+        };
+      }
+    | {
+        type: "image_url";
+        image_url: { url: string; detail: "high" };
+      }
+  > = [{ type: "text", text: userPrompt }];
+
+  if (options.documentAttachment) {
+    const { dataBase64, mimeType } = options.documentAttachment;
+    const dataUrl = `data:${mimeType};base64,${dataBase64}`;
+    if (mimeType === "application/pdf") {
+      userContent.push({
+        type: "file_url",
+        file_url: { url: dataUrl, mime_type: "application/pdf" },
+      });
+    } else {
+      userContent.push({
+        type: "image_url",
+        image_url: { url: dataUrl, detail: "high" },
+      });
+    }
+  }
+
   const response = await invokeLLM({
     messages: [
       { role: "system", content: ANALYSIS_SYSTEM_PROMPT },
-      { role: "user", content: userPrompt },
+      { role: "user", content: userContent },
     ],
     responseFormat: {
       type: "json_schema",

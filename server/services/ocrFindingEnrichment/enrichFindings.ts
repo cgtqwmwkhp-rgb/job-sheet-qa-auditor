@@ -34,6 +34,69 @@ function isSignatureFinding(finding: Finding): boolean {
   );
 }
 
+/** Common field → OCR label aliases for bbox enrichment when snippets miss. */
+const FIELD_LABEL_ALIASES: Record<string, string[]> = {
+  timein: ["time in", "timein", "arrival", "arrived"],
+  timeout: ["time out", "timeout", "departure", "departed", "left site"],
+  customersignature: [
+    "technician signature",
+    "customer signature",
+    "engineer signature",
+    "signature",
+    "signed by",
+  ],
+  techniciansignature: [
+    "technician signature",
+    "engineer signature",
+    "signature",
+    "signed by",
+  ],
+  jobreference: ["job no", "job number", "job ref", "job reference", "wo no"],
+  assetid: ["asset no", "asset number", "asset id", "registration", "reg no"],
+  date: ["date", "job date", "visit date"],
+};
+
+function fieldLabelNeedles(finding: Finding): string[] {
+  const key = finding.fieldName.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+  const aliases = FIELD_LABEL_ALIASES[key] ?? [];
+  const fromName = finding.fieldName
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim();
+  return [...aliases, fromName].filter(Boolean);
+}
+
+function findMatchingBlockByFieldLabel(
+  finding: Finding,
+  pages: OCRPage[]
+): { page: OCRPage; block: OCRBlock } | undefined {
+  const needles = fieldLabelNeedles(finding).map(normalizeForMatch);
+  if (needles.length === 0) return undefined;
+
+  const candidates = pagesForFinding(pages, finding.pageNumber);
+  let best: { page: OCRPage; block: OCRBlock; score: number } | undefined;
+
+  for (const page of candidates) {
+    if (!page.blocks?.length) continue;
+    for (const block of page.blocks) {
+      if (block.type === "signature") continue;
+      if (!block.content || !block.boundingBox) continue;
+      const hay = normalizeForMatch(block.content);
+      for (const needle of needles) {
+        if (needle.length < 2) continue;
+        if (hay.includes(needle) || needle.includes(hay)) {
+          const score = needle.length;
+          if (!best || score > best.score) {
+            best = { page, block, score };
+          }
+        }
+      }
+    }
+  }
+
+  return best ? { page: best.page, block: best.block } : undefined;
+}
+
 function normalizeForMatch(text: string): string {
   return text.toLowerCase().replace(/\s+/g, " ").trim();
 }
@@ -230,7 +293,9 @@ export function enrichFindingsWithOcrEvidence(
         }
       }
 
-      const match = findMatchingBlock(finding, ocrResult.pages);
+      const match =
+        findMatchingBlock(finding, ocrResult.pages) ??
+        findMatchingBlockByFieldLabel(finding, ocrResult.pages);
       if (match) {
         const bbox = blockToAuditBbox(match.block, "ocr_block");
         if (bbox) {
