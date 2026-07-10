@@ -2,7 +2,7 @@
  * Post-judgment finding hygiene (no new gold templates).
  *
  * Suppresses MISSING_FIELD when ensemble already extracted the field,
- * caps MISSING_FIELD storms, demotes nonsense signature/asset conflicts,
+ * caps MISSING_FIELD storms, demotes nonsense signature/date vs asset conflicts,
  * and drops mileage-as-serial snippets.
  *
  * Feature flag: FEATURE_FINDING_HYGIENE
@@ -36,47 +36,61 @@ export interface FindingHygieneOptions {
 
 const ASSET_ID_RE =
   /^[A-Z]{2}\d{2}[A-Z]{3}(_[A-Z0-9]+)?$|^[A-Z0-9]+_TL$|^[A-Z0-9]+_FL$/i;
-const MILEAGE_NOISE_RE = /mileage|odometer|\bhours\b|km\/h|odometer/i;
+const ASSET_BLEED_RE =
+  /\b[A-Z]{2}\d{2}[A-Z]{3}(_[A-Z0-9]+)?\b.*make\/?model|\b[A-Z0-9]+_TL\b/i;
+const MILEAGE_NOISE_RE = /mileage|odometer|\bhours\b|km\/h/i;
 const SIGNATURE_FIELD_RE = /signature/i;
+const DATE_FIELD_RE = /^date$|dateOfService|service.?date|job.?date/i;
+const DATE_VALUE_RE =
+  /^\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}$|^\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2}$|^\d{4}-\d{2}-\d{2}$/;
+
+function splitConflictParts(finding: Finding): string[] {
+  const raw = finding.normalisedSnippet || finding.rawSnippet || "";
+  return raw
+    .split("|")
+    .map(s => s.replace(/^Conflicting values:\s*/i, "").trim())
+    .filter(Boolean);
+}
 
 function isAssetToken(value: string): boolean {
-  return ASSET_ID_RE.test(value.trim());
+  const v = value.trim();
+  return ASSET_ID_RE.test(v) || ASSET_BLEED_RE.test(v);
 }
 
 function isPresentAbsent(value: string): boolean {
   return /^(present|absent)$/i.test(value.trim());
 }
 
+function isDateShaped(value: string): boolean {
+  return DATE_VALUE_RE.test(value.trim());
+}
+
 function isNonsenseSignatureConflict(finding: Finding): boolean {
   if (finding.reasonCode !== "CONFLICT") return false;
   if (!SIGNATURE_FIELD_RE.test(finding.fieldName)) return false;
-  const parts = (finding.normalisedSnippet || finding.rawSnippet || "")
-    .split("|")
-    .map(s => s.replace(/^Conflicting values:\s*/i, "").trim())
-    .filter(Boolean);
-  if (parts.length < 2) {
-    // Also parse "Present | BN21ACO_TL"
-    const raw = finding.normalisedSnippet || finding.rawSnippet || "";
-    const split = raw
-      .split("|")
-      .map(s => s.trim())
-      .filter(Boolean);
-    if (split.length >= 2) {
-      const hasPresence = split.some(isPresentAbsent);
-      const hasAsset = split.some(isAssetToken);
-      return hasPresence && hasAsset;
-    }
-    return false;
-  }
-  const hasPresence = parts.some(isPresentAbsent);
-  const hasAsset = parts.some(isAssetToken);
-  return hasPresence && hasAsset;
+  const parts = splitConflictParts(finding);
+  if (parts.length < 2) return false;
+  return parts.some(isPresentAbsent) && parts.some(isAssetToken);
+}
+
+/** Date CONFLICT that mixes a real date with asset/Make-Model bleed. */
+function isNonsenseDateAssetConflict(finding: Finding): boolean {
+  if (finding.reasonCode !== "CONFLICT") return false;
+  if (!DATE_FIELD_RE.test(finding.fieldName)) return false;
+  const parts = splitConflictParts(finding);
+  if (parts.length < 2) return false;
+  return parts.some(isDateShaped) && parts.some(isAssetToken);
 }
 
 function isMileageAsSerialSnippet(finding: Finding): boolean {
   if (!/serial|asset/i.test(finding.fieldName)) return false;
   const snippet = `${finding.rawSnippet} ${finding.normalisedSnippet}`;
   return MILEAGE_NOISE_RE.test(snippet);
+}
+
+function pickDateFromConflict(finding: Finding): string {
+  const parts = splitConflictParts(finding);
+  return parts.find(isDateShaped) ?? parts[0] ?? "";
 }
 
 /**
@@ -106,22 +120,50 @@ export function applyFindingHygiene(
     if (isMileageAsSerialSnippet(f)) {
       return false;
     }
+    // Drop date findings whose only snippet is asset bleed (no real date)
+    if (DATE_FIELD_RE.test(f.fieldName)) {
+      const snippet = `${f.normalisedSnippet || ""} ${f.rawSnippet || ""}`;
+      const hasDate =
+        DATE_VALUE_RE.test((f.normalisedSnippet || "").trim()) ||
+        DATE_VALUE_RE.test((f.rawSnippet || "").trim()) ||
+        splitConflictParts(f).some(isDateShaped) ||
+        /\d{4}-\d{2}-\d{2}|\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}/.test(snippet);
+      if (!hasDate && isAssetToken(snippet)) {
+        return false;
+      }
+    }
     return true;
   });
 
-  // Downgrade Present|assetId signature conflicts → LOW_CONFIDENCE or drop
+  // Downgrade Present|assetId signature conflicts
   working = working.map(f => {
-    if (!isNonsenseSignatureConflict(f)) return f;
-    return {
-      ...f,
-      reasonCode: "LOW_CONFIDENCE" as const,
-      severity: "S3" as const,
-      normalisedSnippet: "Present",
-      whyItMatters:
-        "Signature presence was confused with an adjacent asset ID; treated as low-confidence presence check.",
-      suggestedFix:
-        "Confirm signature presence on the document; ignore asset ID bleed.",
-    };
+    if (isNonsenseSignatureConflict(f)) {
+      return {
+        ...f,
+        reasonCode: "LOW_CONFIDENCE" as const,
+        severity: "S3" as const,
+        normalisedSnippet: "Present",
+        whyItMatters:
+          "Signature presence was confused with an adjacent asset ID; treated as low-confidence presence check.",
+        suggestedFix:
+          "Confirm signature presence on the document; ignore asset ID bleed.",
+      };
+    }
+    if (isNonsenseDateAssetConflict(f)) {
+      const dateOnly = pickDateFromConflict(f);
+      return {
+        ...f,
+        reasonCode: "LOW_CONFIDENCE" as const,
+        severity: "S3" as const,
+        normalisedSnippet: dateOnly,
+        rawSnippet: dateOnly,
+        whyItMatters:
+          "Date was confused with an adjacent asset/Make-Model line; kept the date candidate only.",
+        suggestedFix:
+          "Confirm the service date on the document; ignore asset ID bleed.",
+      };
+    }
+    return f;
   });
 
   // Dedupe (fieldName, reasonCode) — keep higher confidence / richer snippet

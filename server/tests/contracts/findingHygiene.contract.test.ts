@@ -93,6 +93,21 @@ describe("findingHygiene", () => {
     expect(cleaned[0].normalisedSnippet).toBe("Present");
   });
 
+  it("downgrades Date|asset Make/Model conflicts", () => {
+    const findings = [
+      finding({
+        fieldName: "Date",
+        reasonCode: "CONFLICT",
+        normalisedSnippet: "2024-09-02 | BN21ACO_TL Make/Model",
+        confidence: 69,
+      }),
+    ];
+    const cleaned = applyFindingHygiene(findings);
+    expect(cleaned).toHaveLength(1);
+    expect(cleaned[0].reasonCode).toBe("LOW_CONFIDENCE");
+    expect(cleaned[0].normalisedSnippet).toBe("2024-09-02");
+  });
+
   it("drops mileage noise on serialNumber findings", () => {
     const findings = [
       finding({
@@ -139,6 +154,27 @@ BN21ACO_TL Make/Model
     }
     if (result.value) {
       expect(isAssetIdShaped(result.value)).toBe(false);
+    }
+  });
+
+  it("does not treat BN21ACO_TL Make/Model as a Date value", async () => {
+    const field = FIELD_DEFINITIONS.find(f => f.name === "date")!;
+    const text = `
+Job Summary Report
+Asset No: BN21ACO_TL
+Make/Model: TAILLIFT
+Date
+BN21ACO_TL Make/Model
+02/09/2024
+`;
+    const result = await ensembleExtract(text, field, {
+      useLlm: false,
+      llmConfidenceThreshold: 70,
+    });
+    expect(result.reasonCode).not.toBe("CONFLICT");
+    if (result.value) {
+      expect(isAssetIdShaped(result.value)).toBe(false);
+      expect(result.value).not.toMatch(/Make\/Model/i);
     }
   });
 
