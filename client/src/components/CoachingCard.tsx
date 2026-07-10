@@ -1,13 +1,20 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  GraduationCap, 
-  Target, 
-  CheckCircle2, 
+import {
+  GraduationCap,
+  Target,
+  CheckCircle2,
   Share2,
-  BookOpen
+  BookOpen,
 } from "lucide-react";
 
 interface CoachingCardProps {
@@ -18,7 +25,13 @@ interface CoachingCardProps {
   recommendation: string;
 }
 
-export function CoachingCard({ engineerName, avatarUrl, firstFixRate, topIssues, recommendation }: CoachingCardProps) {
+export function CoachingCard({
+  engineerName,
+  avatarUrl,
+  firstFixRate,
+  topIssues,
+  recommendation,
+}: CoachingCardProps) {
   return (
     <Card className="overflow-hidden border-l-4 border-l-blue-500">
       <CardHeader className="pb-3 bg-[#F9F9F9]/50">
@@ -26,13 +39,21 @@ export function CoachingCard({ engineerName, avatarUrl, firstFixRate, topIssues,
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
               <AvatarImage src={avatarUrl} />
-              <AvatarFallback>{engineerName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+              <AvatarFallback>
+                {engineerName
+                  .split(" ")
+                  .map(n => n[0])
+                  .join("")}
+              </AvatarFallback>
             </Avatar>
             <div>
               <CardTitle className="text-base">{engineerName}</CardTitle>
               <CardDescription className="flex items-center gap-2 mt-1">
-                First Fix Rate: 
-                <Badge variant={firstFixRate < 85 ? "destructive" : "secondary"} className="text-xs px-1.5 py-0 h-5">
+                First Fix Rate:
+                <Badge
+                  variant={firstFixRate < 85 ? "destructive" : "secondary"}
+                  className="text-xs px-1.5 py-0 h-5"
+                >
                   {firstFixRate}%
                 </Badge>
               </CardDescription>
@@ -49,7 +70,10 @@ export function CoachingCard({ engineerName, avatarUrl, firstFixRate, topIssues,
           </h4>
           <ul className="space-y-1">
             {topIssues.map((issue, idx) => (
-              <li key={idx} className="text-sm flex items-start gap-2 text-slate-700">
+              <li
+                key={idx}
+                className="text-sm flex items-start gap-2 text-slate-700"
+              >
                 <span className="text-blue-500 mt-1.5 h-1.5 w-1.5 rounded-full bg-current shrink-0" />
                 {issue}
               </li>

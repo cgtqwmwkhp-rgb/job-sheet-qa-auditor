@@ -59,7 +59,7 @@ export default function ServerError() {
               Go Home
             </Button>
           </div>
-          
+
           <p className="text-sm text-muted-foreground mt-6">
             If this problem persists, please contact support.
           </p>
