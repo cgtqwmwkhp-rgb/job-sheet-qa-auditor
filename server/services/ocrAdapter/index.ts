@@ -17,7 +17,15 @@ export {
   parseMistralOcrResponse,
   pixelCornersToPercent,
 } from "./parseMistralOcrResponse";
-export { parseAzureDiResponse } from "./parseAzureDiResponse";
+export {
+  parseAzureDiResponse,
+  polygonToPercentBBox,
+} from "./parseAzureDiResponse";
+export type {
+  AzureSelectionMark,
+  AzureSelectionMarkBBox,
+  ParsedAzureDiResult,
+} from "./parseAzureDiResponse";
 
 import type { OCRAdapter, OCRProvider } from "./types";
 import { getOCRConfig } from "./types";

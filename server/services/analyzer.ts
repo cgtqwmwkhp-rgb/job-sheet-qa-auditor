@@ -118,6 +118,7 @@ When pre-extracted field hints are provided:
 - Do NOT emit MISSING_FIELD for a required field when a high-confidence (≥70) pre-extraction exists unless the raw text clearly contradicts it
 - Do NOT invent CONFLICT between a signature presence value (Present/Absent) and an asset/registration ID
 - Handwritten signatures usually produce NO OCR text of the ink. If the document text contains a signature label/box (e.g. "Technician Signature", "Customer Signature", "Signed by") and there is no explicit "unsigned"/"not signed" evidence, do NOT mark the signature as Absent or MISSING_FIELD. Prefer Present, or LOW_CONFIDENCE for human review — never FAIL solely because handwriting is invisible to OCR.
+- When Selection Marks hints are provided (Azure DI visual radio/checkbox states for Ok/Adv/Fail/N/A), treat high-confidence selected marks as visual ground truth for checklist columns. Do not contradict them using OCR text alone.
 
 Severity Levels:
 - S0 (Blocker): Critical safety or compliance issues that must be fixed immediately

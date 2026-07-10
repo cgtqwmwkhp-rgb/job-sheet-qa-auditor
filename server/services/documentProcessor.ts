@@ -62,6 +62,11 @@ import {
   sanitizeExtractedFieldsForSignatures,
 } from "./findingHygiene";
 import {
+  runSelectionMarkDetection,
+  isSelectionMarksEnabled,
+  type SelectionMarksResult,
+} from "./selectionMarks";
+import {
   evaluateShadowChallenger,
   isShadowChallengerEnabled,
   type ShadowComparison,
@@ -1014,7 +1019,7 @@ async function processJobSheetWithOptions(
           durationMs: Date.now() - ensembleStartTime,
           error: ensembleResult ? undefined : "Ensemble returned null",
         },
-        "AI Analysis"
+        "Selection Marks"
       );
     } catch (ensembleError) {
       console.warn(
@@ -1031,7 +1036,7 @@ async function processJobSheetWithOptions(
               ? ensembleError.message
               : "Ensemble extraction failed",
         },
-        "AI Analysis"
+        "Selection Marks"
       );
     }
   } else {
@@ -1041,7 +1046,57 @@ async function processJobSheetWithOptions(
         status: "skipped",
         durationMs: Date.now() - ensembleStartTime,
       },
-      "AI Analysis"
+      "Selection Marks"
+    );
+  }
+
+  // =========================================================================
+  // Stage 1.78: Selection Marks (Azure DI prebuilt-layout) — fail-soft
+  // Visual radio/checkbox state (Ok/Adv/Fail/N/A) for Gemini hints + artifact.
+  // =========================================================================
+  const selectionMarksStartTime = Date.now();
+  let selectionMarksResult: SelectionMarksResult | null = null;
+
+  if (isSelectionMarksEnabled()) {
+    try {
+      selectionMarksResult = await runSelectionMarkDetection(documentUrl, {
+        headerText: extractedText.slice(0, 4000),
+      });
+      recordStage(
+        {
+          stage: "Selection Marks",
+          status: selectionMarksResult ? "success" : "failed",
+          durationMs: Date.now() - selectionMarksStartTime,
+          error: selectionMarksResult?.artifact.error,
+        },
+        "Pipeline Integration"
+      );
+    } catch (selectionMarksError) {
+      console.warn(
+        "[DocumentProcessor] Selection marks failed (non-fatal):",
+        selectionMarksError
+      );
+      recordStage(
+        {
+          stage: "Selection Marks",
+          status: "failed",
+          durationMs: Date.now() - selectionMarksStartTime,
+          error:
+            selectionMarksError instanceof Error
+              ? selectionMarksError.message
+              : "Selection marks failed",
+        },
+        "Pipeline Integration"
+      );
+    }
+  } else {
+    recordStage(
+      {
+        stage: "Selection Marks",
+        status: "skipped",
+        durationMs: Date.now() - selectionMarksStartTime,
+      },
+      "Pipeline Integration"
     );
   }
 
@@ -1119,6 +1174,7 @@ async function processJobSheetWithOptions(
         preExtractedFields: (() => {
           const base = {
             ...(ensembleResult?.ensembleExtractedFields ?? {}),
+            ...(selectionMarksResult?.preExtractedFields ?? {}),
           };
           // Text-layer signature label → Present hint for Gemini (ink not in OCR)
           if (
@@ -1136,6 +1192,7 @@ async function processJobSheetWithOptions(
         preExtractedHintsBlock: (() => {
           const fields = {
             ...(ensembleResult?.ensembleExtractedFields ?? {}),
+            ...(selectionMarksResult?.preExtractedFields ?? {}),
           };
           if (
             hasSignatureLabelEvidence(extractedText) &&
@@ -1154,7 +1211,11 @@ async function processJobSheetWithOptions(
           const sigNote = hasSignatureLabelEvidence(extractedText)
             ? "\n\nNote: Signature label/box detected in text. Handwritten ink is usually invisible to OCR — do not mark signature Absent/MISSING solely for lack of ink text."
             : "";
-          return block ? `${block}${sigNote}` : sigNote || undefined;
+          const marksNote = selectionMarksResult?.hintsBlock
+            ? `\n\n${selectionMarksResult.hintsBlock}`
+            : "";
+          const combined = `${block || ""}${sigNote}${marksNote}`.trim();
+          return combined || undefined;
         })(),
       }
     );
@@ -1486,6 +1547,9 @@ async function processJobSheetWithOptions(
         modelRegistry: modelRegistryStamp(),
         ...(ensembleResult
           ? { ensembleExtraction: ensembleResult.artifact }
+          : {}),
+        ...(selectionMarksResult
+          ? { selectionMarks: selectionMarksResult.artifact }
           : {}),
         ...(pipelineIntegrationResult
           ? { pipelineIntegration: pipelineIntegrationResult }
