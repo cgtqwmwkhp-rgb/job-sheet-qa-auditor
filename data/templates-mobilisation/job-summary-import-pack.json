@@ -1,0 +1,284 @@
+{
+  "packVersion": "1.0.0",
+  "exportedAt": "2026-07-10T19:00:00.000Z",
+  "sourceSystem": "mobilisation-job-summary",
+  "templates": [
+    {
+      "metadata": {
+        "templateId": "job-summary-v1",
+        "name": "Job Summary Report",
+        "description": "PlantExpand Job Summary Report — asset block, optional VOR banner, technician sign-off",
+        "category": "summary",
+        "tags": ["job-summary", "plantexpand", "field-service", "vor-optional"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Job Summary Spec",
+        "version": "1.0.0",
+        "fields": [
+          {
+            "field": "jobReference",
+            "label": "Job Reference",
+            "type": "string",
+            "required": true,
+            "extractionHints": [
+              "job no",
+              "job number",
+              "job reference",
+              "work order",
+              "reference"
+            ],
+            "aliases": ["Job No", "Job Number", "Job Ref"]
+          },
+          {
+            "field": "assetId",
+            "label": "Asset No",
+            "type": "string",
+            "required": true,
+            "extractionHints": [
+              "asset no",
+              "asset number",
+              "asset id",
+              "registration",
+              "reg no"
+            ],
+            "aliases": ["Asset No", "Asset Number", "Asset ID"]
+          },
+          {
+            "field": "date",
+            "label": "Date",
+            "type": "date",
+            "required": true,
+            "extractionHints": [
+              "date",
+              "service date",
+              "job date",
+              "completed on"
+            ],
+            "aliases": ["Service Date", "Job Date"]
+          },
+          {
+            "field": "engineerSignOff",
+            "label": "Technician Signature",
+            "type": "boolean",
+            "required": true,
+            "extractionHints": [
+              "technician signature",
+              "engineer signature",
+              "engineer sign off",
+              "signed by",
+              "signature"
+            ],
+            "aliases": [
+              "Technician Signature",
+              "Engineer Sign Off",
+              "Customer Signature"
+            ]
+          },
+          {
+            "field": "makeModel",
+            "label": "Make/Model",
+            "type": "string",
+            "required": false,
+            "extractionHints": ["make/model", "make model", "equipment type"],
+            "aliases": ["Make/Model", "Make Model"]
+          },
+          {
+            "field": "mileageHours",
+            "label": "Mileage/Hours",
+            "type": "number",
+            "required": false,
+            "extractionHints": [
+              "mileage",
+              "hours",
+              "odometer",
+              "mileage/hours",
+              "asset mileage"
+            ],
+            "aliases": ["Mileage/Hours", "Mileage", "Hours"]
+          },
+          {
+            "field": "serialNumber",
+            "label": "Serial No",
+            "type": "string",
+            "required": false,
+            "extractionHints": ["serial no", "serial number", "s/n"],
+            "aliases": ["Serial No", "Serial Number"]
+          },
+          {
+            "field": "customerName",
+            "label": "Customer/Site",
+            "type": "string",
+            "required": false,
+            "extractionHints": ["customer", "site", "client", "location"],
+            "aliases": ["Customer", "Site"]
+          },
+          {
+            "field": "workDescription",
+            "label": "Work Notes",
+            "type": "string",
+            "required": false,
+            "extractionHints": [
+              "work performed",
+              "work notes",
+              "summary notes",
+              "engineer comments",
+              "comments"
+            ],
+            "aliases": ["Work Notes", "Engineer Comments", "Comments"]
+          },
+          {
+            "field": "vorStatus",
+            "label": "VOR Status",
+            "type": "boolean",
+            "required": false,
+            "extractionHints": [
+              "vor",
+              "vehicle off road",
+              "this vehicle is marked as vor"
+            ],
+            "aliases": ["VOR", "Vehicle Off Road"]
+          },
+          {
+            "field": "safeToUse",
+            "label": "Safe to Use",
+            "type": "boolean",
+            "required": false,
+            "extractionHints": ["safe to use", "safe for use", "fit for use"],
+            "aliases": ["Safe to Use"]
+          },
+          {
+            "field": "customerSignature",
+            "label": "Customer Signature",
+            "type": "boolean",
+            "required": false,
+            "extractionHints": ["customer signature", "client signature"],
+            "aliases": ["Customer Signature"]
+          }
+        ],
+        "rules": [
+          {
+            "ruleId": "JSR-R001",
+            "field": "jobReference",
+            "description": "Job reference is required on Job Summary Report",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "JSR-R002",
+            "field": "assetId",
+            "description": "Asset No is required (do not confuse with mileage)",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "JSR-R003",
+            "field": "date",
+            "description": "Service/job date is required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "JSR-R004",
+            "field": "engineerSignOff",
+            "description": "Technician signature / engineer sign-off is required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "JSR-R005",
+            "field": "assetId",
+            "description": "Asset ID should be alphanumeric registration-style",
+            "severity": "major",
+            "type": "pattern",
+            "pattern": "^[A-Z0-9][A-Z0-9_-]*$",
+            "enabled": true
+          },
+          {
+            "ruleId": "JSR-R006",
+            "field": "vorStatus",
+            "description": "When VOR banner is present, record VOR status explicitly",
+            "severity": "major",
+            "type": "format",
+            "enabled": true
+          }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["job", "summary"],
+        "requiredTokensAny": ["report", "asset", "technician"],
+        "optionalTokens": [
+          "plantexpand",
+          "make",
+          "model",
+          "mileage",
+          "hours",
+          "taillift",
+          "vor",
+          "signature"
+        ],
+        "tokenWeights": {
+          "job": 12,
+          "summary": 14,
+          "report": 8,
+          "asset": 6,
+          "technician": 5,
+          "vor": 4,
+          "plantexpand": 3
+        }
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          { "name": "jobReference", "x": 0.05, "y": 0.06, "w": 0.4, "h": 0.05 },
+          { "name": "assetId", "x": 0.05, "y": 0.18, "w": 0.45, "h": 0.08 },
+          { "name": "date", "x": 0.65, "y": 0.02, "w": 0.3, "h": 0.05 },
+          { "name": "expiryDate", "x": 0.65, "y": 0.08, "w": 0.3, "h": 0.04 },
+          { "name": "tickboxBlock", "x": 0.05, "y": 0.35, "w": 0.9, "h": 0.3 },
+          { "name": "signatureBlock", "x": 0.0, "y": 0.82, "w": 1.0, "h": 0.18 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "PASS-001",
+          "description": "Complete Job Summary with BN21ACO_TL and VOR banner",
+          "inputText": "JOB SUMMARY REPORT\nPlantExpand\nThis Vehicle is marked as VOR\nJob Reference: 793\nAsset No: BN21ACO_TL\nMake/Model: TAILLIFT\nMileage/Hours: 74685\nDate: 02/09/2024\nTechnician Signature: Signed\nEngineer Sign Off: Complete\nWork Notes: Tail lift inspection completed",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "PASS-002",
+          "description": "Minimal Job Summary without VOR",
+          "inputText": "Job Summary Report\nJob Reference: JOB-100\nAsset No: PUMP-01\nDate: 15/01/2024\nTechnician Signature present\nEngineer Sign Off: Yes",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "FAIL-001",
+          "description": "Invoice / wrong document family",
+          "inputText": "Invoice\nInvoice Number: INV-12345\nAmount Due: 1500.00\nPayment Terms: 30 days",
+          "expectedOutcome": "fail",
+          "required": true
+        },
+        {
+          "caseId": "FAIL-002",
+          "description": "Job Summary missing asset and signature",
+          "inputText": "Job Summary Report\nJob Reference: JOB-101\nDate: 17/01/2024",
+          "expectedOutcome": "fail",
+          "required": true
+        },
+        {
+          "caseId": "REVIEW-001",
+          "description": "Critical fields present; optional work notes absent (review)",
+          "inputText": "Job Summary Report\nJob Reference: JOB-102\nAsset No: BN21ACO_TL\nDate: 18/01/2024\nTechnician Signature: Signed\nEngineer Sign Off: Complete",
+          "expectedOutcome": "pass",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

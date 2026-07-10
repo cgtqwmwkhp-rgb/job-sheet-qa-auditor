@@ -12,6 +12,8 @@ import { handleMetrics } from "./metrics";
 import {
   initializeDefaultTemplate,
   hasDefaultTemplate,
+  initializeJobSummaryTemplate,
+  hasJobSummaryTemplate,
 } from "../services/templateRegistry";
 import { hydrateDeadLetterQueueFromDb } from "../utils/deadLetterQueue";
 import { pdfProxyRouter } from "./pdfProxy";
@@ -56,6 +58,25 @@ async function startServer() {
     }
   } else {
     console.log("[Templates] Default template already exists");
+  }
+
+  // Gold mobilisation: Job Summary Report (survives pod restart)
+  if (!hasJobSummaryTemplate()) {
+    console.log("[Templates] Initializing job-summary-v1 gold template...");
+    const jsrVersionId = initializeJobSummaryTemplate();
+    if (jsrVersionId) {
+      console.log(
+        `[Templates] job-summary-v1 activated (version ID: ${jsrVersionId})`
+      );
+    } else if (hasJobSummaryTemplate()) {
+      console.log("[Templates] job-summary-v1 already active");
+    } else {
+      console.warn(
+        "[Templates] job-summary-v1 seed skipped or failed (non-fatal)"
+      );
+    }
+  } else {
+    console.log("[Templates] job-summary-v1 already active");
   }
 
   // Phase 1.10: restore in-memory DLQ from durable failed_jobs (fail-safe)

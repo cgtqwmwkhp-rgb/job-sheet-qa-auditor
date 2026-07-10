@@ -17,4 +17,5 @@ export * from "./activationPolicy";
 export * from "./collisionDetector";
 export * from "./defaultTemplate";
 export * from "./fallbackTemplate";
+export * from "./mobilisationTemplates";
 export * from "./mysqlPersistence";

@@ -55,6 +55,7 @@ import {
   mergeExtractedFields,
   isEnsembleExtractionEnabled,
   formatPreExtractedHints,
+  aliasCanonicalExtractedFields,
   type EnsembleAdapterResult,
 } from "./ensembleExtraction";
 import {
@@ -1259,44 +1260,52 @@ async function processJobSheetWithOptions(
           };
         })(),
         preExtractedFields: (() => {
-          const base = {
+          const base = aliasCanonicalExtractedFields({
             ...(ensembleResult?.ensembleExtractedFields ?? {}),
             ...(selectionMarksResult?.preExtractedFields ?? {}),
-          };
+          });
           // Text-layer signature label → Present hint for Gemini (ink not in OCR)
           if (
             hasSignatureLabelEvidence(extractedText) &&
-            !base.customerSignature
+            !base.customerSignature &&
+            !base.engineerSignOff
           ) {
-            base.customerSignature = {
+            const present = {
               value: "Present",
               confidence: 75,
               pageNumber: 1,
             };
+            base.customerSignature = present;
+            base.engineerSignOff = present;
           }
           // Anthropic VLM ink result overrides / strengthens signature hint
           if (vlmInkResult?.preExtractedHint) {
             base.customerSignature = vlmInkResult.preExtractedHint;
+            base.engineerSignOff = vlmInkResult.preExtractedHint;
           }
           return Object.keys(base).length > 0 ? base : undefined;
         })(),
         preExtractedHintsBlock: (() => {
-          const fields = {
+          const fields = aliasCanonicalExtractedFields({
             ...(ensembleResult?.ensembleExtractedFields ?? {}),
             ...(selectionMarksResult?.preExtractedFields ?? {}),
-          };
+          });
           if (
             hasSignatureLabelEvidence(extractedText) &&
-            !fields.customerSignature
+            !fields.customerSignature &&
+            !fields.engineerSignOff
           ) {
-            fields.customerSignature = {
+            const present = {
               value: "Present",
               confidence: 75,
               pageNumber: 1,
             };
+            fields.customerSignature = present;
+            fields.engineerSignOff = present;
           }
           if (vlmInkResult?.preExtractedHint) {
             fields.customerSignature = vlmInkResult.preExtractedHint;
+            fields.engineerSignOff = vlmInkResult.preExtractedHint;
           }
           const block = formatPreExtractedHints(
             fields,
@@ -1403,7 +1412,7 @@ async function processJobSheetWithOptions(
         {
           ruleId: "SYSTEM",
           fieldName: "Overall Confidence",
-          severity: "S2" as const,
+          severity: "S3" as const,
           reasonCode: "LOW_CONFIDENCE" as const,
           rawSnippet: "",
           normalisedSnippet: "",
@@ -1432,7 +1441,7 @@ async function processJobSheetWithOptions(
         {
           ruleId: "SYSTEM",
           fieldName: "OCR Confidence",
-          severity: "S2" as const,
+          severity: "S3" as const,
           reasonCode: "LOW_CONFIDENCE" as const,
           rawSnippet: "",
           normalisedSnippet: "",
