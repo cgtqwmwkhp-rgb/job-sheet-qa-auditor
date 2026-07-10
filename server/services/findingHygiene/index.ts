@@ -3,7 +3,8 @@
  *
  * Suppresses MISSING_FIELD when ensemble already extracted the field,
  * caps MISSING_FIELD storms, demotes nonsense signature/date vs asset conflicts,
- * and drops mileage-as-serial snippets.
+ * drops mileage-as-serial snippets, suppresses optional-template field noise,
+ * and injects Present findings for VOR / asset / mileage when text evidence exists.
  *
  * Feature flag: FEATURE_FINDING_HYGIENE
  * - unset / "true" → enabled (default on)
@@ -36,6 +37,15 @@ export interface FindingHygieneOptions {
   signatureLabelPresent?: boolean;
   /** OCR-4 reported a signature block/region. */
   hasOcrSignature?: boolean;
+  /** Full extracted text for VOR / asset / mileage Present injection. */
+  documentText?: string;
+  /**
+   * Template fields marked required:false (canonical IDs).
+   * MISSING_FIELD on these (or their aliases) is suppressed.
+   */
+  optionalTemplateFields?: Set<string> | string[];
+  /** Optional field aliases from template (e.g. Engineer Comments → workDescription). */
+  optionalFieldAliases?: string[];
 }
 
 const ASSET_ID_RE =
@@ -43,16 +53,74 @@ const ASSET_ID_RE =
 const ASSET_BLEED_RE =
   /\b[A-Z]{2}\d{2}[A-Z]{3}(_[A-Z0-9]+)?\b.*make\/?model|\b[A-Z0-9]+_TL\b/i;
 const MILEAGE_NOISE_RE = /mileage|odometer|\bhours\b|km\/h/i;
-const SIGNATURE_FIELD_RE = /signature/i;
+const SIGNATURE_FIELD_RE = /signature|engineerSignOff/i;
 const DATE_FIELD_RE = /^date$|dateOfService|service.?date|job.?date/i;
 const DATE_VALUE_RE =
   /^\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}$|^\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2}$|^\d{4}-\d{2}-\d{2}$/;
 const SIGNATURE_LABEL_RE =
   /(?:technician|engineer|customer|client)?\s*signature|signed\s*by|sign\s*off|signatory/i;
+const VOR_BANNER_RE =
+  /(?:this\s*)?(?:vehicle|asset)\s*(?:is\s*)?marked\s*as\s*vor|vehicle\s*off\s*road|\bVOR\b/i;
+const WORK_NOTES_FIELD_RE =
+  /^(workDescription|work\s*notes|engineer\s*comments|comments|work\s*performed)$/i;
+
+const DEFAULT_OPTIONAL_ALIASES = [
+  "Engineer Comments",
+  "Work Notes",
+  "Comments",
+  "Work Performed",
+  "workDescription",
+];
 
 /** True when OCR/extracted text shows a signature label/box (ink may still be invisible). */
 export function hasSignatureLabelEvidence(text: string): boolean {
   return SIGNATURE_LABEL_RE.test(text);
+}
+
+/** True when document text shows a VOR / vehicle-off-road banner. */
+export function hasVorBannerEvidence(text: string): boolean {
+  return VOR_BANNER_RE.test(text);
+}
+
+function normalizeOptionalSet(
+  value: Set<string> | string[] | undefined
+): Set<string> {
+  if (!value) return new Set();
+  return value instanceof Set ? value : new Set(value);
+}
+
+function isOptionalTemplateMissing(
+  finding: Finding,
+  optionalFields: Set<string>,
+  optionalAliases: string[]
+): boolean {
+  if (finding.reasonCode !== "MISSING_FIELD") return false;
+  if (optionalFields.size === 0 && optionalAliases.length === 0) return false;
+
+  const name = finding.fieldName.trim();
+  if (optionalFields.has(name)) return true;
+  if (WORK_NOTES_FIELD_RE.test(name) && optionalFields.has("workDescription")) {
+    return true;
+  }
+  const lower = name.toLowerCase();
+  if (
+    optionalAliases.some(a => a.toLowerCase() === lower) &&
+    (optionalFields.has("workDescription") || optionalFields.size === 0)
+  ) {
+    // When workDescription is optional OR aliases explicitly listed
+    if (
+      optionalFields.has("workDescription") ||
+      WORK_NOTES_FIELD_RE.test(name)
+    ) {
+      return true;
+    }
+  }
+  // Canonical optional field matched via camelCase → spaced label
+  for (const field of Array.from(optionalFields)) {
+    const spaced = field.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+    if (lower === spaced || lower === field.toLowerCase()) return true;
+  }
+  return false;
 }
 
 function splitConflictParts(finding: Finding): string[] {
@@ -150,6 +218,115 @@ function buildPresentSignatureFinding(): Finding {
   };
 }
 
+function buildPresentVorFinding(): Finding {
+  return {
+    ruleId: "SYSTEM",
+    fieldName: "vorStatus",
+    severity: "S3",
+    reasonCode: "LOW_CONFIDENCE",
+    rawSnippet: "This Vehicle is marked as VOR",
+    normalisedSnippet: "Present",
+    confidence: 85,
+    pageNumber: 1,
+    whyItMatters:
+      "VOR banner detected on the Job Summary. Recorded as Present — confirm operational status.",
+    suggestedFix:
+      "Confirm the vehicle is VOR and that safe-to-use is not claimed.",
+  };
+}
+
+function buildPresentFieldFinding(
+  fieldName: string,
+  label: string,
+  value: string,
+  confidence: number
+): Finding {
+  return {
+    ruleId: "SYSTEM",
+    fieldName,
+    severity: "S3",
+    reasonCode: "LOW_CONFIDENCE",
+    rawSnippet: `${label}: ${value}`,
+    normalisedSnippet: value,
+    confidence,
+    pageNumber: 1,
+    whyItMatters: `${label} extracted from the document text.`,
+    suggestedFix: `Confirm ${label} on the PDF.`,
+  };
+}
+
+/**
+ * Inject Present/value findings for VOR banner and common Job Summary fields
+ * when evidence exists in text or pre-extraction.
+ */
+export function injectPresentFieldFindings(
+  findings: Finding[],
+  text: string,
+  preExtracted: Record<string, PreExtractedField> = {}
+): Finding[] {
+  const out = [...findings];
+  const hasField = (name: string) =>
+    out.some(
+      f =>
+        f.fieldName === name || f.fieldName.toLowerCase() === name.toLowerCase()
+    );
+
+  if (hasVorBannerEvidence(text) && !hasField("vorStatus")) {
+    out.push(buildPresentVorFinding());
+  }
+
+  const assetMatch = text.match(
+    /Asset\s*(?:No|Number|ID)?\s*[:.]?\s*([A-Z0-9][A-Z0-9_-]*)/i
+  );
+  const assetValue =
+    preExtracted.assetId?.value ||
+    preExtracted.serialNumber?.value ||
+    assetMatch?.[1];
+  if (assetValue && !hasField("assetId") && !hasField("serialNumber")) {
+    out.push(
+      buildPresentFieldFinding(
+        "assetId",
+        "Asset No",
+        assetValue,
+        preExtracted.assetId?.confidence ??
+          preExtracted.serialNumber?.confidence ??
+          80
+      )
+    );
+  }
+
+  const makeMatch = text.match(/Make\s*[/&]?\s*Model\s*[:.]?\s*([^\n\r]+)/i);
+  const makeValue = preExtracted.makeModel?.value || makeMatch?.[1]?.trim();
+  if (makeValue && !hasField("makeModel")) {
+    out.push(
+      buildPresentFieldFinding(
+        "makeModel",
+        "Make/Model",
+        makeValue,
+        preExtracted.makeModel?.confidence ?? 75
+      )
+    );
+  }
+
+  const mileageMatch = text.match(
+    /(?:Asset\s*)?(?:Mileage|Hours)(?:\s*[/&]\s*(?:Hours|Mileage))?\s*[:.]?\s*(\d[\d,]*)/i
+  );
+  const mileageValue =
+    preExtracted.mileageHours?.value || mileageMatch?.[1]?.replace(/,/g, "");
+  if (mileageValue && !hasField("mileageHours")) {
+    out.push(
+      buildPresentFieldFinding(
+        "mileageHours",
+        "Mileage/Hours",
+        String(mileageValue),
+        preExtracted.mileageHours?.confidence ?? 75
+      )
+    );
+  }
+
+  return out;
+}
+
 /**
  * Apply finding hygiene policies. Pure function — does not mutate input.
  */
@@ -164,17 +341,38 @@ export function applyFindingHygiene(
   const threshold = options.confidenceThreshold ?? 70;
   const maxMissing = options.maxMissingField ?? MAX_MISSING_FIELD_FINDINGS;
   const pre = options.preExtractedFields ?? {};
+  const optionalFields = normalizeOptionalSet(options.optionalTemplateFields);
+  const optionalAliases =
+    options.optionalFieldAliases ??
+    (optionalFields.has("workDescription") ? DEFAULT_OPTIONAL_ALIASES : []);
   const signatureEvidence =
     !!options.signatureLabelPresent ||
     !!options.hasOcrSignature ||
     pre.customerSignature?.value === "Present" ||
-    pre.technicianSignature?.value === "Present";
+    pre.technicianSignature?.value === "Present" ||
+    pre.engineerSignOff?.value === "Present";
 
   let working = findings.filter(f => {
+    // Suppress MISSING_FIELD for optional template fields (e.g. Engineer Comments)
+    if (isOptionalTemplateMissing(f, optionalFields, optionalAliases)) {
+      return false;
+    }
     // Suppress MISSING_FIELD when ensemble already has a confident value
     if (f.reasonCode === "MISSING_FIELD") {
-      const hint = pre[f.fieldName];
-      if (hint && hint.value && hint.confidence >= threshold) {
+      const hint = pre[f.fieldName] ?? pre.workDescription;
+      if (
+        hint &&
+        hint.value &&
+        hint.confidence >= threshold &&
+        (f.fieldName === "workDescription" ||
+          WORK_NOTES_FIELD_RE.test(f.fieldName) ||
+          pre[f.fieldName])
+      ) {
+        if (pre[f.fieldName] || WORK_NOTES_FIELD_RE.test(f.fieldName)) {
+          return false;
+        }
+      }
+      if (pre[f.fieldName]?.value && pre[f.fieldName].confidence >= threshold) {
         return false;
       }
       // Handwritten ink is invisible to OCR — don't FAIL on missing signature text
@@ -253,6 +451,11 @@ export function applyFindingHygiene(
     return f;
   });
 
+  // Inject VOR / asset / makeModel / mileage Present findings from text evidence
+  if (options.documentText) {
+    working = injectPresentFieldFindings(working, options.documentText, pre);
+  }
+
   // Dedupe (fieldName, reasonCode) — keep higher confidence / richer snippet
   const deduped = new Map<string, Finding>();
   for (const f of working) {
@@ -295,6 +498,19 @@ export function applyFindingHygiene(
   }
 
   return working;
+}
+
+/**
+ * True when findings are informational only (S3 / LOW_CONFIDENCE soft notes).
+ * Used to promote REVIEW_QUEUE → PASS after hygiene.
+ */
+export function hasOnlyInformationalFindings(findings: Finding[]): boolean {
+  if (findings.length === 0) return true;
+  return findings.every(f => {
+    if (f.severity === "S3") return true;
+    if (f.severity === "S2" && f.reasonCode === "LOW_CONFIDENCE") return true;
+    return false;
+  });
 }
 
 /**
