@@ -35,24 +35,32 @@ export interface ConsistencyJudgmentResult {
   summary: string;
 }
 
-const YES_RE = /\b(?:yes|y|true)\b/i;
-const NO_RE = /\b(?:no|n|false)\b/i;
+const YES_NO_TOKEN_RE = /\b(yes|no|true|false)\b/i;
 
+/**
+ * Capture the short answer immediately after a label.
+ * OCR often flattens the page into one line — never take the rest of the document.
+ */
 function lineValue(text: string, label: RegExp): string | null {
-  const re = new RegExp(
-    `${label.source}\\s*[:?]\\s*([^\\n\\r]+)`,
-    label.flags.includes("i") ? "i" : "i"
-  );
+  const re = new RegExp(`${label.source}\\s*[:?]\\s*([^\\n\\r]{0,60})`, "i");
   const m = text.match(re);
   return m?.[1]?.trim() ?? null;
 }
 
+/** First Yes/No token only — mutually exclusive. */
+function parseYesNo(value: string | null): "yes" | "no" | "unknown" {
+  if (!value) return "unknown";
+  const m = value.match(YES_NO_TOKEN_RE);
+  if (!m) return "unknown";
+  return /^(yes|true)$/i.test(m[1]) ? "yes" : "no";
+}
+
 function isYes(value: string | null): boolean {
-  return !!value && YES_RE.test(value.trim());
+  return parseYesNo(value) === "yes";
 }
 
 function isNo(value: string | null): boolean {
-  return !!value && NO_RE.test(value.trim());
+  return parseYesNo(value) === "no";
 }
 
 /**
