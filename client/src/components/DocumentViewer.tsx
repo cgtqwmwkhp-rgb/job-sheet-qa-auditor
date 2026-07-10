@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -16,8 +17,9 @@ import { perfMark, perfMeasure, PERF_MARKS, PERF_MEASURES } from "@/lib/perf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
-// Set worker source to CDN to avoid build-time resolution issues
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// Same-origin worker — unpkg CDN workers often fail under Easy Auth / CSP and
+// leave a blank canvas after Document reports Page 1 of N.
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 /**
  * Guard: Throw in dev if blob.core.windows.net URL is used
@@ -91,25 +93,27 @@ export function DocumentViewer({
    */
   const [pdfFile, setPdfFile] = useState<string | null>(null);
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null);
+  const [pageRenderError, setPageRenderError] = useState<string | null>(null);
+  const [useIframeFallback, setUseIframeFallback] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const fetchGenRef = useRef(0);
 
   // Guard: prevent direct Azure blob URLs
   useEffect(() => {
     assertNoDirectBlobUrl(url);
   }, [url]);
 
-  // Fetch with credentials, then hand react-pdf a stable blob: URL
+  // Fetch with credentials → stable blob: URL. Revoke only the previous generation
+  // after the new URL is installed (avoids blank canvas from premature revoke).
   useEffect(() => {
     let cancelled = false;
+    const gen = ++fetchGenRef.current;
     setPdfFile(null);
     setPdfLoadError(null);
+    setPageRenderError(null);
+    setUseIframeFallback(false);
     setNumPages(0);
-
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = null;
-    }
 
     if (!url) return;
 
@@ -123,17 +127,32 @@ export function DocumentViewer({
           throw new Error(`PDF fetch failed (${res.status})`);
         }
         const buffer = await res.arrayBuffer();
-        if (cancelled) return;
-        // Copy so the response buffer can be GC'd; blob owns its own bytes
-        const blob = new Blob([buffer.slice(0)], { type: "application/pdf" });
+        if (cancelled || gen !== fetchGenRef.current) return;
+
+        const bytes = new Uint8Array(buffer);
+        const header = String.fromCharCode(
+          bytes[0] ?? 0,
+          bytes[1] ?? 0,
+          bytes[2] ?? 0,
+          bytes[3] ?? 0
+        );
+        if (bytes.byteLength < 5 || header !== "%PDF") {
+          throw new Error(
+            "Response was not a PDF (check Easy Auth / proxy). Try Download."
+          );
+        }
+        const blob = new Blob([bytes], { type: "application/pdf" });
         const objectUrl = URL.createObjectURL(blob);
+        const previous = objectUrlRef.current;
         objectUrlRef.current = objectUrl;
         setPdfFile(objectUrl);
+        if (previous) {
+          URL.revokeObjectURL(previous);
+        }
       } catch (err) {
         console.error("[DocumentViewer] Authenticated PDF fetch failed:", err);
-        if (!cancelled) {
-          // Last resort: same-origin URL with cookies (may still fail under Easy Auth)
-          setPdfFile(url);
+        if (!cancelled && gen === fetchGenRef.current) {
+          setPdfFile(null);
           setPdfLoadError(
             err instanceof Error ? err.message : "PDF fetch failed"
           );
@@ -143,12 +162,18 @@ export function DocumentViewer({
 
     return () => {
       cancelled = true;
+    };
+  }, [url]);
+
+  // Revoke on full unmount only
+  useEffect(() => {
+    return () => {
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
         objectUrlRef.current = null;
       }
     };
-  }, [url]);
+  }, []);
 
   // Sync page from finding selection during render (avoids setState-in-effect)
   if (focusPage !== syncedFocusPage) {
@@ -313,21 +338,31 @@ export function DocumentViewer({
         </div>
       </CardHeader>
 
-      <div className="flex-1 bg-muted/50 overflow-auto p-4 flex items-center justify-center relative">
-        {!pdfFile ? (
+      <div className="flex-1 bg-muted/50 overflow-auto p-4 flex items-center justify-center relative min-h-[240px]">
+        {pdfLoadError && !pdfFile ? (
+          <div className="flex flex-col items-center justify-center h-64 w-full text-destructive px-4 text-center">
+            <p>Failed to load document.</p>
+            <p className="text-xs mt-2">{pdfLoadError}</p>
+          </div>
+        ) : !pdfFile ? (
           <div className="flex items-center justify-center h-64 w-full">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
+        ) : useIframeFallback ? (
+          <iframe
+            title="PDF preview"
+            src={pdfFile}
+            className="w-full h-full min-h-[480px] rounded border bg-white"
+          />
         ) : (
           <Document
             file={pdfFile}
-            // blob: URLs are same-document; withCredentials only matters for http(s) fallback
-            options={
-              pdfFile.startsWith("blob:")
-                ? undefined
-                : { withCredentials: true }
-            }
             onLoadSuccess={onDocumentLoadSuccess}
+            onLoadError={err => {
+              console.error("[DocumentViewer] react-pdf load error:", err);
+              setPageRenderError(err.message);
+              setUseIframeFallback(true);
+            }}
             className="shadow-lg"
             loading={
               <div className="flex items-center justify-center h-64 w-full">
@@ -338,14 +373,23 @@ export function DocumentViewer({
               <div className="flex flex-col items-center justify-center h-64 w-full text-destructive">
                 <p>Failed to load document.</p>
                 <p className="text-xs mt-2">
-                  {pdfLoadError ||
+                  {pageRenderError ||
+                    pdfLoadError ||
                     "Please check if the file exists and is a valid PDF."}
                 </p>
+                <Button
+                  className="mt-3"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setUseIframeFallback(true)}
+                >
+                  Open simple preview
+                </Button>
               </div>
             }
           >
             <div
-              className={`relative inline-block ${isDrawing ? "cursor-crosshair" : ""}`}
+              className={`relative inline-block bg-white ${isDrawing ? "cursor-crosshair" : ""}`}
               ref={containerRef}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
@@ -359,6 +403,11 @@ export function DocumentViewer({
                 renderTextLayer={true}
                 renderAnnotationLayer={true}
                 className="bg-white shadow-md"
+                onRenderError={err => {
+                  console.error("[DocumentViewer] page render error:", err);
+                  setPageRenderError(err.message);
+                  setUseIframeFallback(true);
+                }}
               />
 
               {/* Current Drawing Box */}
