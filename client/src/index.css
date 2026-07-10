@@ -119,14 +119,14 @@
   --input: #ebe8e8;
   --ring: #beda41;
 
-  /* Sidebar - Charcoal Dark */
-  --sidebar: #1a1818;
-  --sidebar-foreground: #f9f9f9;
+  /* Sidebar — Portal light chrome (UI_STYLE_GUIDE_PORTABLE §7.5) */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #706d6d;
   --sidebar-primary: #beda41;
   --sidebar-primary-foreground: #333030;
-  --sidebar-accent: #333030;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #333030;
+  --sidebar-accent: #beda4126; /* ~15% lime active/hover */
+  --sidebar-accent-foreground: #333030;
+  --sidebar-border: #e8e6e6;
   --sidebar-ring: #beda41;
 
   /* Neutral Palette */
@@ -195,14 +195,14 @@
   --input: #334155;
   --ring: #beda41;
 
-  /* Sidebar */
-  --sidebar: #020617;
-  --sidebar-foreground: #f1f5f9;
+  /* Sidebar — dark mode still lime-accented, charcoal surface */
+  --sidebar: #1a1818;
+  --sidebar-foreground: #d9d7d7;
   --sidebar-primary: #beda41;
   --sidebar-primary-foreground: #1a1818;
-  --sidebar-accent: #1e293b;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #334155;
+  --sidebar-accent: #beda4133;
+  --sidebar-accent-foreground: #f9f9f9;
+  --sidebar-border: #333030;
   --sidebar-ring: #beda41;
 
   /* Dark mode neutral palette */

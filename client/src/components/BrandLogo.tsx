@@ -34,9 +34,7 @@ export function BrandLogo({
             PlantExpand
           </span>
           {subtitle ? (
-            <span className="text-xs text-muted-foreground truncate">
-              {subtitle}
-            </span>
+            <span className="text-xs opacity-80 truncate">{subtitle}</span>
           ) : null}
         </div>
       ) : null}

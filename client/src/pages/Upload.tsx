@@ -204,7 +204,7 @@ export default function UploadPage() {
 
   const getStatusColor = (status: string, id: number) => {
     if (processingIds.includes(id) || status === "processing") {
-      return "bg-blue-100 text-blue-600";
+      return "bg-[#DBEAFE] text-[#2868CE]";
     }
     switch (status) {
       case "completed":

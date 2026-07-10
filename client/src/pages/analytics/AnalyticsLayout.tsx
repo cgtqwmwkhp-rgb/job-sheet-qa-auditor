@@ -106,10 +106,10 @@ export function AnalyticsLayout({
             return (
               <Link key={item.href} href={item.href}>
                 <a
-                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all duration-150 ${
                     isActive
-                      ? "bg-white text-primary shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-white/50"
+                      ? "bg-[rgba(190,218,65,0.18)] text-[#333030] shadow-none"
+                      : "text-[#706D6D] hover:text-[#333030] hover:bg-[#F5F4F4]"
                   }`}
                 >
                   <item.icon className="h-4 w-4" />

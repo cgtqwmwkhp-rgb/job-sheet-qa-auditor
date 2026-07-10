@@ -801,7 +801,7 @@ function ReviewWorkstationContent({
             </Badge>
             <Badge
               variant="outline"
-              className="font-mono bg-brand-charcoal text-white border-brand-charcoal"
+              className="font-mono bg-[#333030] text-white border-[#333030]"
               title="Documentation quality out of 100 for this job sheet (engineer mark). Issues deduct points; Passed checks do not."
             >
               Doc quality: {auditData.score}

@@ -45,9 +45,9 @@ export default function TechnicianDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
-      {/* Mobile Header */}
-      <header className="bg-card border-b sticky top-0 z-10 px-4 py-3 flex items-center justify-between shadow-sm backdrop-blur-sm bg-opacity-95">
+    <div className="min-h-screen bg-[#F9F9F9] pb-20">
+      {/* Mobile Header — Portal chrome */}
+      <header className="bg-white border-b border-[#EBE8E8] sticky top-0 z-10 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 bg-primary rounded-xl flex items-center justify-center shadow-sm">
             <CheckCircle2 className="h-5 w-5 text-primary-foreground" />
@@ -85,7 +85,7 @@ export default function TechnicianDashboard() {
 
       <div className="p-4 space-y-5">
         {/* Scorecard */}
-        <Card className="bg-gradient-to-br from-primary to-blue-700 text-primary-foreground border-none shadow-lg relative overflow-hidden">
+        <Card className="bg-primary text-primary-foreground border-none shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-10">
             <TrendingUp className="h-32 w-32 text-white" />
           </div>
