@@ -856,7 +856,7 @@ function ReviewWorkstationContent({
             : "lg:grid-cols-[minmax(0,1fr)_minmax(280px,22rem)] xl:grid-cols-[minmax(0,1fr)_minmax(300px,24rem)]"
         }`}
       >
-        <div className="flex flex-col min-h-0 min-w-0 h-full overflow-hidden rounded-lg border bg-card">
+        <div className="flex flex-col min-h-0 min-w-0 h-full overflow-hidden rounded-lg border border-border bg-white">
           {!showPdfViewer ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/20 p-6">
               <Eye className="w-12 h-12 mb-4 opacity-40" />

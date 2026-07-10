@@ -6,7 +6,6 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ZoomIn,
   ZoomOut,
-  RotateCw,
   ChevronLeft,
   ChevronRight,
   PenTool,
@@ -14,8 +13,7 @@ import {
 } from "lucide-react";
 import { perfMark, perfMeasure, PERF_MARKS, PERF_MEASURES } from "@/lib/perf";
 
-// Worker only used for page-count metadata — rendering is a native iframe so we
-// avoid react-pdf blank-canvas failures under Easy Auth / nested flex layouts.
+// Worker only used for page-count metadata — rendering is a native iframe.
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 /**
@@ -71,7 +69,6 @@ export function DocumentViewer({
   const [pageNumber, setPageNumber] = useState<number>(initialPage);
   const [syncedFocusPage, setSyncedFocusPage] = useState(focusPage);
   const [scale, setScale] = useState<number>(1.0);
-  const [rotation, setRotation] = useState<number>(0);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(
     null
@@ -142,7 +139,6 @@ export function DocumentViewer({
           PERF_MARKS.PDF_FIRST_BYTE
         );
 
-        // Page count only — do not use react-pdf <Page> (blank canvas under ACA).
         try {
           const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
           if (!cancelled && gen === fetchGenRef.current) {
@@ -247,13 +243,14 @@ export function DocumentViewer({
   };
 
   const currentPageBoxes = boxes.filter(box => box.page === pageNumber);
+  // Zoom via PDF open params only — CSS transform breaks native scroll.
   const iframeSrc = pdfFile
     ? `${pdfFile}#page=${pageNumber}&zoom=${Math.round(scale * 100)}`
     : null;
 
   return (
-    <Card className="flex flex-col h-full min-h-0 overflow-hidden border-0 shadow-none rounded-none">
-      <CardHeader className="py-2.5 px-3 border-b flex flex-row items-center justify-between shrink-0 bg-muted/30">
+    <Card className="flex flex-col h-full min-h-0 overflow-hidden border-0 shadow-none rounded-none bg-white">
+      <CardHeader className="py-2.5 px-3 border-b flex flex-row items-center justify-between shrink-0 bg-white">
         <CardTitle className="text-sm font-medium">Document</CardTitle>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 border-r pr-2 mr-2">
@@ -282,21 +279,14 @@ export function DocumentViewer({
             </Button>
           </div>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setRotation(r => (r + 90) % 360)}
-          >
-            <RotateCw className="w-4 h-4" />
-          </Button>
-
           <div className="flex items-center gap-1 border-l pl-2 ml-2">
             <Button
               variant="ghost"
               size="icon"
               className="h-8 w-8"
-              onClick={() => setScale(s => Math.max(0.5, s - 0.1))}
+              onClick={() =>
+                setScale(s => Math.max(0.5, Math.round((s - 0.1) * 10) / 10))
+              }
             >
               <ZoomOut className="w-4 h-4" />
             </Button>
@@ -307,7 +297,9 @@ export function DocumentViewer({
               variant="ghost"
               size="icon"
               className="h-8 w-8"
-              onClick={() => setScale(s => Math.min(2.5, s + 0.1))}
+              onClick={() =>
+                setScale(s => Math.min(2.5, Math.round((s + 0.1) * 10) / 10))
+              }
             >
               <ZoomIn className="w-4 h-4" />
             </Button>
@@ -331,19 +323,19 @@ export function DocumentViewer({
         </div>
       </CardHeader>
 
-      <div className="flex-1 bg-muted/40 overflow-hidden p-1 relative min-h-0">
+      <div className="flex-1 bg-white overflow-hidden relative min-h-0">
         {pdfLoadError && !pdfFile ? (
           <div className="flex flex-col items-center justify-center h-full w-full text-destructive px-4 text-center">
             <p>Failed to load document.</p>
             <p className="text-xs mt-2">{pdfLoadError}</p>
           </div>
         ) : !iframeSrc ? (
-          <div className="flex items-center justify-center h-full w-full min-h-[240px]">
+          <div className="flex items-center justify-center h-full w-full min-h-[240px] bg-white">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : (
           <div
-            className={`relative w-full h-full min-h-0 overflow-auto ${
+            className={`relative w-full h-full min-h-0 bg-white ${
               isDrawing ? "cursor-crosshair" : ""
             }`}
             ref={containerRef}
@@ -352,79 +344,69 @@ export function DocumentViewer({
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
           >
-            <div
-              className="w-full h-full min-h-0 origin-top-left"
-              style={{
-                transform: `rotate(${rotation}deg)`,
-              }}
-            >
-              <iframe
-                key={iframeSrc}
-                title="PDF document"
-                src={iframeSrc}
-                className="w-full h-full min-h-[calc(100vh-14rem)] rounded-sm border-0 bg-white"
-                style={{
-                  pointerEvents: isDrawing ? "none" : "auto",
-                  transform: `scale(${scale})`,
-                  transformOrigin: "top left",
-                  width: `${100 / scale}%`,
-                  height: `${100 / scale}%`,
-                }}
-              />
-            </div>
+            <iframe
+              key={iframeSrc}
+              title="PDF document"
+              src={iframeSrc}
+              className="absolute inset-0 w-full h-full border-0 bg-white"
+              style={{ pointerEvents: isDrawing ? "none" : "auto" }}
+            />
 
-            {currentBox && (
-              <div
-                className="absolute border-2 border-blue-500 bg-blue-500/20 z-20"
-                style={{
-                  left: `${currentBox.x}%`,
-                  top: `${currentBox.y}%`,
-                  width: `${currentBox.width}%`,
-                  height: `${currentBox.height}%`,
-                }}
-              />
-            )}
-
-            {currentPageBoxes.map(box => {
-              const isActive = activeBoxId != null && box.id === activeBoxId;
-              return (
+            {/* pointer-events-none so wheel/scroll reach the iframe */}
+            <div className="absolute inset-0 z-10 pointer-events-none">
+              {currentBox && (
                 <div
-                  key={box.id}
-                  data-box-id={String(box.id)}
-                  data-active={isActive ? "true" : undefined}
-                  onClick={e => {
-                    e.stopPropagation();
-                    onBoxClick?.(box.id);
-                  }}
-                  className={`absolute border-2 cursor-pointer transition-all hover:bg-opacity-20 z-10 ${
-                    isActive
-                      ? "scale-[1.02] z-20 ring-2 ring-offset-1 ring-primary"
-                      : "hover:scale-[1.02]"
-                  } ${isActive ? "animate-pulse" : ""}`}
+                  className="absolute border-2 border-blue-500 bg-blue-500/20"
                   style={{
-                    left: `${box.x}%`,
-                    top: `${box.y}%`,
-                    width: `${box.width}%`,
-                    height: `${box.height}%`,
-                    borderColor: box.color || "#ef4444",
-                    backgroundColor: isActive
-                      ? `${box.color || "#ef4444"}40`
-                      : `${box.color || "#ef4444"}1A`,
-                    borderWidth: isActive ? 3 : 2,
+                    left: `${currentBox.x}%`,
+                    top: `${currentBox.y}%`,
+                    width: `${currentBox.width}%`,
+                    height: `${currentBox.height}%`,
                   }}
-                  title={box.label}
-                >
-                  {box.label && (
-                    <span
-                      className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
-                      style={{ backgroundColor: box.color || "#ef4444" }}
-                    >
-                      {box.label}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+                />
+              )}
+
+              {currentPageBoxes.map(box => {
+                const isActive = activeBoxId != null && box.id === activeBoxId;
+                return (
+                  <div
+                    key={box.id}
+                    data-box-id={String(box.id)}
+                    data-active={isActive ? "true" : undefined}
+                    onClick={e => {
+                      e.stopPropagation();
+                      onBoxClick?.(box.id);
+                    }}
+                    className={`absolute border-2 cursor-pointer pointer-events-auto transition-all ${
+                      isActive
+                        ? "z-20 ring-2 ring-offset-1 ring-primary animate-pulse"
+                        : ""
+                    }`}
+                    style={{
+                      left: `${box.x}%`,
+                      top: `${box.y}%`,
+                      width: `${box.width}%`,
+                      height: `${box.height}%`,
+                      borderColor: box.color || "#ef4444",
+                      backgroundColor: isActive
+                        ? `${box.color || "#ef4444"}33`
+                        : "transparent",
+                      borderWidth: isActive ? 3 : 2,
+                    }}
+                    title={box.label}
+                  >
+                    {box.label && (
+                      <span
+                        className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
+                        style={{ backgroundColor: box.color || "#ef4444" }}
+                      >
+                        {box.label}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
