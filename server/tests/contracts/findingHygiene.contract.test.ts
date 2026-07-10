@@ -109,7 +109,7 @@ describe("findingHygiene", () => {
     expect(cleaned[0].normalisedSnippet).toBe("2024-09-02");
   });
 
-  it("suppresses false Absent signature when label evidence exists", () => {
+  it("records Present instead of dropping false Absent signature", () => {
     const findings = [
       finding({
         fieldName: "customerSignature",
@@ -122,7 +122,29 @@ describe("findingHygiene", () => {
     const cleaned = applyFindingHygiene(findings, {
       signatureLabelPresent: true,
     });
-    expect(cleaned).toHaveLength(0);
+    expect(cleaned).toHaveLength(1);
+    expect(cleaned[0].normalisedSnippet).toBe("Present");
+    expect(cleaned[0].severity).toBe("S3");
+    expect(cleaned[0].reasonCode).toBe("LOW_CONFIDENCE");
+  });
+
+  it("injects Present signature finding when label evidence and Gemini omitted it", () => {
+    const findings = [
+      finding({
+        fieldName: "jobNumber",
+        reasonCode: "LOW_CONFIDENCE",
+        normalisedSnippet: "793",
+        confidence: 100,
+        severity: "S3",
+      }),
+    ];
+    const cleaned = applyFindingHygiene(findings, {
+      signatureLabelPresent: true,
+    });
+    expect(cleaned.some(f => f.fieldName === "customerSignature")).toBe(true);
+    const sig = cleaned.find(f => f.fieldName === "customerSignature")!;
+    expect(sig.normalisedSnippet).toBe("Present");
+    expect(sig.severity).toBe("S3");
   });
 
   it("detects signature labels in document text", () => {

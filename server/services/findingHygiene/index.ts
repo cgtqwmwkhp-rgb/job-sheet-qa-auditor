@@ -104,6 +104,52 @@ function pickDateFromConflict(finding: Finding): string {
   return parts.find(isDateShaped) ?? parts[0] ?? "";
 }
 
+function isFalseAbsentSignature(
+  finding: Finding,
+  signatureEvidence: boolean
+): boolean {
+  if (!signatureEvidence || !SIGNATURE_FIELD_RE.test(finding.fieldName)) {
+    return false;
+  }
+  if (finding.reasonCode === "MISSING_FIELD") return true;
+  return /^(absent|missing|no|unsigned)$/i.test(
+    (finding.normalisedSnippet || finding.rawSnippet || "").trim()
+  );
+}
+
+/** Convert false Absent/MISSING signature into a recorded Present (S3) finding. */
+export function toPresentSignatureFinding(finding: Finding): Finding {
+  return {
+    ...finding,
+    severity: "S3",
+    reasonCode: "LOW_CONFIDENCE",
+    normalisedSnippet: "Present",
+    rawSnippet: finding.rawSnippet || "Technician Signature",
+    confidence: Math.max(finding.confidence || 0, 70),
+    whyItMatters:
+      "Signature label/box detected. Handwritten ink is usually invisible to OCR; recorded as Present — confirm ink on the document (scroll to the signature box).",
+    suggestedFix:
+      "Scroll to the signature section on the PDF and confirm the handwritten signature is present.",
+  };
+}
+
+function buildPresentSignatureFinding(): Finding {
+  return {
+    ruleId: "SYSTEM",
+    fieldName: "customerSignature",
+    severity: "S3",
+    reasonCode: "LOW_CONFIDENCE",
+    rawSnippet: "Technician Signature",
+    normalisedSnippet: "Present",
+    confidence: 75,
+    pageNumber: 1,
+    whyItMatters:
+      "Signature label/box detected. Handwritten ink is usually invisible to OCR; recorded as Present — confirm ink on the document (scroll to the signature box).",
+    suggestedFix:
+      "Scroll to the signature section on the PDF and confirm the handwritten signature is present.",
+  };
+}
+
 /**
  * Apply finding hygiene policies. Pure function — does not mutate input.
  */
@@ -133,19 +179,10 @@ export function applyFindingHygiene(
       }
       // Handwritten ink is invisible to OCR — don't FAIL on missing signature text
       // when a signature label/box (or OCR signature block) is present.
+      // (Converted to Present below — do not drop silently.)
       if (SIGNATURE_FIELD_RE.test(f.fieldName) && signatureEvidence) {
-        return false;
+        return true;
       }
-    }
-    // Drop false "Absent" signature issues when label/OCR evidence exists
-    if (
-      SIGNATURE_FIELD_RE.test(f.fieldName) &&
-      signatureEvidence &&
-      /^(absent|missing|no|unsigned)$/i.test(
-        (f.normalisedSnippet || f.rawSnippet || "").trim()
-      )
-    ) {
-      return false;
     }
     // Drop mileage/odometer noise on serial/asset fields
     if (isMileageAsSerialSnippet(f)) {
@@ -165,6 +202,25 @@ export function applyFindingHygiene(
     }
     return true;
   });
+
+  // Convert false Absent/MISSING signatures → recorded Present (S3 / Passed tab)
+  let convertedSignature = false;
+  working = working.map(f => {
+    if (isFalseAbsentSignature(f, signatureEvidence)) {
+      convertedSignature = true;
+      return toPresentSignatureFinding(f);
+    }
+    return f;
+  });
+
+  // If label/OCR evidence exists but Gemini omitted signature entirely, record Present
+  if (
+    signatureEvidence &&
+    !convertedSignature &&
+    !working.some(f => SIGNATURE_FIELD_RE.test(f.fieldName))
+  ) {
+    working = [...working, buildPresentSignatureFinding()];
+  }
 
   // Downgrade Present|assetId signature conflicts
   working = working.map(f => {
