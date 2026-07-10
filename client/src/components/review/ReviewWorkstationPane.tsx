@@ -747,10 +747,10 @@ function ReviewWorkstationContent({
     <div
       ref={resolvedPaneRef}
       tabIndex={-1}
-      className={`flex flex-col outline-none ${compact ? "h-full min-h-0" : "h-[calc(100vh-8rem)]"}`}
+      className={`flex flex-col outline-none ${compact ? "h-full min-h-0" : "h-[calc(100vh-5.5rem)]"}`}
     >
       <div
-        className={`flex items-center justify-between shrink-0 ${compact ? "mb-2 px-1" : "mb-4"}`}
+        className={`flex items-center justify-between shrink-0 ${compact ? "mb-2 px-1" : "mb-2"}`}
       >
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -840,7 +840,7 @@ function ReviewWorkstationContent({
         </div>
       </div>
 
-      <div className={compact ? "mb-2 px-1" : "mb-4"}>
+      <div className={compact ? "mb-2 px-1" : "mb-2"}>
         <SelectionTracePanel
           trace={auditData.selectionTrace ?? null}
           defaultOpen={false}
@@ -848,70 +848,60 @@ function ReviewWorkstationContent({
         />
       </div>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
-        <Card className="flex flex-col h-full overflow-hidden">
-          <CardHeader className="py-3 px-4 border-b flex flex-row items-center justify-between shrink-0 bg-muted/30">
-            <CardTitle className="text-sm font-medium">
-              Document Preview
-            </CardTitle>
-            {!showPdfViewer && (
+      {/* Document-first landscape: PDF takes ~70–75% width; findings are a narrow review rail */}
+      <div
+        className={`flex-1 grid grid-cols-1 min-h-0 gap-3 ${
+          compact
+            ? "lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]"
+            : "lg:grid-cols-[minmax(0,1fr)_minmax(280px,22rem)] xl:grid-cols-[minmax(0,1fr)_minmax(300px,24rem)]"
+        }`}
+      >
+        <div className="flex flex-col min-h-0 min-w-0 h-full overflow-hidden rounded-lg border bg-card">
+          {!showPdfViewer ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/20 p-6">
+              <Eye className="w-12 h-12 mb-4 opacity-40" />
+              <p className="text-sm font-medium mb-2">Document Preview</p>
+              <p className="text-xs text-center max-w-[220px] mb-4">
+                Load the document to review findings against the page.
+              </p>
               <Button
+                variant="secondary"
                 size="sm"
-                variant="outline"
                 onClick={() => setShowPdfViewer(true)}
               >
                 <Eye className="w-4 h-4 mr-2" />
                 Load Preview
               </Button>
-            )}
-          </CardHeader>
-          <div className="flex-1 overflow-hidden">
-            {showPdfViewer ? (
-              <DocumentViewer
-                url={documentUrl || ""}
-                boxes={boxes}
-                activeBoxId={activeBoxId}
-                focusPage={focusPage}
-                onBoxClick={handleBoxClick}
-                onBoxCreate={handleBoxCreate}
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/20">
-                <Eye className="w-12 h-12 mb-4 opacity-40" />
-                <p className="text-sm font-medium mb-2">Document Preview</p>
-                <p className="text-xs text-center max-w-[200px] mb-4">
-                  Click &quot;Load Preview&quot; above to view the document
-                </p>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowPdfViewer(true)}
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  Load Preview
-                </Button>
-              </div>
-            )}
-          </div>
-        </Card>
+            </div>
+          ) : (
+            <DocumentViewer
+              url={documentUrl || ""}
+              boxes={boxes}
+              activeBoxId={activeBoxId}
+              focusPage={focusPage}
+              onBoxClick={handleBoxClick}
+              onBoxCreate={handleBoxCreate}
+            />
+          )}
+        </div>
 
-        <Card className="flex flex-col h-full overflow-hidden">
-          <CardHeader className="py-3 px-4 border-b shrink-0">
+        <Card className="flex flex-col h-full min-h-0 overflow-hidden min-w-0">
+          <CardHeader className="py-2.5 px-3 border-b shrink-0">
             <CardTitle className="text-sm font-medium">
               Audit Findings
             </CardTitle>
           </CardHeader>
 
           <Tabs defaultValue="all" className="flex-1 flex flex-col min-h-0">
-            <div className="px-4 pt-3 shrink-0">
-              <TabsList className="w-full grid grid-cols-3">
-                <TabsTrigger value="all">
+            <div className="px-3 pt-2 shrink-0">
+              <TabsList className="w-full grid grid-cols-3 h-9">
+                <TabsTrigger value="all" className="text-xs">
                   All ({auditData.findings.length})
                 </TabsTrigger>
-                <TabsTrigger value="issues">
+                <TabsTrigger value="issues" className="text-xs">
                   Issues ({failedFindings.length})
                 </TabsTrigger>
-                <TabsTrigger value="passed">
+                <TabsTrigger value="passed" className="text-xs">
                   Passed ({passedFindings.length})
                 </TabsTrigger>
               </TabsList>
