@@ -252,6 +252,7 @@ export const AZURE_DI_LAYOUT_MODEL = "prebuilt-layout";
 export interface AzureLayoutSelectionResult {
   success: boolean;
   selectionMarks: import("./parseAzureDiResponse").AzureSelectionMark[];
+  lines: import("./parseAzureDiResponse").AzureTextLine[];
   pages: OCRResult["pages"];
   model: string;
   processingTimeMs: number;
@@ -278,6 +279,7 @@ export async function extractLayoutSelectionMarks(
     return {
       success: false,
       selectionMarks: [],
+      lines: [],
       pages: [],
       model: AZURE_DI_LAYOUT_MODEL,
       processingTimeMs: Date.now() - startTime,
@@ -340,6 +342,7 @@ export async function extractLayoutSelectionMarks(
         return {
           success: false,
           selectionMarks: [],
+          lines: [],
           pages: [],
           model: AZURE_DI_LAYOUT_MODEL,
           processingTimeMs: Date.now() - startTime,
@@ -353,6 +356,7 @@ export async function extractLayoutSelectionMarks(
         return {
           success: false,
           selectionMarks: [],
+          lines: [],
           pages: [],
           model: AZURE_DI_LAYOUT_MODEL,
           processingTimeMs: Date.now() - startTime,
@@ -366,6 +370,7 @@ export async function extractLayoutSelectionMarks(
         return {
           success: false,
           selectionMarks: [],
+          lines: [],
           pages: [],
           model: AZURE_DI_LAYOUT_MODEL,
           processingTimeMs: Date.now() - startTime,
@@ -378,6 +383,7 @@ export async function extractLayoutSelectionMarks(
       return {
         success: true,
         selectionMarks: parsed.selectionMarks,
+        lines: parsed.lines,
         pages: parsed.pages,
         model: parsed.model || AZURE_DI_LAYOUT_MODEL,
         processingTimeMs: Date.now() - startTime,
@@ -390,6 +396,7 @@ export async function extractLayoutSelectionMarks(
       return {
         success: false,
         selectionMarks: [],
+        lines: [],
         pages: [],
         model: AZURE_DI_LAYOUT_MODEL,
         processingTimeMs: Date.now() - startTime,

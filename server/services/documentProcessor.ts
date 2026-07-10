@@ -1062,12 +1062,17 @@ async function processJobSheetWithOptions(
       selectionMarksResult = await runSelectionMarkDetection(documentUrl, {
         headerText: extractedText.slice(0, 4000),
       });
+      const marksOk =
+        !!selectionMarksResult && !selectionMarksResult.artifact.error;
       recordStage(
         {
           stage: "Selection Marks",
-          status: selectionMarksResult ? "success" : "failed",
+          status: marksOk ? "success" : "failed",
           durationMs: Date.now() - selectionMarksStartTime,
-          error: selectionMarksResult?.artifact.error,
+          error: marksOk
+            ? undefined
+            : selectionMarksResult?.artifact.error ||
+              "Selection marks returned null",
         },
         "Pipeline Integration"
       );
