@@ -359,6 +359,35 @@ export function mergeExtractedFields(
 }
 
 /**
+ * Bridge legacy GoldSpec field names ↔ activation-canonical IDs.
+ * Job Summary / mobilisation templates use jobReference/assetId/date/engineerSignOff;
+ * ensemble still emits jobNumber/serialNumber/dateOfService/customerSignature.
+ */
+export function aliasCanonicalExtractedFields(
+  fields: Record<
+    string,
+    { value: string; confidence: number; pageNumber: number }
+  >
+): Record<string, { value: string; confidence: number; pageNumber: number }> {
+  const out = { ...fields };
+  const copyIfMissing = (from: string, to: string) => {
+    if (out[from] && !out[to]) {
+      out[to] = out[from];
+    }
+  };
+  copyIfMissing("jobNumber", "jobReference");
+  copyIfMissing("jobReference", "jobNumber");
+  copyIfMissing("serialNumber", "assetId");
+  copyIfMissing("assetId", "serialNumber");
+  copyIfMissing("dateOfService", "date");
+  copyIfMissing("date", "dateOfService");
+  copyIfMissing("customerSignature", "engineerSignOff");
+  copyIfMissing("engineerSignOff", "customerSignature");
+  copyIfMissing("technicianName", "engineerSignOff");
+  return out;
+}
+
+/**
  * Format ensemble consensus for Gemini advisory prompt injection.
  */
 export function formatPreExtractedHints(

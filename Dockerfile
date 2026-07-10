@@ -48,6 +48,7 @@ COPY --from=builder --chown=appuser:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=appuser:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=appuser:nodejs /app/drizzle ./drizzle
 COPY --from=builder --chown=appuser:nodejs /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder --chown=appuser:nodejs /app/data ./data
 COPY --from=builder --chown=appuser:nodejs /app/scripts/ensure-failed-jobs-table.mjs ./scripts/ensure-failed-jobs-table.mjs
 COPY --from=builder --chown=appuser:nodejs /app/scripts/ensure-audit-findings-resolution.mjs ./scripts/ensure-audit-findings-resolution.mjs
 
