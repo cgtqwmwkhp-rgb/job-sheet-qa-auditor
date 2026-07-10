@@ -15,7 +15,7 @@ initAnalytics();
 // One-time purge of pre-denylist service workers (old NavigationRoute ate /.auth).
 // Do NOT auto-navigate on /.auth/* — that caused login loops with Easy Auth.
 try {
-  const FLAG = "jsqa_sw_pdf_iframe_v3";
+  const FLAG = "jsqa_sw_review_layout_v4";
   if (
     typeof window !== "undefined" &&
     "serviceWorker" in navigator &&

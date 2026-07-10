@@ -252,9 +252,9 @@ export function DocumentViewer({
     : null;
 
   return (
-    <Card className="flex flex-col h-full overflow-hidden">
-      <CardHeader className="py-3 px-4 border-b flex flex-row items-center justify-between shrink-0 bg-muted/30">
-        <CardTitle className="text-sm font-medium">Document Viewer</CardTitle>
+    <Card className="flex flex-col h-full min-h-0 overflow-hidden border-0 shadow-none rounded-none">
+      <CardHeader className="py-2.5 px-3 border-b flex flex-row items-center justify-between shrink-0 bg-muted/30">
+        <CardTitle className="text-sm font-medium">Document</CardTitle>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 border-r pr-2 mr-2">
             <Button
@@ -331,7 +331,7 @@ export function DocumentViewer({
         </div>
       </CardHeader>
 
-      <div className="flex-1 bg-muted/50 overflow-hidden p-2 relative min-h-[320px]">
+      <div className="flex-1 bg-muted/40 overflow-hidden p-1 relative min-h-0">
         {pdfLoadError && !pdfFile ? (
           <div className="flex flex-col items-center justify-center h-full w-full text-destructive px-4 text-center">
             <p>Failed to load document.</p>
@@ -343,7 +343,7 @@ export function DocumentViewer({
           </div>
         ) : (
           <div
-            className={`relative w-full h-full min-h-[320px] overflow-auto ${
+            className={`relative w-full h-full min-h-0 overflow-auto ${
               isDrawing ? "cursor-crosshair" : ""
             }`}
             ref={containerRef}
@@ -353,7 +353,7 @@ export function DocumentViewer({
             onMouseLeave={handleMouseUp}
           >
             <div
-              className="w-full h-full min-h-[320px] origin-top-left"
+              className="w-full h-full min-h-0 origin-top-left"
               style={{
                 transform: `rotate(${rotation}deg)`,
               }}
@@ -362,8 +362,7 @@ export function DocumentViewer({
                 key={iframeSrc}
                 title="PDF document"
                 src={iframeSrc}
-                className="w-full h-full min-h-[480px] rounded border-0 bg-white"
-                // pointer-events none while drawing so overlay receives mouse
+                className="w-full h-full min-h-[calc(100vh-14rem)] rounded-sm border-0 bg-white"
                 style={{
                   pointerEvents: isDrawing ? "none" : "auto",
                   transform: `scale(${scale})`,
