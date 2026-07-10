@@ -57,14 +57,14 @@ export function DeepNoteAnalysis() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Search className="h-5 w-5 text-indigo-600" />
-            <CardTitle className="text-base text-indigo-900">
+            <Search className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base text-[#333030]">
               Deep Note Analysis
             </CardTitle>
           </div>
           <Badge
             variant="outline"
-            className="bg-indigo-100 text-indigo-700 border-indigo-200"
+            className="bg-[rgba(190,218,65,0.15)] text-[#333030] border-primary/40"
           >
             AI Audit Active
           </Badge>
@@ -133,10 +133,10 @@ export function DeepNoteAnalysis() {
         </div>
 
         {/* AI Summary */}
-        <div className="bg-indigo-50 p-3 rounded-md border border-indigo-100">
+        <div className="bg-[rgba(190,218,65,0.12)] p-3 rounded-md border border-primary/30">
           <div className="flex gap-2">
-            <MessageSquare className="h-4 w-4 text-indigo-600 mt-0.5 shrink-0" />
-            <p className="text-sm text-indigo-800 italic">
+            <MessageSquare className="h-4 w-4 text-[#706D6D] mt-0.5 shrink-0" />
+            <p className="text-sm text-[#4A4646] italic">
               "{MOCK_ANALYSIS.summary}"
             </p>
           </div>

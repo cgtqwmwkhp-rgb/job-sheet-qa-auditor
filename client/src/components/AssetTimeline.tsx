@@ -65,7 +65,7 @@ export function AssetTimeline({
                   className={`absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 border-white shadow-sm 
                   ${
                     event.type === "visit"
-                      ? "bg-blue-500"
+                      ? "bg-primary"
                       : event.type === "alert"
                         ? "bg-red-500"
                         : "bg-amber-500"
@@ -78,11 +78,11 @@ export function AssetTimeline({
                     {event.date}
                   </div>
 
-                  <div className="bg-[#F9F9F9] rounded-lg p-4 border border-slate-100 hover:border-blue-100 transition-colors">
+                  <div className="bg-[#F9F9F9] rounded-lg p-4 border border-[#EBE8E8] hover:border-primary/40 transition-colors">
                     <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                      <h4 className="font-semibold text-[#333030] flex items-center gap-2">
                         {event.type === "visit" && (
-                          <Wrench className="h-4 w-4 text-blue-500" />
+                          <Wrench className="h-4 w-4 text-primary" />
                         )}
                         {event.type === "alert" && (
                           <AlertTriangle className="h-4 w-4 text-red-500" />

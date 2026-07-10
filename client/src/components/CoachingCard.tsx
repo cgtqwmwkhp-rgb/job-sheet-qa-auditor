@@ -33,7 +33,7 @@ export function CoachingCard({
   recommendation,
 }: CoachingCardProps) {
   return (
-    <Card className="overflow-hidden border-l-4 border-l-blue-500">
+    <Card className="overflow-hidden border-l-4 border-l-primary">
       <CardHeader className="pb-3 bg-[#F9F9F9]/50">
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3">
@@ -59,7 +59,7 @@ export function CoachingCard({
               </CardDescription>
             </div>
           </div>
-          <GraduationCap className="h-5 w-5 text-blue-500" />
+          <GraduationCap className="h-5 w-5 text-primary" />
         </div>
       </CardHeader>
       <CardContent className="pt-4 space-y-4">
@@ -72,21 +72,21 @@ export function CoachingCard({
             {topIssues.map((issue, idx) => (
               <li
                 key={idx}
-                className="text-sm flex items-start gap-2 text-slate-700"
+                className="text-sm flex items-start gap-2 text-[#333030]"
               >
-                <span className="text-blue-500 mt-1.5 h-1.5 w-1.5 rounded-full bg-current shrink-0" />
+                <span className="text-primary mt-1.5 h-1.5 w-1.5 rounded-full bg-current shrink-0" />
                 {issue}
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
-          <h4 className="text-xs font-semibold text-blue-700 mb-1 flex items-center gap-1">
+        <div className="bg-[rgba(190,218,65,0.12)] p-3 rounded-md border border-primary/30">
+          <h4 className="text-xs font-semibold text-[#333030] mb-1 flex items-center gap-1">
             <BookOpen className="h-3 w-3" />
             AI Recommendation
           </h4>
-          <p className="text-sm text-blue-900 leading-relaxed">
+          <p className="text-sm text-[#4A4646] leading-relaxed">
             {recommendation}
           </p>
         </div>

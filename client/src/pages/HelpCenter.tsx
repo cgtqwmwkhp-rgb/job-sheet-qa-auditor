@@ -96,8 +96,8 @@ export default function HelpCenter() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <Card className="hover:shadow-md transition-shadow border-primary/10">
               <CardHeader>
-                <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-2">
-                  <ShieldCheck className="h-6 w-6 text-[#2868CE]" />
+                <div className="h-10 w-10 rounded-lg bg-[rgba(190,218,65,0.15)] flex items-center justify-center mb-2">
+                  <ShieldCheck className="h-6 w-6 text-[#333030]" />
                 </div>
                 <CardTitle>The "Why" & "How"</CardTitle>
                 <CardDescription>
