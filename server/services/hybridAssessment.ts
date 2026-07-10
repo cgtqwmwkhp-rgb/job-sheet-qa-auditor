@@ -85,7 +85,8 @@ export interface HybridAssessmentResult {
   reviewReason:
     | "TEMPLATE_NOT_MATCHED"
     | "LOW_TEMPLATE_CONFIDENCE"
-    | "AMBIGUOUS_SELECTION";
+    | "AMBIGUOUS_SELECTION"
+    | "THIN_OCR_TEXT";
   /** Human-readable explanation */
   reviewExplanation: string;
   /** Error if any */
@@ -266,7 +267,8 @@ export async function performHybridAssessment(
   reviewReason:
     | "TEMPLATE_NOT_MATCHED"
     | "LOW_TEMPLATE_CONFIDENCE"
-    | "AMBIGUOUS_SELECTION",
+    | "AMBIGUOUS_SELECTION"
+    | "THIN_OCR_TEXT",
   ocrHints?: UniversalAssessmentOcrHints
 ): Promise<HybridAssessmentResult> {
   const startTime = Date.now();
@@ -304,6 +306,10 @@ export async function performHybridAssessment(
     } else if (reviewReason === "LOW_TEMPLATE_CONFIDENCE") {
       explanationParts.push(
         "Template match confidence was too low for auto-processing."
+      );
+    } else if (reviewReason === "THIN_OCR_TEXT") {
+      explanationParts.push(
+        "Extracted text is too thin for reliable Gemini judgment; queued for human review instead of emitting MISSING_FIELD noise."
       );
     } else {
       explanationParts.push("Multiple templates matched with similar scores.");

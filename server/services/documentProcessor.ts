@@ -21,10 +21,12 @@ import {
   ocrResilienceReportFields,
 } from "./ocrAdapter/types";
 import { analyzeJobSheet, AnalysisResult, GoldSpec } from "./analyzer";
+import { selectTemplateMultiSignal } from "./templateSelector";
 import {
-  selectTemplate,
-  createSelectionTraceArtifact,
-} from "./templateSelector";
+  enrichWithEmbeddedPdfText,
+  isThinExtractedText,
+  THIN_TEXT_CHAR_THRESHOLD,
+} from "./embeddedPdfText";
 import {
   getTemplateVersion,
   getTemplate,
@@ -544,10 +546,44 @@ async function processJobSheetWithOptions(
     });
   }
 
-  // Combine all page text
-  const extractedText = ocrResult.pages
+  // Combine all page text (OCR baseline; may be replaced by embedded enrichment)
+  let extractedText = ocrResult.pages
     .map(page => `--- Page ${page.pageNumber} ---\n${page.markdown}`)
     .join("\n\n");
+  let pageTextsForPipeline = ocrResult.pages.map(p => p.markdown);
+  let usedEmbeddedText = false;
+
+  // Stage 1.25: Prefer embedded PDF text when richer than thin OCR markdown
+  const enrichStartTime = Date.now();
+  try {
+    const enrichment = await enrichWithEmbeddedPdfText(
+      documentUrl,
+      ocrResult.pages.map(p => p.markdown)
+    );
+    extractedText = enrichment.extractedText;
+    pageTextsForPipeline = enrichment.pageTexts;
+    usedEmbeddedText = enrichment.usedEmbedded;
+    recordStage({
+      stage: "Embedded Text Enrichment",
+      status: enrichment.stageStatus,
+      durationMs: Date.now() - enrichStartTime,
+      error: enrichment.stageError,
+    });
+    if (enrichment.usedEmbedded) {
+      console.log("[DocumentProcessor] Preferring embedded PDF text over OCR", {
+        jobSheetId,
+        ocrLength: enrichment.ocrLength,
+        embeddedLength: enrichment.embeddedLength,
+      });
+    }
+  } catch (error) {
+    recordStage({
+      stage: "Embedded Text Enrichment",
+      status: "failed",
+      durationMs: Date.now() - enrichStartTime,
+      error: error instanceof Error ? error.message : "enrichment failed",
+    });
+  }
 
   // =========================================================================
   // Stage 1.5: Template Selection (PR-1 SSOT Enforcement)
@@ -560,6 +596,118 @@ async function processJobSheetWithOptions(
   const selectionStartTime = Date.now();
   let spec: GoldSpec;
   let usedTemplateVersionId: number | undefined;
+
+  // Thin-text guard: skip Gemini FULL path (avoids MISSING_FIELD storms)
+  if (isThinExtractedText(extractedText)) {
+    console.warn(
+      `[DocumentProcessor] Thin extracted text (<${THIN_TEXT_CHAR_THRESHOLD} chars) — hybrid review instead of Gemini`,
+      {
+        jobSheetId,
+        usableChars: extractedText.replace(/\s+/g, " ").trim().length,
+      }
+    );
+    recordStage({
+      stage: "Thin Text Guard",
+      status: "skipped",
+      durationMs: 0,
+      error: "THIN_OCR_TEXT",
+    });
+
+    const hybridStartTime = Date.now();
+    const avgConfidence =
+      computePageConfidencePrior(ocrResult) ??
+      (ocrResult.pages.length > 0 ? 0.7 : 0.5);
+    const hybridResult = await performHybridAssessment(
+      extractedText,
+      pageTextsForPipeline,
+      avgConfidence,
+      "THIN_OCR_TEXT",
+      { hasOcrSignature: hasOcrSignatureEvidence(ocrResult) }
+    );
+    recordStage({
+      stage: "Hybrid Assessment",
+      status: hybridResult.success ? "success" : "failed",
+      durationMs: Date.now() - hybridStartTime,
+      error: hybridResult.error,
+    });
+
+    try {
+      await db.updateJobSheetStatus(jobSheetId, "review_queue");
+    } catch (error) {
+      console.warn(
+        "[DocumentProcessor] Could not update job sheet status:",
+        error
+      );
+    }
+
+    try {
+      const auditResult = await db.createAuditResult({
+        jobSheetId,
+        goldSpecId: options.goldSpecId || 1,
+        runId,
+        result: "review_queue",
+        confidenceScore: "0",
+        documentStrategy: usedEmbeddedText ? "embedded_text" : "ocr",
+        ocrEngineVersion: getOCREngineVersion(
+          ocrResult.model,
+          getOCRConfig(),
+          ocrResult.provider
+        ),
+        pipelineVersion: PIPELINE_VERSION,
+        reportJson: {
+          summary: hybridResult.llmSummary || hybridResult.reviewExplanation,
+          extractedText,
+          extractedFields: Object.fromEntries(
+            hybridResult.extractedFields.map(f => [
+              f.field,
+              {
+                value: f.value,
+                confidence: f.confidence,
+                pageNumber: f.pageNumber,
+              },
+            ])
+          ),
+          pageCount: ocrResult.totalPages,
+          processingStages: stages,
+          modelRegistry: modelRegistryStamp(),
+          ...ocrResilienceReportFields(ocrResult),
+          hybridAssessment: hybridResult,
+          thinTextGuard: {
+            threshold: THIN_TEXT_CHAR_THRESHOLD,
+            usedEmbeddedText,
+          },
+        },
+        processingTimeMs: Date.now() - startTime,
+      });
+
+      finishProgress("review_queue");
+      return {
+        success: hybridResult.success,
+        jobSheetId,
+        auditResultId: auditResult.id,
+        ocrResult,
+        hybridAssessment: hybridResult,
+        assessmentMode: "HYBRID",
+        processingStages: stages,
+        totalDurationMs: Date.now() - startTime,
+      };
+    } catch (dbError) {
+      console.error(
+        "[DocumentProcessor] Failed to store thin-text hybrid results:",
+        dbError
+      );
+      finishProgress("failed");
+      return {
+        success: false,
+        jobSheetId,
+        ocrResult,
+        hybridAssessment: hybridResult,
+        assessmentMode: "HYBRID",
+        processingStages: stages,
+        totalDurationMs: Date.now() - startTime,
+      };
+    }
+  }
 
   // SSOT: Ensure templates are ready before processing
   try {
@@ -649,8 +797,12 @@ async function processJobSheetWithOptions(
       };
     }
   } else {
-    // Auto-select template from extracted text
-    selectionResult = selectTemplate(extractedText);
+    // Auto-select template via multi-signal recognition (tokens + layout + ROI + plausibility)
+    selectionResult = selectTemplateMultiSignal({
+      documentText: extractedText,
+      pageTexts: pageTextsForPipeline,
+      metadata: { pageCount: ocrResult.totalPages },
+    });
 
     if (!selectionResult.autoProcessingAllowed) {
       // LOW or ambiguous MEDIUM confidence - use HYBRID ASSESSMENT instead of stopping
@@ -678,7 +830,6 @@ async function processJobSheetWithOptions(
 
       // Perform hybrid assessment - NEVER FAIL, always provide partial results
       const hybridStartTime = Date.now();
-      const pageTexts = ocrResult.pages.map(p => p.markdown);
       // Prefer OCR-4 page confidence when available; otherwise neutral prior.
       const avgConfidence =
         computePageConfidencePrior(ocrResult) ??
@@ -686,7 +837,7 @@ async function processJobSheetWithOptions(
 
       const hybridResult = await performHybridAssessment(
         extractedText,
-        pageTexts,
+        pageTextsForPipeline,
         avgConfidence,
         reviewReason,
         { hasOcrSignature: hasOcrSignatureEvidence(ocrResult) }
@@ -717,7 +868,7 @@ async function processJobSheetWithOptions(
           runId,
           result: "review_queue",
           confidenceScore: String(selectionResult.topScore),
-          documentStrategy: "ocr",
+          documentStrategy: usedEmbeddedText ? "embedded_text" : "ocr",
           ocrEngineVersion: getOCREngineVersion(
             ocrResult.model,
             getOCRConfig(),
@@ -1204,7 +1355,7 @@ async function processJobSheetWithOptions(
         | "fail"
         | "review_queue",
       confidenceScore: String(analysisResult.score),
-      documentStrategy: "ocr", // We used OCR
+      documentStrategy: usedEmbeddedText ? "embedded_text" : "ocr",
       ocrEngineVersion: getOCREngineVersion(
         ocrResult.model,
         getOCRConfig(),
