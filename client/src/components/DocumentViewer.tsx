@@ -242,17 +242,29 @@ export function DocumentViewer({
     onPageChange?.(newPage);
   };
 
-  const currentPageBoxes = boxes.filter(box => box.page === pageNumber);
-  // Zoom via PDF open params only — CSS transform breaks native scroll.
+  // Native Chrome/Edge PDF UI needs an uncovered iframe — any stacked HTML
+  // over the plugin (even pointer-events:none) blocks toolbar, scrollbars, zoom.
+  const activeBox =
+    activeBoxId != null
+      ? boxes.find(box => box.id === activeBoxId) ?? null
+      : null;
   const iframeSrc = pdfFile
-    ? `${pdfFile}#page=${pageNumber}&zoom=${Math.round(scale * 100)}`
+    ? `${pdfFile}#toolbar=1&navpanes=0&scrollbar=1&page=${pageNumber}&zoom=${Math.round(scale * 100)}`
     : null;
 
   return (
     <Card className="flex flex-col h-full min-h-0 overflow-hidden border-0 shadow-none rounded-none bg-white">
-      <CardHeader className="py-2.5 px-3 border-b flex flex-row items-center justify-between shrink-0 bg-white">
-        <CardTitle className="text-sm font-medium">Document</CardTitle>
-        <div className="flex items-center gap-2">
+      <CardHeader className="py-2.5 px-3 border-b flex flex-row items-center justify-between shrink-0 bg-white gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <CardTitle className="text-sm font-medium shrink-0">Document</CardTitle>
+          {activeBox?.label && (
+            <span className="text-xs text-muted-foreground truncate">
+              Focus: {activeBox.label}
+              {activeBox.page ? ` (p.${activeBox.page})` : ""}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           <div className="flex items-center gap-1 border-r pr-2 mr-2">
             <Button
               variant="ghost"
@@ -311,7 +323,11 @@ export function DocumentViewer({
               size="icon"
               className="h-8 w-8"
               onClick={() => setIsDrawing(!isDrawing)}
-              title={isDrawing ? "Cancel Drawing" : "Draw Box"}
+              title={
+                isDrawing
+                  ? "Done drawing — PDF controls re-enabled"
+                  : "Draw box (temporarily locks PDF controls)"
+              }
             >
               {isDrawing ? (
                 <MousePointer2 className="w-4 h-4" />
@@ -334,79 +350,36 @@ export function DocumentViewer({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : (
-          <div
-            className={`relative w-full h-full min-h-0 bg-white ${
-              isDrawing ? "cursor-crosshair" : ""
-            }`}
-            ref={containerRef}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-          >
+          <div className="relative w-full h-full min-h-0 bg-white" ref={containerRef}>
             <iframe
               key={iframeSrc}
               title="PDF document"
               src={iframeSrc}
               className="absolute inset-0 w-full h-full border-0 bg-white"
-              style={{ pointerEvents: isDrawing ? "none" : "auto" }}
             />
 
-            {/* pointer-events-none so wheel/scroll reach the iframe */}
-            <div className="absolute inset-0 z-10 pointer-events-none">
-              {currentBox && (
-                <div
-                  className="absolute border-2 border-blue-500 bg-blue-500/20"
-                  style={{
-                    left: `${currentBox.x}%`,
-                    top: `${currentBox.y}%`,
-                    width: `${currentBox.width}%`,
-                    height: `${currentBox.height}%`,
-                  }}
-                />
-              )}
-
-              {currentPageBoxes.map(box => {
-                const isActive = activeBoxId != null && box.id === activeBoxId;
-                return (
+            {/* Capture layer ONLY while drawing — otherwise PDF chrome must be free */}
+            {isDrawing && (
+              <div
+                className="absolute inset-0 z-20 cursor-crosshair bg-transparent"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+              >
+                {currentBox && (
                   <div
-                    key={box.id}
-                    data-box-id={String(box.id)}
-                    data-active={isActive ? "true" : undefined}
-                    onClick={e => {
-                      e.stopPropagation();
-                      onBoxClick?.(box.id);
-                    }}
-                    className={`absolute border-2 cursor-pointer pointer-events-auto transition-all ${
-                      isActive
-                        ? "z-20 ring-2 ring-offset-1 ring-primary animate-pulse"
-                        : ""
-                    }`}
+                    className="absolute border-2 border-blue-500 bg-blue-500/20"
                     style={{
-                      left: `${box.x}%`,
-                      top: `${box.y}%`,
-                      width: `${box.width}%`,
-                      height: `${box.height}%`,
-                      borderColor: box.color || "#ef4444",
-                      backgroundColor: isActive
-                        ? `${box.color || "#ef4444"}33`
-                        : "transparent",
-                      borderWidth: isActive ? 3 : 2,
+                      left: `${currentBox.x}%`,
+                      top: `${currentBox.y}%`,
+                      width: `${currentBox.width}%`,
+                      height: `${currentBox.height}%`,
                     }}
-                    title={box.label}
-                  >
-                    {box.label && (
-                      <span
-                        className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
-                        style={{ backgroundColor: box.color || "#ef4444" }}
-                      >
-                        {box.label}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                  />
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
