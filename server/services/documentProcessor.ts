@@ -1306,14 +1306,15 @@ async function processJobSheetWithOptions(
       analysisResult.extractedFields,
       { signatureLabelPresent, hasOcrSignature }
     );
-    const findingsChanged = cleaned.length !== beforeCount;
+    const findingsChanged =
+      JSON.stringify(cleaned) !== JSON.stringify(analysisResult.findings);
     const fieldsChanged =
       JSON.stringify(sanitizedFields) !==
       JSON.stringify(analysisResult.extractedFields);
 
     if (findingsChanged || fieldsChanged) {
-      // If we removed signature Absents that caused FAIL, demote to review_queue
-      // rather than leaving a FAIL with no supporting findings.
+      // If we removed/converted signature Absents that caused FAIL, demote to
+      // review_queue rather than leaving a FAIL with no supporting S0/S1 findings.
       let overallResult = analysisResult.overallResult;
       if (
         analysisResult.overallResult === "FAIL" &&
@@ -1332,7 +1333,7 @@ async function processJobSheetWithOptions(
         findings: cleaned,
         summary:
           `${analysisResult.summary} ` +
-          `[FINDING_HYGIENE] Reduced findings ${beforeCount}→${cleaned.length}` +
+          `[FINDING_HYGIENE] Findings ${beforeCount}→${cleaned.length}` +
           (signatureLabelPresent || hasOcrSignature
             ? "; signature label/OCR evidence applied."
             : "."),

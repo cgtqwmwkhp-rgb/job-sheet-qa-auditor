@@ -68,7 +68,7 @@ export function DocumentViewer({
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(initialPage);
   const [syncedFocusPage, setSyncedFocusPage] = useState(focusPage);
-  const [scale, setScale] = useState<number>(1.0);
+  const [scale, setScale] = useState<number | "page-width">("page-width");
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(
     null
@@ -248,8 +248,10 @@ export function DocumentViewer({
     activeBoxId != null
       ? (boxes.find(box => box.id === activeBoxId) ?? null)
       : null;
+  const zoomParam =
+    scale === "page-width" ? "page-width" : String(Math.round(scale * 100));
   const iframeSrc = pdfFile
-    ? `${pdfFile}#toolbar=1&navpanes=0&scrollbar=1&page=${pageNumber}&zoom=${Math.round(scale * 100)}`
+    ? `${pdfFile}#toolbar=1&navpanes=0&scrollbar=1&page=${pageNumber}&zoom=${zoomParam}`
     : null;
 
   return (
@@ -299,20 +301,26 @@ export function DocumentViewer({
               size="icon"
               className="h-8 w-8"
               onClick={() =>
-                setScale(s => Math.max(0.5, Math.round((s - 0.1) * 10) / 10))
+                setScale(s => {
+                  const current = s === "page-width" ? 1 : s;
+                  return Math.max(0.5, Math.round((current - 0.1) * 10) / 10);
+                })
               }
             >
               <ZoomOut className="w-4 h-4" />
             </Button>
             <span className="text-xs w-12 text-center">
-              {Math.round(scale * 100)}%
+              {scale === "page-width" ? "Fit" : `${Math.round(scale * 100)}%`}
             </span>
             <Button
               variant="ghost"
               size="icon"
               className="h-8 w-8"
               onClick={() =>
-                setScale(s => Math.min(2.5, Math.round((s + 0.1) * 10) / 10))
+                setScale(s => {
+                  const current = s === "page-width" ? 1 : s;
+                  return Math.min(2.5, Math.round((current + 0.1) * 10) / 10);
+                })
               }
             >
               <ZoomIn className="w-4 h-4" />
