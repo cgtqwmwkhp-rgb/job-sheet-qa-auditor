@@ -399,6 +399,13 @@ function extractWithRegex(
       }
 
       if (value) {
+        if (isPresenceSignatureField(field.name)) {
+          const coerced = normalizeSignatureExtractionValue(value);
+          if (!coerced) {
+            continue;
+          }
+          value = coerced;
+        }
         const confidence = pattern.source.length > 50 ? 85 : 75;
         return {
           value: normalizeValue(value, field.normalizer),
@@ -466,9 +473,18 @@ function extractWithContext(
 
     for (const label of field.fuzzyLabels) {
       if (lineLower.includes(label.toLowerCase())) {
+        // Signature fields: label presence = Present (never grab next-line asset IDs)
+        if (isPresenceSignatureField(field.name)) {
+          return {
+            value: "Present",
+            confidence: 70,
+            strategy: "context",
+            evidence: `Signature label found on line ${i + 1}`,
+          };
+        }
         if (lines[i].includes(":")) {
           const value = lines[i].split(":")[1]?.trim();
-          if (value) {
+          if (value && !isAssetIdShaped(value)) {
             return {
               value: normalizeValue(value, field.normalizer),
               confidence: 70,
@@ -478,7 +494,11 @@ function extractWithContext(
           }
         } else if (i + 1 < lines.length) {
           const nextLine = lines[i + 1].trim();
-          if (nextLine && !nextLine.includes(":")) {
+          if (
+            nextLine &&
+            !nextLine.includes(":") &&
+            !isAssetIdShaped(nextLine)
+          ) {
             return {
               value: normalizeValue(nextLine, field.normalizer),
               confidence: 60,
@@ -542,6 +562,46 @@ Respond with ONLY a JSON object:
 // ============================================================================
 // ENSEMBLE EXTRACTION
 // ============================================================================
+
+/** UK-style asset / reg tokens that must not win signature conflicts. */
+export function isAssetIdShaped(value: string): boolean {
+  const v = value.trim();
+  if (!v) return false;
+  if (/^[A-Z]{2}\d{2}[A-Z]{3}(_[A-Z0-9]+)?$/i.test(v)) return true;
+  if (/^[A-Z]{1,3}\d{1,4}[A-Z]{1,3}(_[A-Z0-9]+)?$/i.test(v) && v.includes("_"))
+    return true;
+  if (/_TL$/i.test(v) || /_FL$/i.test(v)) return true;
+  return false;
+}
+
+export function isPresenceSignatureField(fieldName: string): boolean {
+  return (
+    fieldName === "technician_signature" ||
+    fieldName === "customer_signature" ||
+    /signature/i.test(fieldName)
+  );
+}
+
+/** Coerce signature extractions values to Present/Absent; drop asset IDs. */
+export function normalizeSignatureExtractionValue(
+  value: string | null
+): string | null {
+  if (!value) return null;
+  const v = value.trim();
+  if (!v) return null;
+  if (/^(present|yes|signed|true)$/i.test(v)) return "Present";
+  if (/^(absent|no|missing|false|unsigned)$/i.test(v)) return "Absent";
+  if (isAssetIdShaped(v)) return null;
+  // Long free-text after "Signed by:" that looks like a name — treat as Present
+  if (v.length <= 60 && !/\d{4,}/.test(v) && !isAssetIdShaped(v)) {
+    // If it looks like a person name (letters/spaces), keep as Present signal
+    if (/^[A-Za-z][A-Za-z\s.'-]{1,50}$/.test(v)) return "Present";
+  }
+  if (isAssetIdShaped(v) || /mileage|odometer|hours/i.test(v)) return null;
+  return "Present";
+}
+
+const CONFIDENCE_GAP_RESOLVE = 10;
 
 export interface EnsembleExtractOptions {
   useLlm?: boolean;
@@ -608,6 +668,31 @@ export async function ensembleExtract(
     };
   }
 
+  // Signature hygiene: coerce to Present/Absent; drop asset-ID shaped noise
+  if (isPresenceSignatureField(field.name)) {
+    const normalized: ExtractionResult[] = [];
+    for (const r of results) {
+      const coerced = normalizeSignatureExtractionValue(r.value);
+      if (coerced) {
+        normalized.push({ ...r, value: coerced });
+      }
+    }
+    results.length = 0;
+    results.push(...normalized);
+    if (results.length === 0) {
+      return {
+        displayName: field.displayName,
+        required: field.required,
+        severity: field.severity,
+        value: null,
+        confidence: 0,
+        strategy: "none",
+        evidence: "Signature strategies produced only asset-ID noise",
+        reasonCode: field.required ? "LOW_CONFIDENCE" : null,
+      };
+    }
+  }
+
   // Voting: if multiple strategies agree, boost confidence
   const valueCounts: Record<string, number> = {};
   for (const r of results) {
@@ -627,7 +712,16 @@ export async function ensembleExtract(
   }
 
   // Disagreement: ≥2 distinct high-confidence values with no clear vote winner
-  const highConfResults = results.filter(r => r.confidence >= llmThreshold);
+  let highConfResults = results.filter(r => r.confidence >= llmThreshold);
+  // Type-aware: for signature fields, only presence values participate in conflicts
+  if (isPresenceSignatureField(field.name)) {
+    highConfResults = highConfResults.filter(
+      r =>
+        r.value === "Present" ||
+        r.value === "Absent" ||
+        (!!r.value && !isAssetIdShaped(r.value))
+    );
+  }
   const highConfValues = Array.from(
     new Set(
       highConfResults
@@ -639,7 +733,19 @@ export async function ensembleExtract(
     .filter(([, count]) => count === maxCount)
     .map(([value]) => value);
 
+  // Confidence-gap resolve: clear leader → no CONFLICT
+  const rankedByConf = [...results]
+    .filter(r => r.value)
+    .sort((a, b) => b.confidence - a.confidence);
+  const top = rankedByConf[0];
+  const runner = rankedByConf.find(r => r.value !== top?.value);
+  const gapResolved =
+    top &&
+    runner &&
+    top.confidence - runner.confidence >= CONFIDENCE_GAP_RESOLVE;
+
   const hasConflict =
+    !gapResolved &&
     highConfValues.length >= 2 &&
     (tiedTopValues.length > 1 ||
       (maxCount === 1 && highConfValues.length >= 2));
@@ -647,8 +753,35 @@ export async function ensembleExtract(
   if (hasConflict) {
     const conflictValues =
       highConfValues.length >= 2 ? highConfValues : tiedTopValues;
+    // Drop Present|assetId style nonsense for signatures
+    const filteredConflicts = isPresenceSignatureField(field.name)
+      ? conflictValues.filter(v => !isAssetIdShaped(v))
+      : conflictValues;
+    if (filteredConflicts.length < 2) {
+      // Resolve to presence / top value instead of CONFLICT
+      const resolved =
+        filteredConflicts[0] ??
+        normalizeSignatureExtractionValue(top?.value ?? null) ??
+        mostCommonValue;
+      const bestAmong = results
+        .filter(r => r.value === resolved || r.value === top?.value)
+        .reduce((a, b) => (a.confidence > b.confidence ? a : b), results[0]);
+      return {
+        displayName: field.displayName,
+        required: field.required,
+        severity: field.severity,
+        value: resolved,
+        confidence: Math.min(bestAmong.confidence + 5, 100),
+        strategy: "ensemble(resolved)",
+        evidence: bestAmong.evidence,
+        consensusCount: maxCount,
+        reasonCode:
+          bestAmong.confidence < llmThreshold ? "LOW_CONFIDENCE" : null,
+      };
+    }
+
     const bestAmong = results
-      .filter(r => r.value && conflictValues.includes(r.value))
+      .filter(r => r.value && filteredConflicts.includes(r.value))
       .reduce((a, b) => (a.confidence > b.confidence ? a : b));
 
     return {
@@ -658,9 +791,9 @@ export async function ensembleExtract(
       value: bestAmong.value,
       confidence: Math.min(bestAmong.confidence, llmThreshold - 1),
       strategy: "ensemble(CONFLICT)",
-      evidence: `Conflicting values: ${conflictValues.join(" | ")}`,
+      evidence: `Conflicting values: ${filteredConflicts.join(" | ")}`,
       consensusCount: maxCount,
-      conflictValues,
+      conflictValues: filteredConflicts,
       reasonCode: "CONFLICT",
     };
   }

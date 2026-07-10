@@ -95,6 +95,13 @@ export interface AnalysisOptions {
   skipRetry?: boolean;
   redactPII?: boolean;
   confidenceThreshold?: number;
+  /** Ensemble pre-extraction hints for Gemini (advisory). */
+  preExtractedFields?: Record<
+    string,
+    { value: string; confidence: number; pageNumber: number }
+  >;
+  /** Optional formatted hint block (preferred over serializing fields inline). */
+  preExtractedHintsBlock?: string;
 }
 
 const ANALYSIS_SYSTEM_PROMPT = `You are an expert Job Sheet QA Auditor. Your task is to analyze extracted text from job sheets and validate them against a Gold Standard specification.
@@ -104,6 +111,12 @@ For each field in the specification:
 2. Validate the format and content according to the rules
 3. Assign a confidence score (0-100)
 4. Report any issues found
+
+When pre-extracted field hints are provided:
+- Treat them as advisory hypotheses from ensemble consensus
+- Validate each hint against the raw text before accepting it
+- Do NOT emit MISSING_FIELD for a required field when a high-confidence (≥70) pre-extraction exists unless the raw text clearly contradicts it
+- Do NOT invent CONFLICT between a signature presence value (Present/Absent) and an asset/registration ID
 
 Severity Levels:
 - S0 (Blocker): Critical safety or compliance issues that must be fixed immediately
@@ -128,8 +141,18 @@ Always respond with valid JSON matching the specified schema.`;
 async function callAnalysisLLM(
   extractedText: string,
   goldSpec: GoldSpec,
-  pageCount: number
+  pageCount: number,
+  options: AnalysisOptions = {}
 ): Promise<any> {
+  const hintsBlock =
+    options.preExtractedHintsBlock?.trim() ||
+    (options.preExtractedFields &&
+    Object.keys(options.preExtractedFields).length > 0
+      ? `## Pre-extracted Fields (ensemble consensus — advisory)
+Use these as starting hypotheses. Validate against raw text. Do not emit MISSING_FIELD when a high-confidence pre-extraction exists unless the text contradicts it.
+${JSON.stringify(options.preExtractedFields, null, 2)}`
+      : "");
+
   const userPrompt = `Analyze the following job sheet text against the Gold Standard specification.
 
 ## Gold Standard Specification
@@ -149,7 +172,7 @@ ${goldSpec.rules
 `
   )
   .join("\n")}
-
+${hintsBlock ? `\n${hintsBlock}\n` : ""}
 ## Extracted Job Sheet Text (${pageCount} pages):
 ${extractedText}
 
@@ -159,6 +182,7 @@ ${extractedText}
 3. Report findings with appropriate severity and reason codes
 4. Calculate an overall score (0-100)
 5. Determine if the job sheet PASSES, FAILS, or needs REVIEW_QUEUE
+6. Prefer pre-extracted high-confidence values when they match the text; avoid duplicate MISSING_FIELD noise
 
 Respond with a JSON object containing:
 - overallResult: "PASS" | "FAIL" | "REVIEW_QUEUE"
@@ -343,7 +367,7 @@ export async function analyzeJobSheet(
 
   try {
     const result = await withResiliency(
-      () => callAnalysisLLM(extractedText, goldSpec, pageCount),
+      () => callAnalysisLLM(extractedText, goldSpec, pageCount, options),
       geminiCircuitBreaker,
       {
         maxRetries: options.skipRetry ? 0 : 3,

@@ -53,8 +53,10 @@ import {
   buildEnsembleReviewFindings,
   mergeExtractedFields,
   isEnsembleExtractionEnabled,
+  formatPreExtractedHints,
   type EnsembleAdapterResult,
 } from "./ensembleExtraction";
+import { applyFindingHygiene } from "./findingHygiene";
 import {
   evaluateShadowChallenger,
   isShadowChallengerEnabled,
@@ -1110,6 +1112,13 @@ async function processJobSheetWithOptions(
       {
         jobSheetId,
         confidenceThreshold: processingSettings.llmConfidenceThreshold,
+        preExtractedFields: ensembleResult?.ensembleExtractedFields,
+        preExtractedHintsBlock: ensembleResult
+          ? formatPreExtractedHints(
+              ensembleResult.ensembleExtractedFields,
+              ensembleResult.artifact.fieldDetails
+            )
+          : undefined,
       }
     );
     recordStage(
@@ -1243,6 +1252,31 @@ async function processJobSheetWithOptions(
         `[ENSEMBLE] Consensus review required (${reasonTags.join(", ")}).`,
       findings: [...analysisResult.findings, ...ensembleFindings],
     };
+  }
+
+  // Finding hygiene: suppress garbage MISSING_FIELD / nonsense conflicts
+  {
+    const beforeCount = analysisResult.findings.length;
+    const cleaned = applyFindingHygiene(analysisResult.findings, {
+      preExtractedFields: ensembleResult?.ensembleExtractedFields,
+      confidenceThreshold: llmThreshold,
+    });
+    if (cleaned.length !== beforeCount) {
+      analysisResult = {
+        ...analysisResult,
+        findings: cleaned,
+        summary:
+          `${analysisResult.summary} ` +
+          `[FINDING_HYGIENE] Reduced findings ${beforeCount}→${cleaned.length}.`,
+      };
+      recordStage({
+        stage: "Finding Hygiene",
+        status: "success",
+        durationMs: 0,
+      });
+    } else {
+      analysisResult = { ...analysisResult, findings: cleaned };
+    }
   }
 
   // =========================================================================
