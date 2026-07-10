@@ -65,6 +65,7 @@ import {
   hasOnlyInformationalFindings,
   sanitizeExtractedFieldsForSignatures,
 } from "./findingHygiene";
+import { evaluateJobSummaryConsistency } from "./jobSummaryConsistency";
 import {
   runSelectionMarkDetection,
   isSelectionMarksEnabled,
@@ -1665,6 +1666,47 @@ async function processJobSheetWithOptions(
       });
     } else {
       analysisResult = { ...analysisResult, findings: cleaned };
+    }
+  }
+
+  // Job Summary failure-path consistency: report relationships for auditors.
+  // Consistent VOR/unsafe/return/incomplete stories stay PASS with Passed findings.
+  // Broken relationships or missing engineer narrative → Issues (may demote PASS).
+  {
+    const failMarkCount =
+      selectionMarksResult?.artifact.rows?.filter(r => r.choice === "Fail")
+        .length ?? 0;
+    const consistency = evaluateJobSummaryConsistency(extractedText, {
+      failMarkCount,
+    });
+    if (consistency.findings.length > 0) {
+      let overallResult = analysisResult.overallResult;
+      if (
+        consistency.hasBlockingIssues &&
+        analysisResult.overallResult === "PASS"
+      ) {
+        overallResult = "FAIL";
+      } else if (
+        consistency.hasBlockingIssues &&
+        analysisResult.overallResult === "REVIEW_QUEUE"
+      ) {
+        // Keep review queue, but findings will show the Issues.
+        overallResult = "REVIEW_QUEUE";
+      }
+      analysisResult = {
+        ...analysisResult,
+        overallResult,
+        findings: [...analysisResult.findings, ...consistency.findings],
+        summary:
+          `${analysisResult.summary} ` +
+          `[FAILURE_PATH] ${consistency.summary}`,
+      };
+      recordStage({
+        stage: "Failure Path Consistency",
+        status: "success",
+        durationMs: 0,
+        error: consistency.hasBlockingIssues ? consistency.summary : undefined,
+      });
     }
   }
 
