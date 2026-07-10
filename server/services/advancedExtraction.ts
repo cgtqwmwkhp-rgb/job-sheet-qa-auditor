@@ -485,27 +485,36 @@ function extractWithContext(
         if (lines[i].includes(":")) {
           const value = lines[i].split(":")[1]?.trim();
           if (value && !isAssetIdShaped(value)) {
-            return {
-              value: normalizeValue(value, field.normalizer),
-              confidence: 70,
-              strategy: "context",
-              evidence: `Context match on line ${i + 1}`,
-            };
+            if (isDateField(field.name) && !looksLikeDateValue(value)) {
+              // keep searching — colon value was not a date
+            } else {
+              return {
+                value: normalizeValue(value, field.normalizer),
+                confidence: 70,
+                strategy: "context",
+                evidence: `Context match on line ${i + 1}`,
+              };
+            }
           }
         } else if (i + 1 < lines.length) {
           const nextLine = lines[i + 1].trim();
-          if (
-            nextLine &&
-            !nextLine.includes(":") &&
-            !isAssetIdShaped(nextLine)
-          ) {
-            return {
-              value: normalizeValue(nextLine, field.normalizer),
-              confidence: 60,
-              strategy: "context",
-              evidence: `Value on line after label (line ${i + 2})`,
-            };
+          if (!nextLine || nextLine.includes(":")) {
+            continue;
           }
+          if (isAssetIdShaped(nextLine)) {
+            // Never treat asset/reg bleed as a field value
+            continue;
+          }
+          if (isDateField(field.name) && !looksLikeDateValue(nextLine)) {
+            // Skip non-date text on the line after "Date"
+            continue;
+          }
+          return {
+            value: normalizeValue(nextLine, field.normalizer),
+            confidence: 60,
+            strategy: "context",
+            evidence: `Value on line after label (line ${i + 2})`,
+          };
         }
       }
     }
@@ -563,7 +572,7 @@ Respond with ONLY a JSON object:
 // ENSEMBLE EXTRACTION
 // ============================================================================
 
-/** UK-style asset / reg tokens that must not win signature conflicts. */
+/** UK-style asset / reg tokens that must not win signature/date conflicts. */
 export function isAssetIdShaped(value: string): boolean {
   const v = value.trim();
   if (!v) return false;
@@ -571,6 +580,13 @@ export function isAssetIdShaped(value: string): boolean {
   if (/^[A-Z]{1,3}\d{1,4}[A-Z]{1,3}(_[A-Z0-9]+)?$/i.test(v) && v.includes("_"))
     return true;
   if (/_TL$/i.test(v) || /_FL$/i.test(v)) return true;
+  // "BN21ACO_TL Make/Model" style bleed from next-line context grab
+  if (
+    /\b[A-Z]{2}\d{2}[A-Z]{3}(_[A-Z0-9]+)?\b/i.test(v) &&
+    /make\/?model/i.test(v)
+  )
+    return true;
+  if (/\b[A-Z0-9]+_TL\b/i.test(v) && v.split(/\s+/).length >= 2) return true;
   return false;
 }
 
@@ -580,6 +596,47 @@ export function isPresenceSignatureField(fieldName: string): boolean {
     fieldName === "customer_signature" ||
     /signature/i.test(fieldName)
   );
+}
+
+export function isDateField(fieldName: string): boolean {
+  return (
+    fieldName === "date" ||
+    fieldName === "dateOfService" ||
+    /^date$/i.test(fieldName) ||
+    /date_of|service.?date|job.?date/i.test(fieldName)
+  );
+}
+
+/** True when value looks like a calendar date (not an asset/label bleed). */
+export function looksLikeDateValue(value: string): boolean {
+  const v = value.trim();
+  if (!v) return false;
+  if (isAssetIdShaped(v)) return false;
+  if (/make\/?model|mileage|odometer|taillift|asset\s*no/i.test(v)) {
+    return false;
+  }
+  if (/^\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}$/.test(v)) return true;
+  if (/^\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2}$/.test(v)) return true;
+  if (
+    /^\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}$/i.test(
+      v
+    )
+  ) {
+    return true;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return true;
+  return false;
+}
+
+/** Keep only date-shaped values for date fields. */
+export function normalizeDateExtractionValue(
+  value: string | null
+): string | null {
+  if (!value) return null;
+  const v = value.trim();
+  if (!v) return null;
+  if (!looksLikeDateValue(v)) return null;
+  return v;
 }
 
 /** Coerce signature extractions values to Present/Absent; drop asset IDs. */
@@ -693,6 +750,31 @@ export async function ensembleExtract(
     }
   }
 
+  // Date hygiene: drop asset/label bleed (e.g. BN21ACO_TL Make/Model)
+  if (isDateField(field.name)) {
+    const normalized: ExtractionResult[] = [];
+    for (const r of results) {
+      const coerced = normalizeDateExtractionValue(r.value);
+      if (coerced) {
+        normalized.push({ ...r, value: coerced });
+      }
+    }
+    results.length = 0;
+    results.push(...normalized);
+    if (results.length === 0) {
+      return {
+        displayName: field.displayName,
+        required: field.required,
+        severity: field.severity,
+        value: null,
+        confidence: 0,
+        strategy: "none",
+        evidence: "Date strategies produced only non-date / asset-ID noise",
+        reasonCode: field.required ? "LOW_CONFIDENCE" : null,
+      };
+    }
+  }
+
   // Voting: if multiple strategies agree, boost confidence
   const valueCounts: Record<string, number> = {};
   for (const r of results) {
@@ -753,15 +835,20 @@ export async function ensembleExtract(
   if (hasConflict) {
     const conflictValues =
       highConfValues.length >= 2 ? highConfValues : tiedTopValues;
-    // Drop Present|assetId style nonsense for signatures
-    const filteredConflicts = isPresenceSignatureField(field.name)
-      ? conflictValues.filter(v => !isAssetIdShaped(v))
-      : conflictValues;
+    // Drop Present|assetId / date|assetId nonsense conflicts
+    let filteredConflicts = conflictValues;
+    if (isPresenceSignatureField(field.name)) {
+      filteredConflicts = conflictValues.filter(v => !isAssetIdShaped(v));
+    } else if (isDateField(field.name)) {
+      filteredConflicts = conflictValues.filter(v => looksLikeDateValue(v));
+    }
     if (filteredConflicts.length < 2) {
-      // Resolve to presence / top value instead of CONFLICT
+      // Resolve to presence / date / top value instead of CONFLICT
       const resolved =
         filteredConflicts[0] ??
-        normalizeSignatureExtractionValue(top?.value ?? null) ??
+        (isDateField(field.name)
+          ? normalizeDateExtractionValue(top?.value ?? null)
+          : normalizeSignatureExtractionValue(top?.value ?? null)) ??
         mostCommonValue;
       const bestAmong = results
         .filter(r => r.value === resolved || r.value === top?.value)
