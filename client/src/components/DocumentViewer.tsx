@@ -62,7 +62,7 @@ export function DocumentViewer({
   activeBoxId = null,
   onPageChange,
   boxes = [],
-  onBoxClick,
+  onBoxClick: _onBoxClick,
   onBoxCreate,
 }: DocumentViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
@@ -246,7 +246,7 @@ export function DocumentViewer({
   // over the plugin (even pointer-events:none) blocks toolbar, scrollbars, zoom.
   const activeBox =
     activeBoxId != null
-      ? boxes.find(box => box.id === activeBoxId) ?? null
+      ? (boxes.find(box => box.id === activeBoxId) ?? null)
       : null;
   const iframeSrc = pdfFile
     ? `${pdfFile}#toolbar=1&navpanes=0&scrollbar=1&page=${pageNumber}&zoom=${Math.round(scale * 100)}`
@@ -256,7 +256,9 @@ export function DocumentViewer({
     <Card className="flex flex-col h-full min-h-0 overflow-hidden border-0 shadow-none rounded-none bg-white">
       <CardHeader className="py-2.5 px-3 border-b flex flex-row items-center justify-between shrink-0 bg-white gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <CardTitle className="text-sm font-medium shrink-0">Document</CardTitle>
+          <CardTitle className="text-sm font-medium shrink-0">
+            Document
+          </CardTitle>
           {activeBox?.label && (
             <span className="text-xs text-muted-foreground truncate">
               Focus: {activeBox.label}
@@ -350,7 +352,10 @@ export function DocumentViewer({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : (
-          <div className="relative w-full h-full min-h-0 bg-white" ref={containerRef}>
+          <div
+            className="relative w-full h-full min-h-0 bg-white"
+            ref={containerRef}
+          >
             <iframe
               key={iframeSrc}
               title="PDF document"
