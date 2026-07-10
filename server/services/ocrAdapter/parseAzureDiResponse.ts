@@ -26,10 +26,20 @@ export interface AzureSelectionMark {
   polygon?: number[];
 }
 
+export interface AzureTextLine {
+  pageNumber: number;
+  content: string;
+  /** Approximate vertical center as % of page height. */
+  yPercent: number;
+  /** Left edge as % of page width. */
+  xPercent: number;
+}
+
 export interface ParsedAzureDiResult {
   pages: OCRPage[];
   model: string;
   selectionMarks: AzureSelectionMark[];
+  lines: AzureTextLine[];
   usageInfo?: {
     pagesProcessed: number;
     tokensGenerated: number;
@@ -168,6 +178,7 @@ export function parseAzureDiResponse(raw: unknown): ParsedAzureDiResult {
       pages: [],
       model: DEFAULT_AZURE_DI_MODEL,
       selectionMarks: [],
+      lines: [],
     };
   }
 
@@ -189,6 +200,7 @@ export function parseAzureDiResponse(raw: unknown): ParsedAzureDiResult {
 
   const pages: OCRPage[] = [];
   const selectionMarks: AzureSelectionMark[] = [];
+  const linesOut: AzureTextLine[] = [];
 
   if (rawPages.length === 0 && content) {
     pages.push({
@@ -209,6 +221,32 @@ export function parseAzureDiResponse(raw: unknown): ParsedAzureDiResult {
 
       const lines = Array.isArray(pageObj.lines) ? pageObj.lines : [];
       let markdown = linesToMarkdown(lines);
+
+      // Capture line geometry for checklist row label association
+      if (width && height) {
+        for (const line of lines) {
+          if (!line || typeof line !== "object") continue;
+          const lo = line as Record<string, unknown>;
+          const lineContent = asString(lo.content);
+          if (!lineContent?.trim()) continue;
+          const poly = Array.isArray(lo.polygon)
+            ? lo.polygon
+                .map(asNumber)
+                .filter((n): n is number => n !== undefined)
+            : [];
+          if (poly.length < 8) continue;
+          const ys = [poly[1], poly[3], poly[5], poly[7]];
+          const xs = [poly[0], poly[2], poly[4], poly[6]];
+          const yMid = (Math.min(...ys) + Math.max(...ys)) / 2;
+          const xMin = Math.min(...xs);
+          linesOut.push({
+            pageNumber,
+            content: lineContent.trim(),
+            yPercent: clampPercent((yMid / height) * 100),
+            xPercent: clampPercent((xMin / width) * 100),
+          });
+        }
+      }
 
       // Prefer page-scoped spans from document content when available
       if (!markdown && content && Array.isArray(pageObj.spans)) {
@@ -271,6 +309,7 @@ export function parseAzureDiResponse(raw: unknown): ParsedAzureDiResult {
     pages,
     model: modelId,
     selectionMarks,
+    lines: linesOut,
     usageInfo: {
       pagesProcessed: pages.length,
       tokensGenerated: 0,

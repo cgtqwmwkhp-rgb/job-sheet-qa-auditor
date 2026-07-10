@@ -10,7 +10,10 @@
  * - "false" / "0" → force off
  */
 
-import type { AzureSelectionMark } from "../ocrAdapter/parseAzureDiResponse";
+import type {
+  AzureSelectionMark,
+  AzureTextLine,
+} from "../ocrAdapter/parseAzureDiResponse";
 import { extractLayoutSelectionMarks } from "../ocrAdapter/azureDocumentIntelligenceAdapter";
 import { getOCRConfig } from "../ocrAdapter/types";
 
@@ -122,12 +125,17 @@ export function inferColumnOrder(
  */
 export function mapSelectionMarksToRows(
   marks: AzureSelectionMark[],
-  options: { headerText?: string; yTolerancePercent?: number } = {}
+  options: {
+    headerText?: string;
+    yTolerancePercent?: number;
+    lines?: AzureTextLine[];
+  } = {}
 ): SelectionMarkRow[] {
   if (marks.length === 0) return [];
 
   const yTol = options.yTolerancePercent ?? 1.5;
   const columns = inferColumnOrder(options.headerText);
+  const lines = options.lines ?? [];
 
   // Sort by page, then Y, then X
   const sorted = [...marks].sort((a, b) => {
@@ -159,8 +167,7 @@ export function mapSelectionMarksToRows(
 
     const byX = [...cluster].sort((a, b) => a.bbox.x - b.bbox.x);
     // If more than 4, take the rightmost 4 (status columns usually on the right)
-    const marksForCols =
-      byX.length > 4 ? byX.slice(byX.length - 4) : byX.length === 4 ? byX : byX;
+    const marksForCols = byX.length > 4 ? byX.slice(byX.length - 4) : byX;
 
     const selected = marksForCols.filter(m => m.state === "selected");
     const pageNumber = marksForCols[0].pageNumber;
@@ -172,14 +179,11 @@ export function mapSelectionMarksToRows(
 
     if (selected.length === 1 && marksForCols.length >= 2) {
       const selIdx = marksForCols.indexOf(selected[0]);
-      // Map index into column labels (pad if fewer than 4)
       if (marksForCols.length === 4) {
         choice = columns[selIdx] ?? "UNREADABLE";
       } else if (marksForCols.length === 3) {
-        // Assume Ok / Fail / N/A or Ok / Adv / Fail — prefer first 3 of inferred
         choice = columns[selIdx] ?? "UNREADABLE";
       } else {
-        // 2 marks: treat as Ok / Fail-or-N/A using first/last of columns
         choice =
           selIdx === 0
             ? columns[0]
@@ -190,9 +194,16 @@ export function mapSelectionMarksToRows(
       choice = "UNREADABLE";
     }
 
+    const rowY =
+      marksForCols.reduce((s, m) => s + m.bbox.y + m.bbox.height / 2, 0) /
+      marksForCols.length;
+    const minMarkX = Math.min(...marksForCols.map(m => m.bbox.x));
+    const label = findRowLabel(lines, pageNumber, rowY, minMarkX, yTol);
+
     rows.push({
       rowIndex: rowIndex++,
       pageNumber,
+      label,
       choice,
       confidence: Math.round(avgConf),
       bbox,
@@ -202,6 +213,29 @@ export function mapSelectionMarksToRows(
   }
 
   return rows;
+}
+
+/** Nearest text line left of the radio columns, same vertical band. */
+function findRowLabel(
+  lines: AzureTextLine[],
+  pageNumber: number,
+  rowY: number,
+  minMarkX: number,
+  yTol: number
+): string | undefined {
+  const candidates = lines.filter(
+    l =>
+      l.pageNumber === pageNumber &&
+      l.xPercent < minMarkX - 1 &&
+      Math.abs(l.yPercent - rowY) <= yTol * 2 &&
+      !/^(ok|adv\.?|fail|n\/?a)$/i.test(l.content.trim()) &&
+      l.content.length > 8
+  );
+  if (candidates.length === 0) return undefined;
+  candidates.sort(
+    (a, b) => Math.abs(a.yPercent - rowY) - Math.abs(b.yPercent - rowY)
+  );
+  return candidates[0].content.slice(0, 120);
 }
 
 function unionBBox(marks: AzureSelectionMark[]): SelectionMarkRow["bbox"] {
@@ -239,11 +273,13 @@ export function buildSelectionMarksArtifact(
     model: string;
     processingTimeMs: number;
     headerText?: string;
+    lines?: AzureTextLine[];
     error?: string;
   }
 ): SelectionMarksArtifact {
   const rows = mapSelectionMarksToRows(marks, {
     headerText: meta.headerText,
+    lines: meta.lines,
   });
   const readableRows = rows.filter(r => r.choice !== "UNREADABLE").length;
   return {
@@ -300,10 +336,19 @@ export async function runSelectionMarkDetection(
 
   try {
     const layout = await extractLayoutSelectionMarks(documentUrl);
+    // Re-parse is already done inside extractLayoutSelectionMarks; lines come
+    // from the same parse. Prefer layout.pages markdown as header context.
+    const headerText =
+      options.headerText ||
+      layout.pages
+        .map(p => p.markdown)
+        .join("\n")
+        .slice(0, 4000);
     const artifact = buildSelectionMarksArtifact(layout.selectionMarks, {
       model: layout.model,
       processingTimeMs: layout.processingTimeMs,
-      headerText: options.headerText,
+      headerText,
+      lines: layout.lines,
       error: layout.success ? undefined : layout.error,
     });
     return artifactToResult(artifact);

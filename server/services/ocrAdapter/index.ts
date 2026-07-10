@@ -24,6 +24,7 @@ export {
 export type {
   AzureSelectionMark,
   AzureSelectionMarkBBox,
+  AzureTextLine,
   ParsedAzureDiResult,
 } from "./parseAzureDiResponse";
 
