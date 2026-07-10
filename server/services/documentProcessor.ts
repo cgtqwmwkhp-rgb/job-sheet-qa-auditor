@@ -56,7 +56,11 @@ import {
   formatPreExtractedHints,
   type EnsembleAdapterResult,
 } from "./ensembleExtraction";
-import { applyFindingHygiene } from "./findingHygiene";
+import {
+  applyFindingHygiene,
+  hasSignatureLabelEvidence,
+  sanitizeExtractedFieldsForSignatures,
+} from "./findingHygiene";
 import {
   evaluateShadowChallenger,
   isShadowChallengerEnabled,
@@ -1112,13 +1116,46 @@ async function processJobSheetWithOptions(
       {
         jobSheetId,
         confidenceThreshold: processingSettings.llmConfidenceThreshold,
-        preExtractedFields: ensembleResult?.ensembleExtractedFields,
-        preExtractedHintsBlock: ensembleResult
-          ? formatPreExtractedHints(
-              ensembleResult.ensembleExtractedFields,
-              ensembleResult.artifact.fieldDetails
-            )
-          : undefined,
+        preExtractedFields: (() => {
+          const base = {
+            ...(ensembleResult?.ensembleExtractedFields ?? {}),
+          };
+          // Text-layer signature label → Present hint for Gemini (ink not in OCR)
+          if (
+            hasSignatureLabelEvidence(extractedText) &&
+            !base.customerSignature
+          ) {
+            base.customerSignature = {
+              value: "Present",
+              confidence: 75,
+              pageNumber: 1,
+            };
+          }
+          return Object.keys(base).length > 0 ? base : undefined;
+        })(),
+        preExtractedHintsBlock: (() => {
+          const fields = {
+            ...(ensembleResult?.ensembleExtractedFields ?? {}),
+          };
+          if (
+            hasSignatureLabelEvidence(extractedText) &&
+            !fields.customerSignature
+          ) {
+            fields.customerSignature = {
+              value: "Present",
+              confidence: 75,
+              pageNumber: 1,
+            };
+          }
+          const block = formatPreExtractedHints(
+            fields,
+            ensembleResult?.artifact.fieldDetails
+          );
+          const sigNote = hasSignatureLabelEvidence(extractedText)
+            ? "\n\nNote: Signature label/box detected in text. Handwritten ink is usually invisible to OCR — do not mark signature Absent/MISSING solely for lack of ink text."
+            : "";
+          return block ? `${block}${sigNote}` : sigNote || undefined;
+        })(),
       }
     );
     recordStage(
@@ -1256,18 +1293,49 @@ async function processJobSheetWithOptions(
 
   // Finding hygiene: suppress garbage MISSING_FIELD / nonsense conflicts
   {
+    const signatureLabelPresent = hasSignatureLabelEvidence(extractedText);
+    const hasOcrSignature = hasOcrSignatureEvidence(ocrResult);
     const beforeCount = analysisResult.findings.length;
     const cleaned = applyFindingHygiene(analysisResult.findings, {
       preExtractedFields: ensembleResult?.ensembleExtractedFields,
       confidenceThreshold: llmThreshold,
+      signatureLabelPresent,
+      hasOcrSignature,
     });
-    if (cleaned.length !== beforeCount) {
+    const sanitizedFields = sanitizeExtractedFieldsForSignatures(
+      analysisResult.extractedFields,
+      { signatureLabelPresent, hasOcrSignature }
+    );
+    const findingsChanged = cleaned.length !== beforeCount;
+    const fieldsChanged =
+      JSON.stringify(sanitizedFields) !==
+      JSON.stringify(analysisResult.extractedFields);
+
+    if (findingsChanged || fieldsChanged) {
+      // If we removed signature Absents that caused FAIL, demote to review_queue
+      // rather than leaving a FAIL with no supporting findings.
+      let overallResult = analysisResult.overallResult;
+      if (
+        analysisResult.overallResult === "FAIL" &&
+        !cleaned.some(
+          f =>
+            (f.severity === "S0" || f.severity === "S1") &&
+            f.reasonCode !== "LOW_CONFIDENCE"
+        )
+      ) {
+        overallResult = "REVIEW_QUEUE";
+      }
       analysisResult = {
         ...analysisResult,
+        overallResult,
+        extractedFields: sanitizedFields,
         findings: cleaned,
         summary:
           `${analysisResult.summary} ` +
-          `[FINDING_HYGIENE] Reduced findings ${beforeCount}→${cleaned.length}.`,
+          `[FINDING_HYGIENE] Reduced findings ${beforeCount}→${cleaned.length}` +
+          (signatureLabelPresent || hasOcrSignature
+            ? "; signature label/OCR evidence applied."
+            : "."),
       };
       recordStage({
         stage: "Finding Hygiene",

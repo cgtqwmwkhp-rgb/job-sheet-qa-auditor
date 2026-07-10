@@ -9,6 +9,7 @@ import {
   applyFindingHygiene,
   MAX_MISSING_FIELD_FINDINGS,
   isFindingHygieneEnabled,
+  hasSignatureLabelEvidence,
 } from "../../services/findingHygiene";
 import type { Finding } from "../../services/analyzer";
 import {
@@ -108,6 +109,29 @@ describe("findingHygiene", () => {
     expect(cleaned[0].normalisedSnippet).toBe("2024-09-02");
   });
 
+  it("suppresses false Absent signature when label evidence exists", () => {
+    const findings = [
+      finding({
+        fieldName: "customerSignature",
+        reasonCode: "MISSING_FIELD",
+        normalisedSnippet: "Absent",
+        confidence: 100,
+        severity: "S0",
+      }),
+    ];
+    const cleaned = applyFindingHygiene(findings, {
+      signatureLabelPresent: true,
+    });
+    expect(cleaned).toHaveLength(0);
+  });
+
+  it("detects signature labels in document text", () => {
+    expect(
+      hasSignatureLabelEvidence("Technician Signature\n[handwriting]")
+    ).toBe(true);
+    expect(hasSignatureLabelEvidence("No sign-off section here")).toBe(false);
+  });
+
   it("drops mileage noise on serialNumber findings", () => {
     const findings = [
       finding({
@@ -203,6 +227,8 @@ describe("ensemble→Gemini wiring", () => {
     expect(dp).toContain("formatPreExtractedHints");
     expect(dp).toContain("applyFindingHygiene");
     expect(dp).toContain("Finding Hygiene");
+    expect(dp).toContain("hasSignatureLabelEvidence");
+    expect(dp).toContain("sanitizeExtractedFieldsForSignatures");
   });
 
   it("analyzer prompt path accepts preExtractedHintsBlock", () => {
@@ -213,5 +239,8 @@ describe("ensemble→Gemini wiring", () => {
     expect(analyzer).toContain("preExtractedHintsBlock");
     expect(analyzer).toContain("preExtractedFields");
     expect(analyzer).toContain("Pre-extracted Fields");
+    expect(analyzer).toContain(
+      "Handwritten signatures usually produce NO OCR text"
+    );
   });
 });

@@ -32,6 +32,10 @@ export interface FindingHygieneOptions {
   /** Default 70 — matches llmConfidenceThreshold */
   confidenceThreshold?: number;
   maxMissingField?: number;
+  /** Document text contains a signature label/box (OCR cannot see ink). */
+  signatureLabelPresent?: boolean;
+  /** OCR-4 reported a signature block/region. */
+  hasOcrSignature?: boolean;
 }
 
 const ASSET_ID_RE =
@@ -43,6 +47,13 @@ const SIGNATURE_FIELD_RE = /signature/i;
 const DATE_FIELD_RE = /^date$|dateOfService|service.?date|job.?date/i;
 const DATE_VALUE_RE =
   /^\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}$|^\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2}$|^\d{4}-\d{2}-\d{2}$/;
+const SIGNATURE_LABEL_RE =
+  /(?:technician|engineer|customer|client)?\s*signature|signed\s*by|sign\s*off|signatory/i;
+
+/** True when OCR/extracted text shows a signature label/box (ink may still be invisible). */
+export function hasSignatureLabelEvidence(text: string): boolean {
+  return SIGNATURE_LABEL_RE.test(text);
+}
 
 function splitConflictParts(finding: Finding): string[] {
   const raw = finding.normalisedSnippet || finding.rawSnippet || "";
@@ -107,6 +118,11 @@ export function applyFindingHygiene(
   const threshold = options.confidenceThreshold ?? 70;
   const maxMissing = options.maxMissingField ?? MAX_MISSING_FIELD_FINDINGS;
   const pre = options.preExtractedFields ?? {};
+  const signatureEvidence =
+    !!options.signatureLabelPresent ||
+    !!options.hasOcrSignature ||
+    pre.customerSignature?.value === "Present" ||
+    pre.technicianSignature?.value === "Present";
 
   let working = findings.filter(f => {
     // Suppress MISSING_FIELD when ensemble already has a confident value
@@ -115,6 +131,21 @@ export function applyFindingHygiene(
       if (hint && hint.value && hint.confidence >= threshold) {
         return false;
       }
+      // Handwritten ink is invisible to OCR — don't FAIL on missing signature text
+      // when a signature label/box (or OCR signature block) is present.
+      if (SIGNATURE_FIELD_RE.test(f.fieldName) && signatureEvidence) {
+        return false;
+      }
+    }
+    // Drop false "Absent" signature issues when label/OCR evidence exists
+    if (
+      SIGNATURE_FIELD_RE.test(f.fieldName) &&
+      signatureEvidence &&
+      /^(absent|missing|no|unsigned)$/i.test(
+        (f.normalisedSnippet || f.rawSnippet || "").trim()
+      )
+    ) {
+      return false;
     }
     // Drop mileage/odometer noise on serial/asset fields
     if (isMileageAsSerialSnippet(f)) {
@@ -208,4 +239,38 @@ export function applyFindingHygiene(
   }
 
   return working;
+}
+
+/**
+ * Fix extracted field values that claim signature Absent when label/OCR evidence exists.
+ */
+export function sanitizeExtractedFieldsForSignatures<
+  T extends Record<
+    string,
+    { value: string; confidence: number; pageNumber: number }
+  >,
+>(
+  fields: T,
+  options: {
+    signatureLabelPresent?: boolean;
+    hasOcrSignature?: boolean;
+  } = {}
+): T {
+  if (!options.signatureLabelPresent && !options.hasOcrSignature) {
+    return fields;
+  }
+  const next = { ...fields };
+  for (const [key, data] of Object.entries(next)) {
+    if (
+      SIGNATURE_FIELD_RE.test(key) &&
+      /^(absent|missing|no|unsigned)$/i.test(data.value.trim())
+    ) {
+      next[key as keyof T] = {
+        ...data,
+        value: "Present",
+        confidence: Math.max(data.confidence, 70),
+      } as T[keyof T];
+    }
+  }
+  return next;
 }
