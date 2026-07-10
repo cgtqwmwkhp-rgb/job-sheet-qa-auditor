@@ -64,7 +64,7 @@ export function hasSubstantiveEngineerComments(text: string): {
 } {
   const section =
     text.match(
-      /(?:engineer\s*comments?|work\s*notes?|repairs?\s*(?:required|needed|details?)|action\s*required|defect(?:s)?\s*(?:found|notes?)|parts?\s*required)\s*[:\-]?\s*([\s\S]{15,800}?)(?=\n(?:technician\s*signature|customer\s*signature|completion\s*details|asset\s*details|job\s*details)\b|$)/i
+      /(?:engineer\s*comments?|work\s*notes?|repairs?\s*(?:required|needed|details?)|action\s*required|defect(?:s)?\s*(?:found|notes?)|parts?\s*required)\s*[:-]?\s*([\s\S]{15,800}?)(?=\n(?:technician\s*signature|customer\s*signature|completion\s*details|asset\s*details|job\s*details)\b|$)/i
     )?.[1] ?? "";
 
   const cleaned = section
