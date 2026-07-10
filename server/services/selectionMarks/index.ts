@@ -16,6 +16,7 @@ import type {
 } from "../ocrAdapter/parseAzureDiResponse";
 import { extractLayoutSelectionMarks } from "../ocrAdapter/azureDocumentIntelligenceAdapter";
 import { getOCRConfig } from "../ocrAdapter/types";
+import type { Finding } from "../analyzer";
 
 export const FEATURE_FLAG = "FEATURE_SELECTION_MARKS";
 export const ENGINE_VERSION = "selection-marks-v1";
@@ -325,8 +326,113 @@ export function artifactToResult(
 }
 
 /**
+ * Convert visual checklist rows into first-class audit findings.
+ * Fail → S1 OUT_OF_POLICY; UNREADABLE → S2 LOW_CONFIDENCE; Ok/Adv/N/A → S3 passed.
+ */
+export function buildSelectionMarkFindings(
+  rows: SelectionMarkRow[]
+): Finding[] {
+  const findings: Finding[] = [];
+  for (const row of rows) {
+    const label = row.label || `Checklist row ${row.rowIndex + 1}`;
+    const fieldName = `checklist:${row.choice}:${row.rowIndex + 1}`;
+    const bbox = row.bbox
+      ? {
+          x: row.bbox.x,
+          y: row.bbox.y,
+          width: row.bbox.width,
+          height: row.bbox.height,
+        }
+      : undefined;
+
+    if (row.choice === "Fail") {
+      findings.push({
+        ruleId: "SELECTION_MARKS",
+        fieldName,
+        severity: "S1",
+        reasonCode: "OUT_OF_POLICY",
+        rawSnippet: label,
+        normalisedSnippet: "Fail",
+        confidence: row.confidence,
+        pageNumber: row.pageNumber,
+        boundingBox: bbox,
+        whyItMatters: `Visual checklist marked Fail for "${label}". Detected from radio/checkbox marks (not OCR text).`,
+        suggestedFix:
+          "Confirm the Fail mark on the document and remediate or escalate per policy.",
+      });
+      continue;
+    }
+
+    if (row.choice === "UNREADABLE") {
+      findings.push({
+        ruleId: "SELECTION_MARKS",
+        fieldName,
+        severity: "S2",
+        reasonCode: "LOW_CONFIDENCE",
+        rawSnippet: label,
+        normalisedSnippet: "UNREADABLE",
+        confidence: row.confidence,
+        pageNumber: row.pageNumber,
+        boundingBox: bbox,
+        whyItMatters: `Visual checklist row "${label}" could not be read (none/multiple marks selected).`,
+        suggestedFix:
+          "Inspect the Ok/Adv/Fail/N/A circles on the document and confirm the intended selection.",
+      });
+      continue;
+    }
+
+    findings.push({
+      ruleId: "SELECTION_MARKS",
+      fieldName,
+      severity: "S3",
+      reasonCode: "LOW_CONFIDENCE",
+      rawSnippet: label,
+      normalisedSnippet: row.choice,
+      confidence: row.confidence,
+      pageNumber: row.pageNumber,
+      boundingBox: bbox,
+      whyItMatters: `Visual checklist marked ${row.choice} for "${label}" (Azure DI selectionMarks).`,
+      suggestedFix:
+        "No action required unless the mark looks incorrect on the PDF.",
+    });
+  }
+  return findings;
+}
+
+/**
+ * Ensure Fail/UNREADABLE/Ok visual rows are present even if Gemini omitted them.
+ */
+export function reconcileSelectionMarksWithJudgment(
+  findings: Finding[],
+  artifact: SelectionMarksArtifact | undefined | null
+): Finding[] {
+  if (!artifact?.rows?.length) return findings;
+  const markFindings = buildSelectionMarkFindings(artifact.rows);
+  const existingKeys = new Set(
+    findings.map(f => `${f.ruleId}::${f.fieldName}::${f.normalisedSnippet}`)
+  );
+  const injected = markFindings.filter(
+    f =>
+      !existingKeys.has(`${f.ruleId}::${f.fieldName}::${f.normalisedSnippet}`)
+  );
+  if (injected.length === 0) return findings;
+  return [...findings, ...injected];
+}
+
+/** True when any high-confidence Fail mark should block auto-PASS. */
+export function hasBlockingFailMarks(
+  artifact: SelectionMarksArtifact | undefined | null,
+  minConfidence = 80
+): boolean {
+  if (!artifact?.rows) return false;
+  return artifact.rows.some(
+    r => r.choice === "Fail" && r.confidence >= minConfidence
+  );
+}
+
+/**
  * Run layout selection-mark detection for a document URL (fail-soft).
- * Returns null when disabled or on hard skip; never throws.
+ * Returns null when disabled, not configured, or timed out; never throws.
  */
 export async function runSelectionMarkDetection(
   documentUrl: string,
@@ -336,8 +442,17 @@ export async function runSelectionMarkDetection(
 
   try {
     const layout = await extractLayoutSelectionMarks(documentUrl);
-    // Re-parse is already done inside extractLayoutSelectionMarks; lines come
-    // from the same parse. Prefer layout.pages markdown as header context.
+    if (
+      !layout.success &&
+      (layout.errorCode === "AZURE_DI_NOT_CONFIGURED" ||
+        layout.errorCode === "AZURE_DI_TIMEOUT")
+    ) {
+      console.warn(
+        `[SelectionMarks] skipped: ${layout.errorCode} — ${layout.error}`
+      );
+      return null;
+    }
+
     const headerText =
       options.headerText ||
       layout.pages

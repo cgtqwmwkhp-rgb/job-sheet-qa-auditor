@@ -11,6 +11,9 @@ import {
   mapSelectionMarksToRows,
   buildSelectionMarksArtifact,
   artifactToResult,
+  buildSelectionMarkFindings,
+  reconcileSelectionMarksWithJudgment,
+  hasBlockingFailMarks,
 } from "../../services/selectionMarks";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -119,6 +122,23 @@ describe("selectionMarks edge cases", () => {
     expect(rows[0].choice).toBe("Ok");
     expect(rows[1].pageNumber).toBe(2);
     expect(rows[1].choice).toBe("Fail");
+  });
+
+  it("builds Fail/UNREADABLE/Ok findings from rows", () => {
+    const parsed = parseAzureDiResponse(live);
+    const artifact = buildSelectionMarksArtifact(parsed.selectionMarks, {
+      model: parsed.model,
+      processingTimeMs: 1,
+      headerText: parsed.pages[0]?.markdown,
+      lines: parsed.lines,
+    });
+    const findings = buildSelectionMarkFindings(artifact.rows);
+    expect(findings.some(f => f.normalisedSnippet === "Fail")).toBe(true);
+    expect(findings.some(f => f.normalisedSnippet === "Ok")).toBe(true);
+    expect(findings.some(f => f.normalisedSnippet === "UNREADABLE")).toBe(true);
+    expect(hasBlockingFailMarks(artifact)).toBe(true);
+    const reconciled = reconcileSelectionMarksWithJudgment([], artifact);
+    expect(reconciled.length).toBe(findings.length);
   });
 
   it("handles confidence already on 0-100 scale", () => {

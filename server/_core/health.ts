@@ -1,27 +1,70 @@
 /**
  * Health Check Endpoints for Container Orchestration
- * 
+ *
  * /healthz - Liveness probe: Is the process alive?
  * /readyz  - Readiness probe: Is the service ready to accept traffic?
- * 
+ *
  * Azure Container Apps and Kubernetes use these to manage container lifecycle.
  */
 
-import type { Request, Response } from 'express';
-import { testDbConnection } from '../db';
-import { checkStorageHealth } from '../storage';
+import type { Request, Response } from "express";
+import { testDbConnection } from "../db";
+import { checkStorageHealth } from "../storage";
+
+export type AiCapabilityStatus = "configured" | "disabled" | "partial";
 
 export interface HealthStatus {
-  status: 'ok' | 'degraded' | 'unhealthy';
+  status: "ok" | "degraded" | "unhealthy";
   timestamp: string;
   checks?: {
-    database?: { status: 'ok' | 'error'; latencyMs?: number; error?: string };
-    storage?: { status: 'ok' | 'error'; error?: string };
+    database?: { status: "ok" | "error"; latencyMs?: number; error?: string };
+    storage?: { status: "ok" | "error"; error?: string };
+    /** Non-blocking AI capability probe — never fails readiness alone. */
+    aiCapabilities?: {
+      selectionMarks: AiCapabilityStatus;
+      mistralOcr: AiCapabilityStatus;
+      geminiJudgment: AiCapabilityStatus;
+      detail?: string;
+    };
   };
   version?: {
     sha: string;
     platform: string;
     buildTime: string;
+  };
+}
+
+function probeAiCapabilities(): NonNullable<
+  HealthStatus["checks"]
+>["aiCapabilities"] {
+  const hasDi = Boolean(
+    process.env.AZURE_DI_ENDPOINT && process.env.AZURE_DI_KEY
+  );
+  const selectionFlag = process.env.FEATURE_SELECTION_MARKS;
+  const selectionForcedOff = selectionFlag === "false" || selectionFlag === "0";
+  const selectionMarks: AiCapabilityStatus = selectionForcedOff
+    ? "disabled"
+    : hasDi
+      ? "configured"
+      : "disabled";
+
+  const mistralOcr: AiCapabilityStatus = process.env.MISTRAL_API_KEY
+    ? "configured"
+    : "disabled";
+  const geminiJudgment: AiCapabilityStatus = process.env.GEMINI_API_KEY
+    ? "configured"
+    : "disabled";
+
+  const parts: string[] = [];
+  if (selectionMarks === "configured") parts.push("selectionMarks");
+  if (mistralOcr === "configured") parts.push("mistralOcr");
+  if (geminiJudgment === "configured") parts.push("gemini");
+
+  return {
+    selectionMarks,
+    mistralOcr,
+    geminiJudgment,
+    detail: parts.length ? parts.join(",") : "no AI keys configured",
   };
 }
 
@@ -32,7 +75,7 @@ export interface HealthStatus {
  */
 export function handleHealthz(_req: Request, res: Response): void {
   const response: HealthStatus = {
-    status: 'ok',
+    status: "ok",
     timestamp: new Date().toISOString(),
   };
   res.status(200).json(response);
@@ -43,30 +86,33 @@ export function handleHealthz(_req: Request, res: Response): void {
  * Returns 200 only if all dependencies are healthy.
  * Used by orchestrator to route traffic only to ready instances.
  */
-export async function handleReadyz(_req: Request, res: Response): Promise<void> {
-  const checks: HealthStatus['checks'] = {};
+export async function handleReadyz(
+  _req: Request,
+  res: Response
+): Promise<void> {
+  const checks: HealthStatus["checks"] = {};
   let isReady = true;
 
   // Check database connectivity with actual query
   try {
     const dbResult = await testDbConnection();
-    
+
     if (dbResult.connected) {
       checks.database = {
-        status: 'ok',
+        status: "ok",
         latencyMs: dbResult.latencyMs,
       };
     } else {
       checks.database = {
-        status: 'error',
-        error: dbResult.error || 'Database connection failed',
+        status: "error",
+        error: dbResult.error || "Database connection failed",
       };
       isReady = false;
     }
   } catch (error) {
     checks.database = {
-      status: 'error',
-      error: error instanceof Error ? error.message : 'Unknown database error',
+      status: "error",
+      error: error instanceof Error ? error.message : "Unknown database error",
     };
     isReady = false;
   }
@@ -74,35 +120,37 @@ export async function handleReadyz(_req: Request, res: Response): Promise<void> 
   // Check storage availability using the storage adapter
   try {
     const storageResult = await checkStorageHealth();
-    
+
     if (storageResult.healthy) {
-      checks.storage = { status: 'ok' };
+      checks.storage = { status: "ok" };
     } else {
       checks.storage = {
-        status: 'error',
-        error: storageResult.error || 'Storage health check failed',
+        status: "error",
+        error: storageResult.error || "Storage health check failed",
       };
       isReady = false;
     }
   } catch (error) {
     checks.storage = {
-      status: 'error',
-      error: error instanceof Error ? error.message : 'Unknown storage error',
+      status: "error",
+      error: error instanceof Error ? error.message : "Unknown storage error",
     };
     isReady = false;
   }
 
+  // AI capabilities — informational only (never flips readiness)
+  checks.aiCapabilities = probeAiCapabilities();
+
   const response: HealthStatus = {
-    status: isReady ? 'ok' : 'unhealthy',
+    status: isReady ? "ok" : "unhealthy",
     timestamp: new Date().toISOString(),
     checks,
     version: {
-      sha: process.env.GIT_SHA || 'unknown',
-      platform: process.env.PLATFORM_VERSION || 'unknown',
-      buildTime: process.env.BUILD_TIME || 'unknown',
+      sha: process.env.GIT_SHA || "unknown",
+      platform: process.env.PLATFORM_VERSION || "unknown",
+      buildTime: process.env.BUILD_TIME || "unknown",
     },
   };
 
   res.status(isReady ? 200 : 503).json(response);
 }
-

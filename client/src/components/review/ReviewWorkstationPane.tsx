@@ -63,6 +63,11 @@ import {
   type SelectionTrace,
 } from "@/components/audit/SelectionTracePanel";
 import { mapSelectionTraceFromReport } from "@/components/review/mapSelectionTrace";
+import { SelectionMarksPanel } from "@/components/review/SelectionMarksPanel";
+import {
+  mapSelectionMarksFromReport,
+  type SelectionMarksView,
+} from "@/components/review/mapSelectionMarks";
 import { useReviewFindingKeyboard } from "@/hooks/useReviewFindingKeyboard";
 import { usePersistFn } from "@/hooks/usePersistFn";
 
@@ -96,6 +101,8 @@ export interface AuditData {
   findings: Finding[];
   /** Template selection explainability (from reportJson when available). */
   selectionTrace?: SelectionTrace | null;
+  /** Visual Ok/Adv/Fail/N/A checklist marks from Azure DI. */
+  selectionMarks?: SelectionMarksView | null;
 }
 
 export function mapFindingsFromApi(
@@ -238,6 +245,7 @@ export function ReviewWorkstationPane({
           documentUrl: jobSheetData.fileUrl,
           findings: mapFindingsFromApi(findingsData || []),
           selectionTrace: mapSelectionTraceFromReport(auditResult?.reportJson),
+          selectionMarks: mapSelectionMarksFromReport(auditResult?.reportJson),
         }
       : null;
 
@@ -246,8 +254,13 @@ export function ReviewWorkstationPane({
       ? (auditDataProp.selectionTrace ?? null)
       : mapSelectionTraceFromReport(auditResult?.reportJson);
 
+  const selectionMarks =
+    auditDataProp?.selectionMarks !== undefined
+      ? (auditDataProp.selectionMarks ?? null)
+      : mapSelectionMarksFromReport(auditResult?.reportJson);
+
   const auditData = auditDataProp
-    ? { ...auditDataProp, selectionTrace }
+    ? { ...auditDataProp, selectionTrace, selectionMarks }
     : fetchedAuditData;
   const documentUrl =
     documentUrlProp ??
@@ -840,11 +853,24 @@ function ReviewWorkstationContent({
         </div>
       </div>
 
-      <div className={compact ? "mb-2 px-1" : "mb-2"}>
+      <div className={compact ? "mb-2 px-1 space-y-2" : "mb-2 space-y-2"}>
         <SelectionTracePanel
           trace={auditData.selectionTrace ?? null}
           defaultOpen={false}
           className="shadow-none"
+        />
+        <SelectionMarksPanel
+          marks={auditData.selectionMarks ?? null}
+          defaultOpen={
+            (auditData.selectionMarks?.rows.some(r => r.choice === "Fail") ||
+              false) ??
+            false
+          }
+          className="shadow-none"
+          onRowClick={(_rowIndex, pageNumber) => {
+            setFocusPage(pageNumber);
+            if (!showPdfViewer) setShowPdfViewer(true);
+          }}
         />
       </div>
 
