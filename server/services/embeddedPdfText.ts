@@ -87,7 +87,6 @@ export async function extractEmbeddedPdfText(
     const loadingTask = getDocument({
       data,
       useSystemFonts: true,
-      disableWorker: true,
       isEvalSupported: false,
       verbosity: 0,
     });
