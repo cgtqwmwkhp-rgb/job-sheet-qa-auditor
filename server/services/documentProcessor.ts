@@ -64,6 +64,8 @@ import {
 import {
   runSelectionMarkDetection,
   isSelectionMarksEnabled,
+  reconcileSelectionMarksWithJudgment,
+  hasBlockingFailMarks,
   type SelectionMarksResult,
 } from "./selectionMarks";
 import {
@@ -1256,6 +1258,29 @@ async function processJobSheetWithOptions(
     );
   }
 
+  // Selection marks → first-class findings (visual ground truth, not Gemini-dependent)
+  if (selectionMarksResult?.artifact.rows.length) {
+    analysisResult = {
+      ...analysisResult,
+      findings: reconcileSelectionMarksWithJudgment(
+        analysisResult.findings,
+        selectionMarksResult.artifact
+      ),
+    };
+    if (
+      hasBlockingFailMarks(selectionMarksResult.artifact) &&
+      analysisResult.overallResult === "PASS"
+    ) {
+      analysisResult = {
+        ...analysisResult,
+        overallResult: "REVIEW_QUEUE",
+        summary:
+          `${analysisResult.summary} ` +
+          `[SELECTION_MARKS] High-confidence Fail mark(s) detected; queued for review.`,
+      };
+    }
+  }
+
   // Threshold: analyzer score below LLM confidence → force review_queue (LOW_LLM_CONFIDENCE)
   const llmThreshold = processingSettings.llmConfidenceThreshold ?? 70;
   if (
@@ -1363,7 +1388,10 @@ async function processJobSheetWithOptions(
     const hasOcrSignature = hasOcrSignatureEvidence(ocrResult);
     const beforeCount = analysisResult.findings.length;
     const cleaned = applyFindingHygiene(analysisResult.findings, {
-      preExtractedFields: ensembleResult?.ensembleExtractedFields,
+      preExtractedFields: {
+        ...(ensembleResult?.ensembleExtractedFields ?? {}),
+        ...(selectionMarksResult?.preExtractedFields ?? {}),
+      },
       confidenceThreshold: llmThreshold,
       signatureLabelPresent,
       hasOcrSignature,

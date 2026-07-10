@@ -291,12 +291,25 @@ export async function extractLayoutSelectionMarks(
   const analyzeUrl = `${endpoint}/documentintelligence/documentModels/${AZURE_DI_LAYOUT_MODEL}:analyze?api-version=${apiVersion}`;
   const correlationId = getCorrelationId();
 
+  const POLL_INTERVAL_MS = 500;
+  const DEFAULT_MAX_POLL_MS = 30_000;
+  const maxPollMs = (() => {
+    const raw = process.env.AZURE_DI_LAYOUT_MAX_POLL_MS;
+    const n = raw ? Number(raw) : DEFAULT_MAX_POLL_MS;
+    return Number.isFinite(n) && n > 0 ? n : DEFAULT_MAX_POLL_MS;
+  })();
+  const MAX_POLL_ATTEMPTS = Math.max(
+    1,
+    Math.ceil(maxPollMs / POLL_INTERVAL_MS)
+  );
+
   const pollResult = async (
     operationLocation: string
   ): Promise<unknown | null> => {
     for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
       const res = await fetch(operationLocation, {
         headers: { "Ocp-Apim-Subscription-Key": key },
+        signal: AbortSignal.timeout(10_000),
       });
       if (!res.ok) {
         throw new Error(`Azure DI poll failed: HTTP ${res.status}`);
@@ -336,6 +349,7 @@ export async function extractLayoutSelectionMarks(
           ...(correlationId && { "X-Correlation-ID": correlationId }),
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30_000),
       });
 
       if (!response.ok) {
