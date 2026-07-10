@@ -1,28 +1,34 @@
 /**
  * SelectionTracePanel Component - PR-2
- * 
+ *
  * Displays template selection trace for explainability.
  * Shows how the template was selected, candidates considered,
  * confidence bands, and any manual overrides.
  */
 
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronRight, FileSearch, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
+import {
+  ChevronDown,
+  ChevronRight,
+  FileSearch,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /**
  * Confidence band type
  */
-export type ConfidenceBand = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
+export type ConfidenceBand = "HIGH" | "MEDIUM" | "LOW" | "NONE";
 
 /**
  * Template candidate in selection trace
@@ -85,40 +91,40 @@ export interface SelectionTracePanelProps {
  */
 function getConfidenceDisplay(band: ConfidenceBand) {
   switch (band) {
-    case 'HIGH':
+    case "HIGH":
       return {
         icon: <CheckCircle2 className="h-4 w-4 text-green-500" />,
-        label: 'High Confidence',
-        color: 'text-green-600',
-        bgColor: 'bg-green-100',
+        label: "High Confidence",
+        color: "text-green-600",
+        bgColor: "bg-green-100",
       };
-    case 'MEDIUM':
+    case "MEDIUM":
       return {
         icon: <AlertTriangle className="h-4 w-4 text-yellow-500" />,
-        label: 'Medium Confidence',
-        color: 'text-yellow-600',
-        bgColor: 'bg-yellow-100',
+        label: "Medium Confidence",
+        color: "text-yellow-600",
+        bgColor: "bg-yellow-100",
       };
-    case 'LOW':
+    case "LOW":
       return {
         icon: <AlertTriangle className="h-4 w-4 text-orange-500" />,
-        label: 'Low Confidence',
-        color: 'text-orange-600',
-        bgColor: 'bg-orange-100',
+        label: "Low Confidence",
+        color: "text-orange-600",
+        bgColor: "bg-orange-100",
       };
-    case 'NONE':
+    case "NONE":
       return {
         icon: <XCircle className="h-4 w-4 text-red-500" />,
-        label: 'No Match',
-        color: 'text-red-600',
-        bgColor: 'bg-red-100',
+        label: "No Match",
+        color: "text-red-600",
+        bgColor: "bg-red-100",
       };
   }
 }
 
 /**
  * SelectionTracePanel Component
- * 
+ *
  * Displays deterministic template selection trace for audit transparency.
  */
 export function SelectionTracePanel({
@@ -147,20 +153,49 @@ export function SelectionTracePanel({
   }
 
   const confidenceDisplay = getConfidenceDisplay(trace.confidenceBand);
+  const selectedLabel =
+    trace.selected?.templateName ||
+    trace.selected?.templateId ||
+    "No template selected";
+  const gapHealthy =
+    trace.confidenceBand === "HIGH" || trace.runnerUpDelta >= 10;
 
   return (
-    <Card className={className}>
+    <Card className={cn("shadow-none", className)}>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardHeader>
+        <CardHeader className="py-2 px-3">
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" className="w-full justify-between p-0 h-auto">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <FileSearch className="h-5 w-5" />
-                Template Selection Trace
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <Badge className={cn('text-xs', confidenceDisplay.bgColor, confidenceDisplay.color)}>
-                  {confidenceDisplay.label}
+            <Button
+              variant="ghost"
+              className="w-full justify-between p-0 h-auto hover:bg-transparent"
+            >
+              <div className="flex items-center gap-2 min-w-0 text-left">
+                <FileSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">
+                    Template: {selectedLabel}
+                    {trace.selected?.version
+                      ? ` · v${trace.selected.version}`
+                      : ""}
+                  </div>
+                  {!isOpen && (
+                    <div className="text-xs text-muted-foreground truncate">
+                      {trace.confidenceBand} confidence ·{" "}
+                      {trace.runnerUpDelta.toFixed(0)}% ahead of runner-up
+                      {gapHealthy ? " (clear win)" : " (close call)"}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Badge
+                  className={cn(
+                    "text-xs",
+                    confidenceDisplay.bgColor,
+                    confidenceDisplay.color
+                  )}
+                >
+                  {trace.confidenceBand}
                 </Badge>
                 {isOpen ? (
                   <ChevronDown className="h-4 w-4" />
@@ -173,186 +208,101 @@ export function SelectionTracePanel({
         </CardHeader>
 
         <CollapsibleContent>
-          <CardContent className="space-y-4">
-            {/* Override Notice */}
+          <CardContent className="space-y-3 pt-0 px-3 pb-3">
             {trace.override && (
-              <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
-                <div className="flex items-center gap-2 text-blue-700 font-medium mb-1">
-                  <AlertTriangle className="h-4 w-4" />
-                  Manual Override Applied
-                </div>
-                <div className="text-sm text-blue-600">
-                  Template manually set to <strong>{trace.override.templateId}</strong> v{trace.override.version}
-                  <br />
-                  By: {trace.override.overriddenBy}
-                  <br />
-                  Reason: {trace.override.reason}
-                </div>
+              <div className="rounded-md bg-blue-50 border border-blue-200 p-2 text-sm text-blue-700">
+                Manual override to <strong>{trace.override.templateId}</strong>{" "}
+                v{trace.override.version} by {trace.override.overriddenBy}:{" "}
+                {trace.override.reason}
               </div>
             )}
 
-            {/* Block Reason */}
             {trace.blockReason && (
-              <div className="rounded-lg bg-red-50 border border-red-200 p-3">
-                <div className="flex items-center gap-2 text-red-700 font-medium mb-1">
-                  <XCircle className="h-4 w-4" />
-                  Selection Blocked
-                </div>
-                <div className="text-sm text-red-600">
-                  {trace.blockReason}
-                </div>
+              <div className="rounded-md bg-red-50 border border-red-200 p-2 text-sm text-red-700">
+                Selection blocked: {trace.blockReason}
               </div>
             )}
 
-            {/* Selected Template */}
-            {trace.selected && (
-              <div>
-                <div className="text-sm font-medium mb-2">Selected Template</div>
-                <div className="rounded-lg bg-green-50 border border-green-200 p-3">
-                  <div className="font-medium text-green-700">
-                    {trace.selected.templateName}
-                  </div>
-                  <div className="text-sm text-green-600">
-                    ID: {trace.selected.templateId} • Version: {trace.selected.version}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Input Signals */}
-            <div>
-              <div className="text-sm font-medium mb-2">Input Signals</div>
-              <div className="text-sm text-muted-foreground space-y-1">
-                <div>
-                  <span className="font-medium">Tokens:</span>{' '}
-                  {trace.inputSignals.tokens.length > 0 ? (
-                    <span className="inline-flex flex-wrap gap-1 ml-1">
-                      {trace.inputSignals.tokens.slice(0, 10).map((token, i) => (
-                        <Badge key={i} variant="outline" className="text-xs">
-                          {token}
-                        </Badge>
-                      ))}
-                      {trace.inputSignals.tokens.length > 10 && (
-                        <Badge variant="secondary" className="text-xs">
-                          +{trace.inputSignals.tokens.length - 10} more
-                        </Badge>
-                      )}
-                    </span>
-                  ) : (
-                    '(none extracted)'
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-md border px-2.5 py-2">
+                <div className="text-xs text-muted-foreground">Confidence</div>
+                <div
+                  className={cn(
+                    "font-medium flex items-center gap-1",
+                    confidenceDisplay.color
                   )}
-                </div>
-                {trace.inputSignals.documentType && (
-                  <div>
-                    <span className="font-medium">Document Type:</span>{' '}
-                    {trace.inputSignals.documentType}
-                  </div>
-                )}
-                {trace.inputSignals.customerId && (
-                  <div>
-                    <span className="font-medium">Customer ID:</span>{' '}
-                    {trace.inputSignals.customerId}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Confidence Metrics */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center justify-center gap-1">
+                >
                   {confidenceDisplay.icon}
-                  <span className={cn('font-medium', confidenceDisplay.color)}>
-                    {trace.confidenceBand}
-                  </span>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Confidence Band
+                  {trace.confidenceBand}
                 </div>
               </div>
-              <div className="text-center p-3 rounded-lg bg-muted/50">
+              <div className="rounded-md border px-2.5 py-2">
+                <div className="text-xs text-muted-foreground">
+                  Runner-up gap
+                </div>
                 <div className="font-medium">
-                  {trace.runnerUpDelta.toFixed(1)}%
+                  {trace.runnerUpDelta.toFixed(1)} pts
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Runner-up Gap
+                <div className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                  {gapHealthy
+                    ? "Healthy margin — selection is decisive (HIGH needs score ≥80; gap matters most under MEDIUM)."
+                    : "Close race — review candidates if judgment looks wrong."}
                 </div>
               </div>
             </div>
 
-            <Separator />
-
-            {/* Candidates Table */}
-            <div>
-              <div className="text-sm font-medium mb-2">
-                Candidates Considered ({trace.candidates.length})
+            {trace.inputSignals.tokens.length > 0 && (
+              <div className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Signals: </span>
+                {trace.inputSignals.tokens.slice(0, 8).join(", ")}
+                {trace.inputSignals.tokens.length > 8
+                  ? ` +${trace.inputSignals.tokens.length - 8}`
+                  : ""}
               </div>
-              <div className="rounded-lg border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-left p-2 font-medium">#</th>
-                      <th className="text-left p-2 font-medium">Template</th>
-                      <th className="text-left p-2 font-medium">Version</th>
-                      <th className="text-right p-2 font-medium">Score</th>
-                      <th className="text-left p-2 font-medium">Matched</th>
+            )}
+
+            <div className="rounded-md border overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/40">
+                  <tr>
+                    <th className="text-left p-1.5 font-medium">#</th>
+                    <th className="text-left p-1.5 font-medium">Template</th>
+                    <th className="text-right p-1.5 font-medium">Score</th>
+                    <th className="text-left p-1.5 font-medium">Matched</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trace.candidates.slice(0, 4).map((candidate, index) => (
+                    <tr
+                      key={`${candidate.templateId}-${candidate.version}`}
+                      className={cn(
+                        "border-t",
+                        index === 0 &&
+                          trace.selected?.templateId === candidate.templateId
+                          ? "bg-green-50"
+                          : ""
+                      )}
+                    >
+                      <td className="p-1.5 text-muted-foreground">
+                        {index + 1}
+                      </td>
+                      <td className="p-1.5 font-medium">
+                        {candidate.templateId}
+                        <span className="text-muted-foreground font-normal">
+                          {" "}
+                          v{candidate.version}
+                        </span>
+                      </td>
+                      <td className="p-1.5 text-right font-mono">
+                        {candidate.score.toFixed(0)}
+                      </td>
+                      <td className="p-1.5 text-muted-foreground truncate max-w-[140px]">
+                        {candidate.matchedTokens.slice(0, 3).join(", ")}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {trace.candidates.slice(0, 5).map((candidate, index) => (
-                      <tr
-                        key={`${candidate.templateId}-${candidate.version}`}
-                        className={cn(
-                          'border-t',
-                          index === 0 && trace.selected?.templateId === candidate.templateId
-                            ? 'bg-green-50'
-                            : ''
-                        )}
-                      >
-                        <td className="p-2 text-muted-foreground">{index + 1}</td>
-                        <td className="p-2 font-medium">{candidate.templateId}</td>
-                        <td className="p-2">{candidate.version}</td>
-                        <td className="p-2 text-right font-mono">{candidate.score.toFixed(1)}</td>
-                        <td className="p-2">
-                          <span className="inline-flex flex-wrap gap-1">
-                            {candidate.matchedTokens.slice(0, 3).map((token, i) => (
-                              <Badge key={i} variant="secondary" className="text-xs">
-                                {token}
-                              </Badge>
-                            ))}
-                            {candidate.matchedTokens.length > 3 && (
-                              <span className="text-xs text-muted-foreground">
-                                +{candidate.matchedTokens.length - 3}
-                              </span>
-                            )}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                    {trace.candidates.length > 5 && (
-                      <tr className="border-t bg-muted/30">
-                        <td colSpan={5} className="p-2 text-center text-muted-foreground text-xs">
-                          +{trace.candidates.length - 5} more candidates not shown
-                        </td>
-                      </tr>
-                    )}
-                    {trace.candidates.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="p-4 text-center text-muted-foreground">
-                          No matching candidates found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Timestamp */}
-            <div className="text-xs text-muted-foreground text-right">
-              Selection performed: {new Date(trace.timestamp).toLocaleString()}
+                  ))}
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </CollapsibleContent>

@@ -73,7 +73,6 @@ export function DocumentViewer({
 }: DocumentViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState<number>(initialPage);
-  const [syncedFocusPage, setSyncedFocusPage] = useState(focusPage);
   const [scale, setScale] = useState<number | "page-width">("page-width");
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(
@@ -88,6 +87,10 @@ export function DocumentViewer({
   /** Authenticated blob: URL — never pass raw ArrayBuffer into pdf.js render. */
   const [pdfFile, setPdfFile] = useState<string | null>(null);
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null);
+  /** PDF user-space size per page (from pdf.js) for View-on-Doc zoom targets. */
+  const [pageSizes, setPageSizes] = useState<
+    Record<number, { width: number; height: number }>
+  >({});
   const containerRef = useRef<HTMLDivElement>(null);
   const objectUrlRef = useRef<string | null>(null);
   const fetchGenRef = useRef(0);
@@ -149,12 +152,21 @@ export function DocumentViewer({
           const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
           if (!cancelled && gen === fetchGenRef.current) {
             setNumPages(doc.numPages);
+            const sizes: Record<number, { width: number; height: number }> = {};
+            const maxProbe = Math.min(doc.numPages, 8);
+            for (let i = 1; i <= maxProbe; i++) {
+              const page = await doc.getPage(i);
+              const vp = page.getViewport({ scale: 1 });
+              sizes[i] = { width: vp.width, height: vp.height };
+            }
+            setPageSizes(sizes);
           }
           await doc.destroy();
         } catch (metaErr) {
           console.warn("[DocumentViewer] page-count probe failed:", metaErr);
           if (!cancelled && gen === fetchGenRef.current) {
             setNumPages(1);
+            setPageSizes({});
           }
         }
       } catch (err) {
@@ -182,22 +194,12 @@ export function DocumentViewer({
     };
   }, []);
 
-  if (focusPage !== syncedFocusPage) {
-    setSyncedFocusPage(focusPage);
-    if (
-      focusPage != null &&
-      focusPage >= 1 &&
-      (numPages === 0 || focusPage <= numPages)
-    ) {
-      setPageNumber(focusPage);
-    }
-  }
-
   useEffect(() => {
     if (focusPage == null || focusPage < 1) return;
     if (numPages > 0 && focusPage > numPages) return;
+    setPageNumber(focusPage);
     onPageChange?.(focusPage);
-  }, [focusPage, numPages]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [focusPage, focusNonce, numPages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!isDrawing || !containerRef.current) return;
@@ -255,8 +257,24 @@ export function DocumentViewer({
       ? (boxes.find(box => box.id === activeBoxId) ?? null)
       : null;
   const headerFocusLabel = focusLabel || activeBox?.label || null;
-  const zoomParam =
-    scale === "page-width" ? "page-width" : String(Math.round(scale * 100));
+  const pageSize = pageSizes[pageNumber];
+  // When we know a region, ask the native PDF viewer to open at that point.
+  // zoom=scale,left,top uses PDF user-space units (origin top-left in Chromium).
+  let zoomParam: string;
+  if (
+    activeBox &&
+    activeBox.page === pageNumber &&
+    pageSize &&
+    pageSize.height > 0
+  ) {
+    const left = Math.round((activeBox.x / 100) * pageSize.width);
+    const top = Math.round((activeBox.y / 100) * pageSize.height);
+    const scalePct = scale === "page-width" ? 100 : Math.round(scale * 100);
+    zoomParam = `${scalePct},${left},${top}`;
+  } else {
+    zoomParam =
+      scale === "page-width" ? "page-width" : String(Math.round(scale * 100));
+  }
   // Include focusNonce so re-clicking the same finding remounts the iframe
   // and the browser PDF viewer re-applies #page= / #zoom=.
   const iframeSrc = pdfFile

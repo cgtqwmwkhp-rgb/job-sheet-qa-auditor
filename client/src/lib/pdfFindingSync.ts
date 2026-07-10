@@ -159,8 +159,90 @@ export function resolveFindingFocusLabel(
 }
 
 /**
+ * Approximate regions for common Job Summary fields when OCR bbox is missing.
+ * Tall single-page Job Summaries need this so View on Doc can scroll past the
+ * VOR banner to the signature / completion block.
+ */
+export function inferHeuristicPercentBox(
+  finding: FindingSyncInput
+): ViewerBoundingBox | null {
+  const field = (
+    finding.field ||
+    finding.fieldName ||
+    finding.label ||
+    ""
+  ).toLowerCase();
+  const page = resolveFindingPage(finding, { defaultPage: 1 }) ?? 1;
+  if (!Number.isFinite(page) || page < 1) return null;
+
+  const label = resolveFindingFocusLabel(finding) || undefined;
+
+  if (/signature|sign.?off|engineersignoff/i.test(field)) {
+    return {
+      id: finding.id,
+      page: Math.floor(page),
+      x: 6,
+      y: 88,
+      width: 88,
+      height: 10,
+      color: severityToBoxColor(finding.severity, finding.status),
+      label,
+    };
+  }
+  if (/vorstatus|^vor$|\bvor\b/i.test(field)) {
+    return {
+      id: finding.id,
+      page: Math.floor(page),
+      x: 18,
+      y: 1.5,
+      width: 64,
+      height: 7,
+      color: severityToBoxColor(finding.severity, finding.status),
+      label,
+    };
+  }
+  if (/safe.?to.?use/i.test(field)) {
+    return {
+      id: finding.id,
+      page: Math.floor(page),
+      x: 8,
+      y: 78,
+      width: 84,
+      height: 4,
+      color: severityToBoxColor(finding.severity, finding.status),
+      label,
+    };
+  }
+  if (/return.?visit/i.test(field)) {
+    return {
+      id: finding.id,
+      page: Math.floor(page),
+      x: 8,
+      y: 76,
+      width: 84,
+      height: 4,
+      color: severityToBoxColor(finding.severity, finding.status),
+      label,
+    };
+  }
+  if (/works.?completion|incomplete|repairs/i.test(field)) {
+    return {
+      id: finding.id,
+      page: Math.floor(page),
+      x: 8,
+      y: 74,
+      width: 84,
+      height: 4,
+      color: severityToBoxColor(finding.severity, finding.status),
+      label,
+    };
+  }
+  return null;
+}
+
+/**
  * Map a finding (+ PR-2 percent bbox) to a DocumentViewer overlay box.
- * Returns null when no usable bbox is present.
+ * Falls back to field heuristics when no OCR bbox is persisted.
  */
 export function findingToViewerBox(
   finding: FindingSyncInput
@@ -171,7 +253,9 @@ export function findingToViewerBox(
     : null;
 
   const source = fromNormalized ?? fromApi;
-  if (!source) return null;
+  if (!source) {
+    return inferHeuristicPercentBox(finding);
+  }
 
   const page =
     resolveFindingPage(finding) ??

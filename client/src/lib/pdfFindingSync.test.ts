@@ -161,7 +161,7 @@ describe("findingToViewerBox", () => {
     expect(box?.label).toBe("Custom");
   });
 
-  it("returns null without a usable bbox", () => {
+  it("returns null without a usable bbox for generic fields", () => {
     expect(findingToViewerBox({ id: 1, pageNumber: 1 })).toBeNull();
     expect(
       findingToViewerBox({
@@ -175,6 +175,17 @@ describe("findingToViewerBox", () => {
         },
       })
     ).toBeNull();
+  });
+
+  it("infers a bottom-of-page box for signature findings without OCR bbox", () => {
+    const box = findingToViewerBox({
+      id: 42,
+      pageNumber: 1,
+      field: "customerSignature",
+    });
+    expect(box).not.toBeNull();
+    expect(box!.y).toBeGreaterThanOrEqual(80);
+    expect(box!.page).toBe(1);
   });
 });
 
@@ -219,6 +230,16 @@ describe("syncSelectionFromFinding / syncSelectionFromBox", () => {
       focusLabel: "timeOut",
       hasBox: true,
     });
+  });
+
+  it("uses heuristic signature box when bbox missing", () => {
+    expect(
+      syncSelectionFromFinding({
+        id: 9,
+        pageNumber: 1,
+        field: "customerSignature",
+      }).hasBox
+    ).toBe(true);
   });
 
   it("still returns focusPage from pageNumber when bbox missing", () => {

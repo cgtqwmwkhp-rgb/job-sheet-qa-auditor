@@ -211,6 +211,12 @@ function buildPresentSignatureFinding(): Finding {
     normalisedSnippet: "Present",
     confidence: 75,
     pageNumber: 1,
+    boundingBox: {
+      x: 6,
+      y: 88,
+      width: 88,
+      height: 10,
+    },
     whyItMatters:
       "Signature label/box detected. Handwritten ink is usually invisible to OCR; recorded as Present — confirm ink on the document (scroll to the signature box).",
     suggestedFix:
@@ -228,6 +234,12 @@ function buildPresentVorFinding(): Finding {
     normalisedSnippet: "Present",
     confidence: 85,
     pageNumber: 1,
+    boundingBox: {
+      x: 18,
+      y: 1.5,
+      width: 64,
+      height: 7,
+    },
     whyItMatters:
       "VOR banner detected on the Job Summary. Recorded as Present — confirm operational status.",
     suggestedFix:
