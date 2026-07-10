@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Document, Page, pdfjs } from "react-pdf";
+import { pdfjs } from "react-pdf";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,11 +14,8 @@ import {
 } from "lucide-react";
 import { perfMark, perfMeasure, PERF_MARKS, PERF_MEASURES } from "@/lib/perf";
 
-import "react-pdf/dist/Page/AnnotationLayer.css";
-import "react-pdf/dist/Page/TextLayer.css";
-
-// Same-origin worker — unpkg CDN workers often fail under Easy Auth / CSP and
-// leave a blank canvas after Document reports Page 1 of N.
+// Worker only used for page-count metadata — rendering is a native iframe so we
+// avoid react-pdf blank-canvas failures under Easy Auth / nested flex layouts.
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 /**
@@ -85,34 +82,23 @@ export function DocumentViewer({
     width: number;
     height: number;
   } | null>(null);
-  /**
-   * Blob object URL from an authenticated fetch.
-   * Do NOT pass ArrayBuffer/{ data } into react-pdf — pdf.js transfers/detaches
-   * the buffer, then React re-renders throw:
-   * "Cannot perform Construct on a detached ArrayBuffer" (Hold Queue crash).
-   */
+  /** Authenticated blob: URL — never pass raw ArrayBuffer into pdf.js render. */
   const [pdfFile, setPdfFile] = useState<string | null>(null);
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null);
-  const [pageRenderError, setPageRenderError] = useState<string | null>(null);
-  const [useIframeFallback, setUseIframeFallback] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const objectUrlRef = useRef<string | null>(null);
   const fetchGenRef = useRef(0);
 
-  // Guard: prevent direct Azure blob URLs
   useEffect(() => {
     assertNoDirectBlobUrl(url);
   }, [url]);
 
-  // Fetch with credentials → stable blob: URL. Revoke only the previous generation
-  // after the new URL is installed (avoids blank canvas from premature revoke).
+  // Credentialed fetch → blob URL (Easy Auth cookies). Native iframe renders it.
   useEffect(() => {
     let cancelled = false;
     const gen = ++fetchGenRef.current;
     setPdfFile(null);
     setPdfLoadError(null);
-    setPageRenderError(null);
-    setUseIframeFallback(false);
     setNumPages(0);
 
     if (!url) return;
@@ -141,13 +127,33 @@ export function DocumentViewer({
             "Response was not a PDF (check Easy Auth / proxy). Try Download."
           );
         }
+
         const blob = new Blob([bytes], { type: "application/pdf" });
         const objectUrl = URL.createObjectURL(blob);
         const previous = objectUrlRef.current;
         objectUrlRef.current = objectUrl;
         setPdfFile(objectUrl);
-        if (previous) {
-          URL.revokeObjectURL(previous);
+        if (previous) URL.revokeObjectURL(previous);
+
+        perfMark(PERF_MARKS.PDF_FIRST_BYTE);
+        perfMeasure(
+          PERF_MEASURES.PDF_TTFB,
+          PERF_MARKS.PDF_VIEW_CLICK,
+          PERF_MARKS.PDF_FIRST_BYTE
+        );
+
+        // Page count only — do not use react-pdf <Page> (blank canvas under ACA).
+        try {
+          const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+          if (!cancelled && gen === fetchGenRef.current) {
+            setNumPages(doc.numPages);
+          }
+          await doc.destroy();
+        } catch (metaErr) {
+          console.warn("[DocumentViewer] page-count probe failed:", metaErr);
+          if (!cancelled && gen === fetchGenRef.current) {
+            setNumPages(1);
+          }
         }
       } catch (err) {
         console.error("[DocumentViewer] Authenticated PDF fetch failed:", err);
@@ -165,7 +171,6 @@ export function DocumentViewer({
     };
   }, [url]);
 
-  // Revoke on full unmount only
   useEffect(() => {
     return () => {
       if (objectUrlRef.current) {
@@ -175,7 +180,6 @@ export function DocumentViewer({
     };
   }, []);
 
-  // Sync page from finding selection during render (avoids setState-in-effect)
   if (focusPage !== syncedFocusPage) {
     setSyncedFocusPage(focusPage);
     if (
@@ -187,7 +191,6 @@ export function DocumentViewer({
     }
   }
 
-  // Notify parent of focus-driven page jumps without setState in the effect
   useEffect(() => {
     if (focusPage == null || focusPage < 1) return;
     if (numPages > 0 && focusPage > numPages) return;
@@ -238,25 +241,15 @@ export function DocumentViewer({
     setIsDrawing(false);
   };
 
-  function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
-    setNumPages(numPages);
-
-    // Performance: mark PDF first byte received
-    perfMark(PERF_MARKS.PDF_FIRST_BYTE);
-    perfMeasure(
-      PERF_MEASURES.PDF_TTFB,
-      PERF_MARKS.PDF_VIEW_CLICK,
-      PERF_MARKS.PDF_FIRST_BYTE
-    );
-  }
-
   const handlePageChange = (newPage: number) => {
     setPageNumber(newPage);
     onPageChange?.(newPage);
   };
 
-  // Get boxes for current page
   const currentPageBoxes = boxes.filter(box => box.page === pageNumber);
+  const iframeSrc = pdfFile
+    ? `${pdfFile}#page=${pageNumber}&zoom=${Math.round(scale * 100)}`
+    : null;
 
   return (
     <Card className="flex flex-col h-full overflow-hidden">
@@ -281,9 +274,9 @@ export function DocumentViewer({
               size="icon"
               className="h-8 w-8"
               onClick={() =>
-                handlePageChange(Math.min(numPages, pageNumber + 1))
+                handlePageChange(Math.min(numPages || 1, pageNumber + 1))
               }
-              disabled={pageNumber >= numPages}
+              disabled={numPages > 0 ? pageNumber >= numPages : true}
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
@@ -338,135 +331,102 @@ export function DocumentViewer({
         </div>
       </CardHeader>
 
-      <div className="flex-1 bg-muted/50 overflow-auto p-4 flex items-center justify-center relative min-h-[240px]">
+      <div className="flex-1 bg-muted/50 overflow-hidden p-2 relative min-h-[320px]">
         {pdfLoadError && !pdfFile ? (
-          <div className="flex flex-col items-center justify-center h-64 w-full text-destructive px-4 text-center">
+          <div className="flex flex-col items-center justify-center h-full w-full text-destructive px-4 text-center">
             <p>Failed to load document.</p>
             <p className="text-xs mt-2">{pdfLoadError}</p>
           </div>
-        ) : !pdfFile ? (
-          <div className="flex items-center justify-center h-64 w-full">
+        ) : !iframeSrc ? (
+          <div className="flex items-center justify-center h-full w-full min-h-[240px]">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
-        ) : useIframeFallback ? (
-          <iframe
-            title="PDF preview"
-            src={pdfFile}
-            className="w-full h-full min-h-[480px] rounded border bg-white"
-          />
         ) : (
-          <Document
-            file={pdfFile}
-            onLoadSuccess={onDocumentLoadSuccess}
-            onLoadError={err => {
-              console.error("[DocumentViewer] react-pdf load error:", err);
-              setPageRenderError(err.message);
-              setUseIframeFallback(true);
-            }}
-            className="shadow-lg"
-            loading={
-              <div className="flex items-center justify-center h-64 w-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            }
-            error={
-              <div className="flex flex-col items-center justify-center h-64 w-full text-destructive">
-                <p>Failed to load document.</p>
-                <p className="text-xs mt-2">
-                  {pageRenderError ||
-                    pdfLoadError ||
-                    "Please check if the file exists and is a valid PDF."}
-                </p>
-                <Button
-                  className="mt-3"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setUseIframeFallback(true)}
-                >
-                  Open simple preview
-                </Button>
-              </div>
-            }
+          <div
+            className={`relative w-full h-full min-h-[320px] overflow-auto ${
+              isDrawing ? "cursor-crosshair" : ""
+            }`}
+            ref={containerRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
           >
             <div
-              className={`relative inline-block bg-white ${isDrawing ? "cursor-crosshair" : ""}`}
-              ref={containerRef}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
+              className="w-full h-full min-h-[320px] origin-top-left"
+              style={{
+                transform: `rotate(${rotation}deg)`,
+              }}
             >
-              <Page
-                pageNumber={pageNumber}
-                scale={scale}
-                rotate={rotation}
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
-                className="bg-white shadow-md"
-                onRenderError={err => {
-                  console.error("[DocumentViewer] page render error:", err);
-                  setPageRenderError(err.message);
-                  setUseIframeFallback(true);
+              <iframe
+                key={iframeSrc}
+                title="PDF document"
+                src={iframeSrc}
+                className="w-full h-full min-h-[480px] rounded border-0 bg-white"
+                // pointer-events none while drawing so overlay receives mouse
+                style={{
+                  pointerEvents: isDrawing ? "none" : "auto",
+                  transform: `scale(${scale})`,
+                  transformOrigin: "top left",
+                  width: `${100 / scale}%`,
+                  height: `${100 / scale}%`,
                 }}
               />
-
-              {/* Current Drawing Box */}
-              {currentBox && (
-                <div
-                  className="absolute border-2 border-blue-500 bg-blue-500/20 z-20"
-                  style={{
-                    left: `${currentBox.x}%`,
-                    top: `${currentBox.y}%`,
-                    width: `${currentBox.width}%`,
-                    height: `${currentBox.height}%`,
-                  }}
-                />
-              )}
-
-              {/* Bounding Boxes Overlay */}
-              {currentPageBoxes.map(box => {
-                const isActive = activeBoxId != null && box.id === activeBoxId;
-                const isPulsing = isActive;
-                return (
-                  <div
-                    key={box.id}
-                    data-box-id={String(box.id)}
-                    data-active={isActive ? "true" : undefined}
-                    onClick={e => {
-                      e.stopPropagation();
-                      onBoxClick?.(box.id);
-                    }}
-                    className={`absolute border-2 cursor-pointer transition-all hover:bg-opacity-20 z-10 ${
-                      isActive
-                        ? "scale-[1.02] z-20 ring-2 ring-offset-1 ring-primary"
-                        : "hover:scale-[1.02]"
-                    } ${isPulsing ? "animate-pulse" : ""}`}
-                    style={{
-                      left: `${box.x}%`,
-                      top: `${box.y}%`,
-                      width: `${box.width}%`,
-                      height: `${box.height}%`,
-                      borderColor: box.color || "#ef4444",
-                      backgroundColor: isActive
-                        ? `${box.color || "#ef4444"}40`
-                        : `${box.color || "#ef4444"}1A`, // 10% opacity
-                      borderWidth: isActive ? 3 : 2,
-                    }}
-                    title={box.label}
-                  >
-                    {box.label && (
-                      <span
-                        className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
-                        style={{ backgroundColor: box.color || "#ef4444" }}
-                      >
-                        {box.label}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
             </div>
-          </Document>
+
+            {currentBox && (
+              <div
+                className="absolute border-2 border-blue-500 bg-blue-500/20 z-20"
+                style={{
+                  left: `${currentBox.x}%`,
+                  top: `${currentBox.y}%`,
+                  width: `${currentBox.width}%`,
+                  height: `${currentBox.height}%`,
+                }}
+              />
+            )}
+
+            {currentPageBoxes.map(box => {
+              const isActive = activeBoxId != null && box.id === activeBoxId;
+              return (
+                <div
+                  key={box.id}
+                  data-box-id={String(box.id)}
+                  data-active={isActive ? "true" : undefined}
+                  onClick={e => {
+                    e.stopPropagation();
+                    onBoxClick?.(box.id);
+                  }}
+                  className={`absolute border-2 cursor-pointer transition-all hover:bg-opacity-20 z-10 ${
+                    isActive
+                      ? "scale-[1.02] z-20 ring-2 ring-offset-1 ring-primary"
+                      : "hover:scale-[1.02]"
+                  } ${isActive ? "animate-pulse" : ""}`}
+                  style={{
+                    left: `${box.x}%`,
+                    top: `${box.y}%`,
+                    width: `${box.width}%`,
+                    height: `${box.height}%`,
+                    borderColor: box.color || "#ef4444",
+                    backgroundColor: isActive
+                      ? `${box.color || "#ef4444"}40`
+                      : `${box.color || "#ef4444"}1A`,
+                    borderWidth: isActive ? 3 : 2,
+                  }}
+                  title={box.label}
+                >
+                  {box.label && (
+                    <span
+                      className="absolute -top-6 left-0 text-xs text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap"
+                      style={{ backgroundColor: box.color || "#ef4444" }}
+                    >
+                      {box.label}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </Card>
