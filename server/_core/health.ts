@@ -24,6 +24,8 @@ export interface HealthStatus {
       selectionMarks: AiCapabilityStatus;
       mistralOcr: AiCapabilityStatus;
       geminiJudgment: AiCapabilityStatus;
+      vlmInk?: AiCapabilityStatus;
+      geminiMultimodal?: AiCapabilityStatus;
       detail?: string;
     };
   };
@@ -55,15 +57,39 @@ function probeAiCapabilities(): NonNullable<
     ? "configured"
     : "disabled";
 
+  const vlmOn = process.env.FEATURE_VLM_VERIFICATION === "true";
+  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+  const vlmInk: AiCapabilityStatus = !vlmOn
+    ? "disabled"
+    : hasAnthropic &&
+        (process.env.VLM_PROVIDER || "").toLowerCase() === "anthropic"
+      ? "configured"
+      : vlmOn
+        ? "partial"
+        : "disabled";
+
+  const multimodalFlag = process.env.FEATURE_GEMINI_MULTIMODAL;
+  const multimodalForcedOff =
+    multimodalFlag === "false" || multimodalFlag === "0";
+  const geminiMultimodal: AiCapabilityStatus = multimodalForcedOff
+    ? "disabled"
+    : process.env.GEMINI_API_KEY
+      ? "configured"
+      : "disabled";
+
   const parts: string[] = [];
   if (selectionMarks === "configured") parts.push("selectionMarks");
   if (mistralOcr === "configured") parts.push("mistralOcr");
   if (geminiJudgment === "configured") parts.push("gemini");
+  if (vlmInk === "configured") parts.push("vlmInk");
+  if (geminiMultimodal === "configured") parts.push("geminiMultimodal");
 
   return {
     selectionMarks,
     mistralOcr,
     geminiJudgment,
+    vlmInk,
+    geminiMultimodal,
     detail: parts.length ? parts.join(",") : "no AI keys configured",
   };
 }

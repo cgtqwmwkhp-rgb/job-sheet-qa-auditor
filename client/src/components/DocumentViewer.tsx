@@ -47,6 +47,10 @@ interface DocumentViewerProps {
   initialPage?: number;
   /** Controlled page jump from finding → PDF sync (PR-12). */
   focusPage?: number | null;
+  /** Bumps on each "View on Doc" click so same-page re-focus remounts the iframe. */
+  focusNonce?: number;
+  /** Header label when focusing a finding (works even without a bbox overlay). */
+  focusLabel?: string | null;
   /** Highlight / pulse the active finding overlay (PR-12). */
   activeBoxId?: string | number | null;
   onPageChange?: (page: number) => void;
@@ -59,6 +63,8 @@ export function DocumentViewer({
   url,
   initialPage = 1,
   focusPage = null,
+  focusNonce = 0,
+  focusLabel = null,
   activeBoxId = null,
   onPageChange,
   boxes = [],
@@ -242,16 +248,19 @@ export function DocumentViewer({
     onPageChange?.(newPage);
   };
 
-  // Native Chrome/Edge PDF UI needs an uncovered iframe — any stacked HTML
-  // over the plugin (even pointer-events:none) blocks toolbar, scrollbars, zoom.
+  // Native Chrome/Edge PDF UI needs an uncovered iframe for toolbar/scroll.
+  // pointer-events:none highlight overlays are safe and do not steal chrome.
   const activeBox =
     activeBoxId != null
       ? (boxes.find(box => box.id === activeBoxId) ?? null)
       : null;
+  const headerFocusLabel = focusLabel || activeBox?.label || null;
   const zoomParam =
     scale === "page-width" ? "page-width" : String(Math.round(scale * 100));
+  // Include focusNonce so re-clicking the same finding remounts the iframe
+  // and the browser PDF viewer re-applies #page= / #zoom=.
   const iframeSrc = pdfFile
-    ? `${pdfFile}#toolbar=1&navpanes=0&scrollbar=1&page=${pageNumber}&zoom=${zoomParam}`
+    ? `${pdfFile}#toolbar=1&navpanes=0&scrollbar=1&page=${pageNumber}&zoom=${zoomParam}&focus=${focusNonce}`
     : null;
 
   return (
@@ -261,10 +270,18 @@ export function DocumentViewer({
           <CardTitle className="text-sm font-medium shrink-0">
             Document
           </CardTitle>
-          {activeBox?.label && (
-            <span className="text-xs text-muted-foreground truncate">
-              Focus: {activeBox.label}
-              {activeBox.page ? ` (p.${activeBox.page})` : ""}
+          {headerFocusLabel && (
+            <span
+              className="text-xs text-primary truncate font-medium"
+              title={
+                activeBox
+                  ? `Highlighting ${headerFocusLabel}`
+                  : `Focused ${headerFocusLabel} (no bbox — page jump only)`
+              }
+            >
+              Focus: {headerFocusLabel}
+              {` (p.${activeBox?.page ?? pageNumber})`}
+              {!activeBox ? " · page only" : ""}
             </span>
           )}
         </div>
@@ -365,11 +382,32 @@ export function DocumentViewer({
             ref={containerRef}
           >
             <iframe
-              key={iframeSrc}
+              key={`${iframeSrc}::${focusNonce}`}
               title="PDF document"
               src={iframeSrc}
               className="absolute inset-0 w-full h-full border-0 bg-white"
             />
+
+            {/* Non-interactive highlight for the active finding bbox */}
+            {!isDrawing && activeBox && activeBox.page === pageNumber && (
+              <div
+                className="absolute inset-0 z-10 pointer-events-none"
+                aria-hidden
+              >
+                <div
+                  className="absolute border-2 rounded-sm animate-pulse"
+                  style={{
+                    left: `${activeBox.x}%`,
+                    top: `${activeBox.y}%`,
+                    width: `${activeBox.width}%`,
+                    height: `${activeBox.height}%`,
+                    borderColor: activeBox.color || "#3b82f6",
+                    backgroundColor: `${activeBox.color || "#3b82f6"}33`,
+                    boxShadow: `0 0 0 9999px rgba(15, 23, 42, 0.18)`,
+                  }}
+                />
+              </div>
+            )}
 
             {/* Capture layer ONLY while drawing — otherwise PDF chrome must be free */}
             {isDrawing && (

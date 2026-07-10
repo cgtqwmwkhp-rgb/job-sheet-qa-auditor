@@ -204,6 +204,7 @@ describe("syncSelectionFromFinding / syncSelectionFromBox", () => {
     const result = syncSelectionFromFinding({
       id: 7,
       pageNumber: 3,
+      field: "timeOut",
       boundingBox: {
         x: 1,
         y: 1,
@@ -215,14 +216,27 @@ describe("syncSelectionFromFinding / syncSelectionFromBox", () => {
     expect(result).toEqual({
       activeBoxId: 7,
       focusPage: 3,
+      focusLabel: "timeOut",
       hasBox: true,
     });
   });
 
   it("still returns focusPage from pageNumber when bbox missing", () => {
-    expect(syncSelectionFromFinding({ id: 9, pageNumber: 2 })).toEqual({
+    expect(
+      syncSelectionFromFinding({ id: 9, pageNumber: 2, field: "timeIn" })
+    ).toEqual({
       activeBoxId: 9,
       focusPage: 2,
+      focusLabel: "timeIn",
+      hasBox: false,
+    });
+  });
+
+  it("defaults focusPage to 1 when page and bbox are missing", () => {
+    expect(syncSelectionFromFinding({ id: 11, field: "timeOut" })).toEqual({
+      activeBoxId: 11,
+      focusPage: 1,
+      focusLabel: "timeOut",
       hasBox: false,
     });
   });
@@ -231,6 +245,7 @@ describe("syncSelectionFromFinding / syncSelectionFromBox", () => {
     expect(syncSelectionFromFinding(null)).toEqual({
       activeBoxId: null,
       focusPage: null,
+      focusLabel: null,
       hasBox: false,
     });
   });

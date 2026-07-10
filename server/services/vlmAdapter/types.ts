@@ -12,10 +12,21 @@ export interface VlmCropImage {
   encoding?: "base64";
 }
 
+/** Full PDF document for ink verification when ROI crop is unavailable. */
+export interface VlmDocumentPdf {
+  /** Base64 without data-URI prefix */
+  data: string;
+  mediaType: "application/pdf";
+  encoding?: "base64";
+}
+
 export interface VlmVerifyInput {
   fieldId: string;
   checkType: "signature_present" | "tickboxes_checked";
-  cropImage: VlmCropImage;
+  /** Preferred: cropped ROI image. */
+  cropImage?: VlmCropImage;
+  /** Fallback: full PDF (Anthropic document content). */
+  documentPdf?: VlmDocumentPdf;
   disputeReason?: string;
 }
 

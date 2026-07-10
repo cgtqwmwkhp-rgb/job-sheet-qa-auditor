@@ -114,9 +114,14 @@ export function severityToBoxColor(
 
 /**
  * Resolve the PDF page for a finding (1-based).
- * Prefers explicit pageNumber, then box.page / boundingBox.page, else null.
+ * Prefers explicit pageNumber, then box.page / boundingBox.page.
+ * Defaults to 1 so "View on Doc" still jumps on single-page job sheets
+ * when enrichment did not attach a page.
  */
-export function resolveFindingPage(finding: FindingSyncInput): number | null {
+export function resolveFindingPage(
+  finding: FindingSyncInput,
+  options: { defaultPage?: number | null } = {}
+): number | null {
   if (
     finding.pageNumber != null &&
     Number.isFinite(finding.pageNumber) &&
@@ -133,7 +138,24 @@ export function resolveFindingPage(finding: FindingSyncInput): number | null {
       return Math.floor(page);
     }
   }
+  const fallback = options.defaultPage;
+  if (fallback != null && Number.isFinite(fallback) && fallback >= 1) {
+    return Math.floor(fallback);
+  }
   return null;
+}
+
+/** Human-readable focus label for the document header. */
+export function resolveFindingFocusLabel(
+  finding: FindingSyncInput
+): string | null {
+  const label =
+    finding.label ||
+    finding.field ||
+    finding.fieldName ||
+    finding.box?.label ||
+    null;
+  return label ? String(label) : null;
 }
 
 /**
@@ -193,21 +215,29 @@ export function findingsToViewerBoxes(
 /**
  * Result of selecting a finding for PDF sync:
  * - activeBoxId always set
- * - focusPage set when a page can be resolved (for DocumentViewer jump)
+ * - focusPage set when a page can be resolved (defaults to page 1)
+ * - focusLabel for header feedback even when no overlay box exists
  * - hasBox indicates whether an overlay exists
  */
 export function syncSelectionFromFinding(finding: FindingSyncInput | null): {
   activeBoxId: string | number | null;
   focusPage: number | null;
+  focusLabel: string | null;
   hasBox: boolean;
 } {
   if (!finding) {
-    return { activeBoxId: null, focusPage: null, hasBox: false };
+    return {
+      activeBoxId: null,
+      focusPage: null,
+      focusLabel: null,
+      hasBox: false,
+    };
   }
   const box = findingToViewerBox(finding);
   return {
     activeBoxId: finding.id,
-    focusPage: box?.page ?? resolveFindingPage(finding),
+    focusPage: box?.page ?? resolveFindingPage(finding, { defaultPage: 1 }),
+    focusLabel: resolveFindingFocusLabel(finding),
     hasBox: box != null,
   };
 }
