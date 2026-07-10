@@ -246,3 +246,170 @@ export function createAzureDocumentIntelligenceAdapter(
 
 /** Alias matching PR-4 brief naming. */
 export const createAzureDiAdapter = createAzureDocumentIntelligenceAdapter;
+
+export const AZURE_DI_LAYOUT_MODEL = "prebuilt-layout";
+
+export interface AzureLayoutSelectionResult {
+  success: boolean;
+  selectionMarks: import("./parseAzureDiResponse").AzureSelectionMark[];
+  pages: OCRResult["pages"];
+  model: string;
+  processingTimeMs: number;
+  error?: string;
+  errorCode?: string;
+}
+
+/**
+ * Dedicated Azure DI prebuilt-layout pass for selectionMarks.
+ * Does not change the default prebuilt-read text-OCR fallback model.
+ * Fail-soft: returns success:false on any error (never throws).
+ */
+export async function extractLayoutSelectionMarks(
+  documentUrl: string,
+  _options?: OCROptions
+): Promise<AzureLayoutSelectionResult> {
+  const startTime = Date.now();
+  const config = getOCRConfig();
+  const endpoint = config.azureEndpoint?.replace(/\/+$/, "");
+  const key = config.azureKey;
+  const apiVersion = config.azureApiVersion;
+
+  if (!endpoint || !key) {
+    return {
+      success: false,
+      selectionMarks: [],
+      pages: [],
+      model: AZURE_DI_LAYOUT_MODEL,
+      processingTimeMs: Date.now() - startTime,
+      error: "Azure DI not configured (AZURE_DI_ENDPOINT / AZURE_DI_KEY)",
+      errorCode: "AZURE_DI_NOT_CONFIGURED",
+    };
+  }
+
+  const analyzeUrl = `${endpoint}/documentintelligence/documentModels/${AZURE_DI_LAYOUT_MODEL}:analyze?api-version=${apiVersion}`;
+  const correlationId = getCorrelationId();
+
+  const pollResult = async (
+    operationLocation: string
+  ): Promise<unknown | null> => {
+    for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
+      const res = await fetch(operationLocation, {
+        headers: { "Ocp-Apim-Subscription-Key": key },
+      });
+      if (!res.ok) {
+        throw new Error(`Azure DI poll failed: HTTP ${res.status}`);
+      }
+      const body = (await res.json()) as {
+        status?: string;
+        analyzeResult?: unknown;
+        error?: { message?: string };
+      };
+      if (body.status === "succeeded") {
+        return body.analyzeResult ?? body;
+      }
+      if (body.status === "failed") {
+        throw new Error(
+          body.error?.message || "Azure DI layout analyze failed"
+        );
+      }
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+    }
+    return null;
+  };
+
+  const runAnalyze = async (
+    body: Record<string, unknown>
+  ): Promise<AzureLayoutSelectionResult> => {
+    try {
+      logger.info("Starting Azure DI layout selectionMarks pass", {
+        correlationId,
+        model: AZURE_DI_LAYOUT_MODEL,
+      });
+
+      const response = await fetch(analyzeUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Ocp-Apim-Subscription-Key": key,
+          ...(correlationId && { "X-Correlation-ID": correlationId }),
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        return {
+          success: false,
+          selectionMarks: [],
+          pages: [],
+          model: AZURE_DI_LAYOUT_MODEL,
+          processingTimeMs: Date.now() - startTime,
+          error: `Azure DI layout HTTP ${response.status}`,
+          errorCode: `AZURE_DI_HTTP_${response.status}`,
+        };
+      }
+
+      const operationLocation = response.headers.get("operation-location");
+      if (!operationLocation) {
+        return {
+          success: false,
+          selectionMarks: [],
+          pages: [],
+          model: AZURE_DI_LAYOUT_MODEL,
+          processingTimeMs: Date.now() - startTime,
+          error: "Azure DI missing operation-location header",
+          errorCode: "AZURE_DI_NO_OPERATION",
+        };
+      }
+
+      const analyzeResult = await pollResult(operationLocation);
+      if (!analyzeResult) {
+        return {
+          success: false,
+          selectionMarks: [],
+          pages: [],
+          model: AZURE_DI_LAYOUT_MODEL,
+          processingTimeMs: Date.now() - startTime,
+          error: "Azure DI layout timed out",
+          errorCode: "AZURE_DI_TIMEOUT",
+        };
+      }
+
+      const parsed = parseAzureDiResponse(analyzeResult);
+      return {
+        success: true,
+        selectionMarks: parsed.selectionMarks,
+        pages: parsed.pages,
+        model: parsed.model || AZURE_DI_LAYOUT_MODEL,
+        processingTimeMs: Date.now() - startTime,
+      };
+    } catch (error) {
+      logger.warn("Azure DI layout selectionMarks failed", {
+        correlationId,
+        errorCode: "AZURE_DI_ERROR",
+      });
+      return {
+        success: false,
+        selectionMarks: [],
+        pages: [],
+        model: AZURE_DI_LAYOUT_MODEL,
+        processingTimeMs: Date.now() - startTime,
+        error:
+          error instanceof Error ? error.message : "Azure DI layout failed",
+        errorCode: "AZURE_DI_ERROR",
+      };
+    }
+  };
+
+  // Prefer base64 (works when we can fetch private/SAS URLs Azure cannot)
+  try {
+    const response = await fetch(documentUrl);
+    if (response.ok) {
+      const buffer = Buffer.from(await response.arrayBuffer());
+      return runAnalyze({ base64Source: buffer.toString("base64") });
+    }
+  } catch {
+    // fall through to urlSource
+  }
+
+  return runAnalyze({ urlSource: documentUrl });
+}
