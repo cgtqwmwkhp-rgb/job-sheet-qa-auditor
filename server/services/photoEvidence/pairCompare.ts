@@ -6,12 +6,30 @@
  *
  * Axes: work_done | repaired_properly | clean | residual_risk
  * Confidence bands: high (≥0.8) → Issue, medium → queue nudge, low → info
+ *
+ * VLM path (optional): when documentPdfBase64 is present and
+ * FEATURE_VLM_VERIFICATION or PHOTO_PAIR_USE_VLM is true, tryVlmPairAxes
+ * runs first; on failure falls back to heuristic.
  */
 
+import { getVlmConfig } from "../vlmAdapter/types";
+import { createSafeLogger } from "../../utils/safeLogger";
+
+const logger = createSafeLogger("PhotoPairCompare");
+
 export const FEATURE_PHOTO_PAIR_COMPARE = "FEATURE_PHOTO_PAIR_COMPARE";
+export const PHOTO_PAIR_USE_VLM = "PHOTO_PAIR_USE_VLM";
 
 export function isPhotoPairCompareEnabled(): boolean {
   return process.env[FEATURE_PHOTO_PAIR_COMPARE] === "true";
+}
+
+/** VLM pair path when FEATURE_VLM_VERIFICATION or PHOTO_PAIR_USE_VLM. */
+export function isPhotoPairVlmEnabled(): boolean {
+  return (
+    process.env.FEATURE_VLM_VERIFICATION === "true" ||
+    process.env[PHOTO_PAIR_USE_VLM] === "true"
+  );
 }
 
 export type AxisVerdict = "pass" | "fail" | "inconclusive";
@@ -49,7 +67,7 @@ export interface PhotoPairCompareArtifact {
 export interface PairCompareInput {
   text: string;
   totalPages?: number | null;
-  /** Optional base64 PDF for future VLM; unused by heuristic path. */
+  /** Optional base64 PDF for VLM path. */
   documentPdfBase64?: string | null;
   partsUsedSnippet?: string;
   repairsSnippet?: string;
@@ -57,10 +75,65 @@ export interface PairCompareInput {
   mockMode?: "pass" | "fail_work" | "fail_clean" | "inconclusive";
 }
 
+export interface VlmPairAxesResult {
+  success: boolean;
+  axes?: PhotoPairAxes;
+  confidence?: number;
+  reasoning?: string;
+  provider: "vlm" | "mock";
+  model: string;
+  error?: string;
+}
+
 function bandFor(confidence: number): ConfidenceBand {
   if (confidence >= 0.8) return "high";
   if (confidence >= 0.55) return "medium";
   return "low";
+}
+
+const AXIS_KEYS = [
+  "work_done",
+  "repaired_properly",
+  "clean",
+  "residual_risk",
+] as const;
+
+function parseAxisVerdict(v: unknown): AxisVerdict {
+  if (v === "pass" || v === "fail" || v === "inconclusive") return v;
+  return "inconclusive";
+}
+
+/**
+ * Parse axes JSON from model text (raw JSON or embedded in reasoning).
+ */
+export function parsePairAxesFromText(text: string): {
+  axes: PhotoPairAxes;
+  confidence: number;
+  reasoning: string;
+} | null {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    const obj = JSON.parse(match[0]) as Record<string, unknown>;
+    const axesRaw = (obj.axes as Record<string, unknown> | undefined) ?? obj;
+    const axes: PhotoPairAxes = {
+      work_done: parseAxisVerdict(axesRaw.work_done),
+      repaired_properly: parseAxisVerdict(axesRaw.repaired_properly),
+      clean: parseAxisVerdict(axesRaw.clean),
+      residual_risk: parseAxisVerdict(axesRaw.residual_risk),
+    };
+    // Require at least one explicit axis key in the JSON
+    const hasAxis = AXIS_KEYS.some(k => k in axesRaw);
+    if (!hasAxis) return null;
+    const confidence = Math.min(
+      1,
+      Math.max(0, Number(obj.confidence) || 0.7)
+    );
+    const reasoning = String(obj.reasoning || "VLM pair axes");
+    return { axes, confidence, reasoning };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -150,6 +223,216 @@ function pairFromRoles(
     pairs.push({ beforePage: befores[i], afterPage: afters[i] });
   }
   return pairs;
+}
+
+const PAIR_AXES_PROMPT = `Compare before/after photos on this job sheet PDF (pages noted in context).
+Judge these axes only: work_done, repaired_properly, clean, residual_risk.
+Each axis must be "pass", "fail", or "inconclusive".
+Reply JSON only:
+{"axes":{"work_done":"...","repaired_properly":"...","clean":"...","residual_risk":"..."},"confidence":0-1,"reasoning":"short"}`;
+
+/**
+ * Structured mock or Anthropic document verify for pair axes.
+ * Fail-soft: returns success:false on errors (caller falls back to heuristic).
+ */
+export async function tryVlmPairAxes(input: {
+  documentPdfBase64: string;
+  beforePage: number;
+  afterPage: number;
+  partsUsedSnippet?: string;
+  repairsSnippet?: string;
+}): Promise<VlmPairAxesResult> {
+  const config = getVlmConfig();
+  const providerEnv = (process.env.VLM_PROVIDER || config.provider || "mock").toLowerCase();
+
+  if (providerEnv !== "anthropic") {
+    // Deterministic structured mock axes JSON (CI / local, no network).
+    const mockJson = JSON.stringify({
+      axes: {
+        work_done: "pass",
+        repaired_properly: "pass",
+        clean: "pass",
+        residual_risk: "pass",
+      },
+      confidence: 0.84,
+      reasoning: `mock VLM pair axes pages ${input.beforePage}->${input.afterPage}`,
+    });
+    const parsed = parsePairAxesFromText(mockJson);
+    if (!parsed) {
+      return {
+        success: false,
+        provider: "mock",
+        model: "mock-vlm-pair-v1",
+        error: "MOCK_PARSE_FAILED",
+      };
+    }
+    return {
+      success: true,
+      axes: parsed.axes,
+      confidence: parsed.confidence,
+      reasoning: parsed.reasoning,
+      provider: "mock",
+      model: "mock-vlm-pair-v1",
+    };
+  }
+
+  const apiKey = config.apiKey || process.env.ANTHROPIC_API_KEY;
+  const model = config.model || "claude-3-5-sonnet-20241022";
+  if (!apiKey) {
+    return {
+      success: false,
+      provider: "vlm",
+      model,
+      error: "MISSING_API_KEY",
+      reasoning: "ANTHROPIC_API_KEY not configured",
+    };
+  }
+
+  const context = [
+    `Before page: ${input.beforePage}`,
+    `After page: ${input.afterPage}`,
+    input.partsUsedSnippet ? `Parts used: ${input.partsUsedSnippet}` : "",
+    input.repairsSnippet ? `Repairs: ${input.repairsSnippet}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 384,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "document",
+                source: {
+                  type: "base64",
+                  media_type: "application/pdf",
+                  data: input.documentPdfBase64,
+                },
+              },
+              {
+                type: "text",
+                text: `${PAIR_AXES_PROMPT}\n${context}`,
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      logger.warn("VLM pair axes HTTP error", {
+        status: response.status,
+        bodyPreview: body.slice(0, 120),
+      });
+      return {
+        success: false,
+        provider: "vlm",
+        model,
+        error: "HTTP_ERROR",
+        reasoning: `HTTP ${response.status}`,
+      };
+    }
+
+    const json = (await response.json()) as {
+      content?: Array<{ type: string; text?: string }>;
+    };
+    const text =
+      json.content?.find(c => c.type === "text")?.text?.trim() || "";
+    const parsed = parsePairAxesFromText(text);
+    if (!parsed) {
+      return {
+        success: false,
+        provider: "vlm",
+        model,
+        error: "UNPARSEABLE",
+        reasoning: text.slice(0, 200) || "unparseable model response",
+      };
+    }
+
+    return {
+      success: true,
+      axes: parsed.axes,
+      confidence: parsed.confidence,
+      reasoning: parsed.reasoning,
+      provider: "vlm",
+      model,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown";
+    logger.warn("VLM pair axes failed soft", { message });
+    return {
+      success: false,
+      provider: "vlm",
+      model,
+      error: "NETWORK_OR_PARSE",
+      reasoning: message,
+    };
+  }
+}
+
+/**
+ * Run VLM pair compare for all detected before/after pairs.
+ * Returns null when VLM cannot produce results (caller falls back to heuristic).
+ */
+export async function runVlmPairCompare(
+  input: PairCompareInput
+): Promise<PhotoPairCompareArtifact | null> {
+  if (!input.documentPdfBase64) return null;
+
+  const started = Date.now();
+  const roles = classifyPageRoles(input.text, input.totalPages);
+  const pagePairs = pairFromRoles(roles);
+  if (pagePairs.length === 0) return null;
+
+  const pairs: PhotoPairResult[] = [];
+  let model = "vlm-pair-v1";
+  let provider: "vlm" | "mock" = "vlm";
+
+  for (const pp of pagePairs) {
+    const r = await tryVlmPairAxes({
+      documentPdfBase64: input.documentPdfBase64,
+      beforePage: pp.beforePage,
+      afterPage: pp.afterPage,
+      partsUsedSnippet: input.partsUsedSnippet,
+      repairsSnippet: input.repairsSnippet,
+    });
+    if (!r.success || !r.axes) {
+      return null;
+    }
+    model = r.model;
+    provider = r.provider;
+    const confidence = r.confidence ?? 0.7;
+    pairs.push({
+      beforePage: pp.beforePage,
+      afterPage: pp.afterPage,
+      axes: r.axes,
+      confidence,
+      confidenceBand: bandFor(confidence),
+      reasoning: r.reasoning || "VLM pair compare",
+    });
+  }
+
+  return {
+    enabled: isPhotoPairCompareEnabled(),
+    provider,
+    model,
+    pairs,
+    pageRoles: roles,
+    summary: `VLM paired ${pairs.length} before/after page set(s).`,
+    processingTimeMs: Date.now() - started,
+  };
 }
 
 /**
@@ -253,6 +536,7 @@ export function runHeuristicPairCompare(
 
 /**
  * Run pair compare when feature flag is on. Fail-soft.
+ * Prefer VLM when configured + PDF present; fall back to heuristic.
  */
 export async function runPhotoPairCompare(
   input: PairCompareInput
@@ -261,8 +545,21 @@ export async function runPhotoPairCompare(
     return null;
   }
   try {
-    // Future: call VLM with documentPdfBase64 when provider configured.
-    // For now heuristic/mock is the production-safe path behind the flag.
+    // Explicit mockMode keeps deterministic test path (skip VLM).
+    if (
+      !input.mockMode &&
+      isPhotoPairVlmEnabled() &&
+      input.documentPdfBase64
+    ) {
+      try {
+        const vlmArt = await runVlmPairCompare(input);
+        if (vlmArt) return vlmArt;
+      } catch (err) {
+        logger.warn("VLM pair compare failed soft; using heuristic", {
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
     return runHeuristicPairCompare(input);
   } catch (err) {
     return {
