@@ -209,7 +209,11 @@ describe("pipeline stage catalog sync", () => {
       { stage: "OCR Text Extraction", status: "success", durationMs: 50 },
       { stage: "Tyre Compliance", status: "success", durationMs: 12 },
       { stage: "Photo Evidence", status: "success", durationMs: 8 },
-      { stage: "Audit Policy (Major/Minor)", status: "success", durationMs: 20 },
+      {
+        stage: "Audit Policy (Major/Minor)",
+        status: "success",
+        durationMs: 20,
+      },
       { stage: "Store Results", status: "success", durationMs: 5 },
     ]);
     expect(stages.find(s => s.stage === "Tyre Compliance")?.status).toBe(
@@ -218,9 +222,9 @@ describe("pipeline stage catalog sync", () => {
     expect(stages.find(s => s.stage === "Photo Evidence")?.status).toBe(
       "success"
     );
-    expect(stages.find(s => s.stage === "Audit Policy (Major/Minor)")?.status).toBe(
-      "success"
-    );
+    expect(
+      stages.find(s => s.stage === "Audit Policy (Major/Minor)")?.status
+    ).toBe("success");
     const tyreIdx = stages.findIndex(s => s.stage === "Tyre Compliance");
     const storeIdx = stages.findIndex(s => s.stage === "Store Results");
     expect(tyreIdx).toBeLessThan(storeIdx);
