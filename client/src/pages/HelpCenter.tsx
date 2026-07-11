@@ -678,8 +678,8 @@ export default function HelpCenter() {
               <p>
                 <strong className="text-foreground">VOR</strong> (Vehicle Off
                 Road) is a signal extracted from the job sheet indicating the
-                asset could not be returned to service. When the system detects a
-                VOR flag, it cross-checks the surrounding documentation for
+                asset could not be returned to service. When the system detects
+                a VOR flag, it cross-checks the surrounding documentation for
                 consistency:
               </p>
               <ul className="space-y-2 ml-1">
