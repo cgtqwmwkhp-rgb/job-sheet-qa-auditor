@@ -11,6 +11,7 @@ import { NotificationSettings } from "@/components/NotificationSettings";
 import { EmailTemplateManager } from "@/components/EmailTemplateManager";
 import { AIPersonaSettings } from "@/components/AIPersonaSettings";
 import { ProcessingSettings } from "@/components/ProcessingSettings";
+import { AuditPolicySettings } from "@/components/AuditPolicySettings";
 import {
   Bell,
   Mail,
@@ -23,6 +24,7 @@ import {
   Sun,
   Database,
   Cpu,
+  ShieldAlert,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -90,6 +92,13 @@ export default function Settings() {
               >
                 <Cpu className="w-4 h-4 mr-3" />
                 Processing
+              </TabsTrigger>
+              <TabsTrigger
+                value="audit-policy"
+                className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
+              >
+                <ShieldAlert className="w-4 h-4 mr-3" />
+                Audit Policy
               </TabsTrigger>
               <TabsTrigger
                 value="security"
@@ -266,6 +275,17 @@ export default function Settings() {
                 </p>
               </div>
               <ProcessingSettings />
+            </TabsContent>
+
+            <TabsContent value="audit-policy" className="mt-0 space-y-6">
+              <div className="mb-4">
+                <h2 className="text-lg font-medium">Audit Policy</h2>
+                <p className="text-sm text-muted-foreground">
+                  Major fail hard-fails the job card. Minor fail only affects
+                  Doc Quality %. Editable without a deploy.
+                </p>
+              </div>
+              <AuditPolicySettings />
             </TabsContent>
 
             <TabsContent value="security" className="mt-0 space-y-6">

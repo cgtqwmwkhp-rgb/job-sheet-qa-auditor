@@ -21,6 +21,12 @@ import {
   processingSettings,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import {
+  AUDIT_POLICY_SETTING_KEY,
+  mergeAuditPolicy,
+  parseStoredAuditPolicy,
+  type AuditPolicy,
+} from "./services/auditPolicy";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _connectionVerified = false;
@@ -836,6 +842,56 @@ export async function getAllProcessingSettings() {
     .select()
     .from(processingSettings)
     .orderBy(processingSettings.category);
+}
+
+// ============ AUDIT POLICY (Major / Minor fail) ============
+
+/**
+ * Load admin Audit Policy (Major/Minor). Falls back to code defaults.
+ */
+export async function getAuditPolicy(): Promise<AuditPolicy> {
+  const db = await getDb();
+  if (!db) return mergeAuditPolicy(null);
+
+  try {
+    const rows = await db
+      .select()
+      .from(processingSettings)
+      .where(eq(processingSettings.settingKey, AUDIT_POLICY_SETTING_KEY))
+      .limit(1);
+    if (rows.length === 0) return mergeAuditPolicy(null);
+    return mergeAuditPolicy(parseStoredAuditPolicy(rows[0].settingValue));
+  } catch (error) {
+    console.error("[Database] Failed to get audit policy:", error);
+    return mergeAuditPolicy(null);
+  }
+}
+
+/**
+ * Persist Audit Policy JSON (admin Settings → Audit Policy).
+ */
+export async function saveAuditPolicy(
+  policy: AuditPolicy,
+  updatedBy: number
+): Promise<void> {
+  await updateProcessingSetting(
+    AUDIT_POLICY_SETTING_KEY,
+    policy,
+    updatedBy,
+    "Major/Minor fail policy (Audit Policy)"
+  );
+
+  // Ensure category is validation for grouping
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db
+      .update(processingSettings)
+      .set({ category: "validation" })
+      .where(eq(processingSettings.settingKey, AUDIT_POLICY_SETTING_KEY));
+  } catch {
+    // Non-fatal — setting value is what matters
+  }
 }
 
 // ============ ENGINEER ANALYTICS QUERIES (PR-15) ============

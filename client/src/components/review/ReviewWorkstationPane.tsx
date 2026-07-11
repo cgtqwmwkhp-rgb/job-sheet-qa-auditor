@@ -63,6 +63,7 @@ import {
   type SelectionTrace,
 } from "@/components/audit/SelectionTracePanel";
 import { mapSelectionTraceFromReport } from "@/components/review/mapSelectionTrace";
+import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
 import { SelectionMarksPanel } from "@/components/review/SelectionMarksPanel";
 import {
   mapSelectionMarksFromReport,
@@ -76,6 +77,8 @@ export interface Finding {
   field: string;
   status: "passed" | "missing" | "warning";
   severity?: "critical" | "major" | "minor";
+  /** Admin Audit Policy class (Major hard-fails; Minor is score-only). */
+  failClass?: "major" | "minor" | "informational";
   value?: string;
   message?: string;
   whyItMatters?: string;
@@ -101,6 +104,8 @@ export interface AuditData {
   technician: string;
   documentUrl: string;
   findings: Finding[];
+  /** True when Audit Policy recorded one or more Major fails. */
+  hasMajorFails?: boolean;
   /** Template selection explainability (from reportJson when available). */
   selectionTrace?: SelectionTrace | null;
   /** Visual Ok/Adv/Fail/N/A checklist marks from Azure DI. */
@@ -122,16 +127,23 @@ export function mapFindingsFromApi(
   }>
 ): Finding[] {
   return findingsData.map(f => {
-    const severity =
+    // Post–Audit Policy: S1 = Major, S2 = Minor, S3 = Passed/informational
+    const failClass: Finding["failClass"] =
       f.severity === "S0" || f.severity === "S1"
-        ? "critical"
+        ? "major"
         : f.severity === "S2"
+          ? "minor"
+          : "informational";
+    const severity =
+      failClass === "major"
+        ? "critical"
+        : failClass === "minor"
           ? "major"
           : "minor";
     const status =
-      f.severity === "S0" || f.severity === "S1"
+      failClass === "major"
         ? "missing"
-        : f.severity === "S2"
+        : failClass === "minor"
           ? "warning"
           : "passed";
     const bb = f.boundingBox as
@@ -157,6 +169,7 @@ export function mapFindingsFromApi(
       field: f.fieldName || "Unknown Field",
       status,
       severity,
+      failClass,
       value: f.rawSnippet || undefined,
       message: f.normalisedSnippet || undefined,
       whyItMatters: f.whyItMatters || undefined,
@@ -250,6 +263,7 @@ export function ReviewWorkstationPane({
           technician: `User ${jobSheetData.uploadedBy}`,
           documentUrl: jobSheetData.fileUrl,
           findings: mapFindingsFromApi(findingsData || []),
+          hasMajorFails: mapHasMajorFailsFromReport(auditResult?.reportJson),
           selectionTrace: mapSelectionTraceFromReport(auditResult?.reportJson),
           selectionMarks: mapSelectionMarksFromReport(auditResult?.reportJson),
         }
@@ -265,9 +279,16 @@ export function ReviewWorkstationPane({
       ? (auditDataProp.selectionMarks ?? null)
       : mapSelectionMarksFromReport(auditResult?.reportJson);
 
+  const hasMajorFails =
+    auditDataProp?.hasMajorFails !== undefined
+      ? auditDataProp.hasMajorFails
+      : mapHasMajorFailsFromReport(auditResult?.reportJson);
+
   const auditData = auditDataProp
-    ? { ...auditDataProp, selectionTrace, selectionMarks }
-    : fetchedAuditData;
+    ? { ...auditDataProp, selectionTrace, selectionMarks, hasMajorFails }
+    : fetchedAuditData
+      ? { ...fetchedAuditData, hasMajorFails }
+      : null;
   const documentUrl =
     documentUrlProp ??
     (jobSheetId > 0 ? `/api/documents/${jobSheetId}/pdf` : undefined);
@@ -799,10 +820,17 @@ function ReviewWorkstationContent({
             >
               {auditData.status.toUpperCase()}
             </Badge>
+            {(auditData.hasMajorFails ||
+              (auditData.status === "failed" &&
+                auditData.findings.some(f => f.failClass === "major"))) && (
+              <Badge variant="destructive" className="font-semibold">
+                Major fail
+              </Badge>
+            )}
             <Badge
               variant="outline"
               className="font-mono bg-[#333030] text-white border-[#333030]"
-              title="Documentation quality out of 100 for this job sheet (engineer mark). Issues deduct points; Passed checks do not."
+              title="Documentation quality out of 100 for this job sheet (engineer mark). Major/Minor issues deduct points; Passed checks do not."
             >
               Doc quality: {auditData.score}
             </Badge>
@@ -1275,6 +1303,16 @@ function FindingsList({
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
                 )}
                 <h3 className="font-semibold text-sm">{finding.field}</h3>
+                {finding.failClass === "major" && (
+                  <Badge variant="destructive" className="text-[10px] px-1.5">
+                    Major
+                  </Badge>
+                )}
+                {finding.failClass === "minor" && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5">
+                    Minor
+                  </Badge>
+                )}
               </div>
               <Badge variant="outline" className="bg-white/50">
                 {(finding.confidence * 100).toFixed(0)}% Conf.

@@ -66,6 +66,10 @@ export interface Finding {
   };
   whyItMatters: string;
   suggestedFix: string;
+  /** Admin Audit Policy class — major hard-fails; minor is score-only. */
+  failClass?: "major" | "minor" | "informational";
+  /** True when this finding forces overallResult FAIL. */
+  blocksOverallPass?: boolean;
 }
 
 export interface AnalysisResult {
