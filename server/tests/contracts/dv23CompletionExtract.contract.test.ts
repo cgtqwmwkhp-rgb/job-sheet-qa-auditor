@@ -88,8 +88,14 @@ function assertCleanCompletionSignals(
 }
 
 describe("DV23 completion extraction — golden OCR fixtures", () => {
-  assertCleanCompletionSignals("pdftotext -layout (two-column grid)", layoutText);
-  assertCleanCompletionSignals("Mistral-flattened OCR (single line)", mistralFlatText);
+  assertCleanCompletionSignals(
+    "pdftotext -layout (two-column grid)",
+    layoutText
+  );
+  assertCleanCompletionSignals(
+    "Mistral-flattened OCR (single line)",
+    mistralFlatText
+  );
 
   describe("extractCompletionYesNo — layout variant field-by-field", () => {
     it("Service Completed → yes", () => {
@@ -142,25 +148,19 @@ describe("DV23 completion extraction — golden OCR fixtures", () => {
 
     it("All Works Completed → yes", () => {
       expect(
-        extractCompletionYesNo(mistralFlatText, [
-          /All\s+Works\s+Completed\??/i,
-        ])
+        extractCompletionYesNo(mistralFlatText, [/All\s+Works\s+Completed\??/i])
       ).toBe("yes");
     });
 
     it("Return Visit Needed → no", () => {
       expect(
-        extractCompletionYesNo(mistralFlatText, [
-          /Return\s+Visit\s+Needed\??/i,
-        ])
+        extractCompletionYesNo(mistralFlatText, [/Return\s+Visit\s+Needed\??/i])
       ).toBe("no");
     });
 
     it("Asset Safe To Use → yes", () => {
       expect(
-        extractCompletionYesNo(mistralFlatText, [
-          /Asset\s+Safe\s+To\s+Use\??/i,
-        ])
+        extractCompletionYesNo(mistralFlatText, [/Asset\s+Safe\s+To\s+Use\??/i])
       ).toBe("yes");
     });
   });
