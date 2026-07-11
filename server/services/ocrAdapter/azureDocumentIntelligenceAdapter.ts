@@ -258,6 +258,8 @@ export interface AzureLayoutSelectionResult {
   processingTimeMs: number;
   error?: string;
   errorCode?: string;
+  /** Concatenated page markdown from the layout pass (line text). */
+  layoutText?: string;
 }
 
 /**
@@ -394,6 +396,9 @@ export async function extractLayoutSelectionMarks(
       }
 
       const parsed = parseAzureDiResponse(analyzeResult);
+      const layoutPageText = parsed.pages
+        .map(p => `--- Page ${p.pageNumber} ---\n${p.markdown}`)
+        .join("\n\n");
       return {
         success: true,
         selectionMarks: parsed.selectionMarks,
@@ -401,6 +406,7 @@ export async function extractLayoutSelectionMarks(
         pages: parsed.pages,
         model: parsed.model || AZURE_DI_LAYOUT_MODEL,
         processingTimeMs: Date.now() - startTime,
+        layoutText: layoutPageText.trim() || undefined,
       };
     } catch (error) {
       logger.warn("Azure DI layout selectionMarks failed", {

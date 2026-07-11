@@ -1759,10 +1759,16 @@ async function processJobSheetWithOptions(
       const failMarkCount = countHighConfidenceFailMarks(
         selectionMarksResult?.artifact
       );
-      const consistency = evaluateJobSummaryConsistency(extractedText, {
+      // Prefer Azure DI layout text for completion-block evaluation when
+      // available — it preserves grid structure that Mistral OCR flattens.
+      const jsrText = selectionMarksResult?.layoutText || extractedText;
+      const consistency = evaluateJobSummaryConsistency(jsrText, {
         failMarkCount,
       });
       failurePathSignals = consistency.signals;
+      const jsrTextSource = selectionMarksResult?.layoutText
+        ? "azure-layout"
+        : "ocr-primary";
       failurePathSignalSummary = [
         `VOR=${consistency.signals.vor}`,
         `SafeToUse=${consistency.signals.unsafe ? "No" : consistency.signals.safeYes ? "Yes" : "Unknown"}`,
@@ -1770,6 +1776,7 @@ async function processJobSheetWithOptions(
         `Incomplete=${consistency.signals.incomplete ? "Yes" : consistency.signals.worksCompleteYes ? "No" : "Unknown"}`,
         `FailMarks=${consistency.signals.failMarkCount}`,
         `PartsStillRequired=${consistency.signals.partsStillRequired}`,
+        `TextSource=${jsrTextSource}`,
       ].join(" | ");
       if (consistency.findings.length > 0) {
         analysisResult = {
