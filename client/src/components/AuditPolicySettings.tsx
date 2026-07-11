@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -71,15 +72,26 @@ export function AuditPolicySettings() {
   const [policy, setPolicy] = useState<AuditPolicy | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [activeFormId, setActiveFormId] = useState<string>("");
 
   const { data, isLoading, refetch } = trpc.auditPolicy.get.useQuery();
   const saveMutation = trpc.auditPolicy.save.useMutation();
   const resetMutation = trpc.auditPolicy.reset.useMutation();
 
+  const formEntries = useMemo(
+    () => (policy ? Object.entries(policy.forms) : []),
+    [policy]
+  );
+
   useEffect(() => {
     if (data) {
-      setPolicy(data as AuditPolicy);
+      const next = data as AuditPolicy;
+      setPolicy(next);
       setHasChanges(false);
+      const ids = Object.keys(next.forms);
+      setActiveFormId(prev =>
+        prev && ids.includes(prev) ? prev : (ids[0] ?? "")
+      );
     }
   }, [data]);
 
@@ -147,8 +159,13 @@ export function AuditPolicySettings() {
     setIsSaving(true);
     try {
       const result = await resetMutation.mutateAsync();
-      setPolicy(result.policy as AuditPolicy);
+      const next = result.policy as AuditPolicy;
+      setPolicy(next);
       setHasChanges(false);
+      const ids = Object.keys(next.forms);
+      setActiveFormId(prev =>
+        prev && ids.includes(prev) ? prev : (ids[0] ?? "")
+      );
       toast.success("Audit policy reset to defaults");
       await refetch();
     } catch (err) {
@@ -168,6 +185,8 @@ export function AuditPolicySettings() {
       </div>
     );
   }
+
+  const activeForm = activeFormId ? policy.forms[activeFormId] : null;
 
   return (
     <div className="space-y-6">
@@ -232,91 +251,134 @@ export function AuditPolicySettings() {
         </CardContent>
       </Card>
 
-      {Object.entries(policy.forms).map(([formId, form]) => (
-        <Card key={formId}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {form.label}
-              <Badge variant="outline" className="font-mono text-xs">
-                {formId}
-              </Badge>
-            </CardTitle>
-            <CardDescription>
-              Set each check to Major, Minor, or Informational.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {form.rules.map(rule => (
-              <div
-                key={rule.ruleId}
-                className="rounded-lg border p-4 space-y-3"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium">{rule.label}</span>
-                      {failClassBadge(rule.failClass)}
-                      <span className="text-xs font-mono text-muted-foreground">
-                        {rule.ruleId}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {rule.description}
-                    </p>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>Job sheet type</CardTitle>
+          <CardDescription>
+            Pick a form family, then set each check to Major, Minor, or
+            Informational.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {formEntries.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No form policies configured.
+            </p>
+          ) : (
+            <Tabs
+              value={activeFormId}
+              onValueChange={setActiveFormId}
+              className="w-full"
+            >
+              <TabsList className="w-full h-auto flex flex-wrap justify-start gap-1 p-1">
+                {formEntries.map(([formId, form]) => (
+                  <TabsTrigger
+                    key={formId}
+                    value={formId}
+                    className="flex-none px-4 py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+                  >
+                    {form.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {formEntries.map(([formId, form]) => (
+                <TabsContent
+                  key={formId}
+                  value={formId}
+                  className="mt-4 space-y-4"
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-medium">{form.label}</h3>
+                    <Badge variant="outline" className="font-mono text-xs">
+                      {formId}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {form.rules.length} checks
+                    </span>
                   </div>
-                  <div className="flex items-center gap-4 shrink-0">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={rule.enabled}
-                        onCheckedChange={checked =>
-                          updateRule(formId, rule.ruleId, { enabled: checked })
-                        }
-                        aria-label={`Enable ${rule.ruleId}`}
-                      />
-                      <Label className="text-xs text-muted-foreground">
-                        On
-                      </Label>
-                    </div>
-                    <Select
-                      value={rule.failClass}
-                      onValueChange={value =>
-                        updateRule(formId, rule.ruleId, {
-                          failClass: value as FailClass,
-                        })
-                      }
-                      disabled={!rule.enabled}
+                  {form.rules.map(rule => (
+                    <div
+                      key={rule.ruleId}
+                      className="rounded-lg border p-4 space-y-3"
                     >
-                      <SelectTrigger className="w-[160px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="major">
-                          <span className="flex items-center gap-2">
-                            <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
-                            Major fail
-                          </span>
-                        </SelectItem>
-                        <SelectItem value="minor">
-                          <span className="flex items-center gap-2">
-                            <Info className="h-3.5 w-3.5 text-amber-600" />
-                            Minor fail
-                          </span>
-                        </SelectItem>
-                        <SelectItem value="informational">
-                          <span className="flex items-center gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
-                            Informational
-                          </span>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      ))}
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{rule.label}</span>
+                            {failClassBadge(rule.failClass)}
+                            <span className="text-xs font-mono text-muted-foreground">
+                              {rule.ruleId}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {rule.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-4 shrink-0">
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={rule.enabled}
+                              onCheckedChange={checked =>
+                                updateRule(formId, rule.ruleId, {
+                                  enabled: checked,
+                                })
+                              }
+                              aria-label={`Enable ${rule.ruleId}`}
+                            />
+                            <Label className="text-xs text-muted-foreground">
+                              On
+                            </Label>
+                          </div>
+                          <Select
+                            value={rule.failClass}
+                            onValueChange={value =>
+                              updateRule(formId, rule.ruleId, {
+                                failClass: value as FailClass,
+                              })
+                            }
+                            disabled={!rule.enabled}
+                          >
+                            <SelectTrigger className="w-[160px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="major">
+                                <span className="flex items-center gap-2">
+                                  <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
+                                  Major fail
+                                </span>
+                              </SelectItem>
+                              <SelectItem value="minor">
+                                <span className="flex items-center gap-2">
+                                  <Info className="h-3.5 w-3.5 text-amber-600" />
+                                  Minor fail
+                                </span>
+                              </SelectItem>
+                              <SelectItem value="informational">
+                                <span className="flex items-center gap-2">
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
+                                  Informational
+                                </span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </TabsContent>
+              ))}
+            </Tabs>
+          )}
+
+          {activeFormId && !activeForm && (
+            <p className="text-sm text-muted-foreground">
+              Selected form is unavailable.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <Separator />
 
