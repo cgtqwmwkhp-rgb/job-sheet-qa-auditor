@@ -266,12 +266,7 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           description: "Date or asset-number pattern niggle",
           failClass: "minor",
           enabled: true,
-          fieldAliases: [
-            "assetId pattern",
-            "Asset Number",
-            "Asset No",
-            "date",
-          ],
+          fieldAliases: ["assetId pattern", "Asset Number", "Asset No", "date"],
         },
       ],
     },
