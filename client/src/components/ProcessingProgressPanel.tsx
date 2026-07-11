@@ -7,10 +7,11 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import type {
-  ProcessStatusView,
-  ProcessingStageSnapshot,
-  StageRunStatus,
+import {
+  PIPELINE_CORE_STAGES,
+  type ProcessStatusView,
+  type ProcessingStageSnapshot,
+  type StageRunStatus,
 } from "@shared/processingProgress";
 
 function StageIcon({ status }: { status: StageRunStatus }) {
@@ -51,10 +52,9 @@ export function ProcessingProgressPanel({
 
   const stages = progress.stages.filter(
     s =>
-      // Hide trailing pending extras in compact mode except canonical flow
       !compact ||
       s.status !== "pending" ||
-      progress.stages.findIndex(x => x.stage === s.stage) < 6
+      (PIPELINE_CORE_STAGES as readonly string[]).includes(s.stage)
   );
 
   return (

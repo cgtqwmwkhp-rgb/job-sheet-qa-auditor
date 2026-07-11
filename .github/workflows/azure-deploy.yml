@@ -170,6 +170,7 @@ jobs:
             GIT_SHA=${{ steps.resolve_sha.outputs.deploy_sha }}
             PLATFORM_VERSION=${{ github.ref_name }}
             BUILD_TIME=${{ github.event.head_commit.timestamp }}
+            VITE_FEATURE_OVERTURN_METRICS=true
 
   # Deploy to Staging
   deploy-staging:
@@ -257,7 +258,8 @@ jobs:
               STORAGE_PROVIDER="${{ vars.STORAGE_PROVIDER || 'azure' }}" \
               AZURE_STORAGE_CONTAINER_NAME="${{ vars.AZURE_STORAGE_CONTAINER_NAME || 'jobsheets-staging' }}" \
               ENABLE_PURGE_EXECUTION="${{ vars.ENABLE_PURGE_EXECUTION || 'false' }}" \
-              ENABLE_SCHEDULER="${{ vars.ENABLE_SCHEDULER || 'false' }}"
+              ENABLE_SCHEDULER="${{ vars.ENABLE_SCHEDULER || 'false' }}" \
+              FEATURE_OVERTURN_METRICS=true
 
       - name: Set secrets as environment variables
         run: |

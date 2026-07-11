@@ -156,4 +156,17 @@ describe("advancedExtraction grid hint", () => {
     expect(src).toContain("extractCompletionYesNo");
     expect(src).toContain("completionGrid");
   });
+
+  it("source wires grid hints for return_visit, all_works, service_completed", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const src = fs.readFileSync(
+      path.join(__dirname, "../../services/advancedExtraction.ts"),
+      "utf8"
+    );
+    for (const field of ["return_visit", "all_works", "service_completed"]) {
+      expect(src).toContain(field);
+    }
+    expect(src).toContain("GRID_HINT_FIELDS");
+  });
 });
