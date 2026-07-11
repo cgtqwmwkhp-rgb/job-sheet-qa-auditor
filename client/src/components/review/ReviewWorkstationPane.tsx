@@ -100,6 +100,7 @@ import {
 import {
   BeforeAfterComparePane,
   mapPhotoPairCompareFromReport,
+  resolvePhotoPairFindings,
   type PhotoPairCompareArtifact,
 } from "@/components/review/BeforeAfterComparePane";
 import {
@@ -516,6 +517,7 @@ function ReviewWorkstationContent({
   const createDispute = trpc.disputes.create.useMutation();
   const flagMutation = trpc.auditActions.flag.useMutation();
   const overrideMutation = trpc.auditActions.override.useMutation();
+  const approveMutation = trpc.auditActions.approve.useMutation();
   const waiveMutation = trpc.auditActions.waive.useMutation();
   const undoMutation = trpc.auditActions.undo.useMutation();
   const bulkApproveMutation = trpc.auditActions.bulkApprove.useMutation();
@@ -731,6 +733,67 @@ function ReviewWorkstationContent({
       }
     );
   };
+
+  const applyBeforeAfterPairAction = (
+    pairIndex: number,
+    action: "approve" | "override"
+  ) => {
+    const pair = photoPairCompare?.pairs[pairIndex];
+    if (!pair) {
+      toast.error("Pair not found");
+      return;
+    }
+    const targets = resolvePhotoPairFindings(auditData.findings, pair);
+    if (targets.length === 0) {
+      toast.error("No PHOTO-C012/C013 finding mapped for this pair");
+      return;
+    }
+    const reason =
+      action === "approve"
+        ? "Confirmed before/after pair catch from workstation"
+        : "Overridden before/after pair from workstation";
+    const mutation = action === "approve" ? approveMutation : overrideMutation;
+    const label =
+      action === "approve" ? "Pair catch confirmed" : "Pair finding overridden";
+
+    void Promise.allSettled(
+      targets.map(f => {
+        const findingId = resolveFindingId(f);
+        if (findingId == null) {
+          return Promise.reject(new Error("Invalid finding id"));
+        }
+        return mutation.mutateAsync({ findingId, reason });
+      })
+    ).then(results => {
+      const ok = results.filter(r => r.status === "fulfilled");
+      const failed = results.filter(r => r.status === "rejected");
+      if (ok.length > 0) {
+        invalidateFindings();
+        const firstId = resolveFindingId(targets[0]!);
+        if (firstId != null) {
+          showUndoToast(
+            firstId,
+            ok.length > 1 ? `${label} (${ok.length})` : label
+          );
+        } else {
+          toast.success(label);
+        }
+      }
+      if (failed.length > 0) {
+        toast.error(
+          failed.length === results.length
+            ? "Failed to persist pair decision"
+            : `${failed.length} of ${results.length} pair finding actions failed`
+        );
+      }
+    });
+  };
+
+  const handleConfirmPair = (pairIndex: number) =>
+    applyBeforeAfterPairAction(pairIndex, "approve");
+
+  const handleOverridePair = (pairIndex: number) =>
+    applyBeforeAfterPairAction(pairIndex, "override");
 
   const boxes: ViewerBoundingBox[] = findingsToViewerBoxes(
     auditData.findings.map(f => ({
@@ -1114,6 +1177,8 @@ function ReviewWorkstationContent({
             )
           )}
           className="shadow-none"
+          onConfirmPair={handleConfirmPair}
+          onOverridePair={handleOverridePair}
         />
         {deepNoteAnalysis ? (
           <DeepNoteAnalysis
