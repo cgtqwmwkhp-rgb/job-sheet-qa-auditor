@@ -12,6 +12,7 @@
 
 import { invokeLLM } from "../_core/llm";
 import { getProcessingSettings, ProcessingSettingsConfig } from "../db";
+import { extractCompletionYesNo } from "./extraction/completionYesNo";
 
 // ============================================================================
 // TYPES
@@ -962,6 +963,30 @@ export async function processDocument(
       extractedData[field.name] = result.value;
     }
     fieldDetails[field.name] = result;
+  }
+
+  // Grid-aware hint for safe_to_use — matches the logic jobSummaryConsistency
+  // uses, so ensemble extraction and JSR findings stay aligned.
+  const safeField = fieldDetails["safe_to_use"];
+  if (!safeField?.value || safeField.confidence < llmConfidenceThreshold) {
+    const gridAnswer = extractCompletionYesNo(correctedText, [
+      /Is\s+the\s+asset\s+safe\s+to\s+use\??/i,
+      /Asset\s+Safe\s+To\s+Use\??/i,
+    ]);
+    if (gridAnswer !== "unknown") {
+      const normalized = gridAnswer === "yes" ? "Yes" : "No";
+      extractedData["safe_to_use"] = normalized;
+      fieldDetails["safe_to_use"] = {
+        displayName: safeField?.displayName ?? "Safe to Use",
+        required: safeField?.required ?? true,
+        severity: safeField?.severity ?? "S0",
+        value: normalized,
+        confidence: Math.max(safeField?.confidence ?? 0, 85),
+        strategy: "ensemble(completionGrid)",
+        evidence: `Completion-grid extraction: safe_to_use=${gridAnswer}`,
+        reasonCode: null,
+      };
+    }
   }
 
   // Calculate metrics

@@ -9,3 +9,4 @@ export * from './types';
 export * from './extractor';
 export * from './criticalFieldExtractor';
 export * from './fieldCalibration';
+export * from './completionYesNo';

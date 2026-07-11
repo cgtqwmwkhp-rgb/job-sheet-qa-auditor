@@ -9,6 +9,10 @@
 
 import type { Finding } from "../analyzer";
 import { hasVorBannerEvidence } from "../findingHygiene";
+import {
+  extractCompletionYesNo,
+  COMPLETION_FIELD_BOUNDARIES,
+} from "../extraction/completionYesNo";
 
 export const CONSISTENCY_RULE_PREFIX = "JSR-C";
 
@@ -42,30 +46,9 @@ export interface ConsistencyJudgmentResult {
   summary: string;
 }
 
-const YES_NO_TOKEN_RE = /\b(yes|no|true|false)\b/i;
+export { extractCompletionYesNo } from "../extraction/completionYesNo";
 
-/** Completion-grid labels that bound Yes/No answers on Job Summary / Compliance. */
-const COMPLETION_FIELD_BOUNDARIES = [
-  "Service Completed",
-  "Additional Tasks Complete",
-  "All Works Completed",
-  "Return Visit Needed",
-  "Consumables Used",
-  "Asset Safe To Use",
-  "Is the asset safe to use",
-  "Is a return visit required",
-  "Were all works fully completed",
-  "Was the service fully completed",
-  "Have all of the additional tasks been completed",
-  "Job Duration",
-  "Overtime",
-  "Travel",
-  "Job ID",
-  "Compliance Checklist",
-  "Next Service Date",
-  "Compliance Type",
-  "Compliance Title",
-];
+const YES_NO_TOKEN_RE = /\b(yes|no|true|false)\b/i;
 
 /**
  * Capture the short answer immediately after a label.
@@ -75,101 +58,6 @@ function lineValue(text: string, label: RegExp): string | null {
   const re = new RegExp(`${label.source}\\s*[:?]\\s*([^\\n\\r]{0,60})`, "i");
   const m = text.match(re);
   return m?.[1]?.trim() ?? null;
-}
-
-function completionBoundaryRe(): RegExp {
-  return new RegExp(
-    `(?:${COMPLETION_FIELD_BOUNDARIES.map(b =>
-      b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    ).join("|")})`,
-    "i"
-  );
-}
-
-function tokenToYesNo(token: string): "yes" | "no" {
-  return /^(yes|true)$/i.test(token) ? "yes" : "no";
-}
-
-/** Yes/No on the same line before the next completion-field label. */
-function yesNoBeforeBoundary(segment: string): "yes" | "no" | null {
-  const stopAt = segment.search(completionBoundaryRe());
-  const searchIn = stopAt >= 0 ? segment.slice(0, stopAt) : segment;
-  const token = searchIn.match(YES_NO_TOKEN_RE);
-  return token ? tokenToYesNo(token[1]) : null;
-}
-
-/**
- * Find Yes/No for a completion field even when the answer sits on the next
- * line under a two-column grid (common on Compliance / Inverter sheets).
- *
- * Layout example (DV23 inverter sheet):
- *   Service Completed?          Additional Tasks Complete?
- *              Yes                           Yes
- *   All Works Completed?  Yes   Return Visit Needed?  No
- *   Consumables Used?     No    Asset Safe To Use?    Yes
- */
-export function extractCompletionYesNo(
-  text: string,
-  labelPatterns: RegExp[]
-): "yes" | "no" | "unknown" {
-  const lines = text.split(/\r?\n/);
-
-  for (const label of labelPatterns) {
-    const anchor = new RegExp(label.source, "i");
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const m = anchor.exec(line);
-      if (!m || m.index == null) continue;
-
-      const afterOnLine = line.slice(m.index + m[0].length);
-      const sameLine = yesNoBeforeBoundary(afterOnLine);
-      if (sameLine) return sameLine;
-
-      // Two-column grid: answers often sit on the next line under each label.
-      // Pick the Yes/No whose column is closest to this label (left vs right).
-      const labelCol = m.index;
-      const lineMid = Math.max(40, Math.floor(line.length / 2));
-      const preferLeft = labelCol < lineMid;
-
-      for (let j = i + 1; j <= i + 2 && j < lines.length; j++) {
-        const next = lines[j];
-        // Skip blank / decorative lines
-        if (!next.trim()) continue;
-        // If the next line starts a new labelled row with inline answers,
-        // only use tokens before any new boundary when this label had none.
-        const tokens = Array.from(
-          next.matchAll(new RegExp(YES_NO_TOKEN_RE.source, "gi"))
-        );
-        if (tokens.length === 0) {
-          // Hit another label row with no answers yet — keep looking one more line
-          if (completionBoundaryRe().test(next)) continue;
-          continue;
-        }
-
-        let picked = tokens[0];
-        if (tokens.length >= 2) {
-          // Left-column labels take the first Yes/No; right-column take the last.
-          // Raw column distance alone fails when the left Yes is nearer a right label.
-          picked = preferLeft ? tokens[0] : tokens[tokens.length - 1];
-        }
-
-        return tokenToYesNo(picked[1]);
-      }
-    }
-
-    // Flattened OCR fallback: single-line document without newlines
-    const flat = anchor.exec(text);
-    if (flat && flat.index != null) {
-      const after = text.slice(
-        flat.index + flat[0].length,
-        flat.index + flat[0].length + 220
-      );
-      const flatAnswer = yesNoBeforeBoundary(after);
-      if (flatAnswer) return flatAnswer;
-    }
-  }
-  return "unknown";
 }
 
 /** First Yes/No token only — mutually exclusive. */
