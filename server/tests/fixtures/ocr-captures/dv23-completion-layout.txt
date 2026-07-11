@@ -1,0 +1,60 @@
+                                                    Job Summary Report
+           Asset No:             DV23VSJ                  Make/Model:                                  Inverter Unit
+
+           Asset Mileage/Hours:  12840                    Location:                                    Building 4 — East Wing
+
+
+                                                              Compliance Checklist
+
+     Item                                     Check                        Pass        Fail       N/A
+     1     Visual condition of enclosure                                     ✓
+     2     Ventilation and cooling check                                     ✓
+     3     DC isolator operation                                             ✓
+     4     AC isolator operation                                             ✓
+     5     Earth continuity test                                             ✓
+     6     Insulation resistance test                                        ✓
+     7     String voltage measurement                                        ✓
+     8     Inverter display / fault codes                                    ✓
+     9     Output power vs expected yield                                    ✓
+    10     RCD / RCBO operation                                              ✓
+    11     Cable and connector integrity                                     ✓
+    12     Labelling and signage                                             ✓
+
+
+                                                              Completion Details
+             Date:                    02/07/2026               Compliance Type:                               Service - SB
+
+     Next Service Date:               02/07/2027               Compliance Title:                           Inverter Inspection
+
+    Service Completed?                                      Additional Tasks Complete?
+                                           Yes                                                                    Yes
+
+    All Works Completed?                   Yes                Return Visit Needed?                                 No
+
+    Consumables Used?                       No                 Asset Safe To Use?                                 Yes
+
+
+   Job Duration:             0.8        Overtime:            No            Travel :           1.0      Job ID :           485
+
+
+                                                              Technician Details
+     Technician Name:             nicholas.lawrence
+     Technician Signature:        [signature image]
+
+
+                                                              Engineer Comments
+     Routine inverter inspection complete. All checks passed. No defects found.
+     String voltages within expected range. Output power consistent with irradiance levels.
+     Next scheduled inspection due 02/07/2027.
+
+
+                                                              Repairs Required
+
+                                                              Parts Used
+
+                                                              Parts Still Required
+
+                                                              Customer Signature
+     [signature image]
+
+                                                              Page 1 of 1
