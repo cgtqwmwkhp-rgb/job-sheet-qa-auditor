@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   applyAuditPolicy,
   classifyFinding,
+  computeRuleSnapshotHash,
   decideOverallResult,
   DEFAULT_AUDIT_POLICY,
   mergeAuditPolicy,
@@ -269,5 +270,78 @@ describe("auditPolicy", () => {
     });
     expect(applied.hasMajorFails).toBe(true);
     expect(applied.overallResult).toBe("FAIL");
+  });
+
+  describe("policy version stamp", () => {
+    it("DEFAULT_AUDIT_POLICY.version is a semver string", () => {
+      expect(typeof DEFAULT_AUDIT_POLICY.version).toBe("string");
+      expect(DEFAULT_AUDIT_POLICY.version).toMatch(/^\d+\.\d+\.\d+$/);
+    });
+
+    it("applyAuditPolicy returns policyVersion matching the input policy", () => {
+      const applied = applyAuditPolicy({
+        findings: [],
+        formFamily: "job-summary-v1",
+        policy: DEFAULT_AUDIT_POLICY,
+        currentResult: "PASS",
+      });
+      expect(applied.policyVersion).toBe(DEFAULT_AUDIT_POLICY.version);
+    });
+
+    it("applyAuditPolicy returns a stable ruleSnapshotHash", () => {
+      const a = applyAuditPolicy({
+        findings: [],
+        formFamily: "job-summary-v1",
+        policy: DEFAULT_AUDIT_POLICY,
+        currentResult: "PASS",
+      });
+      const b = applyAuditPolicy({
+        findings: [
+          finding({
+            ruleId: "JSR-C080",
+            fieldName: "Engineer Comments",
+            severity: "S1",
+          }),
+        ],
+        formFamily: "job-summary-v1",
+        policy: DEFAULT_AUDIT_POLICY,
+        currentResult: "PASS",
+      });
+      expect(a.ruleSnapshotHash).toBe(b.ruleSnapshotHash);
+      expect(a.ruleSnapshotHash).toMatch(/^[a-f0-9]{64}$/);
+    });
+
+    it("ruleSnapshotHash changes when policy rules change", () => {
+      const original = computeRuleSnapshotHash(DEFAULT_AUDIT_POLICY);
+      const tweaked = mergeAuditPolicy({
+        version: DEFAULT_AUDIT_POLICY.version,
+        forms: {
+          "job-summary-v1": {
+            label: "Job Summary (VOR)",
+            rules: [
+              {
+                ruleId: "JSR-C080",
+                label: "Engineer Comments (Failure Path)",
+                description: "changed",
+                failClass: "minor",
+                enabled: false,
+              },
+            ],
+          },
+        },
+      });
+      const changed = computeRuleSnapshotHash(tweaked);
+      expect(changed).not.toBe(original);
+    });
+
+    it("mergeAuditPolicy preserves version from stored policy", () => {
+      const merged = mergeAuditPolicy({ version: "2.1.0" });
+      expect(merged.version).toBe("2.1.0");
+    });
+
+    it("mergeAuditPolicy falls back to default version when stored omits it", () => {
+      const merged = mergeAuditPolicy({});
+      expect(merged.version).toBe(DEFAULT_AUDIT_POLICY.version);
+    });
   });
 });

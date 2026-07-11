@@ -2,6 +2,7 @@
  * Audit policy: classify findings and decide hard-fail vs score-only.
  */
 
+import { createHash } from "crypto";
 import type { Finding } from "../analyzer";
 import { DEFAULT_AUDIT_POLICY } from "./defaults";
 import type {
@@ -243,6 +244,18 @@ export function decideOverallResult(input: {
   return input.current;
 }
 
+/**
+ * Deterministic SHA-256 hash of the policy's rule definitions (forms + weights).
+ * Enables downstream consumers to detect rule-set drift without comparing full JSON.
+ */
+export function computeRuleSnapshotHash(policy: AuditPolicy): string {
+  const canonical = JSON.stringify({
+    weights: policy.weights,
+    forms: policy.forms,
+  });
+  return createHash("sha256").update(canonical).digest("hex");
+}
+
 export function applyAuditPolicy(input: {
   findings: Finding[];
   formFamily: string;
@@ -254,6 +267,8 @@ export function applyAuditPolicy(input: {
   hasMajorFails: boolean;
   majorCount: number;
   minorCount: number;
+  policyVersion: string;
+  ruleSnapshotHash: string;
 } {
   const findings = classifyFindings(
     input.findings,
@@ -273,6 +288,8 @@ export function applyAuditPolicy(input: {
     hasMajorFails: majors.length > 0,
     majorCount: majors.length,
     minorCount: minors.length,
+    policyVersion: input.policy.version,
+    ruleSnapshotHash: computeRuleSnapshotHash(input.policy),
   };
 }
 
