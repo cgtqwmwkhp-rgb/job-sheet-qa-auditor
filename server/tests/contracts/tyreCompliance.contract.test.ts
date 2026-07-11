@@ -442,7 +442,10 @@ describe("tyreCompliance", () => {
     });
 
     it("explicit 'Tyre Age: 10 years' → S1 OUT_OF_POLICY", () => {
-      const result = evaluateTyreCompliance(TRAILER_DOT_AGE_EXPLICIT_FAIL, testDate);
+      const result = evaluateTyreCompliance(
+        TRAILER_DOT_AGE_EXPLICIT_FAIL,
+        testDate
+      );
       const s1 = result.findings.filter(
         f => f.ruleId === "TYRE-C030" && f.severity === "S1"
       );
@@ -453,7 +456,10 @@ describe("tyreCompliance", () => {
     });
 
     it("explicit 'Tyre Age: 5 years' → S3 Passed", () => {
-      const result = evaluateTyreCompliance(TRAILER_DOT_AGE_EXPLICIT_PASS, testDate);
+      const result = evaluateTyreCompliance(
+        TRAILER_DOT_AGE_EXPLICIT_PASS,
+        testDate
+      );
       const dotFindings = result.findings.filter(f => f.ruleId === "TYRE-C030");
       expect(dotFindings).toHaveLength(1);
       expect(dotFindings[0].severity).toBe("S3");

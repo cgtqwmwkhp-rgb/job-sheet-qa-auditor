@@ -64,12 +64,10 @@ const PSI_RE =
 
 // DOT date code: 4-digit WWYY (week 01-52, year 00-99). Matches patterns like
 // "DOT 2315", "DOT: 2315", "DOT code 2315", "DOT XXXX XXXX 2315"
-const DOT_CODE_RE =
-  /\bDOT\b[\s\S]{0,40}?\b(\d{2})([01]\d|[2-9]\d)\s*$/gim;
+const DOT_CODE_RE = /\bDOT\b[\s\S]{0,40}?\b(\d{2})([01]\d|[2-9]\d)\s*$/gim;
 
 // More permissive single-match: captures last 4 digits on a DOT line
-const DOT_LINE_RE =
-  /\bDOT\b[^]*?(\d{2})(\d{2})\s*(?:$|\n)/im;
+const DOT_LINE_RE = /\bDOT\b[^]*?(\d{2})(\d{2})\s*(?:$|\n)/im;
 
 // Explicit age statements: "Tyre Age: 9 years" or "Age of tyre: 10yrs"
 const DOT_AGE_EXPLICIT_RE =
@@ -122,7 +120,10 @@ function parsePsi(text: string): number | null {
   return isNaN(val) ? null : val;
 }
 
-function parseDotAge(text: string, now: Date = new Date()): DotAgeResult | null {
+function parseDotAge(
+  text: string,
+  now: Date = new Date()
+): DotAgeResult | null {
   // Try explicit age statement first
   const explicitMatch = text.match(DOT_AGE_EXPLICIT_RE);
   if (explicitMatch) {
@@ -138,14 +139,19 @@ function parseDotAge(text: string, now: Date = new Date()): DotAgeResult | null 
     const week = parseInt(lineMatch[1], 10);
     const yearShort = parseInt(lineMatch[2], 10);
     if (week >= 1 && week <= 53) {
-      const fullYear = yearShort <= (now.getFullYear() % 100)
-        ? 2000 + yearShort
-        : 1900 + yearShort;
+      const fullYear =
+        yearShort <= now.getFullYear() % 100
+          ? 2000 + yearShort
+          : 1900 + yearShort;
       const mfgDate = new Date(fullYear, 0, 1 + (week - 1) * 7);
       const ageMs = now.getTime() - mfgDate.getTime();
       const ageYears = ageMs / (365.25 * 24 * 60 * 60 * 1000);
       if (ageYears >= 0) {
-        return { week, year: fullYear, ageYears: Math.round(ageYears * 10) / 10 };
+        return {
+          week,
+          year: fullYear,
+          ageYears: Math.round(ageYears * 10) / 10,
+        };
       }
     }
   }
@@ -164,7 +170,10 @@ function lookupPsiBand(
   return null;
 }
 
-export function evaluateTyreCompliance(text: string, now?: Date): TyreComplianceResult {
+export function evaluateTyreCompliance(
+  text: string,
+  now?: Date
+): TyreComplianceResult {
   const readings = parseTreadReadings(text);
   const tyreSize = parseTyreSize(text);
   const psiValue = parsePsi(text);
@@ -267,17 +276,17 @@ export function evaluateTyreCompliance(text: string, now?: Date): TyreCompliance
   // --- DOT age ---
   if (dotAge !== null) {
     if (dotAge.ageYears > MAX_DOT_AGE_YEARS) {
-      const ageDisplay = dotAge.year > 0
-        ? `DOT ${String(dotAge.week).padStart(2, "0")}${String(dotAge.year % 100).padStart(2, "0")} (${dotAge.ageYears} years)`
-        : `${dotAge.ageYears} years`;
+      const ageDisplay =
+        dotAge.year > 0
+          ? `DOT ${String(dotAge.week).padStart(2, "0")}${String(dotAge.year % 100).padStart(2, "0")} (${dotAge.ageYears} years)`
+          : `${dotAge.ageYears} years`;
       findings.push({
         ruleId: `${TYRE_RULE_PREFIX}030`,
         fieldName: "Tyre DOT Age",
         severity: "S1",
         reasonCode: "OUT_OF_POLICY",
         rawSnippet: ageDisplay,
-        normalisedSnippet:
-          `Tyre age ${dotAge.ageYears} years exceeds the ${MAX_DOT_AGE_YEARS}-year maximum.`,
+        normalisedSnippet: `Tyre age ${dotAge.ageYears} years exceeds the ${MAX_DOT_AGE_YEARS}-year maximum.`,
         confidence: 90,
         pageNumber: 1,
         whyItMatters:
@@ -287,21 +296,20 @@ export function evaluateTyreCompliance(text: string, now?: Date): TyreCompliance
           "Replace tyres that exceed the 8-year age limit before the trailer returns to service.",
       });
     } else {
-      const ageDisplay = dotAge.year > 0
-        ? `DOT ${String(dotAge.week).padStart(2, "0")}${String(dotAge.year % 100).padStart(2, "0")} (${dotAge.ageYears} years)`
-        : `${dotAge.ageYears} years`;
+      const ageDisplay =
+        dotAge.year > 0
+          ? `DOT ${String(dotAge.week).padStart(2, "0")}${String(dotAge.year % 100).padStart(2, "0")} (${dotAge.ageYears} years)`
+          : `${dotAge.ageYears} years`;
       findings.push({
         ruleId: `${TYRE_RULE_PREFIX}030`,
         fieldName: "Tyre DOT Age",
         severity: "S3",
         reasonCode: "OUT_OF_POLICY",
         rawSnippet: ageDisplay,
-        normalisedSnippet:
-          `Tyre age ${dotAge.ageYears} years is within the ${MAX_DOT_AGE_YEARS}-year limit. Passed.`,
+        normalisedSnippet: `Tyre age ${dotAge.ageYears} years is within the ${MAX_DOT_AGE_YEARS}-year limit. Passed.`,
         confidence: 90,
         pageNumber: 1,
-        whyItMatters:
-          "Tyre age is within the PlantExpand 8-year maximum.",
+        whyItMatters: "Tyre age is within the PlantExpand 8-year maximum.",
         suggestedFix: "No action required.",
       });
     }
