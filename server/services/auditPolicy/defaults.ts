@@ -249,6 +249,15 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           enabled: true,
           fieldAliases: ["Tyre PSI", "Tyre Inflation", "Tyre Pressure"],
         },
+        {
+          ruleId: "TYRE-C030",
+          label: "Tyre DOT Age",
+          description:
+            "Tyre age exceeds 8-year maximum per PlantExpand checklist (DOT date code)",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: ["Tyre DOT Age", "Tyre Age", "DOT Age"],
+        },
       ],
     },
     /**
