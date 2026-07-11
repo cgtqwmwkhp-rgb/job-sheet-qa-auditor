@@ -5,7 +5,7 @@ import type { AuditPolicy } from "./types";
  * Admins override via Settings → Audit Policy; pipeline uses DB ?? these defaults.
  */
 export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
-  version: 1,
+  version: "1.0.0",
   weights: {
     major: 25,
     minor: 15,

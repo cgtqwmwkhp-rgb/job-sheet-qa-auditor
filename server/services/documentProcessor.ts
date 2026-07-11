@@ -1817,6 +1817,8 @@ async function processJobSheetWithOptions(
     majorCount: number;
     minorCount: number;
     weights: { major: number; minor: number; informational: number };
+    policyVersion: string;
+    ruleSnapshotHash: string;
   } | null = null;
   const auditPolicy = await db.getAuditPolicy();
   {
@@ -1832,6 +1834,8 @@ async function processJobSheetWithOptions(
       majorCount: applied.majorCount,
       minorCount: applied.minorCount,
       weights: auditPolicy.weights,
+      policyVersion: applied.policyVersion,
+      ruleSnapshotHash: applied.ruleSnapshotHash,
     };
     analysisResult = {
       ...analysisResult,

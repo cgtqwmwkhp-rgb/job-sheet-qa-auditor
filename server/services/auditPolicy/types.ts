@@ -37,7 +37,8 @@ export interface AuditPolicyWeights {
 }
 
 export interface AuditPolicy {
-  version: number;
+  /** Semver or date-based string stamped onto every audit for traceability. */
+  version: string;
   weights: AuditPolicyWeights;
   forms: Record<string, AuditPolicyForm>;
 }
