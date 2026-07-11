@@ -83,13 +83,13 @@ New activatable templates **must** use activation-canonical field IDs — **not*
 
 **Domain reference:** PlantExpand “Wasted Journey Sheet” (abort / no-show / unable to complete visit). **Not** a repair judgment and **not** Job Summary.
 
-| Layer         | Guidance                                                                                                                                 |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| **Fields**    | Canonical 4 present (`jobReference` soft); required `assetId`, `date`, `engineerSignOff`, `wastedJourneyReason`; contact Y/N answered   |
-| **Rules**     | WJ-C*: reason present; scheduling + site contact answered (Yes **or** No); identity + sign-off. No VOR/safe-to-use/parts/return-visit   |
-| **Selection** | `requiredTokensAll: ["wasted", "journey"]`; optional `no-show`, `scheduling`, `plantexpand`                                              |
-| **ROI**       | Standard 6; `tickboxBlock` over reason/contact questions; `signatureBlock` over technician sign-off                                      |
-| **Fixtures**  | PASS (coherent abort), FAIL (missing reason/unsigned), REVIEW (contacts blank)                                                           |
+| Layer         | Guidance                                                                                                                               |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fields**    | Canonical 4 present (`jobReference` soft); required `assetId`, `date`, `engineerSignOff`, `wastedJourneyReason`; contact Y/N answered  |
+| **Rules**     | WJ-C\*: reason present; scheduling + site contact answered (Yes **or** No); identity + sign-off. No VOR/safe-to-use/parts/return-visit |
+| **Selection** | `requiredTokensAll: ["wasted", "journey"]`; optional `no-show`, `scheduling`, `plantexpand`                                            |
+| **ROI**       | Standard 6; `tickboxBlock` over reason/contact questions; `signatureBlock` over technician sign-off                                    |
+| **Fixtures**  | PASS (coherent abort), FAIL (missing reason/unsigned), REVIEW (contacts blank)                                                         |
 
 **Policy:** A wasted journey with a clear reason and sign-off is a documentation **PASS** even if no work was done. Blank contact answers are Issues; answered No is valid.
 
