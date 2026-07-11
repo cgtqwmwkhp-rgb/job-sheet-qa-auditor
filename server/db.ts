@@ -365,7 +365,12 @@ export async function updateFindingResolution(
     resolvedBy?: number | null;
     resolvedAt?: Date | null;
     previousResolutionStatus?:
-      "open" | "waived" | "overridden" | "flagged" | "approved" | null;
+      | "open"
+      | "waived"
+      | "overridden"
+      | "flagged"
+      | "approved"
+      | null;
   }
 ) {
   const db = await getDb();
@@ -1095,9 +1100,11 @@ function parseReportCohort(reportJson: unknown): {
   const report = reportJson as Record<string, unknown>;
   const cohort = report.selectionCohort as Record<string, unknown> | undefined;
   const selection = report.selectionResult as
-    Record<string, unknown> | undefined;
+    | Record<string, unknown>
+    | undefined;
   const candidates = selection?.candidates as
-    Array<Record<string, unknown>> | undefined;
+    | Array<Record<string, unknown>>
+    | undefined;
 
   return {
     assetType: typeof cohort?.assetType === "string" ? cohort.assetType : null,
@@ -1390,7 +1397,11 @@ export async function getExceptionOverturnFindings(options?: {
     severity: r.severity,
     fieldName: r.fieldName,
     resolutionStatus: (r.resolutionStatus ?? "open") as
-      "open" | "waived" | "overridden" | "flagged" | "approved",
+      | "open"
+      | "waived"
+      | "overridden"
+      | "flagged"
+      | "approved",
     siteInfo: r.siteInfo,
     occurredAt: r.occurredAt,
     resolvedAt: r.resolvedAt ?? null,
@@ -1605,7 +1616,11 @@ export async function getPredictiveRiskFindings(options?: {
     reasonCode: r.reasonCode,
     fieldName: r.fieldName ?? "",
     resolutionStatus: (r.resolutionStatus ?? "open") as
-      "open" | "waived" | "overridden" | "flagged" | "approved",
+      | "open"
+      | "waived"
+      | "overridden"
+      | "flagged"
+      | "approved",
     occurredAt: r.occurredAt,
   }));
 }
