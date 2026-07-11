@@ -158,9 +158,7 @@ describe("Job 87 VOR trailer golden fixtures", () => {
       expect(result.readings).toHaveLength(4);
       expect(result.readings.every(r => r.depthMm === 6)).toBe(true);
 
-      const treadFinding = result.findings.find(
-        f => f.ruleId === "TYRE-C010"
-      );
+      const treadFinding = result.findings.find(f => f.ruleId === "TYRE-C010");
       expect(treadFinding).toBeDefined();
       expect(treadFinding!.severity).toBe("S3");
       expect(treadFinding!.normalisedSnippet).toContain("Passed");
