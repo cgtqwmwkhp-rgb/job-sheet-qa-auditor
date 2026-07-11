@@ -64,6 +64,16 @@ describe("photoEvidence hints", () => {
       priorFileHashes: ["abc123"],
     });
     expect(result.findings.some(f => f.ruleId === "PHOTO-C015")).toBe(true);
+    expect(result.duplicateFileHash).toBe(true);
+  });
+
+  it("skips PHOTO-C015 when prior hashes do not match", () => {
+    const result = evaluatePhotoEvidenceConsistency(NO_HINTS, {
+      fileHash: "abc123",
+      priorFileHashes: ["other-hash"],
+    });
+    expect(result.findings.some(f => f.ruleId === "PHOTO-C015")).toBe(false);
+    expect(result.duplicateFileHash).toBe(false);
   });
 
   it("extractPhotoEvidenceHints counts Photo-N", () => {
@@ -202,5 +212,15 @@ describe("documentProcessor wiring photo/coherence", () => {
     expect(src).toContain("runPhotoPairCompare");
     expect(src).toContain("evaluateEvidenceCoherence");
     expect(src).toContain("photoPairCompare");
+  });
+
+  it("wires prior fileHash lookup for PHOTO-C015", () => {
+    const src = readFileSync(
+      resolve(__dirname, "../../services/documentProcessor.ts"),
+      "utf8"
+    );
+    expect(src).toContain("getPriorFileHashesForJobSheet");
+    expect(src).toContain("updateJobSheetFileHash");
+    expect(src).toContain("priorFileHashes");
   });
 });

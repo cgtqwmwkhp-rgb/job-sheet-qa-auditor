@@ -1,4 +1,14 @@
-import { eq, desc, and, sql, count, gte, lte, isNotNull } from "drizzle-orm";
+import {
+  eq,
+  ne,
+  desc,
+  and,
+  sql,
+  count,
+  gte,
+  lte,
+  isNotNull,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -275,6 +285,55 @@ export async function updateJobSheetStatus(id: number, status: string) {
     .update(jobSheets)
     .set({ status: status as any })
     .where(eq(jobSheets.id, id));
+}
+
+export async function updateJobSheetFileHash(id: number, fileHash: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(jobSheets).set({ fileHash }).where(eq(jobSheets.id, id));
+}
+
+/**
+ * Prior file hashes for duplicate evidence-pack detection (PHOTO-C015).
+ * Match by referenceNumber when present, otherwise technicianId.
+ * Excludes the current job sheet; only non-null hashes; most recent first.
+ */
+export async function getPriorFileHashesForJobSheet(
+  jobSheetId: number,
+  options?: { limit?: number }
+): Promise<string[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const current = await getJobSheetById(jobSheetId);
+  if (!current) return [];
+
+  const matchConditions = [
+    ne(jobSheets.id, jobSheetId),
+    isNotNull(jobSheets.fileHash),
+  ];
+
+  if (current.referenceNumber) {
+    matchConditions.push(
+      eq(jobSheets.referenceNumber, current.referenceNumber)
+    );
+  } else if (current.technicianId != null) {
+    matchConditions.push(eq(jobSheets.technicianId, current.technicianId));
+  } else {
+    return [];
+  }
+
+  const rows = await db
+    .select({ fileHash: jobSheets.fileHash })
+    .from(jobSheets)
+    .where(and(...matchConditions))
+    .orderBy(desc(jobSheets.createdAt))
+    .limit(options?.limit ?? 20);
+
+  return rows
+    .map(r => r.fileHash)
+    .filter((h): h is string => typeof h === "string" && h.length > 0);
 }
 
 // ============ AUDIT RESULT QUERIES ============
