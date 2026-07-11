@@ -21,6 +21,9 @@ import type { Finding } from "../analyzer";
 export const FEATURE_FLAG = "FEATURE_SELECTION_MARKS";
 export const ENGINE_VERSION = "selection-marks-v1";
 
+/** Minimum confidence for a Fail mark to drive S1 findings / block auto-PASS. */
+export const FAIL_CONFIDENCE_THRESHOLD = 80;
+
 export type ChecklistChoice = "Ok" | "Adv" | "Fail" | "N/A" | "UNREADABLE";
 
 export const CHECKLIST_COLUMNS: Exclude<ChecklistChoice, "UNREADABLE">[] = [
@@ -346,6 +349,7 @@ export function buildSelectionMarkFindings(
       : undefined;
 
     if (row.choice === "Fail") {
+      if (row.confidence < FAIL_CONFIDENCE_THRESHOLD) continue;
       findings.push({
         ruleId: "SELECTION_MARKS",
         fieldName,
@@ -422,7 +426,7 @@ export function reconcileSelectionMarksWithJudgment(
 /** True when any high-confidence Fail mark should block auto-PASS. */
 export function hasBlockingFailMarks(
   artifact: SelectionMarksArtifact | undefined | null,
-  minConfidence = 80
+  minConfidence = FAIL_CONFIDENCE_THRESHOLD
 ): boolean {
   return countHighConfidenceFailMarks(artifact, minConfidence) > 0;
 }
@@ -434,7 +438,7 @@ export function hasBlockingFailMarks(
  */
 export function countHighConfidenceFailMarks(
   artifact: SelectionMarksArtifact | undefined | null,
-  minConfidence = 80
+  minConfidence = FAIL_CONFIDENCE_THRESHOLD
 ): number {
   if (!artifact?.rows) return 0;
   return artifact.rows.filter(
