@@ -7,6 +7,7 @@ import {
   DEFAULT_AUDIT_POLICY,
   mergeAuditPolicy,
   resolveAuditFormFamily,
+  SAFETY_CRITICAL_RULE_IDS,
 } from "../../services/auditPolicy";
 import { computeDocumentationQualityScore } from "../../services/documentationQuality";
 import type { Finding } from "../../services/analyzer";
@@ -342,6 +343,42 @@ describe("auditPolicy", () => {
     it("mergeAuditPolicy falls back to default version when stored omits it", () => {
       const merged = mergeAuditPolicy({});
       expect(merged.version).toBe(DEFAULT_AUDIT_POLICY.version);
+    });
+  });
+
+  describe("safety-critical rule set", () => {
+    it("SAFETY_CRITICAL_RULE_IDS is a non-empty ReadonlySet", () => {
+      expect(SAFETY_CRITICAL_RULE_IDS.size).toBeGreaterThan(0);
+      expect(SAFETY_CRITICAL_RULE_IDS).toBeInstanceOf(Set);
+    });
+
+    it("every safety-critical ID exists in the default policy", () => {
+      const allRuleIds = new Set<string>();
+      for (const form of Object.values(DEFAULT_AUDIT_POLICY.forms)) {
+        for (const rule of form.rules) {
+          allRuleIds.add(rule.ruleId);
+        }
+      }
+      for (const id of SAFETY_CRITICAL_RULE_IDS) {
+        expect(allRuleIds.has(id)).toBe(true);
+      }
+    });
+
+    it("all safety-critical rules default to major + enabled", () => {
+      for (const form of Object.values(DEFAULT_AUDIT_POLICY.forms)) {
+        for (const rule of form.rules) {
+          if (SAFETY_CRITICAL_RULE_IDS.has(rule.ruleId)) {
+            expect(rule.failClass).toBe("major");
+            expect(rule.enabled).toBe(true);
+          }
+        }
+      }
+    });
+
+    it("includes the explicitly specified rule IDs from the spec", () => {
+      for (const id of ["JSR-C010", "JSR-C060", "JSR-C090", "JSR-C093"]) {
+        expect(SAFETY_CRITICAL_RULE_IDS.has(id)).toBe(true);
+      }
     });
   });
 });

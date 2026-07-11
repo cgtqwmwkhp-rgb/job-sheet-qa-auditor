@@ -292,3 +292,5 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
 };
 
 export const AUDIT_POLICY_SETTING_KEY = "auditPolicy";
+
+export { SAFETY_CRITICAL_RULE_IDS } from "@shared/const";
