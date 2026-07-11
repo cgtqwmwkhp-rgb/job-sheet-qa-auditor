@@ -198,6 +198,83 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
         },
       ],
     },
+    /**
+     * Catch-all for templates that don't map to a known form family.
+     * Mirrors the most safety-critical job-summary rules so unknown
+     * templates still get major/minor classification instead of
+     * falling through to unmapped→minor for everything.
+     */
+    default: {
+      label: "Default (catch-all)",
+      rules: [
+        {
+          ruleId: "DEF-C010",
+          label: "VOR ↔ Safe to Use (conflict)",
+          description:
+            "VOR / unsafe status contradicts safe-to-use — applies to any form",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: ["VOR ↔ Safe to Use", "vorSafeConflict"],
+        },
+        {
+          ruleId: "DEF-C020",
+          label: "Works Completion",
+          description:
+            "Failure/repairs signals but works marked complete — generic catch-all",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: ["Works Completion", "worksCompletion"],
+        },
+        {
+          ruleId: "DEF-C030",
+          label: "Return Visit Required",
+          description:
+            "Critical outcome but return visit not marked Yes — generic catch-all",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: ["Return Visit Required", "returnVisitRequired"],
+        },
+        {
+          ruleId: "DEF-C040",
+          label: "Engineer Signature / Sign-off",
+          description: "Technician name or signature must be present",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: [
+            "Engineer Signature / Sign-off",
+            "Technician Signature",
+            "engineerSignOff",
+            "customerSignature",
+          ],
+        },
+        {
+          ruleId: "DEF-C050",
+          label: "Engineer Comments (Failure Path)",
+          description:
+            "Failure path without substantive engineer comments — generic catch-all",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: [
+            "Engineer Comments (Failure Path)",
+            "engineer_comments",
+            "Engineer Comments",
+          ],
+        },
+        {
+          ruleId: "DEF-R010",
+          label: "Date / Asset Number format",
+          description: "Date or asset-number pattern niggle",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: [
+            "assetId pattern",
+            "Asset Number",
+            "Asset No",
+            "date",
+          ],
+        },
+      ],
+    },
   },
 };
 
