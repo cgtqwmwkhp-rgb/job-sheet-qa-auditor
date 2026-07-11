@@ -65,9 +65,9 @@ jobs:
         run: |
           echo "Running parity subset tests..."
           mkdir -p parity/reports
-          pnpm test:parity:subset 2>&1 | tee parity/reports/subset-output.txt || true
+          pnpm test:parity:subset 2>&1 | tee parity/reports/subset-output.txt
           
-          # Generate summary report
+          # Generate summary report and latest.json for threshold gate
           node -e "
           const fs = require('fs');
           const path = require('path');
@@ -101,6 +101,20 @@ jobs:
           
           const passRate = (passedFields / totalFields * 100).toFixed(1);
           
+          // Check thresholds
+          const violations = [];
+          const overallThreshold = thresholds.thresholds.overall.minPassRate * 100;
+          if (parseFloat(passRate) < overallThreshold) {
+            violations.push('Overall pass rate ' + passRate + '% below threshold ' + overallThreshold + '%');
+          }
+          Object.entries(bySeverity).forEach(([sev, data]) => {
+            const rate = data.total > 0 ? data.passed / data.total : 1;
+            const threshold = thresholds.thresholds.bySeverity[sev]?.minPassRate || 0;
+            if (rate < threshold) {
+              violations.push(sev + ' pass rate ' + (rate * 100).toFixed(1) + '% below threshold ' + (threshold * 100) + '%');
+            }
+          });
+          
           // Generate markdown summary
           let md = '## Parity Subset Report\\n\\n';
           md += '| Metric | Value |\\n|--------|-------|\\n';
@@ -127,9 +141,54 @@ jobs:
             md += '- ' + status + ' **' + doc.name + '** (' + doc.id + '): ' + docPassed + '/' + docTotal + ' fields\\n';
           });
           
+          if (violations.length > 0) {
+            md += '\\n### ⚠️ Threshold Violations\\n\\n';
+            violations.forEach(v => md += '- ' + v + '\\n');
+          } else {
+            md += '\\n### ✅ All Thresholds Met\\n';
+          }
+          
           fs.writeFileSync('parity/reports/subset-summary.md', md);
+          
+          // Write latest.json for threshold gate step
+          const report = {
+            timestamp: new Date().toISOString(),
+            datasetVersion: dataset.version,
+            thresholdVersion: thresholds.version,
+            scope: 'subset',
+            status: violations.length > 0 ? 'fail' : 'pass',
+            passRate: parseFloat(passRate),
+            totalFields,
+            passedFields,
+            failedFields,
+            bySeverity,
+            violations
+          };
+          fs.writeFileSync('parity/reports/latest.json', JSON.stringify(report, null, 2));
+          
           console.log(md);
           "
+
+      - name: Check Parity Thresholds
+        run: |
+          if [ -f parity/reports/latest.json ]; then
+            STATUS=$(jq -r '.status' parity/reports/latest.json)
+            PASS_RATE=$(jq -r '.passRate' parity/reports/latest.json)
+            echo "Pass Rate: $PASS_RATE%"
+            
+            if [ "$STATUS" = "fail" ]; then
+              echo "❌ Parity subset check failed - thresholds not met"
+              echo ""
+              echo "Violations:"
+              jq -r '.violations[]' parity/reports/latest.json
+              exit 1
+            else
+              echo "✅ Parity subset check passed"
+            fi
+          else
+            echo "❌ No parity report generated - failing gate"
+            exit 1
+          fi
 
       - name: Generate PR Summary
         if: always()
