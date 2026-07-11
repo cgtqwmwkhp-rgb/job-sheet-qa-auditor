@@ -26,15 +26,17 @@ describe("Overturn Metrics Contract", () => {
 
   describe("feature flag", () => {
     it("is disabled by default when FEATURE_OVERTURN_METRICS unset", async () => {
-      const { isOverturnMetricsEnabled } =
-        await import("../../services/overturnMetrics");
+      const { isOverturnMetricsEnabled } = await import(
+        "../../services/overturnMetrics"
+      );
       expect(isOverturnMetricsEnabled()).toBe(false);
     });
 
     it("is enabled when FEATURE_OVERTURN_METRICS=true", async () => {
       process.env.FEATURE_OVERTURN_METRICS = "true";
-      const { isOverturnMetricsEnabled } =
-        await import("../../services/overturnMetrics");
+      const { isOverturnMetricsEnabled } = await import(
+        "../../services/overturnMetrics"
+      );
       expect(isOverturnMetricsEnabled()).toBe(true);
     });
   });
@@ -55,8 +57,9 @@ describe("Overturn Metrics Contract", () => {
     }
 
     it("returns zeroes for empty input", async () => {
-      const { computeOverturnMetrics } =
-        await import("../../services/overturnMetrics");
+      const { computeOverturnMetrics } = await import(
+        "../../services/overturnMetrics"
+      );
       const result = computeOverturnMetrics([]);
 
       expect(result.totalActions).toBe(0);
@@ -70,8 +73,9 @@ describe("Overturn Metrics Contract", () => {
     });
 
     it("counts approvals as agreements", async () => {
-      const { computeOverturnMetrics } =
-        await import("../../services/overturnMetrics");
+      const { computeOverturnMetrics } = await import(
+        "../../services/overturnMetrics"
+      );
 
       const result = computeOverturnMetrics([
         entry("FINDING_APPROVE"),
@@ -87,8 +91,9 @@ describe("Overturn Metrics Contract", () => {
     });
 
     it("counts overrides and waives as overturns", async () => {
-      const { computeOverturnMetrics } =
-        await import("../../services/overturnMetrics");
+      const { computeOverturnMetrics } = await import(
+        "../../services/overturnMetrics"
+      );
 
       const result = computeOverturnMetrics([
         entry("FINDING_OVERRIDE"),
@@ -104,8 +109,9 @@ describe("Overturn Metrics Contract", () => {
     });
 
     it("counts FIELD_CORRECTION separately", async () => {
-      const { computeOverturnMetrics } =
-        await import("../../services/overturnMetrics");
+      const { computeOverturnMetrics } = await import(
+        "../../services/overturnMetrics"
+      );
 
       const result = computeOverturnMetrics([
         entry("FINDING_APPROVE"),
@@ -122,8 +128,9 @@ describe("Overturn Metrics Contract", () => {
     });
 
     it("excludes undo and flag actions from totals", async () => {
-      const { computeOverturnMetrics } =
-        await import("../../services/overturnMetrics");
+      const { computeOverturnMetrics } = await import(
+        "../../services/overturnMetrics"
+      );
 
       const result = computeOverturnMetrics([
         entry("FINDING_APPROVE"),
@@ -139,8 +146,9 @@ describe("Overturn Metrics Contract", () => {
     });
 
     it("provides per-category breakdown", async () => {
-      const { computeOverturnMetrics } =
-        await import("../../services/overturnMetrics");
+      const { computeOverturnMetrics } = await import(
+        "../../services/overturnMetrics"
+      );
 
       const result = computeOverturnMetrics([
         entry("FINDING_OVERRIDE"),
@@ -178,8 +186,9 @@ describe("Overturn Metrics Contract", () => {
     });
 
     it("handles all-overturns scenario (0% trust)", async () => {
-      const { computeOverturnMetrics } =
-        await import("../../services/overturnMetrics");
+      const { computeOverturnMetrics } = await import(
+        "../../services/overturnMetrics"
+      );
 
       const result = computeOverturnMetrics([
         entry("FINDING_OVERRIDE"),
@@ -194,8 +203,9 @@ describe("Overturn Metrics Contract", () => {
 
   describe("computeOverturnRate (snapshot diff)", () => {
     it("returns zeroes for empty before set", async () => {
-      const { computeOverturnRate } =
-        await import("../../services/overturnMetrics");
+      const { computeOverturnRate } = await import(
+        "../../services/overturnMetrics"
+      );
 
       const result = computeOverturnRate([], [1, 2, 3]);
       expect(result.removedCount).toBe(0);
@@ -205,16 +215,18 @@ describe("Overturn Metrics Contract", () => {
     });
 
     it("returns zeroes for two empty sets", async () => {
-      const { computeOverturnRate } =
-        await import("../../services/overturnMetrics");
+      const { computeOverturnRate } = await import(
+        "../../services/overturnMetrics"
+      );
 
       const result = computeOverturnRate([], []);
       expect(result.overturnRate).toBe(0);
     });
 
     it("computes removed/added/unchanged correctly", async () => {
-      const { computeOverturnRate } =
-        await import("../../services/overturnMetrics");
+      const { computeOverturnRate } = await import(
+        "../../services/overturnMetrics"
+      );
 
       const result = computeOverturnRate([1, 2, 3, 4], [2, 4, 5]);
 
@@ -225,8 +237,9 @@ describe("Overturn Metrics Contract", () => {
     });
 
     it("100% overturn when all findings removed", async () => {
-      const { computeOverturnRate } =
-        await import("../../services/overturnMetrics");
+      const { computeOverturnRate } = await import(
+        "../../services/overturnMetrics"
+      );
 
       const result = computeOverturnRate([10, 20, 30], []);
 
@@ -237,8 +250,9 @@ describe("Overturn Metrics Contract", () => {
     });
 
     it("0% overturn when all findings unchanged", async () => {
-      const { computeOverturnRate } =
-        await import("../../services/overturnMetrics");
+      const { computeOverturnRate } = await import(
+        "../../services/overturnMetrics"
+      );
 
       const result = computeOverturnRate([1, 2, 3], [1, 2, 3]);
 
