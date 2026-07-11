@@ -82,6 +82,11 @@ import {
   isRelationshipFinding,
 } from "@/components/review/RelationshipFindingsGroup";
 import { ReviewShortcutsLegend } from "@/components/review/ReviewShortcutsLegend";
+import {
+  FailurePathSignalsPanel,
+  mapFailurePathSignalsFromReport,
+  type FailurePathSignals,
+} from "@/components/review/FailurePathSignalsPanel";
 
 export interface Finding {
   id: number | string;
@@ -127,6 +132,9 @@ export interface AuditData {
   selectionMarks?: SelectionMarksView | null;
   /** Itemised Doc Quality penalty deductions (from reportJson). */
   docQualityPenalties?: DocQualityPenalty[];
+  /** Failure-path signals extracted from Job Summary consistency check. */
+  failurePathSignals?: FailurePathSignals | null;
+  failurePathSignalSummary?: string | null;
 }
 
 export function mapFindingsFromApi(
@@ -290,6 +298,12 @@ export function ReviewWorkstationPane({
           docQualityPenalties: mapDocQualityPenaltiesFromReport(
             auditResult?.reportJson
           ),
+          ...(() => {
+            const fps = mapFailurePathSignalsFromReport(auditResult?.reportJson);
+            return fps.signals
+              ? { failurePathSignals: fps.signals, failurePathSignalSummary: fps.signalSummary }
+              : {};
+          })(),
         }
       : null;
 
@@ -312,6 +326,16 @@ export function ReviewWorkstationPane({
     auditDataProp?.docQualityPenalties ??
     mapDocQualityPenaltiesFromReport(auditResult?.reportJson);
 
+  const failurePathSignalsDerived = (() => {
+    if (auditDataProp?.failurePathSignals !== undefined) {
+      return {
+        signals: auditDataProp.failurePathSignals ?? null,
+        signalSummary: auditDataProp.failurePathSignalSummary ?? null,
+      };
+    }
+    return mapFailurePathSignalsFromReport(auditResult?.reportJson);
+  })();
+
   const auditData = auditDataProp
     ? {
         ...auditDataProp,
@@ -319,9 +343,16 @@ export function ReviewWorkstationPane({
         selectionMarks,
         hasMajorFails,
         docQualityPenalties,
+        failurePathSignals: failurePathSignalsDerived.signals,
+        failurePathSignalSummary: failurePathSignalsDerived.signalSummary,
       }
     : fetchedAuditData
-      ? { ...fetchedAuditData, hasMajorFails }
+      ? {
+          ...fetchedAuditData,
+          hasMajorFails,
+          failurePathSignals: failurePathSignalsDerived.signals,
+          failurePathSignalSummary: failurePathSignalsDerived.signalSummary,
+        }
       : null;
   const documentUrl =
     documentUrlProp ??
@@ -971,6 +1002,12 @@ function ReviewWorkstationContent({
             setFocusPage(pageNumber);
             if (!showPdfViewer) setShowPdfViewer(true);
           }}
+        />
+        <FailurePathSignalsPanel
+          signals={auditData.failurePathSignals ?? null}
+          signalSummary={auditData.failurePathSignalSummary}
+          defaultOpen={auditData.failurePathSignals?.onFailurePath ?? false}
+          className="shadow-none"
         />
       </div>
 
