@@ -41,9 +41,7 @@ export function mapDocQualityPenaltiesFromReport(
     .documentationQualityPenalties;
   if (!Array.isArray(raw)) return [];
   return raw
-    .filter(
-      (p): p is Record<string, unknown> => !!p && typeof p === "object"
-    )
+    .filter((p): p is Record<string, unknown> => !!p && typeof p === "object")
     .map(p => ({
       ruleId: String(p.ruleId ?? ""),
       fieldName: String(p.fieldName ?? ""),
@@ -82,13 +80,15 @@ export function DocQualityBreakdown({
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[420px] p-0" sideOffset={6}>
         <div className="px-4 py-3 border-b">
-          <h4 className="text-sm font-semibold">
-            Doc Quality Breakdown
-          </h4>
+          <h4 className="text-sm font-semibold">Doc Quality Breakdown</h4>
           <p className="text-xs text-muted-foreground mt-0.5">
             Score: <span className="font-mono font-semibold">{score}</span>
             {totalDeducted > 0 && (
-              <> &mdash; {totalDeducted} pts deducted from {penalties.length} issue{penalties.length !== 1 ? "s" : ""}</>
+              <>
+                {" "}
+                &mdash; {totalDeducted} pts deducted from {penalties.length}{" "}
+                issue{penalties.length !== 1 ? "s" : ""}
+              </>
             )}
           </p>
         </div>
@@ -109,11 +109,17 @@ export function DocQualityBreakdown({
               </TableHeader>
               <TableBody>
                 {penalties.map((p, i) => (
-                  <TableRow key={`${p.ruleId}-${p.fieldName}-${i}`} className="text-xs">
+                  <TableRow
+                    key={`${p.ruleId}-${p.fieldName}-${i}`}
+                    className="text-xs"
+                  >
                     <TableCell className="py-1.5 px-3 font-mono text-[11px]">
                       {p.ruleId || "—"}
                     </TableCell>
-                    <TableCell className="py-1.5 px-3 max-w-[140px] truncate" title={p.fieldName}>
+                    <TableCell
+                      className="py-1.5 px-3 max-w-[140px] truncate"
+                      title={p.fieldName}
+                    >
                       {p.fieldName}
                     </TableCell>
                     <TableCell className="py-1.5 px-3">

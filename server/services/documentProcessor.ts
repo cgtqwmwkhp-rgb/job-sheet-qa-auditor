@@ -166,8 +166,7 @@ export interface ProcessingOptions {
   useLegacyPath?: boolean;
 }
 
-export interface OrchestrateJobSheetProcessingRequest
-  extends ProcessingOptions {
+export interface OrchestrateJobSheetProcessingRequest extends ProcessingOptions {
   jobSheetId: number;
   /**
    * Primary HTTP callers already have this from their job sheet lookup. Retry
@@ -1854,7 +1853,9 @@ async function processJobSheetWithOptions(
   // Replace LLM self-confidence with engineer documentation quality (0–100).
   // LLM confidence is retained in reportJson for ops; the stored/UI score is the mark.
   const llmConfidenceForReport = analysisResult.score;
-  let documentationQualityPenalties: ReturnType<typeof computeDocumentationQualityScore>["penalties"] = [];
+  let documentationQualityPenalties: ReturnType<
+    typeof computeDocumentationQualityScore
+  >["penalties"] = [];
   {
     const quality = computeDocumentationQualityScore(analysisResult.findings, {
       llmConfidence: llmConfidenceForReport,
@@ -1982,9 +1983,7 @@ async function processJobSheetWithOptions(
       goldSpecId: options.goldSpecId || 1, // Default to spec ID 1 if not provided
       runId,
       result: analysisResult.overallResult.toLowerCase() as
-        | "pass"
-        | "fail"
-        | "review_queue",
+        "pass" | "fail" | "review_queue",
       confidenceScore: String(analysisResult.score),
       documentStrategy: usedEmbeddedText ? "embedded_text" : "ocr",
       ocrEngineVersion: getOCREngineVersion(
@@ -2032,8 +2031,8 @@ async function processJobSheetWithOptions(
             isGeminiMultimodalEnabled() &&
             Boolean(
               sharedPdfBuffer &&
-                sharedPdfBuffer.length > 0 &&
-                sharedPdfBuffer.length <= VLM_PDF_MAX_BYTES
+              sharedPdfBuffer.length > 0 &&
+              sharedPdfBuffer.length <= VLM_PDF_MAX_BYTES
             ),
         },
         ...(pipelineIntegrationResult

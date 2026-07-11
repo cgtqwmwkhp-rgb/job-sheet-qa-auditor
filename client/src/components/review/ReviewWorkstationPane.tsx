@@ -281,7 +281,9 @@ export function ReviewWorkstationPane({
           hasMajorFails: mapHasMajorFailsFromReport(auditResult?.reportJson),
           selectionTrace: mapSelectionTraceFromReport(auditResult?.reportJson),
           selectionMarks: mapSelectionMarksFromReport(auditResult?.reportJson),
-          docQualityPenalties: mapDocQualityPenaltiesFromReport(auditResult?.reportJson),
+          docQualityPenalties: mapDocQualityPenaltiesFromReport(
+            auditResult?.reportJson
+          ),
         }
       : null;
 
@@ -305,7 +307,13 @@ export function ReviewWorkstationPane({
     mapDocQualityPenaltiesFromReport(auditResult?.reportJson);
 
   const auditData = auditDataProp
-    ? { ...auditDataProp, selectionTrace, selectionMarks, hasMajorFails, docQualityPenalties }
+    ? {
+        ...auditDataProp,
+        selectionTrace,
+        selectionMarks,
+        hasMajorFails,
+        docQualityPenalties,
+      }
     : fetchedAuditData
       ? { ...fetchedAuditData, hasMajorFails }
       : null;
