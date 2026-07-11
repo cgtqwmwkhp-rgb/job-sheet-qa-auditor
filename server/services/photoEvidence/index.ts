@@ -58,11 +58,11 @@ export function extractPhotoEvidenceHints(
   options: { totalPages?: number | null } = {}
 ): PhotoEvidenceHints {
   const hasBeforeLabel =
-    /\bbefore\s*(?:photo|image|pic(?:ture)?)\b|\bphoto\s*[:\-]?\s*before\b|\bbefore\s*[:\-]/i.test(
+    /\bbefore\s*(?:photo|image|pic(?:ture)?)\b|\bphoto\s*[:-]?\s*before\b|\bbefore\s*[:-]/i.test(
       text
     );
   const hasAfterLabel =
-    /\bafter\s*(?:photo|image|pic(?:ture)?)\b|\bphoto\s*[:\-]?\s*after\b|\bafter\s*[:\-]/i.test(
+    /\bafter\s*(?:photo|image|pic(?:ture)?)\b|\bphoto\s*[:-]?\s*after\b|\bafter\s*[:-]/i.test(
       text
     );
 
