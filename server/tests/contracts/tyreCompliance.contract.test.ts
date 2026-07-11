@@ -1,9 +1,9 @@
 /**
  * Tyre compliance contract tests.
  *
- * Covers PlantExpand trailer tread-depth (≥ 2mm) and PSI band rules
+ * Covers PlantExpand trailer tread-depth (≥ 2mm), PSI band rules
  * for multiple C-rated tyre sizes (195/50R13C, 155/70R12C, 185/70R13C,
- * 195/55R10C).
+ * 195/55R10C), and DOT age (max 8 years).
  */
 
 import { describe, it, expect } from "vitest";
@@ -89,6 +89,78 @@ Job Summary Report
 Asset No: DV23VSJ Make/Model: Inverter Unit
 Completion Details
 All Works Completed? Yes
+`;
+
+/** DOT 2315 = week 23, year 2015 — over 8 years old (when tested against 2026). */
+const TRAILER_DOT_OVER_8 = `
+Job Summary Report
+Asset No: DV23TRL Make/Model: PlantExpand General Trailer
+
+OSF Tyre Tread Depth: 6mm
+NSF Tyre Tread Depth: 6mm
+OSR Tyre Tread Depth: 6mm
+NSR Tyre Tread Depth: 6mm
+
+Tyre Size: 195/50R13C
+Tyre Inflation: 93 PSI
+DOT: 2315
+`;
+
+/** DOT 1022 = week 10, year 2022 — under 8 years old (when tested against 2026). */
+const TRAILER_DOT_UNDER_8 = `
+Job Summary Report
+Asset No: DV23TRL Make/Model: PlantExpand General Trailer
+
+OSF Tyre Tread Depth: 6mm
+NSF Tyre Tread Depth: 6mm
+OSR Tyre Tread Depth: 6mm
+NSR Tyre Tread Depth: 6mm
+
+Tyre Size: 195/50R13C
+Tyre Inflation: 93 PSI
+DOT: 1022
+`;
+
+/** Explicit age statement: "Tyre Age: 10 years" — over 8. */
+const TRAILER_DOT_AGE_EXPLICIT_FAIL = `
+Job Summary Report
+Asset No: DV23TRL Make/Model: PlantExpand General Trailer
+
+OSF Tyre Tread Depth: 6mm
+NSF Tyre Tread Depth: 6mm
+OSR Tyre Tread Depth: 6mm
+NSR Tyre Tread Depth: 6mm
+
+Tyre Age: 10 years
+`;
+
+/** Explicit age statement: "Tyre Age: 5 years" — under 8. */
+const TRAILER_DOT_AGE_EXPLICIT_PASS = `
+Job Summary Report
+Asset No: DV23TRL Make/Model: PlantExpand General Trailer
+
+OSF Tyre Tread Depth: 6mm
+Tyre Age: 5 years
+`;
+
+/** No DOT data — should not produce TYRE-C030 finding. */
+const TRAILER_NO_DOT = `
+Job Summary Report
+Asset No: DV23TRL Make/Model: PlantExpand General Trailer
+
+OSF Tyre Tread Depth: 6mm
+NSF Tyre Tread Depth: 6mm
+OSR Tyre Tread Depth: 6mm
+NSR Tyre Tread Depth: 6mm
+
+Tyre Size: 195/50R13C
+Tyre Inflation: 93 PSI
+`;
+
+/** DOT exactly at 8-year boundary — should pass (> 8 required to fail). */
+const TRAILER_DOT_EXACTLY_8 = `
+OSF Tyre Tread Depth: 6mm
+DOT: 2818
 `;
 
 /** PSI at lower end of the acceptable band (90). */
@@ -340,6 +412,73 @@ describe("tyreCompliance", () => {
       expect(
         result.findings.filter(f => f.ruleId === "TYRE-C020")
       ).toHaveLength(0);
+    });
+  });
+
+  describe("DOT age", () => {
+    const testDate = new Date("2026-07-11T12:00:00Z");
+
+    it("DOT 2315 (week 23, 2015) → S1 OUT_OF_POLICY (>8 years)", () => {
+      const result = evaluateTyreCompliance(TRAILER_DOT_OVER_8, testDate);
+      const s1 = result.findings.filter(
+        f => f.ruleId === "TYRE-C030" && f.severity === "S1"
+      );
+      expect(s1).toHaveLength(1);
+      expect(s1[0].reasonCode).toBe("OUT_OF_POLICY");
+      expect(s1[0].normalisedSnippet).toContain("exceeds");
+      expect(s1[0].normalisedSnippet).toContain("8-year");
+      expect(result.dotAge).not.toBeNull();
+      expect(result.dotAge!.ageYears).toBeGreaterThan(8);
+    });
+
+    it("DOT 1022 (week 10, 2022) → S3 Passed (≤8 years)", () => {
+      const result = evaluateTyreCompliance(TRAILER_DOT_UNDER_8, testDate);
+      const dotFindings = result.findings.filter(f => f.ruleId === "TYRE-C030");
+      expect(dotFindings).toHaveLength(1);
+      expect(dotFindings[0].severity).toBe("S3");
+      expect(dotFindings[0].normalisedSnippet).toContain("Passed");
+      expect(result.dotAge).not.toBeNull();
+      expect(result.dotAge!.ageYears).toBeLessThanOrEqual(8);
+    });
+
+    it("explicit 'Tyre Age: 10 years' → S1 OUT_OF_POLICY", () => {
+      const result = evaluateTyreCompliance(
+        TRAILER_DOT_AGE_EXPLICIT_FAIL,
+        testDate
+      );
+      const s1 = result.findings.filter(
+        f => f.ruleId === "TYRE-C030" && f.severity === "S1"
+      );
+      expect(s1).toHaveLength(1);
+      expect(s1[0].normalisedSnippet).toContain("10");
+      expect(s1[0].normalisedSnippet).toContain("exceeds");
+      expect(result.dotAge!.ageYears).toBe(10);
+    });
+
+    it("explicit 'Tyre Age: 5 years' → S3 Passed", () => {
+      const result = evaluateTyreCompliance(
+        TRAILER_DOT_AGE_EXPLICIT_PASS,
+        testDate
+      );
+      const dotFindings = result.findings.filter(f => f.ruleId === "TYRE-C030");
+      expect(dotFindings).toHaveLength(1);
+      expect(dotFindings[0].severity).toBe("S3");
+      expect(result.dotAge!.ageYears).toBe(5);
+    });
+
+    it("no DOT data → no TYRE-C030 finding (skip, no false fail)", () => {
+      const result = evaluateTyreCompliance(TRAILER_NO_DOT, testDate);
+      const dotFindings = result.findings.filter(f => f.ruleId === "TYRE-C030");
+      expect(dotFindings).toHaveLength(0);
+      expect(result.dotAge).toBeNull();
+    });
+
+    it("DOT 2818 (week 28, 2018) at 2026-07-11 → exactly 8 years, passes", () => {
+      const result = evaluateTyreCompliance(TRAILER_DOT_EXACTLY_8, testDate);
+      const dotFindings = result.findings.filter(f => f.ruleId === "TYRE-C030");
+      expect(dotFindings).toHaveLength(1);
+      expect(dotFindings[0].severity).toBe("S3");
+      expect(result.dotAge!.ageYears).toBeLessThanOrEqual(8);
     });
   });
 

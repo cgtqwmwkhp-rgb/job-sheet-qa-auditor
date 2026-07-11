@@ -18,9 +18,16 @@
  *   Recorded PSI outside the band for a matched size → S1 OUT_OF_POLICY.
  *   Unknown / unconfigured size → S3 informational, PSI noted but no fail.
  *
+ * DOT age:
+ *   PlantExpand checklist states plant tyres must not exceed 8 years.
+ *   DOT date codes (4-digit WWYY) are parsed from OCR text; if the
+ *   calculated age exceeds 8 years → S1 OUT_OF_POLICY.
+ *   If no DOT data is present, the check is skipped (no false fail).
+ *
  * Rules:
  *   TYRE-C010  Tread depth  (Major)
  *   TYRE-C020  PSI band     (Major)
+ *   TYRE-C030  DOT age      (Major)
  */
 
 import type { Finding } from "../analyzer";
@@ -28,6 +35,7 @@ import type { Finding } from "../analyzer";
 export const TYRE_RULE_PREFIX = "TYRE-C";
 
 const MIN_TREAD_MM = 2.0;
+const MAX_DOT_AGE_YEARS = 8;
 
 const KNOWN_SIZE_PSI: Record<string, { min: number; max: number }> = {
   "195/50R13C": { min: 90, max: 95 },
@@ -54,9 +62,26 @@ const SIZE_RE =
 const PSI_RE =
   /(?:Tyre\s*)?(?:Inflation|PSI|Pressure)\s*[:-]?\s*(\d+(?:\.\d+)?)\s*(?:PSI|psi)?/i;
 
+// DOT date code: 4-digit WWYY (week 01-52, year 00-99). Matches patterns like
+// "DOT 2315", "DOT: 2315", "DOT code 2315", "DOT XXXX XXXX 2315"
+const DOT_CODE_RE = /\bDOT\b[\s\S]{0,40}?\b(\d{2})([01]\d|[2-9]\d)\s*$/gim;
+
+// More permissive single-match: captures last 4 digits on a DOT line
+const DOT_LINE_RE = /\bDOT\b[^]*?(\d{2})(\d{2})\s*(?:$|\n)/im;
+
+// Explicit age statements: "Tyre Age: 9 years" or "Age of tyre: 10yrs"
+const DOT_AGE_EXPLICIT_RE =
+  /(?:Tyre|DOT)\s*Age\s*[:-]?\s*(\d+)\s*(?:years?|yrs?)/i;
+
 export interface TyreReading {
   position: string;
   depthMm: number;
+}
+
+export interface DotAgeResult {
+  week: number;
+  year: number;
+  ageYears: number;
 }
 
 export interface TyreComplianceResult {
@@ -64,6 +89,7 @@ export interface TyreComplianceResult {
   readings: TyreReading[];
   tyreSize: string | null;
   psiValue: number | null;
+  dotAge: DotAgeResult | null;
   summary: string;
 }
 
@@ -94,6 +120,45 @@ function parsePsi(text: string): number | null {
   return isNaN(val) ? null : val;
 }
 
+function parseDotAge(
+  text: string,
+  now: Date = new Date()
+): DotAgeResult | null {
+  // Try explicit age statement first
+  const explicitMatch = text.match(DOT_AGE_EXPLICIT_RE);
+  if (explicitMatch) {
+    const ageYears = parseInt(explicitMatch[1], 10);
+    if (!isNaN(ageYears) && ageYears >= 0 && ageYears < 100) {
+      return { week: 0, year: 0, ageYears };
+    }
+  }
+
+  // Try DOT code extraction (WWYY format)
+  const lineMatch = text.match(DOT_LINE_RE);
+  if (lineMatch) {
+    const week = parseInt(lineMatch[1], 10);
+    const yearShort = parseInt(lineMatch[2], 10);
+    if (week >= 1 && week <= 53) {
+      const fullYear =
+        yearShort <= now.getFullYear() % 100
+          ? 2000 + yearShort
+          : 1900 + yearShort;
+      const mfgDate = new Date(fullYear, 0, 1 + (week - 1) * 7);
+      const ageMs = now.getTime() - mfgDate.getTime();
+      const ageYears = ageMs / (365.25 * 24 * 60 * 60 * 1000);
+      if (ageYears >= 0) {
+        return {
+          week,
+          year: fullYear,
+          ageYears: Math.round(ageYears * 10) / 10,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 function lookupPsiBand(
   size: string | null
 ): { min: number; max: number } | null {
@@ -105,10 +170,14 @@ function lookupPsiBand(
   return null;
 }
 
-export function evaluateTyreCompliance(text: string): TyreComplianceResult {
+export function evaluateTyreCompliance(
+  text: string,
+  now?: Date
+): TyreComplianceResult {
   const readings = parseTreadReadings(text);
   const tyreSize = parseTyreSize(text);
   const psiValue = parsePsi(text);
+  const dotAge = parseDotAge(text, now);
   const findings: Finding[] = [];
 
   // --- Tread depth ---
@@ -204,12 +273,55 @@ export function evaluateTyreCompliance(text: string): TyreComplianceResult {
     }
   }
 
+  // --- DOT age ---
+  if (dotAge !== null) {
+    if (dotAge.ageYears > MAX_DOT_AGE_YEARS) {
+      const ageDisplay =
+        dotAge.year > 0
+          ? `DOT ${String(dotAge.week).padStart(2, "0")}${String(dotAge.year % 100).padStart(2, "0")} (${dotAge.ageYears} years)`
+          : `${dotAge.ageYears} years`;
+      findings.push({
+        ruleId: `${TYRE_RULE_PREFIX}030`,
+        fieldName: "Tyre DOT Age",
+        severity: "S1",
+        reasonCode: "OUT_OF_POLICY",
+        rawSnippet: ageDisplay,
+        normalisedSnippet: `Tyre age ${dotAge.ageYears} years exceeds the ${MAX_DOT_AGE_YEARS}-year maximum.`,
+        confidence: 90,
+        pageNumber: 1,
+        whyItMatters:
+          "PlantExpand checklist requires plant tyres not to exceed 8 years of age. " +
+          "Rubber degrades over time regardless of tread wear, increasing blowout risk.",
+        suggestedFix:
+          "Replace tyres that exceed the 8-year age limit before the trailer returns to service.",
+      });
+    } else {
+      const ageDisplay =
+        dotAge.year > 0
+          ? `DOT ${String(dotAge.week).padStart(2, "0")}${String(dotAge.year % 100).padStart(2, "0")} (${dotAge.ageYears} years)`
+          : `${dotAge.ageYears} years`;
+      findings.push({
+        ruleId: `${TYRE_RULE_PREFIX}030`,
+        fieldName: "Tyre DOT Age",
+        severity: "S3",
+        reasonCode: "OUT_OF_POLICY",
+        rawSnippet: ageDisplay,
+        normalisedSnippet: `Tyre age ${dotAge.ageYears} years is within the ${MAX_DOT_AGE_YEARS}-year limit. Passed.`,
+        confidence: 90,
+        pageNumber: 1,
+        whyItMatters: "Tyre age is within the PlantExpand 8-year maximum.",
+        suggestedFix: "No action required.",
+      });
+    }
+  }
+
   // --- Summary ---
   const s1Count = findings.filter(f => f.severity === "S1").length;
   const parts: string[] = [];
   if (readings.length > 0) parts.push(`${readings.length} tread readings`);
   if (psiValue !== null) parts.push(`PSI=${psiValue}`);
   if (tyreSize) parts.push(`Size=${tyreSize}`);
+  if (dotAge !== null) parts.push(`DOT age=${dotAge.ageYears}yr`);
   const summary =
     s1Count > 0
       ? `Tyre compliance: ${s1Count} issue(s) found (${parts.join(", ")}).`
@@ -217,5 +329,5 @@ export function evaluateTyreCompliance(text: string): TyreComplianceResult {
         ? `Tyre compliance passed (${parts.join(", ")}).`
         : "No tyre tread/PSI data found; tyre compliance check skipped.";
 
-  return { findings, readings, tyreSize, psiValue, summary };
+  return { findings, readings, tyreSize, psiValue, dotAge, summary };
 }
