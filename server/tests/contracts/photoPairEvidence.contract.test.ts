@@ -186,9 +186,7 @@ describe("evidence ROI analytics", () => {
 describe("policy seeds for photo/evidence", () => {
   it("seeds PHOTO-C012 major and EVIDENCE-C010", () => {
     const rules = DEFAULT_AUDIT_POLICY.forms["job-summary-v1"].rules;
-    expect(rules.find(r => r.ruleId === "PHOTO-C012")!.failClass).toBe(
-      "major"
-    );
+    expect(rules.find(r => r.ruleId === "PHOTO-C012")!.failClass).toBe("major");
     expect(rules.find(r => r.ruleId === "EVIDENCE-C010")!.failClass).toBe(
       "major"
     );

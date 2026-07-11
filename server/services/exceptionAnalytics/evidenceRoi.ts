@@ -43,7 +43,12 @@ function isEvidenceRule(ruleId: string | null | undefined): boolean {
 }
 
 function isMajorSeverity(severity: string): boolean {
-  return severity === "S0" || severity === "S1" || severity === "critical" || severity === "major";
+  return (
+    severity === "S0" ||
+    severity === "S1" ||
+    severity === "critical" ||
+    severity === "major"
+  );
 }
 
 function isMinorSeverity(severity: string): boolean {

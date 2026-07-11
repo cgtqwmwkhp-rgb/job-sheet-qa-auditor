@@ -38,7 +38,10 @@ export interface PhotoPairCompareArtifact {
   provider: "heuristic" | "vlm" | "mock";
   model: string;
   pairs: PhotoPairResult[];
-  pageRoles: Array<{ page: number; role: "before" | "after" | "form" | "unknown" }>;
+  pageRoles: Array<{
+    page: number;
+    role: "before" | "after" | "form" | "unknown";
+  }>;
   summary: string;
   processingTimeMs: number;
 }

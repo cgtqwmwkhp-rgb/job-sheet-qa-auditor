@@ -1097,12 +1097,10 @@ function ReviewWorkstationContent({
         <CommentQualityPanel
           signals={commentQualityDerived.signals}
           summary={commentQualityDerived.summary}
-          defaultOpen={
-            Boolean(
-              commentQualityDerived.signals?.onFailurePath &&
-                !commentQualityDerived.signals?.coherent
-            )
-          }
+          defaultOpen={Boolean(
+            commentQualityDerived.signals?.onFailurePath &&
+              !commentQualityDerived.signals?.coherent
+          )}
           className="shadow-none"
         />
         <BeforeAfterComparePane
@@ -1118,7 +1116,10 @@ function ReviewWorkstationContent({
           className="shadow-none"
         />
         {deepNoteAnalysis ? (
-          <DeepNoteAnalysis analysis={deepNoteAnalysis} className="shadow-none" />
+          <DeepNoteAnalysis
+            analysis={deepNoteAnalysis}
+            className="shadow-none"
+          />
         ) : null}
       </div>
 

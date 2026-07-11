@@ -100,11 +100,11 @@ function extractCommentBody(text: string): string {
 /**
  * Analyse clinical axes of an engineer narrative (deterministic).
  */
-export function analyzeCommentNarrative(text: string): CommentNarrativeAnalysis {
+export function analyzeCommentNarrative(
+  text: string
+): CommentNarrativeAnalysis {
   const body = extractCommentBody(text);
-  const cleaned = body
-    .replace(/^(?:none|n\/a|na|nil|-)\b\.?/i, "")
-    .trim();
+  const cleaned = body.replace(/^(?:none|n\/a|na|nil|-)\b\.?/i, "").trim();
   const words = cleaned.split(/\s+/).filter(w => w.length > 2);
   const present = cleaned.length >= 20 && words.length >= 4;
   const isVagueOnly =
@@ -125,7 +125,8 @@ export function analyzeCommentNarrative(text: string): CommentNarrativeAnalysis 
   if (!present) missingAxes.push("presence");
   else {
     if (!hasWhat) missingAxes.push("what");
-    if (!hasNextAction && !hasPartsStance) missingAxes.push("nextActionOrParts");
+    if (!hasNextAction && !hasPartsStance)
+      missingAxes.push("nextActionOrParts");
     if (isVagueOnly || isTooThin) missingAxes.push("clarity");
   }
 
@@ -200,21 +201,15 @@ function coachActionFix(partsSnippet?: string): string {
   const parts = partsSnippet
     ? ` Reference outstanding parts (${partsSnippet.slice(0, 80)}).`
     : "";
-  return (
-    `State the next action explicitly, e.g. "Return visit required to fit ordered parts and retest."${parts}`
-  );
+  return `State the next action explicitly, e.g. "Return visit required to fit ordered parts and retest."${parts}`;
 }
 
 function coachClarityFix(): string {
-  return (
-    'Replace vague notes ("VOR", "see above", "as discussed") with what failed, why it matters, and the next step.'
-  );
+  return 'Replace vague notes ("VOR", "see above", "as discussed") with what failed, why it matters, and the next step.';
 }
 
 function coachPartsCrossFieldFix(partsSnippet: string): string {
-  return (
-    `Mention the outstanding parts in Engineer Comments (e.g. "Parts still required: ${partsSnippet.slice(0, 100)}").`
-  );
+  return `Mention the outstanding parts in Engineer Comments (e.g. "Parts still required: ${partsSnippet.slice(0, 100)}").`;
 }
 
 function scoreAxes(analysis: CommentNarrativeAnalysis): {
@@ -333,7 +328,9 @@ export function evaluateCommentQuality(
         "INCOMPLETE_EVIDENCE",
         `Diagnosis is present but incomplete — missing: ${missing.join(", ")}.`,
         "A clinical failure-path note must name the defect and either the next action or parts stance so the yard can plan the return.",
-        !analysis.hasWhat ? coachWhatFix() : coachActionFix(fp.partsStillSnippet),
+        !analysis.hasWhat
+          ? coachWhatFix()
+          : coachActionFix(fp.partsStillSnippet),
         raw
       )
     );
@@ -359,10 +356,7 @@ export function evaluateCommentQuality(
   }
 
   // COMMENT-C040 — Actionable when return visit or parts still required
-  if (
-    (fp.returnVisit || fp.partsStillRequired) &&
-    !analysis.hasNextAction
-  ) {
+  if ((fp.returnVisit || fp.partsStillRequired) && !analysis.hasNextAction) {
     findings.push(
       issue(
         `${COMMENT_QUALITY_RULE_PREFIX}040`,

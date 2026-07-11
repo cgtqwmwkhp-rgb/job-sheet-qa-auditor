@@ -1733,9 +1733,9 @@ async function processJobSheetWithOptions(
   let auditFormFamily = resolveAuditFormFamily(null, false);
   let failurePathSignals: FailurePathSignals | null = null;
   let failurePathSignalSummary: string | null = null;
-  let commentQualitySignals: ReturnType<
-    typeof evaluateCommentQuality
-  >["signals"] | null = null;
+  let commentQualitySignals:
+    | ReturnType<typeof evaluateCommentQuality>["signals"]
+    | null = null;
   let commentDeepNote: Awaited<
     ReturnType<typeof buildCommentDeepNoteAdvisory>
   > | null = null;
@@ -2229,9 +2229,7 @@ async function processJobSheetWithOptions(
         ...(photoPairCompareArtifact
           ? { photoPairCompare: photoPairCompareArtifact }
           : {}),
-        ...(evidenceCoherenceSummary
-          ? { evidenceCoherenceSummary }
-          : {}),
+        ...(evidenceCoherenceSummary ? { evidenceCoherenceSummary } : {}),
         ...(vlmInkResult ? { vlmInkVerification: vlmInkResult.artifact } : {}),
         geminiMultimodal: {
           enabled: isGeminiMultimodalEnabled(),

@@ -76,11 +76,7 @@ export function CommentQualityPanel({
     axisChip("NextAction", signals.hasNextAction),
     {
       label: "Clarity",
-      value: signals.isVagueOnly
-        ? "Vague"
-        : signals.isTooThin
-          ? "Thin"
-          : "OK",
+      value: signals.isVagueOnly ? "Vague" : signals.isTooThin ? "Thin" : "OK",
       variant: (signals.isVagueOnly || signals.isTooThin
         ? "negative"
         : "positive") as ChipVariant,

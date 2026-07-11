@@ -179,8 +179,7 @@ export function BeforeAfterComparePane({
                       </Badge>
                     ))}
                     <Badge variant="outline" className="text-[10px]">
-                      {pair.confidenceBand}{" "}
-                      {Math.round(pair.confidence * 100)}%
+                      {pair.confidenceBand} {Math.round(pair.confidence * 100)}%
                     </Badge>
                   </div>
 

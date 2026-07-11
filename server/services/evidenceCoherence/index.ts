@@ -31,10 +31,7 @@ export function evaluateEvidenceCoherence(input: {
   worksCompleteYes?: boolean;
 }): EvidenceCoherenceResult {
   const findings: Finding[] = [];
-  const snippet =
-    input.commentSnippet ||
-    input.commentSignals?.snippet ||
-    "";
+  const snippet = input.commentSnippet || input.commentSignals?.snippet || "";
   const claimsRepair =
     REPAIR_CLAIM_RE.test(snippet) ||
     Boolean(input.worksCompleteYes) ||
