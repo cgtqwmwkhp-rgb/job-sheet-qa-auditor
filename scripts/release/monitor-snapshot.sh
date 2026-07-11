@@ -121,6 +121,7 @@ HEALTH_HTTP_CODE="000"
 EVIDENCE_TYPE="UNKNOWN"
 MISSING_EVIDENCE_REASON=""
 OVERALL_STATUS="PASS"
+AUTH_WALLED_HEALTH=false
 
 # =============================================================================
 # Helper Functions
@@ -147,6 +148,14 @@ log_captured() {
 
 log_not_available() {
   echo "[NOT_AVAILABLE] $1"
+}
+
+log_auth_walled() {
+  echo "[AUTH_WALLED] $1"
+}
+
+is_auth_walled_code() {
+  [[ "$1" == "401" || "$1" == "302" || "$1" == "301" ]]
 }
 
 # =============================================================================
@@ -222,35 +231,45 @@ EOF
 fi
 
 # =============================================================================
-# Check 2: Health Sample
+# Check 2: Health Sample (auth-aware — prefers Easy-Auth-excluded endpoints)
 # =============================================================================
 echo ""
 echo "--- Check 2: Health Sample ---"
 HEALTH_FILE="$LOG_DIR/health_sample.json"
 
-# Try tRPC health endpoint first
-HEALTH_URL="$BASE_URL/api/trpc/system.health?input=%7B%7D"
-HEALTH_HTTP_CODE=$(curl -sS -o "$HEALTH_FILE" -w "%{http_code}" \
-  --max-time 30 \
-  --connect-timeout 10 \
-  "$HEALTH_URL" 2>/dev/null) || HEALTH_HTTP_CODE="000"
+HEALTH_ENDPOINTS=(
+  "$BASE_URL/readyz"
+  "$BASE_URL/healthz"
+  "$BASE_URL/api/trpc/system.health?input=%7B%7D"
+  "$BASE_URL/api/health"
+)
 
-if [[ ! "$HEALTH_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
-  # Fallback to /api/health
-  HEALTH_URL="$BASE_URL/api/health"
+for HEALTH_URL in "${HEALTH_ENDPOINTS[@]}"; do
+  log_info "Trying health sample: $HEALTH_URL"
   HEALTH_HTTP_CODE=$(curl -sS -o "$HEALTH_FILE" -w "%{http_code}" \
     --max-time 30 \
     --connect-timeout 10 \
     "$HEALTH_URL" 2>/dev/null) || HEALTH_HTTP_CODE="000"
-fi
 
-if [[ "$HEALTH_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
-  HEALTH_STATUS="CAPTURED"
-  log_captured "Health Sample - HTTP $HEALTH_HTTP_CODE"
-else
-  HEALTH_STATUS="FAIL"
-  log_fail "Health Sample - HTTP $HEALTH_HTTP_CODE"
-  OVERALL_STATUS="FAIL"
+  if [[ "$HEALTH_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+    HEALTH_STATUS="CAPTURED"
+    log_captured "Health Sample - HTTP $HEALTH_HTTP_CODE from $HEALTH_URL"
+    break
+  elif is_auth_walled_code "$HEALTH_HTTP_CODE"; then
+    AUTH_WALLED_HEALTH=true
+    log_auth_walled "Health $HEALTH_URL - HTTP $HEALTH_HTTP_CODE (Easy Auth)"
+  fi
+done
+
+if [[ "$HEALTH_STATUS" != "CAPTURED" ]]; then
+  if [[ "$AUTH_WALLED_HEALTH" == "true" ]]; then
+    HEALTH_STATUS="AUTH_WALLED"
+    log_auth_walled "Health Sample - all API endpoints auth-walled, no auth-excluded endpoint responded"
+  else
+    HEALTH_STATUS="FAIL"
+    log_fail "Health Sample - HTTP $HEALTH_HTTP_CODE"
+    OVERALL_STATUS="FAIL"
+  fi
 fi
 
 # =============================================================================
@@ -264,6 +283,13 @@ elif [[ "$HEALTH_STATUS" == "CAPTURED" ]]; then
   # ADR-003: In strict mode, HEALTH_ONLY is only acceptable if health_only=true
   if [[ "$MODE" == "strict" && "$HEALTH_ONLY_FLAG" != "true" ]]; then
     OVERALL_STATUS="FAIL"
+  fi
+elif [[ "$HEALTH_STATUS" == "AUTH_WALLED" ]]; then
+  EVIDENCE_TYPE="AUTH_WALLED"
+  if [[ "$MODE" == "strict" ]]; then
+    OVERALL_STATUS="FAIL"
+  else
+    log_warn "Health endpoints auth-walled — treating as non-fatal in soft mode"
   fi
 else
   EVIDENCE_TYPE="NONE"
@@ -288,6 +314,7 @@ cat > "$SUMMARY_FILE" << EOF
   "healthHttpCode": $HEALTH_HTTP_CODE,
   "evidenceType": "$EVIDENCE_TYPE",
   "missingEvidenceReason": $(if [[ -n "$MISSING_EVIDENCE_REASON" ]]; then echo "\"$MISSING_EVIDENCE_REASON\""; else echo "null"; fi),
+  "authWalledHealth": $AUTH_WALLED_HEALTH,
   "overallStatus": "$OVERALL_STATUS",
   "adr003Compliant": true
 }
@@ -310,13 +337,20 @@ echo "  Logs:          $LOG_DIR"
 # =============================================================================
 if [[ "$OVERALL_STATUS" == "FAIL" ]]; then
   echo ""
-  if [[ "$MODE" == "strict" && "$EVIDENCE_TYPE" == "HEALTH_ONLY" && "$HEALTH_ONLY_FLAG" != "true" ]]; then
+  if [[ "$MODE" == "strict" && "$EVIDENCE_TYPE" == "AUTH_WALLED" ]]; then
+    echo "❌ Monitoring snapshot failed (strict mode, health endpoints auth-walled)"
+    echo "   Hint: Ensure /readyz or /healthz is excluded from Easy Auth"
+  elif [[ "$MODE" == "strict" && "$EVIDENCE_TYPE" == "HEALTH_ONLY" && "$HEALTH_ONLY_FLAG" != "true" ]]; then
     echo "❌ Monitoring snapshot failed (strict mode requires metrics)"
     echo "   Hint: Use HEALTH_ONLY=true for sandbox/dev environments (per ADR-003)"
   else
     echo "❌ Monitoring snapshot failed"
   fi
   exit 1
+elif [[ "$EVIDENCE_TYPE" == "AUTH_WALLED" ]]; then
+  echo ""
+  echo "⚠️  Monitoring snapshot: health endpoints auth-walled (Easy Auth noise, soft mode)"
+  exit 0
 elif [[ "$EVIDENCE_TYPE" == "HEALTH_ONLY" ]]; then
   echo ""
   if [[ "$HEALTH_ONLY_FLAG" == "true" ]]; then
