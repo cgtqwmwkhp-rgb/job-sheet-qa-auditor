@@ -27,7 +27,7 @@ import {
 import { Link, useRoute, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAnalyticsFilters } from "@/hooks/useAnalyticsFilters";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 function outcomeLabel(outcome: string): string {
@@ -51,123 +51,48 @@ function trendLabel(trend: string): string {
   return "stable vs prior";
 }
 
-export default function EngineerCoachingPackPage() {
-  const [, params] = useRoute("/analytics/technicians/:engineerId/coaching");
-  const search = useSearch();
-  const engineerId = params?.engineerId ?? "";
-  const { startDate, endDate, site, setPeriod } = useAnalyticsFilters();
+type PackData = NonNullable<
+  ReturnType<typeof trpc.analytics.getEngineerCoachingPack.useQuery>["data"]
+>["pack"];
+type SessionData = NonNullable<
+  ReturnType<typeof trpc.analytics.getEngineerCoachingPack.useQuery>["data"]
+>["session"];
 
-  // Optional query overrides for deep links from scorecard
-  useEffect(() => {
-    const qs = new URLSearchParams(search);
-    const start = qs.get("start");
-    const end = qs.get("end");
-    if (start && end) setPeriod(start, end);
-  }, [search, setPeriod]);
-
-  const { data, isLoading, error, refetch } =
-    trpc.analytics.getEngineerCoachingPack.useQuery(
-      { engineerId, startDate, endDate, site },
-      { enabled: !!engineerId }
-    );
-
-  const markCompleted = trpc.analytics.markCoachingCompleted.useMutation({
-    onSuccess: () => {
-      toast.success("Coaching session marked completed");
-      void refetch();
-    },
-    onError: err => toast.error(err.message),
-  });
-
-  const pack = data?.pack ?? null;
-  const session = data?.session ?? null;
-
-  const [opening, setOpening] = useState("");
-  const [strengthsText, setStrengthsText] = useState("");
-  const [themesText, setThemesText] = useState("");
-  const [developmentText, setDevelopmentText] = useState("");
-  const [asksText, setAsksText] = useState("");
-  const [qaNote, setQaNote] = useState("");
-
-  useEffect(() => {
-    if (!pack) return;
-    setOpening(pack.draftNarrative.opening);
-    setStrengthsText(pack.draftNarrative.strengths.join("\n\n"));
-    setThemesText(pack.draftNarrative.themesSummary);
-    setDevelopmentText(pack.draftNarrative.development.join("\n\n"));
-    setAsksText(pack.draftNarrative.coachingAsks.join("\n"));
-    setQaNote(session?.qaLeadNote ?? "");
-  }, [pack, session]);
+function CoachingPackView({
+  pack,
+  session,
+  onMarkCompleted,
+  markPending,
+}: {
+  pack: NonNullable<PackData>;
+  session: SessionData;
+  onMarkCompleted: (input: {
+    qaLeadNote: string;
+    narrativeOpening: string;
+    coachingAsks: string[];
+  }) => void;
+  markPending: boolean;
+}) {
+  const [opening, setOpening] = useState(pack.draftNarrative.opening);
+  const [strengthsText, setStrengthsText] = useState(
+    pack.draftNarrative.strengths.join("\n\n")
+  );
+  const [themesText, setThemesText] = useState(
+    pack.draftNarrative.themesSummary
+  );
+  const [developmentText, setDevelopmentText] = useState(
+    pack.draftNarrative.development.join("\n\n")
+  );
+  const [asksText, setAsksText] = useState(
+    pack.draftNarrative.coachingAsks.join("\n")
+  );
+  const [qaNote, setQaNote] = useState(session?.qaLeadNote ?? "");
 
   const periodLabel = useMemo(() => {
-    if (!pack) return "";
     const s = new Date(pack.period.start).toLocaleDateString("en-GB");
     const e = new Date(pack.period.end).toLocaleDateString("en-GB");
     return `${s} – ${e}`;
-  }, [pack]);
-
-  if (!engineerId) {
-    return (
-      <AnalyticsLayout
-        title="Coaching pack"
-        description="Select a technician to open their analytical coaching pack."
-      >
-        <Card className="p-8 text-center text-muted-foreground">
-          Missing engineer id.{" "}
-          <Link href="/analytics/technicians">
-            <a className="text-primary underline">Back to technicians</a>
-          </Link>
-        </Card>
-      </AnalyticsLayout>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <AnalyticsLayout
-        title="Coaching pack"
-        description="Building analytical feedback for this period."
-      >
-        <div className="flex items-center justify-center h-[40vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      </AnalyticsLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <AnalyticsLayout
-        title="Coaching pack"
-        description="Building analytical feedback for this period."
-      >
-        <div className="flex flex-col items-center justify-center h-[40vh]">
-          <AlertTriangle className="h-12 w-12 text-destructive mb-3" />
-          <p className="text-muted-foreground">{error.message}</p>
-        </div>
-      </AnalyticsLayout>
-    );
-  }
-
-  if (!pack) {
-    return (
-      <AnalyticsLayout
-        title="Coaching pack"
-        description="Building analytical feedback for this period."
-      >
-        <Card className="p-8 space-y-3">
-          <p className="text-muted-foreground">
-            No attributed job cards for this technician in the selected period.
-          </p>
-          <Link href="/analytics/technicians">
-            <a className="text-primary underline text-sm">
-              Back to technicians
-            </a>
-          </Link>
-        </Card>
-      </AnalyticsLayout>
-    );
-  }
+  }, [pack.period.start, pack.period.end]);
 
   const m = pack.summaryMetrics;
 
@@ -199,13 +124,9 @@ export default function EngineerCoachingPackPage() {
               type="button"
               size="sm"
               className="gap-2"
-              disabled={markCompleted.isPending || !!session}
+              disabled={markPending || !!session}
               onClick={() =>
-                markCompleted.mutate({
-                  engineerId: pack.engineerId,
-                  engineerName: pack.engineerName,
-                  periodStart: pack.period.start,
-                  periodEnd: pack.period.end,
+                onMarkCompleted({
                   qaLeadNote: qaNote,
                   narrativeOpening: opening,
                   coachingAsks: asksText
@@ -227,7 +148,6 @@ export default function EngineerCoachingPackPage() {
           </div>
         </div>
 
-        {/* Page 1 — One-page summary */}
         <section className="space-y-5 print:break-after-page">
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -353,7 +273,6 @@ export default function EngineerCoachingPackPage() {
           </Card>
         </section>
 
-        {/* Pages 2–3 — Session pack */}
         <section className="space-y-5">
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -565,5 +484,123 @@ export default function EngineerCoachingPackPage() {
         }
       `}</style>
     </AnalyticsLayout>
+  );
+}
+
+export default function EngineerCoachingPackPage() {
+  const [, params] = useRoute("/analytics/technicians/:engineerId/coaching");
+  const search = useSearch();
+  const engineerId = params?.engineerId ?? "";
+  const { startDate, endDate, site } = useAnalyticsFilters();
+
+  const queryDates = useMemo(() => {
+    const qs = new URLSearchParams(search);
+    return {
+      startDate: qs.get("start") || startDate,
+      endDate: qs.get("end") || endDate,
+    };
+  }, [search, startDate, endDate]);
+
+  const { data, isLoading, error, refetch } =
+    trpc.analytics.getEngineerCoachingPack.useQuery(
+      {
+        engineerId,
+        startDate: queryDates.startDate,
+        endDate: queryDates.endDate,
+        site,
+      },
+      { enabled: !!engineerId }
+    );
+
+  const markCompleted = trpc.analytics.markCoachingCompleted.useMutation({
+    onSuccess: () => {
+      toast.success("Coaching session marked completed");
+      void refetch();
+    },
+    onError: err => toast.error(err.message),
+  });
+
+  const pack = data?.pack ?? null;
+  const session = data?.session ?? null;
+
+  if (!engineerId) {
+    return (
+      <AnalyticsLayout
+        title="Coaching pack"
+        description="Select a technician to open their analytical coaching pack."
+      >
+        <Card className="p-8 text-center text-muted-foreground">
+          Missing engineer id.{" "}
+          <Link href="/analytics/technicians">
+            <a className="text-primary underline">Back to technicians</a>
+          </Link>
+        </Card>
+      </AnalyticsLayout>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <AnalyticsLayout
+        title="Coaching pack"
+        description="Building analytical feedback for this period."
+      >
+        <div className="flex items-center justify-center h-[40vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AnalyticsLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AnalyticsLayout
+        title="Coaching pack"
+        description="Building analytical feedback for this period."
+      >
+        <div className="flex flex-col items-center justify-center h-[40vh]">
+          <AlertTriangle className="h-12 w-12 text-destructive mb-3" />
+          <p className="text-muted-foreground">{error.message}</p>
+        </div>
+      </AnalyticsLayout>
+    );
+  }
+
+  if (!pack) {
+    return (
+      <AnalyticsLayout
+        title="Coaching pack"
+        description="Building analytical feedback for this period."
+      >
+        <Card className="p-8 space-y-3">
+          <p className="text-muted-foreground">
+            No attributed job cards for this technician in the selected period.
+          </p>
+          <Link href="/analytics/technicians">
+            <a className="text-primary underline text-sm">
+              Back to technicians
+            </a>
+          </Link>
+        </Card>
+      </AnalyticsLayout>
+    );
+  }
+
+  return (
+    <CoachingPackView
+      key={`${pack.engineerId}-${pack.period.start}-${pack.period.end}-${session?.id ?? "open"}`}
+      pack={pack}
+      session={session}
+      markPending={markCompleted.isPending}
+      onMarkCompleted={input =>
+        markCompleted.mutate({
+          engineerId: pack.engineerId,
+          engineerName: pack.engineerName,
+          periodStart: pack.period.start,
+          periodEnd: pack.period.end,
+          ...input,
+        })
+      }
+    />
   );
 }
