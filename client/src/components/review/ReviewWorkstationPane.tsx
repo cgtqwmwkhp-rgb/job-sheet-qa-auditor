@@ -947,7 +947,10 @@ function ReviewWorkstationContent({
       </div>
 
       {showLegend && (
-        <ReviewShortcutsLegend variant="workstation" className="bg-muted/40 mb-2" />
+        <ReviewShortcutsLegend
+          variant="workstation"
+          className="bg-muted/40 mb-2"
+        />
       )}
 
       <div className={compact ? "mb-2 px-1 space-y-2" : "mb-2 space-y-2"}>

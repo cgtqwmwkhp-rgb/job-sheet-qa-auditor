@@ -52,7 +52,12 @@ export function ReviewShortcutsLegend({
   const entries: ShortcutEntry[] =
     variant === "queue"
       ? [...QUEUE_SHORTCUTS, ...FINDING_SHORTCUTS, ...META_SHORTCUTS]
-      : [...FINDING_SHORTCUTS, ...META_SHORTCUTS.filter(e => e.keys[0] !== "Enter" && e.keys[0] !== "?")];
+      : [
+          ...FINDING_SHORTCUTS,
+          ...META_SHORTCUTS.filter(
+            e => e.keys[0] !== "Enter" && e.keys[0] !== "?"
+          ),
+        ];
 
   return (
     <Card className={className ?? "bg-muted/40"}>
