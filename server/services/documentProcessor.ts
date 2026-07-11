@@ -1520,6 +1520,8 @@ async function processJobSheetWithOptions(
     const dropEnsembleField = (field: string) => {
       if (optionalFieldIds.has(field)) return true;
       if (isWastedJourney && isWastedJourneyExcludedField(field)) return true;
+      if (/^(serial_no|serialNumber|Serial Number|serial\s*no)$/i.test(field))
+        return true;
       return false;
     };
 

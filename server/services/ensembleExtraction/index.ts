@@ -165,7 +165,13 @@ function mapFieldDetails(
       }
     } else {
       unmappedFieldDetails[sourceName] = detail;
-      if (detail.reasonCode === "CONFLICT") {
+      const isBlankPlaceholder =
+        !detail.value ||
+        /^(null|n\/a|none|nil|-|—|–|\.+)$/i.test((detail.value ?? "").trim());
+      if (
+        detail.reasonCode === "CONFLICT" &&
+        !(detail.required === false && isBlankPlaceholder)
+      ) {
         conflictFields.push(sourceName);
       }
       // Safe remap: technician signature Present → customerSignature hint for Gemini

@@ -161,6 +161,53 @@ function isNonsenseDateAssetConflict(finding: Finding): boolean {
   return parts.some(isDateShaped) && parts.some(isAssetToken);
 }
 
+const ENGINEER_NAME_FIELD_RE = /engineer|technician/i;
+const USERNAME_RE = /^[A-Za-z][A-Za-z0-9]*\.[A-Za-z][A-Za-z0-9]*$/;
+const LETTERHEAD_NOISE_RE =
+  /www\.|https?:\/\/|@|\.com\b|\.co\.uk\b|\d{5,}|plantexpand/i;
+
+/** CONFLICT where one part is a username and another is letterhead noise. */
+function isNonsenseEngineerNameConflict(finding: Finding): boolean {
+  if (finding.reasonCode !== "CONFLICT") return false;
+  if (!ENGINEER_NAME_FIELD_RE.test(finding.fieldName)) return false;
+  const parts = splitConflictParts(finding);
+  if (parts.length < 2) return false;
+  return (
+    parts.some(p => USERNAME_RE.test(p.trim())) &&
+    parts.some(p => LETTERHEAD_NOISE_RE.test(p.trim()))
+  );
+}
+
+function pickUsernameFromConflict(finding: Finding): string {
+  const parts = splitConflictParts(finding);
+  return (
+    parts.find(p => USERNAME_RE.test(p.trim()))?.trim() ??
+    parts[0]?.trim() ??
+    ""
+  );
+}
+
+/** CONFLICT where all parts normalize to the same digit string (e.g. "87" vs "87"). */
+function isNonsenseJobRefConflict(finding: Finding): boolean {
+  if (finding.reasonCode !== "CONFLICT") return false;
+  if (!/job|reference/i.test(finding.fieldName)) return false;
+  const parts = splitConflictParts(finding);
+  if (parts.length < 2) return false;
+  const digitSet = new Set(
+    parts.map(p => p.trim().replace(/\D/g, "")).filter(d => d.length > 0)
+  );
+  return digitSet.size === 1;
+}
+
+function pickDigitsFromConflict(finding: Finding): string {
+  const parts = splitConflictParts(finding);
+  return (
+    parts.map(p => p.trim().replace(/\D/g, "")).find(d => d.length > 0) ??
+    parts[0]?.trim() ??
+    ""
+  );
+}
+
 function isMileageAsSerialSnippet(finding: Finding): boolean {
   if (!/serial|asset/i.test(finding.fieldName)) return false;
   const snippet = `${finding.rawSnippet} ${finding.normalisedSnippet}`;
@@ -471,6 +518,33 @@ export function applyFindingHygiene(
           "Date was confused with an adjacent asset/Make-Model line; kept the date candidate only.",
         suggestedFix:
           "Confirm the service date on the document; ignore asset ID bleed.",
+      };
+    }
+    if (isNonsenseEngineerNameConflict(f)) {
+      const username = pickUsernameFromConflict(f);
+      return {
+        ...f,
+        reasonCode: "LOW_CONFIDENCE" as const,
+        severity: "S3" as const,
+        normalisedSnippet: username,
+        rawSnippet: username,
+        whyItMatters:
+          "Technician name was confused with company letterhead/URL; kept the username only.",
+        suggestedFix:
+          "Confirm the technician name on the document; ignore letterhead noise.",
+      };
+    }
+    if (isNonsenseJobRefConflict(f)) {
+      const digits = pickDigitsFromConflict(f);
+      return {
+        ...f,
+        reasonCode: "LOW_CONFIDENCE" as const,
+        severity: "S3" as const,
+        normalisedSnippet: digits,
+        rawSnippet: digits,
+        whyItMatters:
+          "Job reference values all normalize to the same number; treated as agreement.",
+        suggestedFix: "Confirm the job reference number on the document.",
       };
     }
     return f;
