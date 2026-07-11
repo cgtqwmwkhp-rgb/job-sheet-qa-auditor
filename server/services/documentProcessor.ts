@@ -66,6 +66,11 @@ import {
   sanitizeExtractedFieldsForSignatures,
 } from "./findingHygiene";
 import { evaluateJobSummaryConsistency } from "./jobSummaryConsistency";
+import {
+  evaluateWastedJourneyConsistency,
+  isWastedJourneyDocument,
+  WASTED_JOURNEY_TEMPLATE_ID,
+} from "./wastedJourneyConsistency";
 import { computeDocumentationQualityScore } from "./documentationQuality";
 import {
   runSelectionMarkDetection,
@@ -1670,44 +1675,86 @@ async function processJobSheetWithOptions(
     }
   }
 
-  // Job Summary failure-path consistency: report relationships for auditors.
-  // Consistent VOR/unsafe/return/incomplete stories stay PASS with Passed findings.
-  // Broken relationships or missing engineer narrative → Issues (may demote PASS).
+  // Form-family consistency: Wasted Journey vs Job Summary failure-path.
+  // Never run repair/VOR failure-path rules on wasted-journey sheets.
   {
-    const failMarkCount =
-      selectionMarksResult?.artifact.rows?.filter(r => r.choice === "Fail")
-        .length ?? 0;
-    const consistency = evaluateJobSummaryConsistency(extractedText, {
-      failMarkCount,
-    });
-    if (consistency.findings.length > 0) {
-      let overallResult = analysisResult.overallResult;
-      if (
-        consistency.hasBlockingIssues &&
-        analysisResult.overallResult === "PASS"
-      ) {
-        overallResult = "FAIL";
-      } else if (
-        consistency.hasBlockingIssues &&
-        analysisResult.overallResult === "REVIEW_QUEUE"
-      ) {
-        // Keep review queue, but findings will show the Issues.
-        overallResult = "REVIEW_QUEUE";
+    const selectedSlug =
+      buildSelectionCohortMeta(selectionResult, usedTemplateVersionId)
+        ?.templateSlug ?? null;
+    const isWastedJourney =
+      selectedSlug === WASTED_JOURNEY_TEMPLATE_ID ||
+      isWastedJourneyDocument(extractedText);
+
+    if (isWastedJourney) {
+      const consistency = evaluateWastedJourneyConsistency(extractedText);
+      if (consistency.findings.length > 0) {
+        let overallResult = analysisResult.overallResult;
+        if (
+          consistency.hasBlockingIssues &&
+          analysisResult.overallResult === "PASS"
+        ) {
+          overallResult = "FAIL";
+        } else if (
+          consistency.hasBlockingIssues &&
+          analysisResult.overallResult === "REVIEW_QUEUE"
+        ) {
+          overallResult = "REVIEW_QUEUE";
+        }
+        analysisResult = {
+          ...analysisResult,
+          overallResult,
+          findings: [...analysisResult.findings, ...consistency.findings],
+          summary:
+            `${analysisResult.summary} ` +
+            `[WASTED_JOURNEY] ${consistency.summary}`,
+        };
+        recordStage({
+          stage: "Wasted Journey Consistency",
+          status: "success",
+          durationMs: 0,
+          error: consistency.hasBlockingIssues
+            ? consistency.summary
+            : undefined,
+        });
       }
-      analysisResult = {
-        ...analysisResult,
-        overallResult,
-        findings: [...analysisResult.findings, ...consistency.findings],
-        summary:
-          `${analysisResult.summary} ` +
-          `[FAILURE_PATH] ${consistency.summary}`,
-      };
-      recordStage({
-        stage: "Failure Path Consistency",
-        status: "success",
-        durationMs: 0,
-        error: consistency.hasBlockingIssues ? consistency.summary : undefined,
+    } else {
+      const failMarkCount =
+        selectionMarksResult?.artifact.rows?.filter(r => r.choice === "Fail")
+          .length ?? 0;
+      const consistency = evaluateJobSummaryConsistency(extractedText, {
+        failMarkCount,
       });
+      if (consistency.findings.length > 0) {
+        let overallResult = analysisResult.overallResult;
+        if (
+          consistency.hasBlockingIssues &&
+          analysisResult.overallResult === "PASS"
+        ) {
+          overallResult = "FAIL";
+        } else if (
+          consistency.hasBlockingIssues &&
+          analysisResult.overallResult === "REVIEW_QUEUE"
+        ) {
+          // Keep review queue, but findings will show the Issues.
+          overallResult = "REVIEW_QUEUE";
+        }
+        analysisResult = {
+          ...analysisResult,
+          overallResult,
+          findings: [...analysisResult.findings, ...consistency.findings],
+          summary:
+            `${analysisResult.summary} ` +
+            `[FAILURE_PATH] ${consistency.summary}`,
+        };
+        recordStage({
+          stage: "Failure Path Consistency",
+          status: "success",
+          durationMs: 0,
+          error: consistency.hasBlockingIssues
+            ? consistency.summary
+            : undefined,
+        });
+      }
     }
   }
 

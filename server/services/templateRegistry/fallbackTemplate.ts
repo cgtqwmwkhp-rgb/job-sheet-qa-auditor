@@ -236,6 +236,11 @@ export const TEMPLATE_SUGGESTION_PATTERNS: {
     confidence: "HIGH",
   },
   {
+    pattern: /wasted\s*journey/i,
+    suggestedTemplateHint: "Wasted Journey Sheet",
+    confidence: "HIGH",
+  },
+  {
     pattern:
       /LOLER|thorough examination|lifting equipment|6 month|12 month examination/i,
     suggestedTemplateHint: "LOLER Examination Report",
@@ -277,12 +282,17 @@ export function getSuggestedTemplates(documentText: string): {
 }[] {
   const suggestions: { hint: string; confidence: "HIGH" | "MEDIUM" | "LOW" }[] =
     [];
+  const isWastedJourney = /wasted\s*journey/i.test(documentText);
 
   for (const {
     pattern,
     suggestedTemplateHint,
     confidence,
   } of TEMPLATE_SUGGESTION_PATTERNS) {
+    // Wasted Journey is its own family — never also hint VOR/Repair
+    if (isWastedJourney && suggestedTemplateHint === "VOR/Repair Report") {
+      continue;
+    }
     if (pattern.test(documentText)) {
       suggestions.push({ hint: suggestedTemplateHint, confidence });
     }
