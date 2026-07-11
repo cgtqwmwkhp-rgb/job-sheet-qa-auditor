@@ -111,10 +111,11 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     required: true,
     severity: "S0",
     regexPatterns: [
-      /Asset\s*(?:No|Number|#)?[:\s]*([A-Z0-9]+-?[A-Z0-9]+)/i,
-      /Asset\s*ID[:\s]*([A-Z0-9]+-?[A-Z0-9]+)/i,
+      // Require No/Number/ID/# so "Asset Details" never captures "DETAILS"
+      /Asset\s*(?:No|Number|ID|#)\s*[:\s]+([A-Z0-9][A-Z0-9_-]{2,})/i,
+      /Asset\s*ID[:\s]+([A-Z0-9][A-Z0-9_-]{2,})/i,
       /Registration[:\s]*([A-Z]{2}\d{2}[A-Z]{3})/i,
-      /Reg(?:istration)?[:\s]*([A-Z0-9]{5,8})/i,
+      /Reg(?:istration)?\s*(?:No|Number|#)?[:\s]*([A-Z0-9]{5,8})/i,
     ],
     fuzzyLabels: [
       "Asset No",

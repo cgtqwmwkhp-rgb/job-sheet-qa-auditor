@@ -288,12 +288,21 @@ export function injectPresentFieldFindings(
   }
 
   const assetMatch = text.match(
-    /Asset\s*(?:No|Number|ID)?\s*[:.]?\s*([A-Z0-9][A-Z0-9_-]*)/i
+    /Asset\s*(?:No|Number|ID|#)\s*[:.]?\s*([A-Z0-9][A-Z0-9_-]{2,})/i
   );
-  const assetValue =
+  const rawAsset = (
     preExtracted.assetId?.value ||
     preExtracted.serialNumber?.value ||
-    assetMatch?.[1];
+    assetMatch?.[1] ||
+    ""
+  )
+    .trim()
+    .toUpperCase();
+  const assetValue =
+    rawAsset &&
+    !/^(DETAILS?|NUMBER|NO|ID|MAKE|MODEL|SERIAL|CUSTOMER)$/i.test(rawAsset)
+      ? rawAsset
+      : undefined;
   if (assetValue && !hasField("assetId") && !hasField("serialNumber")) {
     out.push(
       buildPresentFieldFinding(

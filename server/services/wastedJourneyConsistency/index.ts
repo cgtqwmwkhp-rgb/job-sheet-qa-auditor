@@ -2,14 +2,31 @@
  * Wasted Journey documentation coherence judgment.
  *
  * Audits whether an abort/no-show visit was documented completely —
- * not whether any repair succeeded. Yes or No on contact questions both
- * count as answered; blank answers are Issues.
+ * not whether any repair succeeded.
+ *
+ * Policy (ops): engineer must contact control (Scheduling Team) AND booking
+ * site contact, and both answers must be Yes. No / blank = Issue.
+ * Job number and serial number are out of scope for this form family.
  */
 
 import type { Finding } from "../analyzer";
 
 export const WASTED_JOURNEY_RULE_PREFIX = "WJ-C";
 export const WASTED_JOURNEY_TEMPLATE_ID = "wasted-journey-v1";
+
+/** Ensemble / legacy fields that must never block a Wasted Journey audit. */
+export const WASTED_JOURNEY_EXCLUDED_FIELDS = new Set([
+  "jobNumber",
+  "jobReference",
+  "job_no",
+  "Job Number",
+  "Job No",
+  "serialNumber",
+  "serial_no",
+  "serialNo",
+  "Serial Number",
+  "Serial No",
+]);
 
 export interface WastedJourneySignals {
   isWastedJourneySheet: boolean;
@@ -22,6 +39,7 @@ export interface WastedJourneySignals {
   siteContactYes: boolean;
   siteContactNo: boolean;
   hasAssetId: boolean;
+  assetId: string;
   hasDate: boolean;
   hasSignOff: boolean;
   technicianName: string;
@@ -35,6 +53,26 @@ export interface WastedJourneyJudgmentResult {
 }
 
 const YES_NO_TOKEN_RE = /\b(yes|no|true|false)\b/i;
+
+/** Header / label tokens that must never be treated as an asset id. */
+const ASSET_ID_REJECT = new Set([
+  "DETAILS",
+  "DETAIL",
+  "NUMBER",
+  "NO",
+  "ID",
+  "MAKE",
+  "MODEL",
+  "CUSTOMER",
+  "SERIAL",
+  "MILES",
+  "HOURS",
+  "ADDRESS",
+  "CONTACT",
+  "OPENREACH",
+  "GROUPED",
+  "ANCILLARIES",
+]);
 
 function lineValue(text: string, label: RegExp): string | null {
   const re = new RegExp(`${label.source}\\s*[:?]\\s*([^\\n\\r]{0,80})`, "i");
@@ -54,6 +92,38 @@ export function isWastedJourneyDocument(text: string): boolean {
   return /wasted\s*journey/i.test(text);
 }
 
+export function isWastedJourneyExcludedField(fieldName: string): boolean {
+  const raw = fieldName.trim();
+  if (WASTED_JOURNEY_EXCLUDED_FIELDS.has(raw)) return true;
+  const compact = raw.toLowerCase().replace(/[\s_-]+/g, "");
+  return (
+    compact === "jobnumber" ||
+    compact === "jobno" ||
+    compact === "jobreference" ||
+    compact === "serialnumber" ||
+    compact === "serialno"
+  );
+}
+
+/**
+ * Extract Asset No robustly — never treat "Asset Details" header as the value.
+ */
+export function extractAssetNo(text: string): string | null {
+  const patterns = [
+    /Asset\s*(?:No|Number|ID|#)\s*[:.]?\s*([A-Z0-9][A-Z0-9_-]{2,})/i,
+    /(?:^|\n)\s*Asset\s*(?:No|Number|ID)\s*[:.]?\s*([A-Z0-9][A-Z0-9_-]{2,})/im,
+  ];
+  for (const pattern of patterns) {
+    const m = text.match(pattern);
+    const candidate = m?.[1]?.trim().toUpperCase();
+    if (!candidate) continue;
+    if (ASSET_ID_REJECT.has(candidate)) continue;
+    if (/^DETAILS?/i.test(candidate)) continue;
+    return candidate;
+  }
+  return null;
+}
+
 export function extractWastedJourneySignals(
   text: string
 ): WastedJourneySignals {
@@ -67,7 +137,6 @@ export function extractWastedJourneySignals(
     );
 
   let reasonSnippet = (reasonRaw ?? "").replace(/\s+/g, " ").trim();
-  // Prefer dedicated reason line; fall back to common no-show phrasing nearby
   if (!reasonSnippet || /^(yes|no)\b/i.test(reasonSnippet)) {
     const noShow = text.match(
       /(?:customer\s*\/\s*driver\s*no[-\s]?show|site\s*inaccessible|no\s*access|cancelled\s*on\s*arrival)[^\n]{0,40}/i
@@ -92,7 +161,7 @@ export function extractWastedJourneySignals(
   const scheduling = parseYesNo(schedulingRaw);
   const site = parseYesNo(siteRaw);
 
-  const assetRaw = lineValue(text, /Asset\s*No/i);
+  const assetId = extractAssetNo(text) ?? "";
   const dateRaw = lineValue(text, /\bDate\b/i);
   const techRaw =
     lineValue(text, /Techni(?:ci)?an\s*Name/i) ?? lineValue(text, /Name/i);
@@ -111,7 +180,8 @@ export function extractWastedJourneySignals(
     siteContactAnswered: site !== "unknown",
     siteContactYes: site === "yes",
     siteContactNo: site === "no",
-    hasAssetId: Boolean(assetRaw && /[A-Z0-9]/i.test(assetRaw)),
+    hasAssetId: assetId.length > 0,
+    assetId,
     hasDate: Boolean(dateRaw && /\d/.test(dateRaw)),
     hasSignOff,
     technicianName: (techRaw ?? "").slice(0, 80),
@@ -124,7 +194,7 @@ function signalSummary(s: WastedJourneySignals): string {
     `Reason=${s.hasReason ? "Yes" : "No"}`,
     `SchedulingContacted=${s.schedulingYes ? "Yes" : s.schedulingNo ? "No" : "Unknown"}`,
     `SiteContactConfirmed=${s.siteContactYes ? "Yes" : s.siteContactNo ? "No" : "Unknown"}`,
-    `AssetId=${s.hasAssetId ? "Yes" : "No"}`,
+    `AssetId=${s.assetId || "Missing"}`,
     `Date=${s.hasDate ? "Yes" : "No"}`,
     `SignOff=${s.hasSignOff ? "Yes" : "No"}`,
   ].join(" | ");
@@ -198,8 +268,8 @@ export function evaluateWastedJourneyConsistency(
     passed(
       `${WASTED_JOURNEY_RULE_PREFIX}001`,
       "Wasted Journey Judgment",
-      "Wasted Journey documentation detected. Checking reason, contact answers, identity, and sign-off — not repair outcome.",
-      "This judgment audits whether the abort/no-show visit was recorded completely. A wasted journey is a valid operational outcome.",
+      "Wasted Journey documentation detected. Checking reason, mandatory Yes contacts, identity, and sign-off — not repair outcome.",
+      "This judgment audits abort/no-show paperwork. Job number and serial number are not required on this form.",
       raw
     )
   );
@@ -229,16 +299,18 @@ export function evaluateWastedJourneyConsistency(
     );
   }
 
-  // WJ-C020 — scheduling contact answered (Yes or No both OK)
-  if (!signals.schedulingAnswered) {
+  // WJ-C020 — scheduling / control room contact must be Yes
+  if (!signals.schedulingYes) {
     findings.push(
       issue(
         `${WASTED_JOURNEY_RULE_PREFIX}020`,
         "Scheduling Team Contacted",
-        "INCOMPLETE_EVIDENCE",
-        "Scheduling team contact question is present but not answered Yes or No.",
-        "Contact attempts must be recorded even when unsuccessful.",
-        "Answer 'Have you successfully contacted the Scheduling Team…?' with Yes or No.",
+        signals.schedulingAnswered ? "CONFLICT" : "INCOMPLETE_EVIDENCE",
+        signals.schedulingNo
+          ? "Scheduling / control room contact is marked No — must be Yes."
+          : "Scheduling / control room contact was not confirmed as Yes.",
+        "Engineers must contact the control room (Scheduling Team) and record Yes.",
+        "Contact the Scheduling Team and set the answer to Yes.",
         raw
       )
     );
@@ -247,23 +319,25 @@ export function evaluateWastedJourneyConsistency(
       passed(
         `${WASTED_JOURNEY_RULE_PREFIX}021`,
         "Scheduling Team Contacted",
-        `Consistent: scheduling contact answered (${signals.schedulingYes ? "Yes" : "No"}).`,
-        "Yes and No are both valid answers.",
+        "Consistent: scheduling / control room contact confirmed Yes.",
+        "Mandatory control-room contact is documented.",
         raw
       )
     );
   }
 
-  // WJ-C030 — site contact answered
-  if (!signals.siteContactAnswered) {
+  // WJ-C030 — booking site contact must be Yes
+  if (!signals.siteContactYes) {
     findings.push(
       issue(
         `${WASTED_JOURNEY_RULE_PREFIX}030`,
         "Booking Site Contact Confirmed",
-        "INCOMPLETE_EVIDENCE",
-        "Booking site contact question is present but not answered Yes or No.",
-        "Site contact confirmation must be recorded even when unsuccessful.",
-        "Answer 'Have you successfully contacted the original Booking Site Contact…?' with Yes or No.",
+        signals.siteContactAnswered ? "CONFLICT" : "INCOMPLETE_EVIDENCE",
+        signals.siteContactNo
+          ? "Booking site contact is marked No — must be Yes."
+          : "Booking site contact was not confirmed as Yes.",
+        "Engineers must contact the booking site contact and record Yes.",
+        "Contact the original Booking Site Contact and set the answer to Yes.",
         raw
       )
     );
@@ -272,8 +346,8 @@ export function evaluateWastedJourneyConsistency(
       passed(
         `${WASTED_JOURNEY_RULE_PREFIX}031`,
         "Booking Site Contact Confirmed",
-        `Consistent: site contact answered (${signals.siteContactYes ? "Yes" : "No"}).`,
-        "Yes and No are both valid answers.",
+        "Consistent: booking site contact confirmed Yes.",
+        "Mandatory booking contact is documented.",
         raw
       )
     );
@@ -304,15 +378,15 @@ export function evaluateWastedJourneyConsistency(
     );
   }
 
-  // WJ-C050 — identity
+  // WJ-C050 — identity (asset + date; never job/serial)
   if (!signals.hasAssetId || !signals.hasDate) {
     findings.push(
       issue(
         `${WASTED_JOURNEY_RULE_PREFIX}050`,
         "Asset / Date Identity",
         "MISSING_FIELD",
-        `Wasted journey identity incomplete (Asset=${signals.hasAssetId ? "Yes" : "No"}, Date=${signals.hasDate ? "Yes" : "No"}).`,
-        "Asset and date identify which visit was wasted.",
+        `Wasted journey identity incomplete (Asset=${signals.assetId || "Missing"}, Date=${signals.hasDate ? "Yes" : "No"}).`,
+        "Asset and date identify which visit was wasted. Job number and serial are not required.",
         "Complete Asset No and Date on the sheet.",
         raw
       )
@@ -322,7 +396,7 @@ export function evaluateWastedJourneyConsistency(
       passed(
         `${WASTED_JOURNEY_RULE_PREFIX}051`,
         "Asset / Date Identity",
-        "Consistent: asset and date are present.",
+        `Consistent: asset ${signals.assetId} and date are present.`,
         "Visit identity is documented.",
         raw
       )
