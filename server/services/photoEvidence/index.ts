@@ -55,7 +55,7 @@ export function detectPhotoLabels(text: string): string[] {
   const results: string[] = [];
   for (const pattern of PHOTO_LABEL_PATTERNS) {
     const global = new RegExp(pattern.source, pattern.flags + "g");
-    for (const m of text.matchAll(global)) {
+    for (const m of Array.from(text.matchAll(global))) {
       const key = m[0].toLowerCase();
       if (!seenLower.has(key)) {
         seenLower.add(key);
