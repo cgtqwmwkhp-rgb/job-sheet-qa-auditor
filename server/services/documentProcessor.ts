@@ -1746,6 +1746,7 @@ async function processJobSheetWithOptions(
     ReturnType<typeof runPhotoPairCompare>
   > = null;
   let evidenceCoherenceSummary: string | null = null;
+  let evidenceFileHashToPersist: string | null = null;
   {
     const selectedSlug =
       buildSelectionCohortMeta(selectionResult, usedTemplateVersionId)
@@ -1853,6 +1854,17 @@ async function processJobSheetWithOptions(
     const evidenceFileHash = sharedPdfBuffer
       ? sha256(sharedPdfBuffer)
       : sha256(extractedText);
+    evidenceFileHashToPersist = evidenceFileHash;
+
+    let priorFileHashes: string[] = [];
+    try {
+      priorFileHashes = await db.getPriorFileHashesForJobSheet(jobSheetId);
+    } catch (err) {
+      console.warn(
+        "[DocumentProcessor] Prior fileHash lookup failed (non-fatal):",
+        err
+      );
+    }
 
     if (isPhotoPairCompareEnabled()) {
       try {
@@ -1886,7 +1898,7 @@ async function processJobSheetWithOptions(
     const photoResult = evaluatePhotoEvidenceConsistency(extractedText, {
       totalPages: ocrResult.totalPages,
       fileHash: evidenceFileHash,
-      priorFileHashes: [],
+      priorFileHashes,
       pairCompare: photoPairCompareArtifact,
     });
     photoEvidenceArtifact = photoResult;
@@ -2311,6 +2323,17 @@ async function processJobSheetWithOptions(
           processingTimeMs: Date.now() - startTime,
         },
       });
+    }
+
+    if (evidenceFileHashToPersist) {
+      try {
+        await db.updateJobSheetFileHash(jobSheetId, evidenceFileHashToPersist);
+      } catch (err) {
+        console.warn(
+          "[DocumentProcessor] Failed to persist fileHash (non-fatal):",
+          err
+        );
+      }
     }
 
     recordStage({
