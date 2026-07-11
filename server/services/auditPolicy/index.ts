@@ -21,7 +21,11 @@ export type {
   AuditPolicyForm,
 } from "./types";
 
-export { DEFAULT_AUDIT_POLICY, AUDIT_POLICY_SETTING_KEY } from "./defaults";
+export {
+  DEFAULT_AUDIT_POLICY,
+  AUDIT_POLICY_SETTING_KEY,
+  SAFETY_CRITICAL_RULE_IDS,
+} from "./defaults";
 
 /** Extended finding with fail-class annotation (in-pipeline). */
 export type PolicyFinding = Finding & {
