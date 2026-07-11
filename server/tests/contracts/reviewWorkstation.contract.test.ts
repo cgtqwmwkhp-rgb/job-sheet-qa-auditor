@@ -113,6 +113,17 @@ describe("Review Workstation Contract (PR-13)", () => {
         'applyBeforeAfterPairAction(pairIndex, "override")'
       );
     });
+
+    it("uses ClinicalContextStack and composite outcome strip", () => {
+      expect(pane).toContain("ClinicalContextStack");
+      expect(pane).toContain("Needs review");
+      expect(pane).toContain("ErrorBoundary");
+      expect(pane).toContain("CommentFindingsGroup");
+      expect(pane).toContain("PhotoEvidenceFindingsGroup");
+      expect(pane).toContain('defaultValue="issues"');
+      expect(pane).toContain('value="context"');
+      expect(pane).toContain("hasActionableClinicalContext");
+    });
   });
 
   describe("captureFieldCorrection API", () => {

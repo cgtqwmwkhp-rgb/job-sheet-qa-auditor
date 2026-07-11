@@ -42,6 +42,8 @@ export interface FailurePathSignalsPanelProps {
   signalSummary?: string | null;
   defaultOpen?: boolean;
   className?: string;
+  /** Hide EngineerComments chip when CommentQualityPanel is also shown. */
+  hideEngineerCommentsChip?: boolean;
 }
 
 type ChipVariant = "positive" | "negative" | "neutral";
@@ -52,7 +54,10 @@ interface SignalChip {
   variant: ChipVariant;
 }
 
-function resolveChips(signals: FailurePathSignals): SignalChip[] {
+function resolveChips(
+  signals: FailurePathSignals,
+  hideEngineerCommentsChip?: boolean
+): SignalChip[] {
   const chips: SignalChip[] = [];
 
   // SafeToUse
@@ -103,12 +108,13 @@ function resolveChips(signals: FailurePathSignals): SignalChip[] {
     variant: signals.partsStillRequired ? "negative" : "neutral",
   });
 
-  // EngineerComments
-  chips.push({
-    label: "EngineerComments",
-    value: signals.hasSubstantiveComments ? "Yes" : "No",
-    variant: signals.hasSubstantiveComments ? "positive" : "negative",
-  });
+  if (!hideEngineerCommentsChip) {
+    chips.push({
+      label: "EngineerComments",
+      value: signals.hasSubstantiveComments ? "Yes" : "No",
+      variant: signals.hasSubstantiveComments ? "positive" : "negative",
+    });
+  }
 
   return chips;
 }
@@ -124,12 +130,14 @@ export function FailurePathSignalsPanel({
   signalSummary,
   defaultOpen = false,
   className,
+  hideEngineerCommentsChip = false,
 }: FailurePathSignalsPanelProps) {
   const [open, setOpen] = useState(defaultOpen);
+  const [showRaw, setShowRaw] = useState(false);
 
   if (!signals) return null;
 
-  const chips = resolveChips(signals);
+  const chips = resolveChips(signals, hideEngineerCommentsChip);
 
   return (
     <Card className={cn("shadow-none", className)}>
@@ -180,9 +188,22 @@ export function FailurePathSignalsPanel({
               ))}
             </div>
             {signalSummary && (
-              <p className="mt-2 text-[11px] text-muted-foreground font-mono leading-snug truncate">
-                {signalSummary}
-              </p>
+              <div className="mt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-1 text-[11px] text-muted-foreground"
+                  onClick={() => setShowRaw(v => !v)}
+                >
+                  {showRaw ? "Hide raw signals" : "Show raw signals"}
+                </Button>
+                {showRaw && (
+                  <p className="mt-1 text-[11px] text-muted-foreground font-mono leading-snug break-all">
+                    {signalSummary}
+                  </p>
+                )}
+              </div>
             )}
           </CardContent>
         </CollapsibleContent>

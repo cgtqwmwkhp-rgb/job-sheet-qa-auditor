@@ -459,11 +459,14 @@ export default function AuditResults() {
 
   return (
     <DashboardLayout>
-      <ReviewWorkstationPane
-        jobSheetId={numericId}
-        auditData={auditData}
-        documentUrl={pdfProxyUrl}
-      />
+      {/* Full-bleed workstation: cancel shell padding so PDF can fill the viewport */}
+      <div className="-m-6 h-[calc(100vh-3.5rem)] min-h-0 overflow-hidden">
+        <ReviewWorkstationPane
+          jobSheetId={numericId}
+          auditData={auditData}
+          documentUrl={pdfProxyUrl}
+        />
+      </div>
     </DashboardLayout>
   );
 }

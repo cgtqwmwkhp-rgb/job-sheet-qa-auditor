@@ -61,13 +61,17 @@ function axisChip(
 
 export function CommentQualityPanel({
   signals,
-  summary,
+  summary: _summary,
   defaultOpen = false,
   className,
 }: CommentQualityPanelProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   if (!signals || !signals.onFailurePath) return null;
+
+  const missingAxes = Array.isArray(signals.missingAxes)
+    ? signals.missingAxes
+    : [];
 
   const chips = [
     axisChip("Present", signals.present),
@@ -148,14 +152,9 @@ export function CommentQualityPanel({
                 No substantive engineer comments found.
               </p>
             )}
-            {signals.missingAxes.length > 0 && (
+            {missingAxes.length > 0 && (
               <p className="text-[11px] text-amber-800">
-                Missing: {signals.missingAxes.join(", ")}
-              </p>
-            )}
-            {summary && (
-              <p className="text-[11px] text-muted-foreground font-mono truncate">
-                {summary}
+                Missing: {missingAxes.join(", ")}
               </p>
             )}
           </CardContent>
@@ -173,10 +172,36 @@ export function mapCommentQualityFromReport(reportJson: unknown): {
     return { signals: null, summary: null };
   }
   const report = reportJson as Record<string, unknown>;
+  const raw = report.commentQualitySignals;
+  if (!raw || typeof raw !== "object") {
+    return {
+      signals: null,
+      summary: (report.commentQualitySummary as string) ?? null,
+    };
+  }
+  const s = raw as Record<string, unknown>;
+  const signals: CommentQualitySignals = {
+    onFailurePath: Boolean(s.onFailurePath),
+    present: Boolean(s.present),
+    wordCount: typeof s.wordCount === "number" ? s.wordCount : 0,
+    hasWhat: Boolean(s.hasWhat),
+    hasImpact: Boolean(s.hasImpact),
+    hasPartsStance: Boolean(s.hasPartsStance),
+    hasNextAction: Boolean(s.hasNextAction),
+    isVagueOnly: Boolean(s.isVagueOnly),
+    isTooThin: Boolean(s.isTooThin),
+    missingAxes: Array.isArray(s.missingAxes)
+      ? s.missingAxes.filter((x): x is string => typeof x === "string")
+      : [],
+    snippet: typeof s.snippet === "string" ? s.snippet : "",
+    coherent: Boolean(s.coherent),
+    returnVisit: Boolean(s.returnVisit),
+    partsStillRequired: Boolean(s.partsStillRequired),
+    partsStillSnippet:
+      typeof s.partsStillSnippet === "string" ? s.partsStillSnippet : "",
+  };
   return {
-    signals:
-      (report.commentQualitySignals as CommentQualitySignals | undefined) ??
-      null,
+    signals,
     summary: (report.commentQualitySummary as string) ?? null,
   };
 }
