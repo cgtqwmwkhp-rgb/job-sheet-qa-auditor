@@ -39,6 +39,11 @@ describe("API Authentication Contract", () => {
     it("should handle Azure AD authentication", () => {
       expect(sdkContent).toContain("azure-easy-auth");
     });
+
+    it("should resolve Azure staff roles for hold-queue access", () => {
+      expect(sdkContent).toContain("resolveAzureAuthRole");
+      expect(sdkContent).toContain("extractAzureRoleClaims");
+    });
   });
 
   describe("Protected Procedures", () => {

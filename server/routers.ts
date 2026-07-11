@@ -546,14 +546,16 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const result = await db.updateUserRole(input.id, input.role);
+        // Client "viewer" maps to DB enum "user"
+        const dbRole = input.role === "viewer" ? "user" : input.role;
+        const result = await db.updateUserRole(input.id, dbRole);
 
         await db.logAction({
           userId: ctx.user.id,
           action: "UPDATE_USER_ROLE",
           entityType: "user",
           entityId: input.id,
-          details: { newRole: input.role },
+          details: { newRole: input.role, dbRole },
         });
 
         return result;
