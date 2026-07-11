@@ -66,6 +66,11 @@ import { mapSelectionTraceFromReport } from "@/components/review/mapSelectionTra
 import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
 import { SelectionMarksPanel } from "@/components/review/SelectionMarksPanel";
 import {
+  DocQualityBreakdown,
+  mapDocQualityPenaltiesFromReport,
+  type DocQualityPenalty,
+} from "@/components/review/DocQualityBreakdown";
+import {
   mapSelectionMarksFromReport,
   type SelectionMarksView,
 } from "@/components/review/mapSelectionMarks";
@@ -118,6 +123,8 @@ export interface AuditData {
   selectionTrace?: SelectionTrace | null;
   /** Visual Ok/Adv/Fail/N/A checklist marks from Azure DI. */
   selectionMarks?: SelectionMarksView | null;
+  /** Itemised Doc Quality penalty deductions (from reportJson). */
+  docQualityPenalties?: DocQualityPenalty[];
 }
 
 export function mapFindingsFromApi(
@@ -278,6 +285,9 @@ export function ReviewWorkstationPane({
           hasMajorFails: mapHasMajorFailsFromReport(auditResult?.reportJson),
           selectionTrace: mapSelectionTraceFromReport(auditResult?.reportJson),
           selectionMarks: mapSelectionMarksFromReport(auditResult?.reportJson),
+          docQualityPenalties: mapDocQualityPenaltiesFromReport(
+            auditResult?.reportJson
+          ),
         }
       : null;
 
@@ -296,8 +306,18 @@ export function ReviewWorkstationPane({
       ? auditDataProp.hasMajorFails
       : mapHasMajorFailsFromReport(auditResult?.reportJson);
 
+  const docQualityPenalties =
+    auditDataProp?.docQualityPenalties ??
+    mapDocQualityPenaltiesFromReport(auditResult?.reportJson);
+
   const auditData = auditDataProp
-    ? { ...auditDataProp, selectionTrace, selectionMarks, hasMajorFails }
+    ? {
+        ...auditDataProp,
+        selectionTrace,
+        selectionMarks,
+        hasMajorFails,
+        docQualityPenalties,
+      }
     : fetchedAuditData
       ? { ...fetchedAuditData, hasMajorFails }
       : null;
@@ -839,13 +859,10 @@ function ReviewWorkstationContent({
                 Major fail
               </Badge>
             )}
-            <Badge
-              variant="outline"
-              className="font-mono bg-[#333030] text-white border-[#333030]"
-              title="Documentation quality out of 100 for this job sheet (engineer mark). Major/Minor issues deduct points; Passed checks do not."
-            >
-              Doc quality: {auditData.score}
-            </Badge>
+            <DocQualityBreakdown
+              score={auditData.score}
+              penalties={auditData.docQualityPenalties ?? []}
+            />
           </div>
           <p className="text-sm text-muted-foreground">
             Technician: {auditData.technician} • Date: {auditData.date} •{" "}

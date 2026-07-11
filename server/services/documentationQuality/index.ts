@@ -23,6 +23,7 @@ export interface DocumentationQualityResult {
   /** LLM / analyzer confidence if known (separate from quality). */
   llmConfidence: number | null;
   penalties: Array<{
+    ruleId: string;
     fieldName: string;
     severity: string;
     failClass?: FailClass;
@@ -79,6 +80,7 @@ export function computeDocumentationQualityScore(
     if (points <= 0) continue;
     deducted += points;
     penalties.push({
+      ruleId: f.ruleId,
       fieldName: f.fieldName,
       severity: f.severity,
       failClass: f.failClass,
