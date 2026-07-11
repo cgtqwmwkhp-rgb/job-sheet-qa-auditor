@@ -1,9 +1,17 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertCircle, CheckCircle2, Clock, Eye, Loader2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Eye,
+  Loader2,
+} from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/lib/trpc";
@@ -21,6 +29,12 @@ import {
 } from "@/components/review/ReviewWorkstationPane";
 import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
 import { perfMark, PERF_MARKS, perfClear } from "@/lib/perf";
+
+interface AuditOutcomeSummary {
+  result: string;
+  docQualityScore: number | null;
+  hasMajorFails: boolean;
+}
 
 // No mock data - only show real audit results
 
@@ -114,6 +128,27 @@ export default function AuditResults() {
         },
       }
     );
+
+  // Fetch audit results for outcome badges on the list
+  const { data: allAuditResults } = trpc.audits.list.useQuery({ limit: 100 });
+
+  const auditOutcomeMap = useMemo(() => {
+    const map = new Map<number, AuditOutcomeSummary>();
+    if (!allAuditResults) return map;
+    for (const ar of allAuditResults) {
+      const reportJson = ar.reportJson as Record<string, unknown> | null;
+      const docScore =
+        typeof (reportJson as any)?.documentationQualityScore === "number"
+          ? ((reportJson as any).documentationQualityScore as number)
+          : null;
+      map.set(ar.jobSheetId, {
+        result: ar.result,
+        docQualityScore: docScore,
+        hasMajorFails: mapHasMajorFailsFromReport(reportJson),
+      });
+    }
+    return map;
+  }, [allAuditResults]);
 
   // Fetch the audit result for this job sheet (always call, use enabled flag)
   const { data: auditResult, isLoading: auditLoading } =
@@ -250,72 +285,127 @@ export default function AuditResults() {
               </CardHeader>
               <ScrollArea className="h-[calc(100vh-16rem)]">
                 <div className="p-4 space-y-3">
-                  {allJobSheets.map(sheet => (
-                    <div
-                      key={sheet.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                      onClick={() => navigateToAudit(sheet.id)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={e =>
-                        e.key === "Enter" && navigateToAudit(sheet.id)
-                      }
-                    >
-                      <div className="flex items-center gap-4">
-                        <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            sheet.status === "failed"
-                              ? "bg-red-100 text-red-600"
-                              : sheet.status === "review_queue"
-                                ? "bg-orange-100 text-orange-600"
-                                : sheet.status === "completed"
-                                  ? "bg-lime-100 text-lime-700"
-                                  : "bg-[#DBEAFE] text-[#2868CE]"
-                          }`}
-                        >
-                          {sheet.status === "failed" ? (
-                            <AlertCircle className="w-5 h-5" />
-                          ) : sheet.status === "review_queue" ? (
-                            <Clock className="w-5 h-5" />
-                          ) : sheet.status === "completed" ? (
-                            <CheckCircle2 className="w-5 h-5" />
-                          ) : (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-medium font-mono">
-                            {sheet.referenceNumber || `JS-${sheet.id}`}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {sheet.fileName} •{" "}
-                            {sheet.siteInfo || "No site info"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p
-                            className={`font-bold text-sm ${
+                  {allJobSheets.map(sheet => {
+                    const outcome = auditOutcomeMap.get(sheet.id);
+                    return (
+                      <div
+                        key={sheet.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => navigateToAudit(sheet.id)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={e =>
+                          e.key === "Enter" && navigateToAudit(sheet.id)
+                        }
+                      >
+                        <div className="flex items-center gap-4">
+                          <div
+                            className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
                               sheet.status === "failed"
-                                ? "text-red-600"
+                                ? "bg-red-100 text-red-600"
                                 : sheet.status === "review_queue"
-                                  ? "text-orange-600"
+                                  ? "bg-orange-100 text-orange-600"
                                   : sheet.status === "completed"
-                                    ? "text-green-600"
-                                    : "text-muted-foreground"
+                                    ? "bg-lime-100 text-lime-700"
+                                    : "bg-[#DBEAFE] text-[#2868CE]"
                             }`}
                           >
-                            {sheet.status.toUpperCase().replace("_", " ")}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(sheet.createdAt).toLocaleDateString()}
-                          </p>
+                            {sheet.status === "failed" ? (
+                              <AlertCircle className="w-5 h-5" />
+                            ) : sheet.status === "review_queue" ? (
+                              <Clock className="w-5 h-5" />
+                            ) : sheet.status === "completed" ? (
+                              <CheckCircle2 className="w-5 h-5" />
+                            ) : (
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium font-mono">
+                              {sheet.referenceNumber || `JS-${sheet.id}`}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {sheet.fileName} •{" "}
+                              {sheet.siteInfo || "No site info"}
+                            </p>
+                          </div>
                         </div>
-                        <Eye className="w-4 h-4 text-muted-foreground" />
+                        <div className="flex items-center gap-3">
+                          {/* Pass/Fail badge */}
+                          {outcome ? (
+                            <Badge
+                              variant={
+                                outcome.result === "pass"
+                                  ? "default"
+                                  : "destructive"
+                              }
+                              className={
+                                outcome.result === "pass"
+                                  ? "bg-emerald-600 hover:bg-emerald-700"
+                                  : undefined
+                              }
+                            >
+                              {outcome.result === "pass" ? "PASS" : "FAIL"}
+                            </Badge>
+                          ) : isTerminalJobSheetStatus(sheet.status) ? (
+                            <Badge
+                              variant="outline"
+                              className="text-muted-foreground"
+                            >
+                              —
+                            </Badge>
+                          ) : null}
+
+                          {/* Major Fail chip */}
+                          {outcome?.hasMajorFails && (
+                            <Badge
+                              variant="destructive"
+                              className="gap-1 bg-red-700 hover:bg-red-800"
+                            >
+                              <AlertTriangle className="w-3 h-3" />
+                              Major
+                            </Badge>
+                          )}
+
+                          {/* Doc Quality score */}
+                          {outcome?.docQualityScore != null && (
+                            <span
+                              className={`text-xs font-semibold tabular-nums px-2 py-0.5 rounded ${
+                                outcome.docQualityScore >= 80
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : outcome.docQualityScore >= 50
+                                    ? "bg-amber-50 text-amber-700"
+                                    : "bg-red-50 text-red-700"
+                              }`}
+                              title="Documentation Quality Score"
+                            >
+                              Doc {outcome.docQualityScore}%
+                            </span>
+                          )}
+
+                          <div className="text-right ml-2">
+                            <p
+                              className={`font-bold text-sm ${
+                                sheet.status === "failed"
+                                  ? "text-red-600"
+                                  : sheet.status === "review_queue"
+                                    ? "text-orange-600"
+                                    : sheet.status === "completed"
+                                      ? "text-green-600"
+                                      : "text-muted-foreground"
+                              }`}
+                            >
+                              {sheet.status.toUpperCase().replace("_", " ")}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(sheet.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Eye className="w-4 h-4 text-muted-foreground" />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </ScrollArea>
             </Card>
