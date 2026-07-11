@@ -205,6 +205,15 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           enabled: true,
           fieldAliases: ["Parts Still Required ↔ Works Completion"],
         },
+        {
+          ruleId: "PHOTO-C010",
+          label: "Photo Evidence (scaffold)",
+          description:
+            "Parts or repairs recorded but before/after photo evidence was not verified",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: ["Photo Evidence"],
+        },
       ],
     },
     /**

@@ -77,6 +77,7 @@ import {
   WASTED_JOURNEY_TEMPLATE_ID,
 } from "./wastedJourneyConsistency";
 import { computeDocumentationQualityScore } from "./documentationQuality";
+import { evaluatePhotoEvidenceConsistency } from "./photoEvidence";
 import { applyAuditPolicy, resolveAuditFormFamily } from "./auditPolicy";
 import {
   runSelectionMarkDetection,
@@ -1785,6 +1786,23 @@ async function processJobSheetWithOptions(
             : undefined,
         });
       }
+    }
+  }
+
+  // Photo evidence scaffold (PHOTO-C010): advisory when parts/repairs present
+  if (!isWastedJourneyDocument(extractedText)) {
+    const photoResult = evaluatePhotoEvidenceConsistency(extractedText);
+    if (photoResult.findings.length > 0) {
+      analysisResult = {
+        ...analysisResult,
+        findings: [...analysisResult.findings, ...photoResult.findings],
+        summary: `${analysisResult.summary} [PHOTO_EVIDENCE] ${photoResult.summary}`,
+      };
+      recordStage({
+        stage: "Photo Evidence",
+        status: "success",
+        durationMs: 0,
+      });
     }
   }
 
