@@ -15,13 +15,18 @@ import {
   mapSelectionMarksToRows,
   inferColumnOrder,
   buildSelectionMarksArtifact,
+  buildSelectionMarkFindings,
   formatSelectionMarksHints,
   isSelectionMarksEnabled,
   countHighConfidenceFailMarks,
   hasBlockingFailMarks,
   FEATURE_FLAG,
+  FAIL_CONFIDENCE_THRESHOLD,
 } from "../../services/selectionMarks";
-import type { SelectionMarksArtifact } from "../../services/selectionMarks";
+import type {
+  SelectionMarksArtifact,
+  SelectionMarkRow,
+} from "../../services/selectionMarks";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const layoutFixture = JSON.parse(
@@ -200,5 +205,88 @@ describe("documentProcessor wiring", () => {
       "utf-8"
     );
     expect(analyzer).toContain("Selection Marks hints");
+  });
+});
+
+describe("buildSelectionMarkFindings confidence gate", () => {
+  function makeRow(
+    overrides: Partial<SelectionMarkRow> &
+      Pick<SelectionMarkRow, "choice" | "confidence">
+  ): SelectionMarkRow {
+    return {
+      rowIndex: 0,
+      pageNumber: 1,
+      selectedCount: 1,
+      markCount: 4,
+      ...overrides,
+    };
+  }
+
+  it("emits S1 OUT_OF_POLICY for Fail at exactly the threshold", () => {
+    const rows = [
+      makeRow({ choice: "Fail", confidence: FAIL_CONFIDENCE_THRESHOLD }),
+    ];
+    const findings = buildSelectionMarkFindings(rows);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe("S1");
+    expect(findings[0].reasonCode).toBe("OUT_OF_POLICY");
+  });
+
+  it("emits S1 OUT_OF_POLICY for Fail above the threshold", () => {
+    const rows = [makeRow({ choice: "Fail", confidence: 95 })];
+    const findings = buildSelectionMarkFindings(rows);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe("S1");
+  });
+
+  it("omits low-confidence Fail (below threshold) from findings entirely", () => {
+    const rows = [makeRow({ choice: "Fail", confidence: 55 })];
+    const findings = buildSelectionMarkFindings(rows);
+    expect(findings).toHaveLength(0);
+  });
+
+  it("omits Fail at threshold - 1", () => {
+    const rows = [
+      makeRow({ choice: "Fail", confidence: FAIL_CONFIDENCE_THRESHOLD - 1 }),
+    ];
+    const findings = buildSelectionMarkFindings(rows);
+    expect(findings).toHaveLength(0);
+  });
+
+  it("mixed: only high-confidence Fails produce S1", () => {
+    const rows = [
+      makeRow({ rowIndex: 0, choice: "Fail", confidence: 40 }),
+      makeRow({ rowIndex: 1, choice: "Fail", confidence: 90 }),
+      makeRow({ rowIndex: 2, choice: "Ok", confidence: 95 }),
+      makeRow({ rowIndex: 3, choice: "UNREADABLE", confidence: 30 }),
+    ];
+    const findings = buildSelectionMarkFindings(rows);
+    const s1 = findings.filter(f => f.severity === "S1");
+    const s2 = findings.filter(f => f.severity === "S2");
+    const s3 = findings.filter(f => f.severity === "S3");
+    expect(s1).toHaveLength(1);
+    expect(s1[0].normalisedSnippet).toBe("Fail");
+    expect(s1[0].confidence).toBe(90);
+    expect(s2).toHaveLength(1);
+    expect(s3).toHaveLength(1);
+  });
+
+  it("threshold constant matches countHighConfidenceFailMarks default", () => {
+    expect(FAIL_CONFIDENCE_THRESHOLD).toBe(80);
+  });
+
+  it("buildSelectionMarkFindings and countHighConfidenceFailMarks agree on Fail count", () => {
+    const rows = [
+      makeRow({ rowIndex: 0, choice: "Fail", confidence: 40 }),
+      makeRow({ rowIndex: 1, choice: "Fail", confidence: 55 }),
+      makeRow({ rowIndex: 2, choice: "Fail", confidence: 80 }),
+      makeRow({ rowIndex: 3, choice: "Fail", confidence: 95 }),
+      makeRow({ rowIndex: 4, choice: "Ok", confidence: 99 }),
+    ];
+    const artifact = { rows } as SelectionMarksArtifact;
+    const findingFailCount = buildSelectionMarkFindings(rows).filter(
+      f => f.severity === "S1" && f.normalisedSnippet === "Fail"
+    ).length;
+    expect(findingFailCount).toBe(countHighConfidenceFailMarks(artifact));
   });
 });
