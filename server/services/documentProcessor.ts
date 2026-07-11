@@ -80,6 +80,7 @@ import {
   isSelectionMarksEnabled,
   reconcileSelectionMarksWithJudgment,
   hasBlockingFailMarks,
+  countHighConfidenceFailMarks,
   type SelectionMarksResult,
 } from "./selectionMarks";
 import {
@@ -1747,9 +1748,9 @@ async function processJobSheetWithOptions(
         });
       }
     } else {
-      const failMarkCount =
-        selectionMarksResult?.artifact.rows?.filter(r => r.choice === "Fail")
-          .length ?? 0;
+      const failMarkCount = countHighConfidenceFailMarks(
+        selectionMarksResult?.artifact
+      );
       const consistency = evaluateJobSummaryConsistency(extractedText, {
         failMarkCount,
       });
