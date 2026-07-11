@@ -106,7 +106,9 @@ describe("Review Workstation Contract (PR-13)", () => {
       expect(pane).toContain("onConfirmPair={handleConfirmPair}");
       expect(pane).toContain("onOverridePair={handleOverridePair}");
       expect(pane).toContain("auditActions.approve");
-      expect(pane).toContain('applyBeforeAfterPairAction(pairIndex, "approve")');
+      expect(pane).toContain(
+        'applyBeforeAfterPairAction(pairIndex, "approve")'
+      );
       expect(pane).toContain(
         'applyBeforeAfterPairAction(pairIndex, "override")'
       );

@@ -243,7 +243,6 @@ export function BeforeAfterComparePane({
   );
 }
 
-
 /** Map a compare pair to open PHOTO-C012 / PHOTO-C013 findings (ruleId + page). */
 export function resolvePhotoPairFindings<
   T extends {

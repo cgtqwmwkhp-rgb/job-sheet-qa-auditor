@@ -752,12 +752,9 @@ function ReviewWorkstationContent({
       action === "approve"
         ? "Confirmed before/after pair catch from workstation"
         : "Overridden before/after pair from workstation";
-    const mutation =
-      action === "approve" ? approveMutation : overrideMutation;
+    const mutation = action === "approve" ? approveMutation : overrideMutation;
     const label =
-      action === "approve"
-        ? "Pair catch confirmed"
-        : "Pair finding overridden";
+      action === "approve" ? "Pair catch confirmed" : "Pair finding overridden";
 
     void Promise.allSettled(
       targets.map(f => {
