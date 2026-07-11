@@ -67,6 +67,7 @@ describe("Release Verification Contract Tests", () => {
     it("creates required output files", () => {
       expect(scriptContent).toContain("homepage.txt");
       expect(scriptContent).toContain("health.txt");
+      expect(scriptContent).toContain("readyz.json");
       expect(scriptContent).toContain("version.json");
       expect(scriptContent).toContain("deployed_sha.txt");
       expect(scriptContent).toContain("summary.json");
@@ -79,6 +80,47 @@ describe("Release Verification Contract Tests", () => {
     it("exits non-zero in strict mode when evidence missing", () => {
       expect(scriptContent).toContain('MODE" == "strict"');
       expect(scriptContent).toContain("exit 1");
+    });
+
+    it("prefers /readyz for SHA proof over tRPC", () => {
+      const readyzIdx = scriptContent.indexOf("/readyz");
+      const trpcVersionIdx = scriptContent.indexOf(
+        "api/trpc/system.version",
+        scriptContent.indexOf("Check 3")
+      );
+      expect(readyzIdx).toBeGreaterThan(-1);
+      expect(trpcVersionIdx).toBeGreaterThan(-1);
+      expect(readyzIdx).toBeLessThan(trpcVersionIdx);
+    });
+
+    it("extracts SHA from readyz version.sha field", () => {
+      expect(scriptContent).toContain(".version.sha");
+    });
+
+    it("tracks shaSource in summary", () => {
+      expect(scriptContent).toContain("shaSource");
+      expect(scriptContent).toContain("SHA_SOURCE");
+    });
+
+    it("classifies auth-walled responses as AUTH_WALLED not FAIL", () => {
+      expect(scriptContent).toContain("AUTH_WALLED");
+      expect(scriptContent).toContain("is_auth_walled_code");
+      expect(scriptContent).toContain("log_auth_walled");
+    });
+
+    it("does not set OVERALL_STATUS to FAIL for auth-walled checks", () => {
+      const lines = scriptContent.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('STATUS="AUTH_WALLED"')) {
+          const nearby = lines.slice(i, i + 3).join("\n");
+          expect(nearby).not.toContain('OVERALL_STATUS="FAIL"');
+        }
+      }
+    });
+
+    it("includes authWalledCount in summary.json", () => {
+      expect(scriptContent).toContain("authWalledCount");
+      expect(scriptContent).toContain("authWalledChecks");
     });
   });
 

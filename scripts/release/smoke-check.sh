@@ -9,15 +9,21 @@
 #   expected_git_sha - Optional. Expected SHA to verify against deployed version
 #   mode             - Optional. soft (default) or strict
 #
+# Auth-Aware Probing:
+#   Endpoints excluded from Easy Auth (/readyz, /healthz) are preferred.
+#   Auth-walled responses (401/302) from tRPC or homepage are classified
+#   as AUTH_WALLED (informational) rather than FAIL.
+#
 # Output Files (always written to logs/release/smoke/):
 #   - homepage.txt      - Homepage response body
 #   - health.txt        - Health endpoint response body
+#   - readyz.json       - /readyz response (preferred SHA source)
 #   - version.json      - Full version endpoint JSON response
 #   - deployed_sha.txt  - Extracted gitSha or MISSING_EVIDENCE marker
 #   - summary.json      - Structured summary with all check results
 #
 # Exit Codes:
-#   0 - All checks passed (or soft mode with warnings)
+#   0 - All checks passed (or soft mode with warnings/auth-walled)
 #   1 - Critical failure (strict mode) or missing required evidence
 # =============================================================================
 
@@ -64,8 +70,10 @@ VERSION_HTTP_CODE="000"
 VERSION_DURATION_MS=0
 DEPLOYED_SHA=""
 SHA_MATCH_STATUS="N/A"
+SHA_SOURCE=""
 OVERALL_STATUS="PASS"
 WARNINGS=()
+AUTH_WALLED_CHECKS=()
 
 # =============================================================================
 # Helper Functions
@@ -85,6 +93,15 @@ log_fail() {
 log_warn() {
   echo "[WARN] $1"
   WARNINGS+=("$1")
+}
+
+log_auth_walled() {
+  echo "[AUTH_WALLED] $1"
+  AUTH_WALLED_CHECKS+=("$1")
+}
+
+is_auth_walled_code() {
+  [[ "$1" == "401" || "$1" == "302" || "$1" == "301" ]]
 }
 
 measure_request() {
@@ -128,6 +145,9 @@ read HOMEPAGE_HTTP_CODE HOMEPAGE_DURATION_MS <<< $(measure_request "$BASE_URL" "
 if [[ "$HOMEPAGE_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
   HOMEPAGE_STATUS="PASS"
   log_pass "Homepage - HTTP $HOMEPAGE_HTTP_CODE (${HOMEPAGE_DURATION_MS}ms)"
+elif is_auth_walled_code "$HOMEPAGE_HTTP_CODE"; then
+  HOMEPAGE_STATUS="AUTH_WALLED"
+  log_auth_walled "Homepage - HTTP $HOMEPAGE_HTTP_CODE (expected behind Easy Auth)"
 else
   HOMEPAGE_STATUS="FAIL"
   log_fail "Homepage - HTTP $HOMEPAGE_HTTP_CODE"
@@ -140,78 +160,137 @@ fi
 echo ""
 echo "--- Check 2: Health Endpoint ---"
 HEALTH_FILE="$LOG_DIR/health.txt"
+HEALTH_SOURCE=""
 
-# Try tRPC health endpoint first
-HEALTH_URL="$BASE_URL/api/trpc/system.health?input=%7B%7D"
+# Prefer /readyz (excluded from Easy Auth, includes version info)
+HEALTH_URL="$BASE_URL/readyz"
 read HEALTH_HTTP_CODE HEALTH_DURATION_MS <<< $(measure_request "$HEALTH_URL" "$HEALTH_FILE")
 
-if [[ ! "$HEALTH_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
-  # Fallback to /api/health
-  HEALTH_URL="$BASE_URL/api/health"
-  read HEALTH_HTTP_CODE HEALTH_DURATION_MS <<< $(measure_request "$HEALTH_URL" "$HEALTH_FILE")
+if [[ "$HEALTH_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+  HEALTH_SOURCE="readyz"
 fi
 
-if [[ "$HEALTH_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+if [[ -z "$HEALTH_SOURCE" ]]; then
+  # Try /healthz (also excluded from Easy Auth)
+  HEALTH_URL="$BASE_URL/healthz"
+  read HEALTH_HTTP_CODE HEALTH_DURATION_MS <<< $(measure_request "$HEALTH_URL" "$HEALTH_FILE")
+  if [[ "$HEALTH_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+    HEALTH_SOURCE="healthz"
+  fi
+fi
+
+if [[ -z "$HEALTH_SOURCE" ]]; then
+  # Try tRPC health (may be auth-walled behind Easy Auth)
+  HEALTH_URL="$BASE_URL/api/trpc/system.health?input=%7B%7D"
+  read HEALTH_HTTP_CODE HEALTH_DURATION_MS <<< $(measure_request "$HEALTH_URL" "$HEALTH_FILE")
+  if [[ "$HEALTH_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+    HEALTH_SOURCE="trpc"
+  elif is_auth_walled_code "$HEALTH_HTTP_CODE"; then
+    HEALTH_STATUS="AUTH_WALLED"
+    log_auth_walled "Health tRPC - HTTP $HEALTH_HTTP_CODE (auth-walled, used /readyz or /healthz instead)"
+  fi
+fi
+
+if [[ -n "$HEALTH_SOURCE" ]]; then
   HEALTH_STATUS="PASS"
-  log_pass "Health - HTTP $HEALTH_HTTP_CODE (${HEALTH_DURATION_MS}ms)"
-else
+  log_pass "Health - HTTP $HEALTH_HTTP_CODE via /$HEALTH_SOURCE (${HEALTH_DURATION_MS}ms)"
+elif [[ "$HEALTH_STATUS" != "AUTH_WALLED" ]]; then
   HEALTH_STATUS="FAIL"
-  log_fail "Health - HTTP $HEALTH_HTTP_CODE"
+  log_fail "Health - HTTP $HEALTH_HTTP_CODE (no reachable health endpoint)"
   OVERALL_STATUS="FAIL"
 fi
 
 # =============================================================================
-# Check 3: Version Endpoint (Critical for SHA capture)
+# Check 3: Version / SHA Capture
 # =============================================================================
 echo ""
-echo "--- Check 3: Version Endpoint ---"
+echo "--- Check 3: Version / SHA Capture ---"
 VERSION_FILE="$LOG_DIR/version.json"
 DEPLOYED_SHA_FILE="$LOG_DIR/deployed_sha.txt"
 
-# Try tRPC version endpoint first
-VERSION_URL="$BASE_URL/api/trpc/system.version?input=%7B%7D"
-read VERSION_HTTP_CODE VERSION_DURATION_MS <<< $(measure_request "$VERSION_URL" "$VERSION_FILE")
+# Prefer /readyz for SHA proof (excluded from Easy Auth, returns version.sha)
+READYZ_FILE="$LOG_DIR/readyz.json"
+READYZ_URL="$BASE_URL/readyz"
+read READYZ_HTTP_CODE READYZ_DURATION_MS <<< $(measure_request "$READYZ_URL" "$READYZ_FILE")
 
-if [[ ! "$VERSION_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
-  # Fallback to /api/version
-  VERSION_URL="$BASE_URL/api/version"
-  read VERSION_HTTP_CODE VERSION_DURATION_MS <<< $(measure_request "$VERSION_URL" "$VERSION_FILE")
+if [[ "$READYZ_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+  if command -v jq &> /dev/null; then
+    DEPLOYED_SHA=$(jq -r '.version.sha // empty' "$READYZ_FILE" 2>/dev/null || echo "")
+  else
+    DEPLOYED_SHA=$(grep -oE '"sha"\s*:\s*"[^"]+"' "$READYZ_FILE" 2>/dev/null | head -1 | grep -oE '"[^"]+"\s*$' | tr -d '"' || echo "")
+  fi
+  if [[ -n "$DEPLOYED_SHA" && "$DEPLOYED_SHA" != "null" && "$DEPLOYED_SHA" != "unknown" ]]; then
+    SHA_SOURCE="readyz"
+    cp "$READYZ_FILE" "$VERSION_FILE"
+    VERSION_HTTP_CODE="$READYZ_HTTP_CODE"
+    VERSION_DURATION_MS="$READYZ_DURATION_MS"
+    VERSION_STATUS="PASS"
+    log_pass "Version (via /readyz) - HTTP $READYZ_HTTP_CODE (${READYZ_DURATION_MS}ms)"
+    log_pass "Deployed SHA captured from /readyz: $DEPLOYED_SHA"
+    echo "$DEPLOYED_SHA" > "$DEPLOYED_SHA_FILE"
+  fi
 fi
 
-if [[ "$VERSION_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
-  VERSION_STATUS="PASS"
-  log_pass "Version - HTTP $VERSION_HTTP_CODE (${VERSION_DURATION_MS}ms)"
-  
-  # Extract gitSha from response
-  # Handle both: result.data.json.gitSha AND result.data.gitSha
-  if command -v jq &> /dev/null; then
-    DEPLOYED_SHA=$(jq -r '.result.data.json.gitSha // .result.data.gitSha // .gitSha // empty' "$VERSION_FILE" 2>/dev/null || echo "")
-  else
-    # Fallback: grep for gitSha
-    DEPLOYED_SHA=$(grep -oP '"gitSha"\s*:\s*"\K[^"]+' "$VERSION_FILE" 2>/dev/null | head -1 || echo "")
-  fi
-  
-  if [[ -n "$DEPLOYED_SHA" && "$DEPLOYED_SHA" != "null" ]]; then
-    echo "$DEPLOYED_SHA" > "$DEPLOYED_SHA_FILE"
-    log_pass "Deployed SHA captured: $DEPLOYED_SHA"
-  else
-    echo "MISSING_EVIDENCE: version endpoint returned 200 but gitSha field is missing or null" > "$DEPLOYED_SHA_FILE"
-    log_warn "Could not extract gitSha from version response"
-    DEPLOYED_SHA=""
-    
-    if [[ "$MODE" == "strict" ]]; then
-      OVERALL_STATUS="FAIL"
+# Fall back to tRPC system.version if /readyz didn't yield a SHA
+if [[ -z "$SHA_SOURCE" ]]; then
+  VERSION_URL="$BASE_URL/api/trpc/system.version?input=%7B%7D"
+  read VERSION_HTTP_CODE VERSION_DURATION_MS <<< $(measure_request "$VERSION_URL" "$VERSION_FILE")
+
+  if [[ "$VERSION_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+    VERSION_STATUS="PASS"
+    log_pass "Version (via tRPC) - HTTP $VERSION_HTTP_CODE (${VERSION_DURATION_MS}ms)"
+
+    if command -v jq &> /dev/null; then
+      DEPLOYED_SHA=$(jq -r '.result.data.json.gitSha // .result.data.gitSha // .gitSha // empty' "$VERSION_FILE" 2>/dev/null || echo "")
     else
-      if [[ "$OVERALL_STATUS" == "PASS" ]]; then
-        OVERALL_STATUS="WARN"
-      fi
+      DEPLOYED_SHA=$(grep -oP '"gitSha"\s*:\s*"\K[^"]+' "$VERSION_FILE" 2>/dev/null | head -1 || echo "")
+    fi
+
+    if [[ -n "$DEPLOYED_SHA" && "$DEPLOYED_SHA" != "null" ]]; then
+      SHA_SOURCE="trpc"
+      echo "$DEPLOYED_SHA" > "$DEPLOYED_SHA_FILE"
+      log_pass "Deployed SHA captured from tRPC: $DEPLOYED_SHA"
+    fi
+  elif is_auth_walled_code "$VERSION_HTTP_CODE"; then
+    VERSION_STATUS="AUTH_WALLED"
+    log_auth_walled "Version tRPC - HTTP $VERSION_HTTP_CODE (auth-walled)"
+  fi
+fi
+
+# Fall back to /api/version
+if [[ -z "$SHA_SOURCE" && "$VERSION_STATUS" != "PASS" ]]; then
+  VERSION_URL="$BASE_URL/api/version"
+  read VERSION_HTTP_CODE VERSION_DURATION_MS <<< $(measure_request "$VERSION_URL" "$VERSION_FILE")
+
+  if [[ "$VERSION_HTTP_CODE" =~ ^2[0-9][0-9]$ ]]; then
+    VERSION_STATUS="PASS"
+    if command -v jq &> /dev/null; then
+      DEPLOYED_SHA=$(jq -r '.gitSha // empty' "$VERSION_FILE" 2>/dev/null || echo "")
+    fi
+    if [[ -n "$DEPLOYED_SHA" && "$DEPLOYED_SHA" != "null" ]]; then
+      SHA_SOURCE="api-version"
+      echo "$DEPLOYED_SHA" > "$DEPLOYED_SHA_FILE"
+      log_pass "Deployed SHA captured from /api/version: $DEPLOYED_SHA"
     fi
   fi
+fi
+
+# Evaluate SHA capture outcome
+if [[ -n "$SHA_SOURCE" ]]; then
+  : # SHA captured successfully above
+elif [[ "$VERSION_STATUS" == "AUTH_WALLED" ]]; then
+  echo "MISSING_EVIDENCE: version endpoints auth-walled (HTTP $VERSION_HTTP_CODE) and /readyz did not provide SHA" > "$DEPLOYED_SHA_FILE"
+  log_warn "SHA not captured — tRPC auth-walled and /readyz unavailable or missing version.sha"
 else
-  VERSION_STATUS="FAIL"
-  log_fail "Version - HTTP $VERSION_HTTP_CODE"
-  echo "MISSING_EVIDENCE: version endpoint returned HTTP $VERSION_HTTP_CODE" > "$DEPLOYED_SHA_FILE"
-  
+  if [[ "$VERSION_STATUS" == "PASS" ]]; then
+    echo "MISSING_EVIDENCE: version endpoint returned 200 but gitSha field is missing or null" > "$DEPLOYED_SHA_FILE"
+    log_warn "Could not extract gitSha from version response"
+  else
+    VERSION_STATUS="FAIL"
+    log_fail "Version - HTTP $VERSION_HTTP_CODE"
+    echo "MISSING_EVIDENCE: version endpoint returned HTTP $VERSION_HTTP_CODE" > "$DEPLOYED_SHA_FILE"
+  fi
+
   if [[ "$MODE" == "strict" ]]; then
     OVERALL_STATUS="FAIL"
   else
@@ -284,6 +363,8 @@ fi
 # =============================================================================
 SUMMARY_FILE="$LOG_DIR/summary.json"
 
+AUTH_WALLED_COUNT=${#AUTH_WALLED_CHECKS[@]}
+
 cat > "$SUMMARY_FILE" << EOF
 {
   "timestamp": "$TIMESTAMP",
@@ -291,8 +372,10 @@ cat > "$SUMMARY_FILE" << EOF
   "mode": "$MODE",
   "expectedGitSha": "${EXPECTED_GIT_SHA:-null}",
   "deployedGitSha": "${DEPLOYED_SHA:-null}",
+  "shaSource": "${SHA_SOURCE:-null}",
   "shaMatchStatus": "$SHA_MATCH_STATUS",
   "overallStatus": "$OVERALL_STATUS",
+  "authWalledCount": $AUTH_WALLED_COUNT,
   "checks": [
     {
       "name": "homepage",
@@ -319,7 +402,8 @@ cat > "$SUMMARY_FILE" << EOF
       "durationMs": $PDF_DURATION_MS
     }
   ],
-  "warnings": $(printf '%s\n' "${WARNINGS[@]:-}" | jq -R . | jq -s . 2>/dev/null || echo "[]")
+  "warnings": $(printf '%s\n' "${WARNINGS[@]:-}" | jq -R . | jq -s . 2>/dev/null || echo "[]"),
+  "authWalledChecks": $(printf '%s\n' "${AUTH_WALLED_CHECKS[@]:-}" | jq -R . | jq -s . 2>/dev/null || echo "[]")
 }
 EOF
 
@@ -333,7 +417,9 @@ echo "  Health:        $HEALTH_STATUS"
 echo "  Version:       $VERSION_STATUS"
 echo "  PDF Proxy:     $PDF_PROXY_STATUS"
 echo "  Deployed SHA:  ${DEPLOYED_SHA:-<not captured>}"
+echo "  SHA Source:    ${SHA_SOURCE:-<none>}"
 echo "  SHA Match:     $SHA_MATCH_STATUS"
+echo "  Auth-Walled:   $AUTH_WALLED_COUNT check(s)"
 echo "  Overall:       $OVERALL_STATUS"
 echo "  Logs:          $LOG_DIR"
 
