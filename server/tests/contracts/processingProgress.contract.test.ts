@@ -10,6 +10,7 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   PIPELINE_STAGE_LABELS,
+  PIPELINE_CORE_STAGES,
   buildStatusOnlyView,
   completionToastCopy,
   derivePercentComplete,
@@ -63,18 +64,19 @@ describe("PR-11 processing progress helpers", () => {
   });
 
   it("derives percent complete from stage weights", () => {
+    const half = Math.floor(PIPELINE_STAGE_LABELS.length / 2);
     const stages = PIPELINE_STAGE_LABELS.map((stage, i) => ({
       stage,
       status:
-        i < 2
+        i < half
           ? ("success" as const)
-          : i === 2
+          : i === half
             ? ("running" as const)
             : ("pending" as const),
     }));
     const pct = derivePercentComplete(stages, "processing");
-    expect(pct).toBeGreaterThan(30);
-    expect(pct).toBeLessThan(100);
+    expect(pct).toBeGreaterThan(40);
+    expect(pct).toBeLessThan(60);
     expect(derivePercentComplete(stages, "completed")).toBe(100);
   });
 
@@ -161,6 +163,99 @@ describe("PR-11 live processing progress store", () => {
     view = getLiveProcessingProgress(42);
     expect(view?.status).toBe("completed");
     expect(view?.percentComplete).toBe(100);
+  });
+});
+
+describe("pipeline stage catalog sync", () => {
+  beforeEach(() => {
+    clearProcessingProgressStore();
+  });
+
+  const REQUIRED_RUNTIME_STAGES = [
+    "Tyre Compliance",
+    "Photo Evidence",
+    "Checklist Completeness",
+    "Failure Path Consistency",
+    "Audit Policy (Major/Minor)",
+  ] as const;
+
+  it("PIPELINE_STAGE_LABELS includes all required runtime stages", () => {
+    const labels: readonly string[] = PIPELINE_STAGE_LABELS;
+    for (const stage of REQUIRED_RUNTIME_STAGES) {
+      expect(labels).toContain(stage);
+    }
+  });
+
+  it("PIPELINE_CORE_STAGES is a subset of PIPELINE_STAGE_LABELS", () => {
+    const labels: readonly string[] = PIPELINE_STAGE_LABELS;
+    for (const stage of PIPELINE_CORE_STAGES) {
+      expect(labels).toContain(stage);
+    }
+  });
+
+  it("PIPELINE_STAGE_LABELS preserves execution order (Store Results last)", () => {
+    const labels = PIPELINE_STAGE_LABELS;
+    expect(labels[0]).toBe("Upload");
+    expect(labels[labels.length - 1]).toBe("Store Results");
+    const aiIdx = labels.indexOf("AI Analysis");
+    const tyreIdx = labels.indexOf("Tyre Compliance");
+    const storeIdx = labels.indexOf("Store Results");
+    expect(aiIdx).toBeLessThan(tyreIdx);
+    expect(tyreIdx).toBeLessThan(storeIdx);
+  });
+
+  it("normalizeReportStages maps runtime stages back into canonical order", () => {
+    const stages = normalizeReportStages([
+      { stage: "OCR Text Extraction", status: "success", durationMs: 50 },
+      { stage: "Tyre Compliance", status: "success", durationMs: 12 },
+      { stage: "Photo Evidence", status: "success", durationMs: 8 },
+      { stage: "Audit Policy (Major/Minor)", status: "success", durationMs: 20 },
+      { stage: "Store Results", status: "success", durationMs: 5 },
+    ]);
+    expect(stages.find(s => s.stage === "Tyre Compliance")?.status).toBe(
+      "success"
+    );
+    expect(stages.find(s => s.stage === "Photo Evidence")?.status).toBe(
+      "success"
+    );
+    expect(stages.find(s => s.stage === "Audit Policy (Major/Minor)")?.status).toBe(
+      "success"
+    );
+    const tyreIdx = stages.findIndex(s => s.stage === "Tyre Compliance");
+    const storeIdx = stages.findIndex(s => s.stage === "Store Results");
+    expect(tyreIdx).toBeLessThan(storeIdx);
+  });
+
+  it("buildStatusOnlyView uses core stages for minimal skeleton", () => {
+    const view = buildStatusOnlyView(99, "processing");
+    const stageNames = view.stages.map(s => s.stage);
+    expect(stageNames).toEqual(PIPELINE_CORE_STAGES);
+    expect(stageNames).toHaveLength(6);
+  });
+
+  it("derivePercentComplete works with expanded stage count", () => {
+    const stages = PIPELINE_STAGE_LABELS.map((stage, i) => ({
+      stage,
+      status:
+        i < 10
+          ? ("success" as const)
+          : i === 10
+            ? ("running" as const)
+            : ("pending" as const),
+    }));
+    const pct = derivePercentComplete(stages, "processing");
+    expect(pct).toBeGreaterThan(35);
+    expect(pct).toBeLessThan(55);
+  });
+
+  it("live store initializes with full catalog", () => {
+    beginProcessingProgress(999);
+    const view = getLiveProcessingProgress(999);
+    expect(view!.stages.length).toBe(PIPELINE_STAGE_LABELS.length);
+    expect(view!.stages.find(s => s.stage === "Tyre Compliance")).toBeDefined();
+    expect(
+      view!.stages.find(s => s.stage === "Audit Policy (Major/Minor)")
+    ).toBeDefined();
   });
 });
 

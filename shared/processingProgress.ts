@@ -24,17 +24,51 @@ export interface ProcessingStageSnapshot {
   error?: string;
 }
 
-/** Canonical pipeline stages shown in the UI (upload → OCR → analysis). */
+/**
+ * Canonical pipeline stages shown in the UI, ordered by runtime execution.
+ * Keep in sync with documentProcessor.ts recordStage() calls.
+ */
 export const PIPELINE_STAGE_LABELS = [
+  "Upload",
+  "OCR Text Extraction",
+  "OCR Confidence Gate",
+  "Embedded Text Enrichment",
+  "Thin Text Guard",
+  "Hybrid Assessment",
+  "Template Selection",
+  "Ensemble Extraction",
+  "Selection Marks",
+  "Pipeline Integration",
+  "PDF Buffer Fetch",
+  "VLM Ink Verification",
+  "AI Analysis",
+  "Finding Hygiene",
+  "Wasted Journey Consistency",
+  "Failure Path Consistency",
+  "Photo Evidence",
+  "Tyre Compliance",
+  "Checklist Completeness",
+  "Informational Pass Promotion",
+  "Audit Policy (Major/Minor)",
+  "Documentation Quality Score",
+  "Shadow Challenger",
+  "Store Results",
+] as const;
+
+export type PipelineStageLabel = (typeof PIPELINE_STAGE_LABELS)[number];
+
+/**
+ * The short "core flow" subset shown in compact/summary UI contexts.
+ * Mirrors the original 6-stage view for backwards compat.
+ */
+export const PIPELINE_CORE_STAGES: readonly PipelineStageLabel[] = [
   "Upload",
   "OCR Text Extraction",
   "Template Selection",
   "Ensemble Extraction",
   "AI Analysis",
   "Store Results",
-] as const;
-
-export type PipelineStageLabel = (typeof PIPELINE_STAGE_LABELS)[number];
+];
 
 export interface ProcessStatusView {
   jobSheetId: number;
@@ -184,26 +218,24 @@ export function buildStatusOnlyView(
   jobSheetId: number,
   status: JobSheetProcessStatus
 ): ProcessStatusView {
-  const stages: ProcessingStageSnapshot[] = PIPELINE_STAGE_LABELS.map(
-    (stage, index) => {
-      if (status === "pending") {
-        return { stage, status: "pending" };
-      }
-      if (status === "processing") {
-        if (index === 0) return { stage, status: "success", durationMs: 0 };
-        if (index === 1) return { stage, status: "running" };
-        return { stage, status: "pending" };
-      }
-      // Terminal without report stages — mark all done/failed
-      if (status === "failed") {
-        return {
-          stage,
-          status: index === 0 ? "success" : index === 1 ? "failed" : "pending",
-        };
-      }
-      return { stage, status: "success", durationMs: 0 };
+  const coreStages = PIPELINE_CORE_STAGES;
+  const stages: ProcessingStageSnapshot[] = coreStages.map((stage, index) => {
+    if (status === "pending") {
+      return { stage, status: "pending" };
     }
-  );
+    if (status === "processing") {
+      if (index === 0) return { stage, status: "success", durationMs: 0 };
+      if (index === 1) return { stage, status: "running" };
+      return { stage, status: "pending" };
+    }
+    if (status === "failed") {
+      return {
+        stage,
+        status: index === 0 ? "success" : index === 1 ? "failed" : "pending",
+      };
+    }
+    return { stage, status: "success", durationMs: 0 };
+  });
 
   return {
     jobSheetId,
