@@ -138,9 +138,9 @@ export function extractCompletionYesNo(
         if (!next.trim()) continue;
         // If the next line starts a new labelled row with inline answers,
         // only use tokens before any new boundary when this label had none.
-        const tokens = [
-          ...next.matchAll(new RegExp(YES_NO_TOKEN_RE.source, "gi")),
-        ];
+        const tokens = Array.from(
+          next.matchAll(new RegExp(YES_NO_TOKEN_RE.source, "gi"))
+        );
         if (tokens.length === 0) {
           // Hit another label row with no answers yet — keep looking one more line
           if (completionBoundaryRe().test(next)) continue;
