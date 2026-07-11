@@ -622,6 +622,29 @@ export async function getAuditLogs(options?: {
     .offset(options?.offset ?? 0);
 }
 
+export async function getOverturnMetricsActionLogs(options?: {
+  startDate?: Date;
+  endDate?: Date;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [eq(systemAuditLog.entityType, "audit_finding")];
+  if (options?.startDate) {
+    conditions.push(gte(systemAuditLog.createdAt, options.startDate));
+  }
+  if (options?.endDate) {
+    conditions.push(lte(systemAuditLog.createdAt, options.endDate));
+  }
+
+  return db
+    .select()
+    .from(systemAuditLog)
+    .where(and(...conditions))
+    .orderBy(desc(systemAuditLog.createdAt))
+    .limit(10000);
+}
+
 // ============ STATISTICS QUERIES ============
 
 export async function getDashboardStats() {
