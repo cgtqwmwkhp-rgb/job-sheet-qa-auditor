@@ -774,8 +774,7 @@ export const appRouter = router({
               ) {
                 throw new TRPCError({
                   code: "FORBIDDEN",
-                  message:
-                    `Changing failClass or enabled on safety-critical rule ${rule.ruleId} requires admin privileges.`,
+                  message: `Changing failClass or enabled on safety-critical rule ${rule.ruleId} requires admin privileges.`,
                 });
               }
             }

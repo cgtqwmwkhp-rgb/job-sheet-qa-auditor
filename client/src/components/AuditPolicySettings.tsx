@@ -304,7 +304,9 @@ export function AuditPolicySettings() {
                     </span>
                   </div>
                   {form.rules.map(rule => {
-                    const isSafetyCritical = SAFETY_CRITICAL_RULE_IDS.has(rule.ruleId);
+                    const isSafetyCritical = SAFETY_CRITICAL_RULE_IDS.has(
+                      rule.ruleId
+                    );
                     const safetyLocked = isSafetyCritical && !isAdmin;
 
                     return (
@@ -321,7 +323,10 @@ export function AuditPolicySettings() {
                                 {rule.ruleId}
                               </span>
                               {isSafetyCritical && (
-                                <Badge variant="outline" className="text-xs gap-1 border-red-300 text-red-700">
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs gap-1 border-red-300 text-red-700"
+                                >
                                   <Lock className="h-3 w-3" />
                                   Safety-critical
                                 </Badge>
@@ -332,7 +337,8 @@ export function AuditPolicySettings() {
                             </p>
                             {safetyLocked && (
                               <p className="text-xs text-red-600/80 mt-1">
-                                Admin required to change fail class or disable this rule.
+                                Admin required to change fail class or disable
+                                this rule.
                               </p>
                             )}
                           </div>
