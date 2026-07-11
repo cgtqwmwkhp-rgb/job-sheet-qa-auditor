@@ -205,6 +205,14 @@ export async function runImageQa(
   const heuristic = heuristicImageQa(fieldId);
 
   if (!isVlmVerificationEnabled()) {
+    if (options.disputed) {
+      return {
+        ...heuristic,
+        passed: false,
+        confidence: 0,
+        details: `${heuristic.checkType} disputed but VLM verification is off — cannot confirm`,
+      };
+    }
     return heuristic;
   }
 
