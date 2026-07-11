@@ -36,8 +36,52 @@ import { toast } from "sonner";
 import { useMemo, useRef, useState } from "react";
 import { useReviewQueueKeyboard } from "@/hooks/useReviewQueueKeyboard";
 import { usePersistFn } from "@/hooks/usePersistFn";
+import { deriveReasonChips } from "@/components/review/holdQueueReasons";
+import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
 
 type FilterChip = "all" | "critical";
+
+function HoldItemReasonChips({ jobSheetId }: { jobSheetId: number }) {
+  const { data: auditResult } = trpc.audits.getByJobSheet.useQuery(
+    { jobSheetId },
+    { staleTime: 60_000 }
+  );
+  const { data: findings } = trpc.audits.getFindings.useQuery(
+    { auditResultId: auditResult?.id ?? 0 },
+    { enabled: !!auditResult?.id, staleTime: 60_000 }
+  );
+
+  const chips = useMemo(() => {
+    if (!findings || findings.length === 0) {
+      return deriveReasonChips([], {
+        hasMajorFails: auditResult?.reportJson
+          ? mapHasMajorFailsFromReport(auditResult.reportJson)
+          : false,
+        auditResult: auditResult?.result ?? null,
+      });
+    }
+    return deriveReasonChips(findings, {
+      hasMajorFails: auditResult?.reportJson
+        ? mapHasMajorFailsFromReport(auditResult.reportJson)
+        : false,
+      auditResult: auditResult?.result ?? null,
+    });
+  }, [findings, auditResult]);
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {chips.map(chip => (
+        <Badge
+          key={chip.key}
+          variant="secondary"
+          className={`text-[10px] px-1.5 py-0 leading-4 border ${chip.className}`}
+        >
+          {chip.label}
+        </Badge>
+      ))}
+    </div>
+  );
+}
 
 export default function HoldQueue() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -99,7 +143,6 @@ export default function HoldQueue() {
           technician: `User ${sheet.uploadedBy}`,
           site: sheet.siteInfo || "Unknown Site",
           date: new Date(sheet.createdAt).toLocaleString(),
-          reason: "Review Required",
           severity: (sla?.highestSeverity === "S0" ||
           sla?.highestSeverity === "S1"
             ? "critical"
@@ -578,12 +621,7 @@ export default function HoldQueue() {
                                   {item.site} • {item.date}
                                 </div>
                                 <div className="mt-1 flex items-center gap-2">
-                                  <Badge
-                                    variant="secondary"
-                                    className="bg-orange-100 text-orange-800 text-xs"
-                                  >
-                                    {item.reason}
-                                  </Badge>
+                                  <HoldItemReasonChips jobSheetId={item.id} />
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button
