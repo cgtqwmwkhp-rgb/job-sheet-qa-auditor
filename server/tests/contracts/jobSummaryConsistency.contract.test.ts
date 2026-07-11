@@ -186,4 +186,155 @@ Is the asset safe to use?: Yes
     expect(src).toContain("[FAILURE_PATH]");
     expect(src).toContain("Failure Path Consistency");
   });
+
+  it("blank Parts Still Required + Return No does not raise parts-return Issue", () => {
+    const text = `
+Job Summary Report
+Asset No: DV23VSJ
+All Works Completed? Yes
+Return Visit Needed? No
+Asset Safe To Use? Yes
+Repairs Required
+Parts Used
+Parts Still Required
+Technician Name: nicholas.lawrence
+`;
+    const signals = extractFailurePathSignals(text);
+    expect(signals.partsStillRequired).toBe(false);
+    expect(signals.partsUsed).toBe(false);
+    expect(signals.returnVisitNo).toBe(true);
+    const result = evaluateJobSummaryConsistency(text);
+    expect(
+      result.findings.some(f =>
+        /Parts Still Required ↔ Return Visit/.test(f.fieldName)
+      )
+    ).toBe(false);
+  });
+
+  it("Parts Still Required + Return No raises JSR-C090 Major Issue", () => {
+    const text = `
+Job Summary Report
+Return Visit Needed? No
+All Works Completed? No
+Asset Safe To Use? Yes
+Repairs Required
+Parts Used
+Parts Still Required
+hinge assembly kit
+Technician Name: nicholas.lawrence
+Engineer Comments: Waiting on hinge kit; return to fit and retest.
+`;
+    const signals = extractFailurePathSignals(text);
+    expect(signals.partsStillRequired).toBe(true);
+    expect(signals.onFailurePath).toBe(true);
+    const result = evaluateJobSummaryConsistency(text);
+    const issue090 = result.findings.find(
+      f =>
+        f.ruleId === "JSR-C090" ||
+        /Parts Still Required ↔ Return Visit/.test(f.fieldName)
+    );
+    expect(issue090?.severity).toBe("S1");
+    expect(issue090?.reasonCode).toBe("CONFLICT");
+    expect(result.hasBlockingIssues).toBe(true);
+  });
+
+  it("Parts Used alone + Return No does not raise parts-return Issue", () => {
+    const text = `
+Job Summary Report
+Return Visit Needed? No
+All Works Completed? Yes
+Asset Safe To Use? Yes
+Repairs Required
+Parts Used
+13A fuse x2
+Parts Still Required
+Technician Name: nicholas.lawrence
+`;
+    const signals = extractFailurePathSignals(text);
+    expect(signals.partsUsed).toBe(true);
+    expect(signals.partsStillRequired).toBe(false);
+    expect(signals.repairsPath).toBe(false);
+    expect(signals.onFailurePath).toBe(false);
+    const result = evaluateJobSummaryConsistency(text);
+    expect(
+      result.findings.some(f =>
+        /Parts Still Required ↔ Return Visit/.test(f.fieldName)
+      )
+    ).toBe(false);
+    expect(result.hasBlockingIssues).toBe(false);
+  });
+
+  it("Parts Still Required + Return Yes is coherent (JSR-C092 Passed)", () => {
+    const text = `
+Job Summary Report
+Return Visit Needed? Yes
+All Works Completed? No
+Asset Safe To Use? No
+This Vehicle is marked as VOR
+Repairs Required
+replace hinge
+Parts Used
+Parts Still Required
+hinge assembly kit
+Technician Name: bob
+Engineer Comments: Hinge cracked; ordered kit; return visit to fit and retest.
+`;
+    const result = evaluateJobSummaryConsistency(text);
+    expect(
+      result.findings.some(
+        f =>
+          f.ruleId === "JSR-C092" &&
+          f.severity === "S3" &&
+          /Consistent/i.test(f.normalisedSnippet)
+      )
+    ).toBe(true);
+    expect(
+      result.findings.some(
+        f =>
+          /Parts Still Required ↔ Return Visit/.test(f.fieldName) &&
+          f.severity === "S1"
+      )
+    ).toBe(false);
+  });
+
+  it("Parts Still Required + All Works Completed Yes raises JSR-C091", () => {
+    const text = `
+Job Summary Report
+Return Visit Needed? Yes
+All Works Completed? Yes
+Service Completed? Yes
+Additional Tasks Complete? Yes
+Asset Safe To Use? Yes
+Parts Still Required
+relay module RM-4
+Technician Name: bob
+Engineer Comments: Need relay module on return; cannot close works yet.
+`;
+    const result = evaluateJobSummaryConsistency(text);
+    const issue091 = result.findings.find(
+      f =>
+        f.ruleId === "JSR-C091" ||
+        /Parts Still Required ↔ Works Completion/.test(f.fieldName)
+    );
+    expect(issue091?.severity).toBe("S1");
+    expect(issue091?.reasonCode).toBe("CONFLICT");
+  });
+
+  it("does not treat bare parts-required wording in comments as repairsPath", () => {
+    const text = `
+Job Summary Report
+Return Visit Needed? No
+All Works Completed? Yes
+Asset Safe To Use? Yes
+Repairs Required
+Parts Used
+Parts Still Required
+Technician Name: bob
+Engineer Comments: Routine service complete; no parts required this visit.
+`;
+    const signals = extractFailurePathSignals(text);
+    expect(signals.repairsPath).toBe(false);
+    expect(signals.partsStillRequired).toBe(false);
+    expect(signals.onFailurePath).toBe(false);
+  });
 });

@@ -20,7 +20,14 @@ export interface FailurePathSignals {
   returnVisitNo: boolean;
   incomplete: boolean;
   worksCompleteYes: boolean;
+  /** Repairs Required section has content, or service type says Specify in Repairs. */
   repairsPath: boolean;
+  /** Parts fitted this visit (Parts Used) — does not force return visit. */
+  partsUsed: boolean;
+  /** Outstanding parts the engineer did not have — forces return visit follow-up. */
+  partsStillRequired: boolean;
+  partsStillSnippet: string;
+  partsUsedSnippet: string;
   failMarkCount: number;
   hasSubstantiveComments: boolean;
   commentSnippet: string;
@@ -72,7 +79,7 @@ export function hasSubstantiveEngineerComments(text: string): {
 } {
   const section =
     text.match(
-      /(?:engineer\s*comments?|work\s*notes?|repairs?\s*(?:required|needed|details?)|action\s*required|defect(?:s)?\s*(?:found|notes?)|parts?\s*required)\s*[:-]?\s*([\s\S]{15,800}?)(?=\n(?:technician\s*signature|customer\s*signature|completion\s*details|asset\s*details|job\s*details)\b|$)/i
+      /(?:engineer\s*comments?|work\s*notes?|repairs?\s*(?:needed|details?)|action\s*required|defect(?:s)?\s*(?:found|notes?))\s*[:-]?\s*([\s\S]{15,800}?)(?=\n(?:technician\s*signature|customer\s*signature|completion\s*details|asset\s*details|job\s*details)\b|$)/i
     )?.[1] ?? "";
 
   const cleaned = section
@@ -101,25 +108,142 @@ export function hasSubstantiveEngineerComments(text: string): {
   return { present: true, snippet: cleaned.slice(0, 240) };
 }
 
+/** Section headers that bound repairs/parts blocks. */
+const PARTS_SECTION_HEADERS = [
+  "Repairs Required",
+  "Parts Used",
+  "Parts Still Required",
+  "Technician Name",
+  "Technician Signature",
+  "Customer Signature",
+  "Engineer Comments",
+  "Work Notes",
+] as const;
+
+function isSectionHeaderLine(line: string): string | null {
+  const trimmed = line.trim();
+  if (/^Photo\s+\d/i.test(trimmed) || /^Page\s+\d/i.test(trimmed)) {
+    return trimmed;
+  }
+  for (const h of PARTS_SECTION_HEADERS) {
+    // Exact header line, or "Header: inline content"
+    const re = new RegExp(`^${h}\\s*[:-]?\\s*(.*)$`, "i");
+    const m = trimmed.match(re);
+    if (!m) continue;
+    // Avoid "Parts Used" matching inside "Parts Still Required"
+    if (h === "Parts Used" && /^Still\b/i.test(m[1] ?? "")) continue;
+    if (
+      h === "Parts Used" &&
+      /^Still\s+Required/i.test(trimmed.replace(/^Parts\s+/i, ""))
+    ) {
+      continue;
+    }
+    // "Parts Still Required" must not match as "Parts Used"
+    if (h === "Parts Used" && /Parts\s+Still\s+Required/i.test(trimmed)) {
+      continue;
+    }
+    return h;
+  }
+  return null;
+}
+
+/**
+ * Body text under a named section header until the next known header.
+ */
+export function extractNamedSection(text: string, headerName: string): string {
+  const lines = text.split(/\r?\n/);
+  const headerNorm = headerName.trim().toLowerCase();
+  let start = -1;
+  let inline = "";
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    const re = new RegExp(
+      `^${headerName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*[:-]?\\s*(.*)$`,
+      "i"
+    );
+    const m = trimmed.match(re);
+    if (!m) continue;
+    if (headerNorm === "parts used" && /still\s+required/i.test(trimmed)) {
+      continue;
+    }
+    start = i;
+    inline = (m[1] ?? "").trim();
+    break;
+  }
+
+  if (start < 0) return "";
+
+  const body: string[] = [];
+  if (inline) body.push(inline);
+
+  for (let j = start + 1; j < lines.length; j++) {
+    const hdr = isSectionHeaderLine(lines[j]);
+    if (hdr && hdr.toLowerCase() !== headerNorm) {
+      break;
+    }
+    body.push(lines[j]);
+  }
+
+  return body.join("\n").trim();
+}
+
+/** True when a section has real content (not blank / none / n/a). */
+export function sectionHasContent(body: string): {
+  present: boolean;
+  snippet: string;
+} {
+  const cleaned = body
+    .replace(/\s+/g, " ")
+    .replace(/^(?:none|n\/a|na|nil|-|—|\.)+\.?$/i, "")
+    .trim();
+  if (cleaned.length < 2) {
+    return { present: false, snippet: "" };
+  }
+  if (!/[a-z0-9]/i.test(cleaned)) {
+    return { present: false, snippet: "" };
+  }
+  if (/^(?:see\s+above|tbc|tba|\.+)$/i.test(cleaned)) {
+    return { present: false, snippet: cleaned };
+  }
+  return { present: true, snippet: cleaned.slice(0, 160) };
+}
+
 export function extractFailurePathSignals(
   text: string,
   options: { failMarkCount?: number } = {}
 ): FailurePathSignals {
-  const safeRaw = lineValue(text, /Is\s+the\s+asset\s+safe\s+to\s+use\??/i);
-  const returnRaw = lineValue(text, /Is\s+a\s+return\s+visit\s+required\??/i);
-  const worksRaw = lineValue(
-    text,
-    /Were\s+all\s+works\s+fully\s+completed\??/i
+  const safeRaw =
+    lineValue(text, /Is\s+the\s+asset\s+safe\s+to\s+use\??/i) ??
+    lineValue(text, /Asset\s+Safe\s+To\s+Use\??/i);
+  const returnRaw =
+    lineValue(text, /Is\s+a\s+return\s+visit\s+required\??/i) ??
+    lineValue(text, /Return\s+Visit\s+Needed\??/i);
+  const worksRaw =
+    lineValue(text, /Were\s+all\s+works\s+fully\s+completed\??/i) ??
+    lineValue(text, /All\s+Works\s+Completed\??/i);
+  const serviceRaw =
+    lineValue(text, /Was\s+the\s+service\s+fully\s+completed/i) ??
+    lineValue(text, /Service\s+Completed\??/i);
+  const additionalRaw =
+    lineValue(
+      text,
+      /Have\s+all\s+of\s+the\s+additional\s+tasks\s+been\s+completed/i
+    ) ?? lineValue(text, /Additional\s+Tasks\s+Complete\??/i);
+  const serviceType =
+    lineValue(text, /Type\s+of\s+service\s+completed/i) ??
+    lineValue(text, /Compliance\s+Type/i) ??
+    "";
+
+  const repairsSection = sectionHasContent(
+    extractNamedSection(text, "Repairs Required")
   );
-  const serviceRaw = lineValue(
-    text,
-    /Was\s+the\s+service\s+fully\s+completed/i
+  const partsUsedSection = sectionHasContent(
+    extractNamedSection(text, "Parts Used")
   );
-  const additionalRaw = lineValue(
-    text,
-    /Have\s+all\s+of\s+the\s+additional\s+tasks\s+been\s+completed/i
+  const partsStillSection = sectionHasContent(
+    extractNamedSection(text, "Parts Still Required")
   );
-  const serviceType = lineValue(text, /Type\s+of\s+service\s+completed/i) ?? "";
 
   const vor = hasVorBannerEvidence(text);
   const unsafe = isNo(safeRaw);
@@ -131,15 +255,20 @@ export function extractFailurePathSignals(
     isYes(worksRaw) &&
     (serviceRaw == null || isYes(serviceRaw)) &&
     (additionalRaw == null || isYes(additionalRaw));
+  // Do NOT key repairsPath off bare "parts required" / "Parts Used" — only
+  // Repairs Required content or explicit "Specify in Repairs" service type.
   const repairsPath =
-    /specify\s+in\s+repairs|repairs?\s+required|parts?\s+required/i.test(
-      `${serviceType}\n${text}`
-    );
+    repairsSection.present || /specify\s+in\s+repairs/i.test(serviceType);
   const failMarkCount = Math.max(0, options.failMarkCount ?? 0);
   const comments = hasSubstantiveEngineerComments(text);
 
   const onFailurePath =
-    vor || unsafe || failMarkCount > 0 || incomplete || repairsPath;
+    vor ||
+    unsafe ||
+    failMarkCount > 0 ||
+    incomplete ||
+    repairsPath ||
+    partsStillSection.present;
 
   return {
     vor,
@@ -150,6 +279,10 @@ export function extractFailurePathSignals(
     incomplete,
     worksCompleteYes,
     repairsPath,
+    partsUsed: partsUsedSection.present,
+    partsStillRequired: partsStillSection.present,
+    partsStillSnippet: partsStillSection.snippet,
+    partsUsedSnippet: partsUsedSection.snippet,
     failMarkCount,
     hasSubstantiveComments: comments.present,
     commentSnippet: comments.snippet,
@@ -165,6 +298,8 @@ function signalSummary(s: FailurePathSignals): string {
     `Incomplete=${s.incomplete ? "Yes" : s.worksCompleteYes ? "No" : "Unknown"}`,
     `FailMarks=${s.failMarkCount}`,
     `RepairsPath=${s.repairsPath ? "Yes" : "No"}`,
+    `PartsUsed=${s.partsUsed ? "Yes" : "No"}`,
+    `PartsStillRequired=${s.partsStillRequired ? "Yes" : "No"}`,
     `EngineerComments=${s.hasSubstantiveComments ? "Yes" : "No"}`,
   ].join(" | ");
 }
@@ -448,7 +583,8 @@ export function evaluateJobSummaryConsistency(
     );
   }
 
-  // G: Repairs path without return visit
+  // G: Repairs path without return visit (Repairs Required / Specify in Repairs)
+  // Does NOT cover Parts Still Required — that is JSR-C090.
   if (signals.repairsPath && signals.returnVisitNo) {
     findings.push(
       issue(
@@ -468,6 +604,58 @@ export function evaluateJobSummaryConsistency(
         "Repairs Path",
         "Consistent: repairs path is paired with return visit required.",
         "Repair follow-up is documented.",
+        raw
+      )
+    );
+  }
+
+  // I: Parts Still Required → Return Visit Yes (Parts Used alone never forces this)
+  if (signals.partsStillRequired && signals.returnVisitNo) {
+    findings.push(
+      issue(
+        `${CONSISTENCY_RULE_PREFIX}090`,
+        "Parts Still Required ↔ Return Visit",
+        "CONFLICT",
+        `Parts Still Required is recorded (${signals.partsStillSnippet}) but return visit is marked No.`,
+        "Outstanding parts the engineer did not have require a follow-up return visit.",
+        "Set Return Visit Needed / required to Yes.",
+        raw
+      )
+    );
+  } else if (signals.partsStillRequired && !signals.returnVisit) {
+    findings.push(
+      issue(
+        `${CONSISTENCY_RULE_PREFIX}090`,
+        "Parts Still Required ↔ Return Visit",
+        "INCOMPLETE_EVIDENCE",
+        `Parts Still Required is recorded (${signals.partsStillSnippet}) but return visit was not confirmed as Yes.`,
+        "Outstanding parts require an explicit return visit follow-up.",
+        "Complete Return Visit Needed / required: Yes.",
+        raw
+      )
+    );
+  } else if (signals.partsStillRequired && signals.returnVisit) {
+    findings.push(
+      passed(
+        `${CONSISTENCY_RULE_PREFIX}092`,
+        "Parts Still Required ↔ Return Visit",
+        `Consistent: Parts Still Required (${signals.partsStillSnippet}) is paired with return visit Yes.`,
+        "Outstanding parts have a documented follow-up visit.",
+        raw
+      )
+    );
+  }
+
+  // J: Parts Still Required cannot coexist with All Works Completed Yes
+  if (signals.partsStillRequired && signals.worksCompleteYes) {
+    findings.push(
+      issue(
+        `${CONSISTENCY_RULE_PREFIX}091`,
+        "Parts Still Required ↔ Works Completion",
+        "CONFLICT",
+        `Parts Still Required is recorded (${signals.partsStillSnippet}) but works are marked fully completed.`,
+        "Outstanding parts mean the job is not fully complete.",
+        "Set All Works Completed / works fully completed to No, or clear Parts Still Required.",
         raw
       )
     );

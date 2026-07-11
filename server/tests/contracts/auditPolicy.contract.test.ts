@@ -193,4 +193,15 @@ describe("auditPolicy", () => {
       "major"
     );
   });
+
+  it("JSR Parts Still Required ↔ Return Visit is major by default", () => {
+    const f = finding({
+      ruleId: "JSR-C090",
+      fieldName: "Parts Still Required ↔ Return Visit",
+      severity: "S1",
+    });
+    expect(classifyFinding(f, "job-summary-v1", DEFAULT_AUDIT_POLICY)).toBe(
+      "major"
+    );
+  });
 });

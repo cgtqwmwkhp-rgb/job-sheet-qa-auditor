@@ -178,6 +178,24 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
             "Engineer Comments",
           ],
         },
+        {
+          ruleId: "JSR-C090",
+          label: "Parts Still Required ↔ Return Visit",
+          description:
+            "Parts Still Required has content but return visit is not Yes",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: ["Parts Still Required ↔ Return Visit"],
+        },
+        {
+          ruleId: "JSR-C091",
+          label: "Parts Still Required ↔ Works Completion",
+          description:
+            "Parts Still Required has content but works marked fully completed",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: ["Parts Still Required ↔ Works Completion"],
+        },
       ],
     },
   },
