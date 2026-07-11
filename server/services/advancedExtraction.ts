@@ -826,7 +826,7 @@ export async function ensembleExtract(
       .map(r => r.value!.replace(/\D/g, ""));
     const uniqueDigits = new Set(digitValues.filter(d => d.length > 0));
     if (uniqueDigits.size === 1 && results.length >= 2) {
-      const canonical = [...uniqueDigits][0];
+      const canonical = Array.from(uniqueDigits)[0];
       const best = results.reduce((a, b) =>
         a.confidence > b.confidence ? a : b
       );
