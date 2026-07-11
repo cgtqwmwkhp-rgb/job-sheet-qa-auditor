@@ -54,8 +54,8 @@ export interface WastedJourneyJudgmentResult {
 
 const YES_NO_TOKEN_RE = /\b(yes|no|true|false)\b/i;
 
-/** Header / label tokens that must never be treated as an asset id. */
-const ASSET_ID_REJECT = new Set([
+/** Header / label tokens that must never be treated as an asset number. */
+const ASSET_NUMBER_REJECT = new Set([
   "DETAILS",
   "DETAIL",
   "NUMBER",
@@ -72,6 +72,11 @@ const ASSET_ID_REJECT = new Set([
   "OPENREACH",
   "GROUPED",
   "ANCILLARIES",
+  "COMPLETION",
+  "REPAIR",
+  "ISSUE",
+  "WASTED",
+  "JOURNEY",
 ]);
 
 function lineValue(text: string, label: RegExp): string | null {
@@ -106,21 +111,74 @@ export function isWastedJourneyExcludedField(fieldName: string): boolean {
 }
 
 /**
- * Extract Asset No robustly — never treat "Asset Details" header as the value.
+ * True for PlantExpand-style asset numbers (e.g. YH23WKA_1C, BN21ACO_TL).
+ * Rejects plain words like DETAILS / MAKE.
+ */
+function looksLikeAssetNumber(raw: string): boolean {
+  const v = raw.trim().toUpperCase().replace(/\s+/g, "");
+  if (v.length < 4 || v.length > 32) return false;
+  if (ASSET_NUMBER_REJECT.has(v)) return false;
+  if (/^DETAILS?/i.test(v)) return false;
+  // Must mix letters + digits (registration / fleet style)
+  if (!/[A-Z]/.test(v) || !/\d/.test(v)) return false;
+  return /^[A-Z0-9][A-Z0-9_-]*$/i.test(v);
+}
+
+function normalizeAssetCandidate(raw: string): string | null {
+  const cleaned = raw
+    .trim()
+    .toUpperCase()
+    // OCR sometimes splits underscore segments with spaces
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^[^A-Z0-9]+|[^A-Z0-9_]+$/g, "");
+  if (!looksLikeAssetNumber(cleaned)) return null;
+  return cleaned;
+}
+
+/**
+ * Extract Asset Number (Asset No) — never "Asset Details", never require Asset ID.
+ * Handles same-line, next-line, and two-column OCR layouts.
  */
 export function extractAssetNo(text: string): string | null {
-  const patterns = [
-    /Asset\s*(?:No|Number|ID|#)\s*[:.]?\s*([A-Z0-9][A-Z0-9_-]{2,})/i,
-    /(?:^|\n)\s*Asset\s*(?:No|Number|ID)\s*[:.]?\s*([A-Z0-9][A-Z0-9_-]{2,})/im,
+  const normalized = text.replace(/\u00a0/g, " ");
+
+  const patterns: RegExp[] = [
+    // Asset No / Asset Number / Asset #  (explicitly not "Asset Details")
+    /Asset\s*(?:No\.?|Number|#)\b\s*[:.|]?\s*([A-Z0-9][A-Z0-9 _-]{2,})/gi,
+    // Value on the following line
+    /Asset\s*(?:No\.?|Number|#)\b\s*[:.|]?\s*[\r\n]+\s*([A-Z0-9][A-Z0-9 _-]{2,})/gi,
+    // Two-column / pipe tables: Asset No | YH23WKA_1C |
+    /Asset\s*(?:No\.?|Number|#)\b\s*[|:]\s*([A-Z0-9][A-Z0-9 _-]{2,})/gi,
   ];
+
   for (const pattern of patterns) {
-    const m = text.match(pattern);
-    const candidate = m?.[1]?.trim().toUpperCase();
-    if (!candidate) continue;
-    if (ASSET_ID_REJECT.has(candidate)) continue;
-    if (/^DETAILS?/i.test(candidate)) continue;
-    return candidate;
+    pattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(normalized)) !== null) {
+      const candidate = normalizeAssetCandidate(match[1] ?? "");
+      if (candidate) return candidate;
+    }
   }
+
+  // Nearby window after "Asset No" / "Asset Number" (skip "Asset Details")
+  const labelHits = [...normalized.matchAll(/Asset\s*(?:No\.?|Number|#)\b/gi)];
+  for (const hit of labelHits) {
+    const start = hit.index ?? 0;
+    const window = normalized.slice(start, start + 120);
+    if (/^Asset\s*Details/i.test(window)) continue;
+    const tokenMatches = [
+      ...window.matchAll(
+        /\b([A-Z]{1,3}\d{2}[A-Z]{3}(?:[_\s-]?[A-Z0-9]+)?)\b/gi
+      ),
+      ...window.matchAll(/\b([A-Z0-9]{5,}(?:[_\s-][A-Z0-9]+)+)\b/gi),
+    ];
+    for (const tm of tokenMatches) {
+      const candidate = normalizeAssetCandidate(tm[1] ?? "");
+      if (candidate) return candidate;
+    }
+  }
+
   return null;
 }
 
@@ -161,14 +219,22 @@ export function extractWastedJourneySignals(
   const scheduling = parseYesNo(schedulingRaw);
   const site = parseYesNo(siteRaw);
 
-  const assetId = extractAssetNo(text) ?? "";
-  const dateRaw = lineValue(text, /\bDate\b/i);
+  const assetNumber = extractAssetNo(text) ?? "";
+  const dateRaw =
+    lineValue(text, /\bDate\b/i) ??
+    lineValue(text, /Completion\s*Details[\s\S]{0,40}?\bDate\b/i);
+  // Prefer an explicit dd/mm/yyyy near Completion Details when label parse is noisy
+  const dateFallback = normalizedDateFromText(text);
   const techRaw =
     lineValue(text, /Techni(?:ci)?an\s*Name/i) ?? lineValue(text, /Name/i);
 
   const hasSignOff =
     /signature\s*[-:]?\s*(?:signed|present|yes|[a-z0-9._-]{2,})/i.test(text) ||
     /(?:technician|technican|engineer)\s+signature/i.test(text);
+
+  const hasDate = Boolean(
+    (dateRaw && /\d/.test(dateRaw)) || dateFallback != null
+  );
 
   return {
     isWastedJourneySheet,
@@ -180,12 +246,18 @@ export function extractWastedJourneySignals(
     siteContactAnswered: site !== "unknown",
     siteContactYes: site === "yes",
     siteContactNo: site === "no",
-    hasAssetId: assetId.length > 0,
-    assetId,
-    hasDate: Boolean(dateRaw && /\d/.test(dateRaw)),
+    hasAssetId: assetNumber.length > 0,
+    assetId: assetNumber,
+    hasDate,
     hasSignOff,
     technicianName: (techRaw ?? "").slice(0, 80),
   };
+}
+
+/** Prefer UK-style dates that appear on wasted journey completion blocks. */
+function normalizedDateFromText(text: string): string | null {
+  const m = text.match(/\b(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\b/);
+  return m?.[1] ?? null;
 }
 
 function signalSummary(s: WastedJourneySignals): string {
@@ -194,7 +266,7 @@ function signalSummary(s: WastedJourneySignals): string {
     `Reason=${s.hasReason ? "Yes" : "No"}`,
     `SchedulingContacted=${s.schedulingYes ? "Yes" : s.schedulingNo ? "No" : "Unknown"}`,
     `SiteContactConfirmed=${s.siteContactYes ? "Yes" : s.siteContactNo ? "No" : "Unknown"}`,
-    `AssetId=${s.assetId || "Missing"}`,
+    `AssetNumber=${s.assetId || "Missing"}`,
     `Date=${s.hasDate ? "Yes" : "No"}`,
     `SignOff=${s.hasSignOff ? "Yes" : "No"}`,
   ].join(" | ");
@@ -378,16 +450,16 @@ export function evaluateWastedJourneyConsistency(
     );
   }
 
-  // WJ-C050 — identity (asset + date; never job/serial)
+  // WJ-C050 — identity (Asset Number + date; never job/serial; never "Asset ID")
   if (!signals.hasAssetId || !signals.hasDate) {
     findings.push(
       issue(
         `${WASTED_JOURNEY_RULE_PREFIX}050`,
-        "Asset / Date Identity",
+        "Asset Number / Date",
         "MISSING_FIELD",
-        `Wasted journey identity incomplete (Asset=${signals.assetId || "Missing"}, Date=${signals.hasDate ? "Yes" : "No"}).`,
-        "Asset and date identify which visit was wasted. Job number and serial are not required.",
-        "Complete Asset No and Date on the sheet.",
+        `Wasted journey identity incomplete (Asset Number=${signals.assetId || "Missing"}, Date=${signals.hasDate ? "Yes" : "No"}).`,
+        "Asset Number and date identify which visit was wasted. Job number and serial are not required.",
+        "Complete Asset No (Asset Number) and Date on the sheet.",
         raw
       )
     );
@@ -395,8 +467,8 @@ export function evaluateWastedJourneyConsistency(
     findings.push(
       passed(
         `${WASTED_JOURNEY_RULE_PREFIX}051`,
-        "Asset / Date Identity",
-        `Consistent: asset ${signals.assetId} and date are present.`,
+        "Asset Number / Date",
+        `Consistent: Asset Number ${signals.assetId} and date are present.`,
         "Visit identity is documented.",
         raw
       )
