@@ -299,9 +299,14 @@ export function ReviewWorkstationPane({
             auditResult?.reportJson
           ),
           ...(() => {
-            const fps = mapFailurePathSignalsFromReport(auditResult?.reportJson);
+            const fps = mapFailurePathSignalsFromReport(
+              auditResult?.reportJson
+            );
             return fps.signals
-              ? { failurePathSignals: fps.signals, failurePathSignalSummary: fps.signalSummary }
+              ? {
+                  failurePathSignals: fps.signals,
+                  failurePathSignalSummary: fps.signalSummary,
+                }
               : {};
           })(),
         }

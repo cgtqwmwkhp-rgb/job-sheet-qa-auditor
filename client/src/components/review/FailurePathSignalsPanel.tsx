@@ -93,10 +93,7 @@ function resolveChips(signals: FailurePathSignals): SignalChip[] {
   chips.push({
     label: "FailMarks",
     value: String(signals.failMarkCount),
-    variant:
-      signals.failMarkCount > 0
-        ? "negative"
-        : "positive",
+    variant: signals.failMarkCount > 0 ? "negative" : "positive",
   });
 
   // PartsStillRequired
@@ -110,12 +107,9 @@ function resolveChips(signals: FailurePathSignals): SignalChip[] {
 }
 
 const variantStyles: Record<ChipVariant, string> = {
-  positive:
-    "bg-emerald-50 text-emerald-700 border-emerald-200",
-  negative:
-    "bg-red-50 text-red-700 border-red-200",
-  neutral:
-    "bg-slate-50 text-slate-600 border-slate-200",
+  positive: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  negative: "bg-red-50 text-red-700 border-red-200",
+  neutral: "bg-slate-50 text-slate-600 border-slate-200",
 };
 
 export function FailurePathSignalsPanel({
