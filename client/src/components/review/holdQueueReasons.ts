@@ -102,9 +102,9 @@ export function deriveReasonChips(
 
     let label = meta.label;
     if (code === "CONFLICT") {
-      const fields = [
-        ...new Set(matching.map(f => f.fieldName).filter(Boolean)),
-      ];
+      const fields = Array.from(
+        new Set(matching.map(f => f.fieldName).filter(Boolean)),
+      );
       if (fields.length > 0 && fields.length <= 2) {
         label = `${meta.label} ↔ ${fields.join(", ")}`;
       } else if (fields.length > 2) {
