@@ -69,6 +69,7 @@ import { evaluateJobSummaryConsistency } from "./jobSummaryConsistency";
 import {
   evaluateWastedJourneyConsistency,
   isWastedJourneyDocument,
+  isWastedJourneyExcludedField,
   WASTED_JOURNEY_TEMPLATE_ID,
 } from "./wastedJourneyConsistency";
 import { computeDocumentationQualityScore } from "./documentationQuality";
@@ -1484,10 +1485,18 @@ async function processJobSheetWithOptions(
   // Ensemble consensus → review_queue on CONFLICT / low confidence required fields
   // Does not override FAIL; never promotes to PASS.
   // Filter optional template fields (e.g. workDescription) out of missingRequired.
+  // Wasted Journey: never require job number or serial number.
   {
     const templateVersion = usedTemplateVersionId
       ? getTemplateVersion(usedTemplateVersionId)
       : null;
+    const selectedSlug =
+      buildSelectionCohortMeta(selectionResult, usedTemplateVersionId)
+        ?.templateSlug ?? null;
+    const isWastedJourney =
+      selectedSlug === WASTED_JOURNEY_TEMPLATE_ID ||
+      isWastedJourneyDocument(extractedText);
+
     const optionalFieldIds = new Set(
       (
         (
@@ -1500,20 +1509,30 @@ async function processJobSheetWithOptions(
         .map(f => f.field)
     );
 
+    const dropEnsembleField = (field: string) => {
+      if (optionalFieldIds.has(field)) return true;
+      if (isWastedJourney && isWastedJourneyExcludedField(field)) return true;
+      return false;
+    };
+
     if (
       ensembleResult?.reviewSignals.reviewRequired &&
       analysisResult.overallResult !== "FAIL"
     ) {
       const filteredMissing =
         ensembleResult.reviewSignals.missingRequired.filter(
-          f => !optionalFieldIds.has(f)
+          f => !dropEnsembleField(f)
         );
       const filteredLow =
         ensembleResult.reviewSignals.lowConfidenceFields.filter(
-          f => !optionalFieldIds.has(f)
+          f => !dropEnsembleField(f)
+        );
+      const filteredConflicts =
+        ensembleResult.reviewSignals.conflictFields.filter(
+          f => !dropEnsembleField(f)
         );
       const stillRequired =
-        ensembleResult.reviewSignals.conflictFields.length > 0 ||
+        filteredConflicts.length > 0 ||
         filteredMissing.length > 0 ||
         filteredLow.length > 0;
 
@@ -1522,6 +1541,7 @@ async function processJobSheetWithOptions(
           ...ensembleResult.reviewSignals,
           missingRequired: filteredMissing,
           lowConfidenceFields: filteredLow,
+          conflictFields: filteredConflicts,
           reviewRequired: true,
         };
         const ensembleFindings = buildEnsembleReviewFindings(
@@ -1529,6 +1549,9 @@ async function processJobSheetWithOptions(
           ensembleResult.artifact.fieldDetails,
           llmThreshold
         ).filter(f => {
+          if (isWastedJourney && isWastedJourneyExcludedField(f.fieldName)) {
+            return false;
+          }
           // Drop Engineer Comments / Work Notes when workDescription is optional
           if (
             optionalFieldIds.has("workDescription") &&
@@ -1598,7 +1621,7 @@ async function processJobSheetWithOptions(
       .flatMap(f => f.aliases ?? []);
 
     const beforeCount = analysisResult.findings.length;
-    const cleaned = applyFindingHygiene(analysisResult.findings, {
+    let cleaned = applyFindingHygiene(analysisResult.findings, {
       preExtractedFields: aliasCanonicalExtractedFields({
         ...(ensembleResult?.ensembleExtractedFields ?? {}),
         ...(selectionMarksResult?.preExtractedFields ?? {}),
@@ -1625,6 +1648,17 @@ async function processJobSheetWithOptions(
       optionalTemplateFields,
       optionalFieldAliases,
     });
+
+    // Wasted Journey: drop job number / serial noise from any stage
+    const hygieneSlug =
+      buildSelectionCohortMeta(selectionResult, usedTemplateVersionId)
+        ?.templateSlug ?? null;
+    if (
+      hygieneSlug === WASTED_JOURNEY_TEMPLATE_ID ||
+      isWastedJourneyDocument(extractedText)
+    ) {
+      cleaned = cleaned.filter(f => !isWastedJourneyExcludedField(f.fieldName));
+    }
     const sanitizedFields = sanitizeExtractedFieldsForSignatures(
       analysisResult.extractedFields,
       {

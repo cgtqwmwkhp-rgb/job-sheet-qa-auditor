@@ -85,13 +85,13 @@ New activatable templates **must** use activation-canonical field IDs — **not*
 
 | Layer         | Guidance                                                                                                                               |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Fields**    | Canonical 4 present (`jobReference` soft); required `assetId`, `date`, `engineerSignOff`, `wastedJourneyReason`; contact Y/N answered  |
-| **Rules**     | WJ-C\*: reason present; scheduling + site contact answered (Yes **or** No); identity + sign-off. No VOR/safe-to-use/parts/return-visit |
+| **Fields**    | Canonical 4 present (`jobReference` soft); required `assetId`, `date`, `engineerSignOff`, `wastedJourneyReason`; contacts must be Yes  |
+| **Rules**     | WJ-C*: reason; scheduling + booking contact **must be Yes**; asset+date+sign-off. No job number / serial / VOR/parts                   |
 | **Selection** | `requiredTokensAll: ["wasted", "journey"]`; optional `no-show`, `scheduling`, `plantexpand`                                            |
 | **ROI**       | Standard 6; `tickboxBlock` over reason/contact questions; `signatureBlock` over technician sign-off                                    |
-| **Fixtures**  | PASS (coherent abort), FAIL (missing reason/unsigned), REVIEW (contacts blank)                                                         |
+| **Fixtures**  | PASS (both contacts Yes), FAIL (missing reason/unsigned), REVIEW (contacts No still selects family)                                    |
 
-**Policy:** A wasted journey with a clear reason and sign-off is a documentation **PASS** even if no work was done. Blank contact answers are Issues; answered No is valid.
+**Policy:** Engineer must contact control (Scheduling Team) **and** booking site contact, both answered **Yes**. Job number and serial number are **not** required. Asset No must extract the real id (never the “Asset Details” header).
 
 ---
 

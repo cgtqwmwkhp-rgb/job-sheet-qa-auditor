@@ -51,10 +51,20 @@ function bootActivateTemplate(options: {
   packRelative: string;
   label: string;
   createdBy?: number;
+  /** When set, re-import + activate if active version string differs. */
+  expectedVersion?: string;
 }): number | null {
-  const { slug, packRelative, label, createdBy = 0 } = options;
+  const { slug, packRelative, label, createdBy = 0, expectedVersion } = options;
+
   if (hasActiveTemplate(slug)) {
-    return null;
+    if (!expectedVersion) return null;
+    const existing = getTemplateBySlug(slug);
+    const active = existing ? getActiveVersion(existing.id) : null;
+    if (active?.version === expectedVersion) return null;
+    logger.info(`${label} pack version changed — re-seeding`, {
+      activeVersion: active?.version ?? null,
+      expectedVersion,
+    });
   }
 
   try {
@@ -85,6 +95,7 @@ function bootActivateTemplate(options: {
     logger.info(`${label} gold template activated`, {
       templateId: slug,
       versionId,
+      version: version.version,
     });
     return versionId;
   } catch (err) {
@@ -132,6 +143,7 @@ export function initializeWastedJourneyTemplate(
     packRelative: WASTED_JOURNEY_PACK,
     label: "Wasted Journey",
     createdBy,
+    expectedVersion: "1.1.0",
   });
 }
 

@@ -5,12 +5,29 @@
 import { describe, it, expect } from "vitest";
 import {
   evaluateWastedJourneyConsistency,
+  extractAssetNo,
   extractWastedJourneySignals,
   isWastedJourneyDocument,
+  isWastedJourneyExcludedField,
 } from "../../services/wastedJourneyConsistency";
+import { injectPresentFieldFindings } from "../../services/findingHygiene";
 
-const COHERENT = `
+const COHERENT_YES = `
 Wasted Journey Sheet
+Asset Details
+Asset No: YH23WKA_1C
+Date: 10/07/2026
+Repair Issue: Wasted Journey
+Wasted Journey Reason: Customer / Driver No-Show
+Have you successfully contacted the Scheduling Team to advise them? Yes
+Have you successfully contacted the original Booking Site Contact to confirm? Yes
+Technican Name: aidan.binley
+Signature: Signed
+`;
+
+const BOTH_NO = `
+Wasted Journey Sheet
+Asset Details
 Asset No: YH23WKA_1C
 Date: 10/07/2026
 Repair Issue: Wasted Journey
@@ -27,7 +44,7 @@ Asset No: YH23WKA_1C
 Date: 10/07/2026
 Repair Issue: Wasted Journey
 Have you successfully contacted the Scheduling Team to advise them? Yes
-Have you successfully contacted the original Booking Site Contact to confirm? No
+Have you successfully contacted the original Booking Site Contact to confirm? Yes
 Signature: Signed
 `;
 
@@ -43,27 +60,39 @@ Signature: Signed
 
 describe("wastedJourneyConsistency", () => {
   it("detects wasted journey documents", () => {
-    expect(isWastedJourneyDocument(COHERENT)).toBe(true);
+    expect(isWastedJourneyDocument(COHERENT_YES)).toBe(true);
     expect(isWastedJourneyDocument("Job Summary Report\nVOR")).toBe(false);
   });
 
-  it("treats answered No as valid contact answers", () => {
-    const signals = extractWastedJourneySignals(COHERENT);
-    expect(signals.hasReason).toBe(true);
-    expect(signals.schedulingAnswered).toBe(true);
-    expect(signals.schedulingNo).toBe(true);
-    expect(signals.siteContactAnswered).toBe(true);
-    expect(signals.siteContactNo).toBe(true);
-    expect(signals.hasSignOff).toBe(true);
+  it("extracts YH23WKA_1C and never Asset Details header", () => {
+    expect(extractAssetNo(BOTH_NO)).toBe("YH23WKA_1C");
+    expect(extractAssetNo("Asset Details\nMake/Model: Grouped")).toBeNull();
+    const signals = extractWastedJourneySignals(BOTH_NO);
+    expect(signals.assetId).toBe("YH23WKA_1C");
+    expect(signals.hasAssetId).toBe(true);
   });
 
-  it("PASS path: coherent wasted journey has no blocking Issues", () => {
-    const result = evaluateWastedJourneyConsistency(COHERENT);
+  it("excludes job number and serial from WJ requirements", () => {
+    expect(isWastedJourneyExcludedField("jobNumber")).toBe(true);
+    expect(isWastedJourneyExcludedField("Job Number")).toBe(true);
+    expect(isWastedJourneyExcludedField("serial_no")).toBe(true);
+    expect(isWastedJourneyExcludedField("serialNumber")).toBe(true);
+    expect(isWastedJourneyExcludedField("assetId")).toBe(false);
+  });
+
+  it("PASS path: both contacts Yes", () => {
+    const result = evaluateWastedJourneyConsistency(COHERENT_YES);
     expect(result.hasBlockingIssues).toBe(false);
-    expect(result.findings.some(f => f.severity === "S3")).toBe(true);
-    expect(result.findings.some(f => f.ruleId === "WJ-C011")).toBe(true);
     expect(result.findings.some(f => f.ruleId === "WJ-C021")).toBe(true);
     expect(result.findings.some(f => f.ruleId === "WJ-C031")).toBe(true);
+    expect(result.findings.some(f => f.ruleId === "WJ-C051")).toBe(true);
+  });
+
+  it("Issues when contacts are No (must be Yes)", () => {
+    const result = evaluateWastedJourneyConsistency(BOTH_NO);
+    expect(result.hasBlockingIssues).toBe(true);
+    expect(result.findings.some(f => f.ruleId === "WJ-C020")).toBe(true);
+    expect(result.findings.some(f => f.ruleId === "WJ-C030")).toBe(true);
   });
 
   it("Issues when reason is blank", () => {
@@ -85,5 +114,20 @@ describe("wastedJourneyConsistency", () => {
     );
     expect(result.findings).toHaveLength(0);
     expect(result.hasBlockingIssues).toBe(false);
+  });
+});
+
+describe("asset Present injection vs Asset Details", () => {
+  it("injects YH23WKA_1C not DETAILS", () => {
+    const text = `
+Wasted Journey Sheet
+Asset Details
+Asset No: YH23WKA_1C
+Make/Model: Grouped Ancillaries
+`;
+    const injected = injectPresentFieldFindings([], text);
+    const asset = injected.find(f => f.fieldName === "assetId");
+    expect(asset?.normalisedSnippet).toBe("YH23WKA_1C");
+    expect(asset?.normalisedSnippet).not.toBe("DETAILS");
   });
 });

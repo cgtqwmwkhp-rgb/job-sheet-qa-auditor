@@ -17,10 +17,10 @@
           "no-show"
         ]
       },
-      "version": "1.0.0",
+      "version": "1.1.0",
       "specJson": {
         "name": "Wasted Journey Spec",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "fields": [
           {
             "field": "jobReference",
@@ -192,16 +192,16 @@
           {
             "ruleId": "WJ-R005",
             "field": "schedulingContacted",
-            "description": "Scheduling team contact question must be answered Yes or No",
-            "severity": "major",
+            "description": "Scheduling / control room contact must be Yes",
+            "severity": "critical",
             "type": "format",
             "enabled": true
           },
           {
             "ruleId": "WJ-R006",
             "field": "siteContactConfirmed",
-            "description": "Booking site contact question must be answered Yes or No",
-            "severity": "major",
+            "description": "Booking site contact must be Yes",
+            "severity": "critical",
             "type": "format",
             "enabled": true
           },
@@ -255,14 +255,14 @@
       "fixtures": [
         {
           "caseId": "PASS-001",
-          "description": "YH23WKA coherent wasted journey — reason + both contacts answered No + sign-off",
-          "inputText": "Wasted Journey Sheet\nPlantExpand\nAsset Details\nAsset No: YH23WKA_1C\nMake/Model: Grouped Ancillaries\nCustomer: Openreach\nSite Address / Contact: NG34 7QZ\nCompletion Details\nDate: 10/07/2026\nRepair Issue: Wasted Journey\nWasted Journey Reason: Customer / Driver No-Show\nHave you successfully contacted the Scheduling Team to advise them? No\nHave you successfully contacted the original Booking Site Contact to confirm? No\nTechnican Name: aidan.binley\nSignature: Signed",
+          "description": "YH23WKA wasted journey — Asset Details header + real Asset No + both contacts Yes",
+          "inputText": "Wasted Journey Sheet\nPlantExpand\nAsset Details\nAsset No: YH23WKA_1C\nMake/Model: Grouped Ancillaries\nCustomer: Openreach\nSite Address / Contact: NG34 7QZ\nSerial No:\nCompletion Details\nDate: 10/07/2026\nRepair Issue: Wasted Journey\nWasted Journey Reason: Customer / Driver No-Show\nHave you successfully contacted the Scheduling Team to advise them? Yes\nHave you successfully contacted the original Booking Site Contact to confirm? Yes\nTechnican Name: aidan.binley\nSignature: Signed",
           "expectedOutcome": "pass",
           "required": true
         },
         {
           "caseId": "PASS-002",
-          "description": "Wasted journey with contacts answered Yes",
+          "description": "Wasted journey with both contacts Yes (no job number / serial)",
           "inputText": "Wasted Journey Sheet\nAsset No: AB12CDE_1\nDate: 01/06/2026\nWasted Journey Reason: Site inaccessible\nHave you successfully contacted the Scheduling Team to advise them? Yes\nHave you successfully contacted the original Booking Site Contact to confirm? Yes\nTechnician Name: j.smith\nSignature: Present",
           "expectedOutcome": "pass",
           "required": true
@@ -283,8 +283,8 @@
         },
         {
           "caseId": "REVIEW-001",
-          "description": "Reason present but contact questions unanswered",
-          "inputText": "Wasted Journey Sheet\nAsset No: YH23WKA_1C\nDate: 10/07/2026\nWasted Journey Reason: Customer / Driver No-Show\nHave you successfully contacted the Scheduling Team to advise them?\nHave you successfully contacted the original Booking Site Contact to confirm?\nTechnician Name: aidan.binley\nSignature: Signed",
+          "description": "Still selects as wasted journey when contacts are No (runtime WJ-C fails)",
+          "inputText": "Wasted Journey Sheet\nAsset Details\nAsset No: YH23WKA_1C\nDate: 10/07/2026\nWasted Journey Reason: Customer / Driver No-Show\nHave you successfully contacted the Scheduling Team to advise them? No\nHave you successfully contacted the original Booking Site Contact to confirm? No\nTechnician Name: aidan.binley\nSignature: Signed",
           "expectedOutcome": "pass",
           "required": true
         }
