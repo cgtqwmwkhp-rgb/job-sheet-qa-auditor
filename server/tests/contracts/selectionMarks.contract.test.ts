@@ -17,8 +17,11 @@ import {
   buildSelectionMarksArtifact,
   formatSelectionMarksHints,
   isSelectionMarksEnabled,
+  countHighConfidenceFailMarks,
+  hasBlockingFailMarks,
   FEATURE_FLAG,
 } from "../../services/selectionMarks";
+import type { SelectionMarksArtifact } from "../../services/selectionMarks";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const layoutFixture = JSON.parse(
@@ -156,6 +159,30 @@ describe("isSelectionMarksEnabled", () => {
     delete process.env.AZURE_DI_ENDPOINT;
     delete process.env.AZURE_DI_KEY;
     expect(isSelectionMarksEnabled()).toBe(false);
+  });
+});
+
+describe("countHighConfidenceFailMarks", () => {
+  it("ignores low-confidence Fail circles (empty-column false positives)", () => {
+    const artifact = {
+      rows: [
+        { choice: "Fail", confidence: 40, rowIndex: 0 },
+        { choice: "Fail", confidence: 55, rowIndex: 1 },
+        { choice: "Ok", confidence: 95, rowIndex: 2 },
+        { choice: "Fail", confidence: 90, rowIndex: 3 },
+      ],
+    } as SelectionMarksArtifact;
+    expect(countHighConfidenceFailMarks(artifact)).toBe(1);
+    expect(hasBlockingFailMarks(artifact)).toBe(true);
+    expect(countHighConfidenceFailMarks(artifact, 95)).toBe(0);
+  });
+
+  it("documentProcessor uses high-confidence Fail count for consistency", () => {
+    const dp = readFileSync(
+      resolve(__dirname, "../../services/documentProcessor.ts"),
+      "utf-8"
+    );
+    expect(dp).toContain("countHighConfidenceFailMarks");
   });
 });
 

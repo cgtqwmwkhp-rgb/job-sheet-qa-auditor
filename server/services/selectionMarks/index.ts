@@ -424,10 +424,22 @@ export function hasBlockingFailMarks(
   artifact: SelectionMarksArtifact | undefined | null,
   minConfidence = 80
 ): boolean {
-  if (!artifact?.rows) return false;
-  return artifact.rows.some(
+  return countHighConfidenceFailMarks(artifact, minConfidence) > 0;
+}
+
+/**
+ * Count Fail marks that are confident enough to drive failure-path QA.
+ * Low-confidence empty Fail-column circles (common on Ok/Adv/Fail/N/A grids)
+ * must not invent FailMarks=N and force Return Visit / unsafe conflicts.
+ */
+export function countHighConfidenceFailMarks(
+  artifact: SelectionMarksArtifact | undefined | null,
+  minConfidence = 80
+): number {
+  if (!artifact?.rows) return 0;
+  return artifact.rows.filter(
     r => r.choice === "Fail" && r.confidence >= minConfidence
-  );
+  ).length;
 }
 
 /**
