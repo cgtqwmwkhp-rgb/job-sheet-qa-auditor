@@ -10,7 +10,9 @@ import {
 import {
   runHeuristicPairCompare,
   runPhotoPairCompare,
+  parsePairAxesFromText,
   FEATURE_PHOTO_PAIR_COMPARE,
+  PHOTO_PAIR_USE_VLM,
 } from "../../services/photoEvidence/pairCompare";
 import { evaluateEvidenceCoherence } from "../../services/evidenceCoherence";
 import { DEFAULT_AUDIT_POLICY } from "../../services/auditPolicy/defaults";
@@ -84,13 +86,26 @@ describe("photoEvidence hints", () => {
 });
 
 describe("pairCompare", () => {
-  const prev = process.env[FEATURE_PHOTO_PAIR_COMPARE];
+  const envKeys = [
+    FEATURE_PHOTO_PAIR_COMPARE,
+    PHOTO_PAIR_USE_VLM,
+    "FEATURE_VLM_VERIFICATION",
+    "VLM_PROVIDER",
+    "ANTHROPIC_API_KEY",
+  ] as const;
+  const prev: Record<string, string | undefined> = {};
   beforeEach(() => {
+    for (const k of envKeys) prev[k] = process.env[k];
     process.env[FEATURE_PHOTO_PAIR_COMPARE] = "true";
+    delete process.env[PHOTO_PAIR_USE_VLM];
+    delete process.env.FEATURE_VLM_VERIFICATION;
+    delete process.env.VLM_PROVIDER;
   });
   afterEach(() => {
-    if (prev === undefined) delete process.env[FEATURE_PHOTO_PAIR_COMPARE];
-    else process.env[FEATURE_PHOTO_PAIR_COMPARE] = prev;
+    for (const k of envKeys) {
+      if (prev[k] === undefined) delete process.env[k];
+      else process.env[k] = prev[k];
+    }
   });
 
   it("pairs before/after pages and can mock fail work_done", () => {
@@ -120,6 +135,61 @@ describe("pairCompare", () => {
     delete process.env[FEATURE_PHOTO_PAIR_COMPARE];
     const art = await runPhotoPairCompare({ text: WITH_HINTS, totalPages: 3 });
     expect(art).toBeNull();
+  });
+
+  it("mockMode still works with FEATURE_PHOTO_PAIR_COMPARE=true", async () => {
+    process.env.PHOTO_PAIR_USE_VLM = "true";
+    process.env.VLM_PROVIDER = "mock";
+    const art = await runPhotoPairCompare({
+      text: WITH_HINTS,
+      totalPages: 3,
+      mockMode: "fail_work",
+      documentPdfBase64: Buffer.from("%PDF-1.4 mock").toString("base64"),
+    });
+    expect(art).not.toBeNull();
+    expect(art!.provider).toBe("mock");
+    expect(art!.model).toBe("mock-fail_work");
+    expect(art!.pairs[0].axes.work_done).toBe("fail");
+  });
+
+  it("VLM mock path returns axes artifact when PDF present", async () => {
+    process.env.PHOTO_PAIR_USE_VLM = "true";
+    process.env.VLM_PROVIDER = "mock";
+    const art = await runPhotoPairCompare({
+      text: WITH_HINTS,
+      totalPages: 3,
+      documentPdfBase64: Buffer.from("%PDF-1.4 mock").toString("base64"),
+    });
+    expect(art).not.toBeNull();
+    expect(art!.provider).toBe("mock");
+    expect(art!.model).toBe("mock-vlm-pair-v1");
+    expect(art!.pairs.length).toBeGreaterThan(0);
+    expect(art!.pairs[0].axes.work_done).toBe("pass");
+    expect(art!.summary).toMatch(/VLM paired/i);
+  });
+
+  it("VLM path fail-soft returns heuristic artifact", async () => {
+    process.env.PHOTO_PAIR_USE_VLM = "true";
+    process.env.VLM_PROVIDER = "anthropic";
+    delete process.env.ANTHROPIC_API_KEY;
+    const art = await runPhotoPairCompare({
+      text: WITH_HINTS,
+      totalPages: 3,
+      documentPdfBase64: Buffer.from("%PDF-1.4 mock").toString("base64"),
+    });
+    expect(art).not.toBeNull();
+    expect(art!.provider).toBe("heuristic");
+    expect(art!.model).toBe("heuristic-page-roles-v1");
+    expect(art!.pairs.length).toBeGreaterThan(0);
+  });
+
+  it("parsePairAxesFromText reads nested axes JSON", () => {
+    const parsed = parsePairAxesFromText(
+      'prefix {"axes":{"work_done":"fail","repaired_properly":"pass","clean":"pass","residual_risk":"inconclusive"},"confidence":0.9,"reasoning":"x"}'
+    );
+    expect(parsed).not.toBeNull();
+    expect(parsed!.axes.work_done).toBe("fail");
+    expect(parsed!.confidence).toBe(0.9);
   });
 });
 
