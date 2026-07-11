@@ -120,7 +120,7 @@ describe("Wasted Journey mobilisation pack", () => {
     expect(versionId).not.toBeNull();
     expect(hasWastedJourneyTemplate()).toBe(true);
 
-    // Idempotent when pack version already active (1.2.0)
+    // Idempotent when pack version already active (1.3.0)
     expect(initializeWastedJourneyTemplate()).toBeNull();
     expect(hasWastedJourneyTemplate()).toBe(true);
   });

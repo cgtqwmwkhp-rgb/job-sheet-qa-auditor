@@ -84,12 +84,12 @@ New activatable templates **must** use activation-canonical field IDs — **not*
 **Domain reference:** PlantExpand “Wasted Journey Sheet” (abort / no-show / unable to complete visit). **Not** a repair judgment and **not** Job Summary.
 
 - **Fields:** Canonical 4 present (`jobReference` soft); required Asset Number (`assetId` field key), `date`, `engineerSignOff`, `wastedJourneyReason`; contacts must be Yes. No Asset ID label / job number / serial.
-- **Rules:** WJ-C\*: reason; scheduling + booking contact **must be Yes**; Asset Number + date + sign-off
+- **Rules:** WJ-C\*: reason; scheduling + booking contact **must be Yes** (WJ-C is SSOT — Gemini contact Issues are deduped); Asset Number + date + sign-off
 - **Selection:** `requiredTokensAll: ["wasted", "journey"]`; optional `no-show`, `scheduling`, `plantexpand`
 - **ROI:** Standard 6; `tickboxBlock` over reason/contact questions; `signatureBlock` over technician sign-off
 - **Fixtures:** PASS (both contacts Yes), FAIL (missing reason/unsigned), REVIEW (contacts No still selects family)
 
-**Policy:** Engineer must contact control (Scheduling Team) **and** booking site contact, both answered **Yes**. Job number and serial number are **not** required. **Asset Number (Asset No)** must be present — never confuse with the “Asset Details” section header.
+**Policy:** Engineer must contact control (Scheduling Team) **and** booking site contact, both answered **Yes**. Each contact failure is raised **once** (not twice). Job number and serial number are **not** required. **Asset Number (Asset No)** must be present — never confuse with the “Asset Details” section header.
 
 ---
 

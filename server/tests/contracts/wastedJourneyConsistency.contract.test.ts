@@ -9,7 +9,9 @@ import {
   extractWastedJourneySignals,
   isWastedJourneyDocument,
   isWastedJourneyExcludedField,
+  mergeWastedJourneyFindings,
 } from "../../services/wastedJourneyConsistency";
+import type { Finding } from "../../services/analyzer";
 import { injectPresentFieldFindings } from "../../services/findingHygiene";
 
 const COHERENT_YES = `
@@ -149,6 +151,69 @@ Make/Model: Grouped Ancillaries
     );
     expect(result.findings).toHaveLength(0);
     expect(result.hasBlockingIssues).toBe(false);
+  });
+
+  it("dedupes Gemini contact Issues so only WJ-C findings remain", () => {
+    const consistency = evaluateWastedJourneyConsistency(BOTH_NO);
+    const geminiDuplicates: Finding[] = [
+      {
+        ruleId: "GEMINI",
+        fieldName: "schedulingContacted",
+        severity: "S1",
+        reasonCode: "CONFLICT",
+        rawSnippet: "No",
+        normalisedSnippet: "No",
+        confidence: 100,
+        pageNumber: 1,
+        whyItMatters: "duplicate scheduling finding",
+        suggestedFix: "mark Yes",
+      },
+      {
+        ruleId: "GEMINI",
+        fieldName: "siteContactConfirmed",
+        severity: "S1",
+        reasonCode: "CONFLICT",
+        rawSnippet: "No",
+        normalisedSnippet: "No",
+        confidence: 100,
+        pageNumber: 1,
+        whyItMatters: "duplicate site finding",
+        suggestedFix: "mark Yes",
+      },
+      {
+        ruleId: "GEMINI",
+        fieldName: "assetId",
+        severity: "S3",
+        reasonCode: "LOW_CONFIDENCE",
+        rawSnippet: "YH23WKA_1C",
+        normalisedSnippet: "YH23WKA_1C",
+        confidence: 85,
+        pageNumber: 1,
+        whyItMatters: "unrelated",
+        suggestedFix: "n/a",
+      },
+    ];
+
+    const merged = mergeWastedJourneyFindings(
+      geminiDuplicates,
+      consistency.findings
+    );
+    const issueFindings = merged.filter(
+      f => f.severity === "S0" || f.severity === "S1"
+    );
+    // Exactly two contact Issues (WJ-C020 + WJ-C030), not four
+    const contactIssues = issueFindings.filter(
+      f =>
+        f.ruleId === "WJ-C020" ||
+        f.ruleId === "WJ-C030" ||
+        /scheduling|site|booking/i.test(f.fieldName)
+    );
+    expect(contactIssues).toHaveLength(2);
+    expect(contactIssues.every(f => f.ruleId.startsWith("WJ-C"))).toBe(true);
+    expect(merged.some(f => f.fieldName === "assetId")).toBe(true);
+    expect(
+      merged.some(f => f.ruleId === "GEMINI" && /scheduling/i.test(f.fieldName))
+    ).toBe(false);
   });
 });
 
