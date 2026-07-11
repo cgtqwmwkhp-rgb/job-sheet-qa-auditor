@@ -475,9 +475,23 @@ jobs:
           # Run smoke checks (soft mode for staging)
           ./scripts/release/smoke-check.sh "$STAGING_URL" "$EXPECTED_SHA" "soft"
 
-          # Run monitoring snapshot
+          # Run monitoring snapshot — capture exit code so auth noise doesn't
+          # fail the whole workflow when /readyz already proved the deploy is healthy.
+          MONITOR_RC=0
           ENVIRONMENT=staging HEALTH_ONLY=false \
-            ./scripts/release/monitor-snapshot.sh "$STAGING_URL" "soft" "false"
+            ./scripts/release/monitor-snapshot.sh "$STAGING_URL" "soft" "false" || MONITOR_RC=$?
+
+          if [[ "$MONITOR_RC" -ne 0 ]]; then
+            SUMMARY="logs/release/monitoring/summary.json"
+            if [[ -f "$SUMMARY" ]] && jq -e '.authWalledHealth == true' "$SUMMARY" >/dev/null 2>&1; then
+              echo ""
+              echo "⚠️ Monitor snapshot exited $MONITOR_RC due to auth-walled health endpoints (Easy Auth noise)"
+              echo "   Smoke-check /readyz already verified deploy — treating as non-fatal"
+            else
+              echo "❌ Monitor snapshot failed with a real error (exit $MONITOR_RC)"
+              exit 1
+            fi
+          fi
 
       - name: Capture endpoint evidence
         id: evidence
