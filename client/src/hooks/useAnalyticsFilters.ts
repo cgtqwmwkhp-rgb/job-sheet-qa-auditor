@@ -1,6 +1,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 
-export type AnalyticsPeriodPreset = "7d" | "30d" | "90d";
+/** Coaching-first presets: 1–4 weeks, plus 90d for longer lookback. */
+export type AnalyticsPeriodPreset = "7d" | "14d" | "21d" | "28d" | "90d";
 
 export type AnalyticsFilters = {
   preset: AnalyticsPeriodPreset;
@@ -11,7 +12,9 @@ export type AnalyticsFilters = {
 
 const PRESET_DAYS: Record<AnalyticsPeriodPreset, number> = {
   "7d": 7,
-  "30d": 30,
+  "14d": 14,
+  "21d": 21,
+  "28d": 28,
   "90d": 90,
 };
 
@@ -32,7 +35,7 @@ function rangeForPreset(
 }
 
 /** Shared store so layout filter bar and page queries stay in sync. */
-let filtersState: AnalyticsFilters = rangeForPreset("30d");
+let filtersState: AnalyticsFilters = rangeForPreset("14d");
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -49,11 +52,11 @@ function getSnapshot() {
 }
 
 function getServerSnapshot(): AnalyticsFilters {
-  return rangeForPreset("30d");
+  return rangeForPreset("14d");
 }
 
 /**
- * Analytics period filters — default rolling 30d → now.
+ * Analytics period filters — default rolling 14d (2 weeks) → now.
  * Exposes ISO startDate/endDate plus preset setters for the filter bar.
  */
 export function useAnalyticsFilters() {

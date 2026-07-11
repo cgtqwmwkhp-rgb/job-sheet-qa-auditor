@@ -40,6 +40,9 @@ const DefectAnalysis = lazy(() => import("./pages/analytics/DefectAnalysis"));
 const TechnicianPerformance = lazy(
   () => import("./pages/analytics/TechnicianPerformance")
 );
+const EngineerCoachingPack = lazy(
+  () => import("./pages/analytics/EngineerCoachingPack")
+);
 const FirstFixAnalysis = lazy(
   () => import("./pages/analytics/FirstFixAnalysis")
 );
@@ -148,6 +151,11 @@ function Router() {
         <Route path="/analytics/technicians">
           <RequireStaff>
             <TechnicianPerformance />
+          </RequireStaff>
+        </Route>
+        <Route path="/analytics/technicians/:engineerId/coaching">
+          <RequireStaff>
+            <EngineerCoachingPack />
           </RequireStaff>
         </Route>
         <Route path="/analytics/sites">

@@ -127,7 +127,11 @@ export function buildEvidenceRoiAnalytics(input: {
 
     const eng =
       input.engineerByFindingId?.[f.findingId] ??
-      (f.siteInfo ? `site:${f.siteInfo}` : `sheet:${f.jobSheetId}`);
+      (f.technicianId != null
+        ? String(f.technicianId)
+        : f.siteInfo
+          ? `site:${f.siteInfo}`
+          : `sheet:${f.jobSheetId}`);
     let engEntry = byEngineerMap.get(eng);
     if (!engEntry) {
       engEntry = {

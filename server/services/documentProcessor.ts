@@ -131,6 +131,10 @@ import {
   type SignatureInkVerificationResult,
 } from "./vlmInkVerification";
 import * as db from "../db";
+import {
+  extractTechnicianNameFromFields,
+  resolveTechnicianIdFromName,
+} from "./technicianAttribution";
 import { v4 as uuidv4 } from "uuid";
 import {
   beginProcessingProgress,
@@ -2162,6 +2166,50 @@ async function processJobSheetWithOptions(
       score: analysisResult.score,
     });
 
+    // Attribute technician from OCR name when upload left technicianId unset
+    const finalExtractedFields = ensembleResult
+      ? mergeExtractedFields(
+          analysisResult.extractedFields,
+          ensembleResult.ensembleExtractedFields
+        )
+      : analysisResult.extractedFields;
+    try {
+      const sheetRow = await db.getJobSheetById(jobSheetId);
+      if (sheetRow && sheetRow.technicianId == null) {
+        const name = extractTechnicianNameFromFields(
+          finalExtractedFields as Record<string, unknown>
+        );
+        const users = await db.getAllUsers();
+        const resolvedId = resolveTechnicianIdFromName(
+          name,
+          users.map(u => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+          }))
+        );
+        if (resolvedId != null) {
+          await db.updateJobSheetTechnicianId(jobSheetId, resolvedId);
+          console.log(`[DocumentProcessor] Attributed technician`, {
+            jobSheetId,
+            technicianId: resolvedId,
+            extractedName: name,
+          });
+        } else if (name) {
+          console.log(
+            `[DocumentProcessor] Could not resolve technician name to user`,
+            { jobSheetId, extractedName: name }
+          );
+        }
+      }
+    } catch (attrErr) {
+      console.warn(
+        `[DocumentProcessor] Technician attribution skipped`,
+        attrErr
+      );
+    }
+
     // Update job sheet status
     await db.updateJobSheetStatus(jobSheetId, finalStatus);
 
@@ -2189,12 +2237,7 @@ async function processJobSheetWithOptions(
         documentationQualityPenalties,
         llmConfidenceScore: llmConfidenceForReport,
         ...(auditPolicyDecision ? { auditPolicyDecision } : {}),
-        extractedFields: ensembleResult
-          ? mergeExtractedFields(
-              analysisResult.extractedFields,
-              ensembleResult.ensembleExtractedFields
-            )
-          : analysisResult.extractedFields,
+        extractedFields: finalExtractedFields,
         pageCount: ocrResult.totalPages,
         ...(typeof pageConfidencePrior === "number"
           ? {

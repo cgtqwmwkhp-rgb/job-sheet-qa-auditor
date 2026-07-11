@@ -32,6 +32,7 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAnalyticsFilters } from "@/hooks/useAnalyticsFilters";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   Bar,
   BarChart,
@@ -73,6 +74,7 @@ export default function TechnicianPerformance() {
   const [selectedEngineerId, setSelectedEngineerId] = useState<string | null>(
     null
   );
+  const utils = trpc.useUtils();
 
   const {
     data: summary,
@@ -133,6 +135,21 @@ export default function TechnicianPerformance() {
   }
 
   const hasData = (summary?.engineerCount ?? 0) > 0;
+  const unattributedCount = summary?.unattributedCount ?? 0;
+
+  const backfillMutation =
+    trpc.jobSheets.backfillTechnicianAttribution.useMutation({
+      onSuccess: result => {
+        toast.success(
+          `Attributed ${result.attributed} of ${result.scanned} sheets` +
+            (result.unresolved
+              ? ` (${result.unresolved} names unmatched — add matching technician users)`
+              : "")
+        );
+        void utils.analytics.getEngineerSummary.invalidate();
+      },
+      onError: err => toast.error(err.message),
+    });
 
   if (!hasData) {
     return (
@@ -141,14 +158,55 @@ export default function TechnicianPerformance() {
         description="Track and compare technician quality metrics."
       >
         <Card className="p-12">
-          <div className="flex flex-col items-center justify-center text-center">
-            <Users className="h-16 w-16 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">
-              No Technician Attribution Yet
-            </h2>
-            <p className="text-muted-foreground max-w-md">
-              Upload and process job sheets with a technician assigned to see
-              scorecards, trends, and drill-through to underlying audits.
+          <div className="flex flex-col items-center justify-center text-center gap-4">
+            <Users className="h-16 w-16 text-muted-foreground" />
+            <div>
+              <h2 className="text-xl font-semibold mb-2">
+                No Technician Attribution Yet
+              </h2>
+              <p className="text-muted-foreground max-w-lg mx-auto">
+                Processed job cards only appear here when they are linked to a
+                technician user. Uploads currently leave that blank unless you
+                pick a technician on upload, or we match the OCR engineer name
+                to a user account.
+              </p>
+              {unattributedCount > 0 && (
+                <p className="text-sm text-amber-800 mt-3">
+                  {unattributedCount} processed card
+                  {unattributedCount === 1 ? "" : "s"} in this period have no
+                  technician assigned.
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button
+                type="button"
+                disabled={backfillMutation.isPending}
+                onClick={() => backfillMutation.mutate({ limit: 200 })}
+              >
+                {backfillMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Matching names…
+                  </>
+                ) : (
+                  "Backfill from OCR names"
+                )}
+              </Button>
+              <Link href="/upload">
+                <Button type="button" variant="outline">
+                  Upload with technician
+                </Button>
+              </Link>
+              <Link href="/users">
+                <Button type="button" variant="ghost">
+                  Manage users
+                </Button>
+              </Link>
+            </div>
+            <p className="text-xs text-muted-foreground max-w-md">
+              Tip: create users whose names match the engineer name printed on
+              the job card (role technician), then run backfill.
             </p>
           </div>
         </Card>
@@ -166,22 +224,40 @@ export default function TechnicianPerformance() {
         description="Scorecard and finding drill-through for the selected technician."
       >
         <div className="space-y-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedEngineerId(null)}
-            className="gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to leaderboard
-          </Button>
-
           {detailLoading || !scoreCard ? (
-            <div className="flex items-center justify-center h-[30vh]">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <div className="space-y-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedEngineerId(null)}
+                className="gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to leaderboard
+              </Button>
+              <div className="flex items-center justify-center h-[30vh]">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
             </div>
           ) : (
             <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedEngineerId(null)}
+                  className="gap-2"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to leaderboard
+                </Button>
+                <Link
+                  href={`/analytics/technicians/${selectedEngineerId}/coaching`}
+                >
+                  <Button size="sm">Open coaching pack</Button>
+                </Link>
+              </div>
+
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                   <CardHeader className="pb-2">

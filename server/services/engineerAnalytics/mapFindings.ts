@@ -35,6 +35,7 @@ export interface RawFindingRow {
   severity: DbSeverity;
   reasonCode: DbReasonCode;
   fieldName: string;
+  ruleId?: string | null;
   resolutionStatus: DbResolutionStatus;
   occurredAt: Date | string;
 }

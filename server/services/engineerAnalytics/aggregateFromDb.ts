@@ -19,6 +19,10 @@ import type {
 export interface EngineerDocumentRow {
   technicianId: number;
   jobSheetId: number;
+  referenceNumber?: string | null;
+  siteInfo?: string | null;
+  result?: "pass" | "fail" | "review_queue" | "waived" | null;
+  confidenceScore?: number | null;
   processedAt: Date | string;
 }
 
