@@ -498,14 +498,18 @@ function ReviewWorkstationContent({
       { id: jobSheetId },
       {
         onSuccess: () => {
-          toast.success("Reprocessing started — results will refresh automatically");
+          toast.success(
+            "Reprocessing started — results will refresh automatically"
+          );
           utils.jobSheets.get.invalidate({ id: jobSheetId });
           invalidateFindings();
         },
         onError: err => {
           const msg = err.message || "Reprocess failed";
           if (msg.includes("UNAUTHORIZED") || msg.includes("FORBIDDEN")) {
-            toast.error("You don't have permission to reprocess this job sheet");
+            toast.error(
+              "You don't have permission to reprocess this job sheet"
+            );
           } else {
             toast.error(msg);
           }
