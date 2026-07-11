@@ -101,6 +101,20 @@ export default function TechnicianPerformance() {
     [summary]
   );
 
+  const backfillMutation =
+    trpc.jobSheets.backfillTechnicianAttribution.useMutation({
+      onSuccess: result => {
+        toast.success(
+          `Attributed ${result.attributed} of ${result.scanned} sheets` +
+            (result.unresolved
+              ? ` (${result.unresolved} names unmatched — add matching technician users)`
+              : "")
+        );
+        void utils.analytics.getEngineerSummary.invalidate();
+      },
+      onError: err => toast.error(err.message),
+    });
+
   if (isLoading) {
     return (
       <AnalyticsLayout
@@ -136,20 +150,6 @@ export default function TechnicianPerformance() {
 
   const hasData = (summary?.engineerCount ?? 0) > 0;
   const unattributedCount = summary?.unattributedCount ?? 0;
-
-  const backfillMutation =
-    trpc.jobSheets.backfillTechnicianAttribution.useMutation({
-      onSuccess: result => {
-        toast.success(
-          `Attributed ${result.attributed} of ${result.scanned} sheets` +
-            (result.unresolved
-              ? ` (${result.unresolved} names unmatched — add matching technician users)`
-              : "")
-        );
-        void utils.analytics.getEngineerSummary.invalidate();
-      },
-      onError: err => toast.error(err.message),
-    });
 
   if (!hasData) {
     return (
