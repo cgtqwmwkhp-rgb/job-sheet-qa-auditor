@@ -1,0 +1,294 @@
+{
+  "packVersion": "1.0.0",
+  "exportedAt": "2026-07-11T06:00:00.000Z",
+  "sourceSystem": "mobilisation-wasted-journey",
+  "templates": [
+    {
+      "metadata": {
+        "templateId": "wasted-journey-v1",
+        "name": "Wasted Journey Sheet",
+        "description": "PlantExpand Wasted Journey — abort/no-show visit documentation (not a repair judgment)",
+        "category": "wasted-journey",
+        "tags": [
+          "wasted-journey",
+          "plantexpand",
+          "field-service",
+          "abort",
+          "no-show"
+        ]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Wasted Journey Spec",
+        "version": "1.0.0",
+        "fields": [
+          {
+            "field": "jobReference",
+            "label": "Job Reference",
+            "type": "string",
+            "required": false,
+            "extractionHints": [
+              "job no",
+              "job number",
+              "job reference",
+              "work order",
+              "reference"
+            ],
+            "aliases": ["Job No", "Job Number", "Job Ref"]
+          },
+          {
+            "field": "assetId",
+            "label": "Asset No",
+            "type": "string",
+            "required": true,
+            "extractionHints": [
+              "asset no",
+              "asset number",
+              "asset id",
+              "registration",
+              "reg no"
+            ],
+            "aliases": ["Asset No", "Asset Number", "Asset ID"]
+          },
+          {
+            "field": "date",
+            "label": "Date",
+            "type": "date",
+            "required": true,
+            "extractionHints": [
+              "date",
+              "completion date",
+              "job date",
+              "completed on"
+            ],
+            "aliases": ["Completion Date", "Job Date"]
+          },
+          {
+            "field": "engineerSignOff",
+            "label": "Technician Signature",
+            "type": "boolean",
+            "required": true,
+            "extractionHints": [
+              "technician signature",
+              "engineer signature",
+              "engineer sign off",
+              "signed by",
+              "signature"
+            ],
+            "aliases": [
+              "Technician Signature",
+              "Engineer Sign Off",
+              "Technican Signature"
+            ]
+          },
+          {
+            "field": "wastedJourneyReason",
+            "label": "Wasted Journey Reason",
+            "type": "string",
+            "required": true,
+            "extractionHints": [
+              "wasted journey reason",
+              "reason",
+              "customer / driver no-show",
+              "no-show",
+              "no show"
+            ],
+            "aliases": ["Wasted Journey Reason", "Reason"]
+          },
+          {
+            "field": "schedulingContacted",
+            "label": "Scheduling Team Contacted",
+            "type": "boolean",
+            "required": true,
+            "extractionHints": [
+              "contacted the scheduling team",
+              "scheduling team",
+              "advise them"
+            ],
+            "aliases": ["Scheduling Team Contacted"]
+          },
+          {
+            "field": "siteContactConfirmed",
+            "label": "Booking Site Contact Confirmed",
+            "type": "boolean",
+            "required": true,
+            "extractionHints": [
+              "booking site contact",
+              "original booking site",
+              "site contact to confirm"
+            ],
+            "aliases": ["Site Contact Confirmed", "Booking Site Contact"]
+          },
+          {
+            "field": "technicianName",
+            "label": "Technician Name",
+            "type": "string",
+            "required": false,
+            "extractionHints": ["technician name", "technican name", "name"],
+            "aliases": ["Technician Name", "Technican Name"]
+          },
+          {
+            "field": "customerName",
+            "label": "Customer",
+            "type": "string",
+            "required": false,
+            "extractionHints": ["customer", "client"],
+            "aliases": ["Customer"]
+          },
+          {
+            "field": "siteAddress",
+            "label": "Site Address / Contact",
+            "type": "string",
+            "required": false,
+            "extractionHints": [
+              "site address",
+              "site address / contact",
+              "contact"
+            ],
+            "aliases": ["Site Address", "Site Address / Contact"]
+          },
+          {
+            "field": "makeModel",
+            "label": "Make/Model",
+            "type": "string",
+            "required": false,
+            "extractionHints": ["make/model", "make model", "equipment type"],
+            "aliases": ["Make/Model", "Make Model"]
+          }
+        ],
+        "rules": [
+          {
+            "ruleId": "WJ-R001",
+            "field": "assetId",
+            "description": "Asset No is required on Wasted Journey sheets",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "WJ-R002",
+            "field": "date",
+            "description": "Completion/job date is required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "WJ-R003",
+            "field": "engineerSignOff",
+            "description": "Technician signature / engineer sign-off is required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "WJ-R004",
+            "field": "wastedJourneyReason",
+            "description": "Wasted journey reason must be recorded",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "WJ-R005",
+            "field": "schedulingContacted",
+            "description": "Scheduling team contact question must be answered Yes or No",
+            "severity": "major",
+            "type": "format",
+            "enabled": true
+          },
+          {
+            "ruleId": "WJ-R006",
+            "field": "siteContactConfirmed",
+            "description": "Booking site contact question must be answered Yes or No",
+            "severity": "major",
+            "type": "format",
+            "enabled": true
+          },
+          {
+            "ruleId": "WJ-R007",
+            "field": "assetId",
+            "description": "Asset ID should be alphanumeric registration-style",
+            "severity": "major",
+            "type": "pattern",
+            "pattern": "^[A-Z0-9][A-Z0-9_-]*$",
+            "enabled": true
+          }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["wasted", "journey"],
+        "requiredTokensAny": ["asset", "scheduling", "reason", "plantexpand"],
+        "optionalTokens": [
+          "no-show",
+          "noshow",
+          "customer",
+          "driver",
+          "signature",
+          "technican",
+          "technician",
+          "repair issue"
+        ],
+        "tokenWeights": {
+          "wasted": 18,
+          "journey": 18,
+          "no-show": 8,
+          "noshow": 8,
+          "scheduling": 6,
+          "reason": 5,
+          "asset": 4,
+          "plantexpand": 3,
+          "signature": 2
+        }
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          { "name": "jobReference", "x": 0.05, "y": 0.04, "w": 0.4, "h": 0.04 },
+          { "name": "assetId", "x": 0.05, "y": 0.14, "w": 0.45, "h": 0.08 },
+          { "name": "date", "x": 0.05, "y": 0.32, "w": 0.4, "h": 0.05 },
+          { "name": "expiryDate", "x": 0.65, "y": 0.08, "w": 0.3, "h": 0.04 },
+          { "name": "tickboxBlock", "x": 0.05, "y": 0.4, "w": 0.9, "h": 0.28 },
+          { "name": "signatureBlock", "x": 0.0, "y": 0.78, "w": 1.0, "h": 0.2 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "PASS-001",
+          "description": "YH23WKA coherent wasted journey — reason + both contacts answered No + sign-off",
+          "inputText": "Wasted Journey Sheet\nPlantExpand\nAsset Details\nAsset No: YH23WKA_1C\nMake/Model: Grouped Ancillaries\nCustomer: Openreach\nSite Address / Contact: NG34 7QZ\nCompletion Details\nDate: 10/07/2026\nRepair Issue: Wasted Journey\nWasted Journey Reason: Customer / Driver No-Show\nHave you successfully contacted the Scheduling Team to advise them? No\nHave you successfully contacted the original Booking Site Contact to confirm? No\nTechnican Name: aidan.binley\nSignature: Signed",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "PASS-002",
+          "description": "Wasted journey with contacts answered Yes",
+          "inputText": "Wasted Journey Sheet\nAsset No: AB12CDE_1\nDate: 01/06/2026\nWasted Journey Reason: Site inaccessible\nHave you successfully contacted the Scheduling Team to advise them? Yes\nHave you successfully contacted the original Booking Site Contact to confirm? Yes\nTechnician Name: j.smith\nSignature: Present",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "FAIL-001",
+          "description": "Wrong document family — Job Summary",
+          "inputText": "Job Summary Report\nPlantExpand\nAsset No: BN21ACO_TL\nDate: 02/09/2024\nTechnician Signature: Signed",
+          "expectedOutcome": "fail",
+          "required": true
+        },
+        {
+          "caseId": "FAIL-002",
+          "description": "Wasted Journey missing reason and signature",
+          "inputText": "Wasted Journey Sheet\nAsset No: YH23WKA_1C\nDate: 10/07/2026\nRepair Issue: Wasted Journey",
+          "expectedOutcome": "fail",
+          "required": true
+        },
+        {
+          "caseId": "REVIEW-001",
+          "description": "Reason present but contact questions unanswered",
+          "inputText": "Wasted Journey Sheet\nAsset No: YH23WKA_1C\nDate: 10/07/2026\nWasted Journey Reason: Customer / Driver No-Show\nHave you successfully contacted the Scheduling Team to advise them?\nHave you successfully contacted the original Booking Site Contact to confirm?\nTechnician Name: aidan.binley\nSignature: Signed",
+          "expectedOutcome": "pass",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

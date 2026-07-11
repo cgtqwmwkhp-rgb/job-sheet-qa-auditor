@@ -14,6 +14,8 @@ import {
   hasDefaultTemplate,
   initializeJobSummaryTemplate,
   hasJobSummaryTemplate,
+  initializeWastedJourneyTemplate,
+  hasWastedJourneyTemplate,
 } from "../services/templateRegistry";
 import { hydrateDeadLetterQueueFromDb } from "../utils/deadLetterQueue";
 import { pdfProxyRouter } from "./pdfProxy";
@@ -77,6 +79,25 @@ async function startServer() {
     }
   } else {
     console.log("[Templates] job-summary-v1 already active");
+  }
+
+  // Gold mobilisation: Wasted Journey Sheet (abort/no-show — not repair)
+  if (!hasWastedJourneyTemplate()) {
+    console.log("[Templates] Initializing wasted-journey-v1 gold template...");
+    const wjVersionId = initializeWastedJourneyTemplate();
+    if (wjVersionId) {
+      console.log(
+        `[Templates] wasted-journey-v1 activated (version ID: ${wjVersionId})`
+      );
+    } else if (hasWastedJourneyTemplate()) {
+      console.log("[Templates] wasted-journey-v1 already active");
+    } else {
+      console.warn(
+        "[Templates] wasted-journey-v1 seed skipped or failed (non-fatal)"
+      );
+    }
+  } else {
+    console.log("[Templates] wasted-journey-v1 already active");
   }
 
   // Phase 1.10: restore in-memory DLQ from durable failed_jobs (fail-safe)
