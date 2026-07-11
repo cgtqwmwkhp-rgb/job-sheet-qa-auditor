@@ -25,6 +25,11 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
+# Feature flags available to the Vite client build (inlined at compile time).
+# Server-side env vars still gate actual data access per-environment.
+ARG VITE_FEATURE_OVERTURN_METRICS=false
+ENV VITE_FEATURE_OVERTURN_METRICS=${VITE_FEATURE_OVERTURN_METRICS}
+
 # Build the application
 RUN pnpm build
 
