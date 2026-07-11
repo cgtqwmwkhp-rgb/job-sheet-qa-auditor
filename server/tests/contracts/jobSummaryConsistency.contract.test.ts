@@ -304,9 +304,7 @@ Engineer Comments: Waiting on hinge kit; return to fit and retest.
     expect(issue093?.severity).toBe("S1");
     expect(issue093?.reasonCode).toBe("INCOMPLETE_EVIDENCE");
     expect(result.hasBlockingIssues).toBe(true);
-    expect(
-      result.findings.some(f => f.ruleId === "JSR-C090")
-    ).toBe(false);
+    expect(result.findings.some(f => f.ruleId === "JSR-C090")).toBe(false);
   });
 
   it("Parts Still Required + Return Yes is coherent (JSR-C092 Passed)", () => {
