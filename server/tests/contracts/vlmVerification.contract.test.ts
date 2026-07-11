@@ -71,7 +71,20 @@ describe("VLM Verification — Phase 2.5", () => {
     expect(result.provider).toBe("mock");
   });
 
-  it("runImageQa stays heuristic when flag off", async () => {
+  it("runImageQa heuristic-passes non-disputed when flag off", async () => {
+    process.env.FEATURE_VLM_VERIFICATION = "false";
+    const result = await runImageQa(roi, "signatureBlock", {
+      cropImage: {
+        data: tinyPngBase64,
+        mediaType: "image/png",
+      },
+    });
+    expect(result.vlmUsed).toBe(false);
+    expect(result.passed).toBe(true);
+    expect(result.confidence).toBe(0.88);
+  });
+
+  it("runImageQa fail-closed: disputed + VLM off → passed:false", async () => {
     process.env.FEATURE_VLM_VERIFICATION = "false";
     const result = await runImageQa(roi, "signatureBlock", {
       cropImage: {
@@ -81,8 +94,9 @@ describe("VLM Verification — Phase 2.5", () => {
       disputed: true,
     });
     expect(result.vlmUsed).toBe(false);
-    expect(result.passed).toBe(true);
-    expect(result.confidence).toBe(0.88);
+    expect(result.passed).toBe(false);
+    expect(result.confidence).toBe(0);
+    expect(result.details).toMatch(/disputed.*VLM.*off/i);
   });
 
   it("runImageQa uses VLM for disputed crop when enabled", async () => {
