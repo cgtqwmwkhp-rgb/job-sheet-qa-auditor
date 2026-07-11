@@ -7,6 +7,7 @@ import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
+import { extractAzureRoleClaims, resolveAzureAuthRole } from "./azureRoles";
 import { createSafeLogger } from "../utils/safeLogger";
 import type {
   ExchangeTokenRequest,
@@ -311,6 +312,7 @@ class SDKServer {
         let email = azurePrincipalName || "";
         let name = "";
 
+        let roleClaims: string[] = [];
         if (azureClientPrincipal) {
           const decoded = Buffer.from(azureClientPrincipal, "base64").toString(
             "utf8"
@@ -320,6 +322,7 @@ class SDKServer {
             nameIdentifier?: string;
             userDetails?: string;
             name?: string;
+            userRoles?: string[];
             claims?: Array<{ typ?: string; val?: string }>;
           };
           const claim = (types: string[]) =>
@@ -351,6 +354,7 @@ class SDKServer {
             ]) ||
             (email.includes("@") ? email.split("@")[0] : "") ||
             "Azure User";
+          roleClaims = extractAzureRoleClaims(principal);
         } else {
           name = email.includes("@")
             ? email.split("@")[0]!
@@ -364,20 +368,27 @@ class SDKServer {
         authLogger.debug("Azure Easy Auth - user authenticated via Azure AD", {
           userId,
           email,
+          roleClaims,
         });
 
-        // Find or create user from Azure auth
-        let user = await db.getUserByOpenId(`azure-${userId}`);
-        if (!user) {
-          await db.upsertUser({
-            openId: `azure-${userId}`,
-            name: name || "Azure User",
-            email: email || null,
-            loginMethod: "azure-easy-auth",
-            lastSignedIn: new Date(),
-          });
-          user = await db.getUserByOpenId(`azure-${userId}`);
-        }
+        // Find or create user from Azure auth. Default staff role is qa_lead
+        // so Hold Queue / review actions work (error 10003 otherwise).
+        const openId = `azure-${userId}`;
+        let user = await db.getUserByOpenId(openId);
+        const role = resolveAzureAuthRole({
+          roleClaims,
+          existingRole: user?.role,
+          isNewUser: !user,
+        });
+        await db.upsertUser({
+          openId,
+          name: name || "Azure User",
+          email: email || null,
+          loginMethod: "azure-easy-auth",
+          lastSignedIn: new Date(),
+          ...(role ? { role } : {}),
+        });
+        user = await db.getUserByOpenId(openId);
         if (user) {
           return user;
         }
