@@ -429,7 +429,7 @@ Engineer Comments: Tail lift hinge cracked at pin; ordered hinge kit. Return to 
     );
     expect(src).toContain("selectionMarksResult?.layoutText || extractedText");
     expect(src).toContain("jsrText");
-    expect(src).toContain('TextSource=');
+    expect(src).toContain("TextSource=");
   });
 
   it("reads DV23 two-column completion grid (Safe Yes, Return No, works complete)", () => {
