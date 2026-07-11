@@ -1854,12 +1854,14 @@ async function processJobSheetWithOptions(
   // Replace LLM self-confidence with engineer documentation quality (0–100).
   // LLM confidence is retained in reportJson for ops; the stored/UI score is the mark.
   const llmConfidenceForReport = analysisResult.score;
+  let documentationQualityPenalties: ReturnType<typeof computeDocumentationQualityScore>["penalties"] = [];
   {
     const quality = computeDocumentationQualityScore(analysisResult.findings, {
       llmConfidence: llmConfidenceForReport,
       overallResult: analysisResult.overallResult,
       weights: auditPolicy.weights,
     });
+    documentationQualityPenalties = quality.penalties;
     analysisResult = {
       ...analysisResult,
       score: quality.score,
@@ -1995,6 +1997,7 @@ async function processJobSheetWithOptions(
         summary: analysisResult.summary,
         extractedText,
         documentationQualityScore: analysisResult.score,
+        documentationQualityPenalties,
         llmConfidenceScore: llmConfidenceForReport,
         ...(auditPolicyDecision ? { auditPolicyDecision } : {}),
         extractedFields: ensembleResult
