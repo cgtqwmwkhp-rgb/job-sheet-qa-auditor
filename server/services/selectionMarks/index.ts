@@ -74,6 +74,12 @@ export interface SelectionMarksResult {
     string,
     { value: string; confidence: number; pageNumber: number }
   >;
+  /**
+   * Full page text from the Azure DI layout pass (line-concatenated markdown).
+   * Richer than Mistral-flattened text for completion-grid fields.
+   * Undefined when layout returned no usable text.
+   */
+  layoutText?: string;
 }
 
 /** Default on when Azure DI is configured; explicit false/0 disables. */
@@ -302,7 +308,8 @@ export function buildSelectionMarksArtifact(
 }
 
 export function artifactToResult(
-  artifact: SelectionMarksArtifact
+  artifact: SelectionMarksArtifact,
+  options?: { layoutText?: string }
 ): SelectionMarksResult {
   const hintsBlock = formatSelectionMarksHints(artifact.rows);
   const preExtractedFields: SelectionMarksResult["preExtractedFields"] = {};
@@ -325,7 +332,12 @@ export function artifactToResult(
     };
   }
 
-  return { artifact, hintsBlock, preExtractedFields };
+  return {
+    artifact,
+    hintsBlock,
+    preExtractedFields,
+    ...(options?.layoutText ? { layoutText: options.layoutText } : {}),
+  };
 }
 
 /**
@@ -482,7 +494,7 @@ export async function runSelectionMarkDetection(
       lines: layout.lines,
       error: layout.success ? undefined : layout.error,
     });
-    return artifactToResult(artifact);
+    return artifactToResult(artifact, { layoutText: layout.layoutText });
   } catch (error) {
     console.warn("[SelectionMarks] fail-soft:", error);
     return artifactToResult(
