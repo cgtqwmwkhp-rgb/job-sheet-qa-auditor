@@ -33,13 +33,13 @@ function normaliseTyreSize(raw: string): string {
 
 // Positions extracted from OCR lines (OSF, NSF, OSR, NSR, 3rd-axle variants)
 const TREAD_FIELD_RE =
-  /\b(OSF|NSF|OSR|NSR|OS\s*3rd|NS\s*3rd|3rd\s*(?:axle\s*)?(?:OS|NS))\s*(?:Tyre\s*)?Tread\s*(?:Depth)?\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*mm/gi;
+  /\b(OSF|NSF|OSR|NSR|OS\s*3rd|NS\s*3rd|3rd\s*(?:axle\s*)?(?:OS|NS))\s*(?:Tyre\s*)?Tread\s*(?:Depth)?\s*[:-]?\s*(\d+(?:\.\d+)?)\s*mm/gi;
 
 const SIZE_RE =
-  /(?:Tyre\s*)?Size\s*[:\-]?\s*([\d]{2,3}\s*\/\s*\d{2,3}\s*R?\s*\d{2,3}\s*C?)\b/i;
+  /(?:Tyre\s*)?Size\s*[:-]?\s*([\d]{2,3}\s*\/\s*\d{2,3}\s*R?\s*\d{2,3}\s*C?)\b/i;
 
 const PSI_RE =
-  /(?:Tyre\s*)?(?:Inflation|PSI|Pressure)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:PSI|psi)?/i;
+  /(?:Tyre\s*)?(?:Inflation|PSI|Pressure)\s*[:-]?\s*(\d+(?:\.\d+)?)\s*(?:PSI|psi)?/i;
 
 export interface TyreReading {
   position: string;
