@@ -214,6 +214,24 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           enabled: true,
           fieldAliases: ["Photo Evidence"],
         },
+        {
+          ruleId: "TYRE-C010",
+          label: "Tyre Tread Depth",
+          description:
+            "Recorded tread depth below PlantExpand 2mm minimum",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: ["Tyre Tread Depth", "Tread Depth"],
+        },
+        {
+          ruleId: "TYRE-C020",
+          label: "Tyre PSI",
+          description:
+            "Recorded PSI outside acceptable band for tyre size (195/50R13C: 90–95 PSI)",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: ["Tyre PSI", "Tyre Inflation", "Tyre Pressure"],
+        },
       ],
     },
     /**
