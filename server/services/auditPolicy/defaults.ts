@@ -207,21 +207,127 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
         },
         {
           ruleId: "PHOTO-C010",
-          label: "Photo Evidence (scaffold)",
+          label: "Photo Evidence (missing hints)",
           description:
-            "Parts or repairs recorded but before/after photo evidence was not verified",
+            "Parts or repairs recorded but no before/after / Photo-N hints found",
           failClass: "minor",
           enabled: true,
           fieldAliases: ["Photo Evidence"],
         },
         {
           ruleId: "PHOTO-C011",
-          label: "Photo Evidence Labels Present",
-          description:
-            "Before/after photo labels detected in OCR text (visual QA not verified)",
+          label: "Photo Evidence Hints",
+          description: "Before/after or Photo-N hints detected in the pack",
           failClass: "informational",
           enabled: true,
-          fieldAliases: ["Photo Evidence"],
+          fieldAliases: ["Photo Evidence Hints", "Photo Evidence"],
+        },
+        {
+          ruleId: "PHOTO-C012",
+          label: "Before/After Pair Compare",
+          description:
+            "Multimodal pair compare failed work_done or repaired_properly",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: ["Before/After Pair Compare", "Photo Evidence"],
+        },
+        {
+          ruleId: "PHOTO-C013",
+          label: "Before/After Cleanliness",
+          description: "After photo cleanliness axis failed",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: ["Before/After Cleanliness", "Photo Evidence"],
+        },
+        {
+          ruleId: "PHOTO-C014",
+          label: "Before/After Inconclusive",
+          description: "Pair compare inconclusive or unpaired",
+          failClass: "informational",
+          enabled: true,
+          fieldAliases: ["Before/After Pair Compare", "Photo Evidence"],
+        },
+        {
+          ruleId: "PHOTO-C015",
+          label: "Photo Evidence (Duplicate)",
+          description: "Evidence pack file hash matches a prior upload",
+          failClass: "informational",
+          enabled: true,
+          fieldAliases: ["Photo Evidence (Duplicate)", "Photo Evidence"],
+        },
+        {
+          ruleId: "COMMENT-C010",
+          label: "Engineer Comments (Clinical Presence)",
+          description: "Failure path without substantive clinical narrative",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: [
+            "Engineer Comments (Clinical)",
+            "Engineer Comments (Failure Path)",
+            "engineer_comments",
+            "Engineer Comments",
+          ],
+        },
+        {
+          ruleId: "COMMENT-C020",
+          label: "Engineer Comments (Sufficiency)",
+          description:
+            "Narrative missing what-failed and next-action/parts stance",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: [
+            "Engineer Comments (Sufficiency)",
+            "Engineer Comments",
+          ],
+        },
+        {
+          ruleId: "COMMENT-C030",
+          label: "Engineer Comments (Clarity)",
+          description: "Vague-only or too-thin engineer comments",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: ["Engineer Comments (Clarity)", "Engineer Comments"],
+        },
+        {
+          ruleId: "COMMENT-C040",
+          label: "Engineer Comments (Actionable)",
+          description:
+            "Return visit / parts still required without actionable next step",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: ["Engineer Comments (Actionable)", "Engineer Comments"],
+        },
+        {
+          ruleId: "COMMENT-C050",
+          label: "Engineer Comments (Cross-field)",
+          description:
+            "Parts Still Required content not referenced in comments",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: [
+            "Engineer Comments (Cross-field)",
+            "Engineer Comments",
+          ],
+        },
+        {
+          ruleId: "COMMENT-C041",
+          label: "Engineer Comments (Coherent)",
+          description: "Coherent clinical narrative on failure path",
+          failClass: "informational",
+          enabled: true,
+          fieldAliases: ["Engineer Comments (Clinical)", "Engineer Comments"],
+        },
+        {
+          ruleId: "EVIDENCE-C010",
+          label: "Evidence Coherence",
+          description:
+            "Narrative claims repair complete but photo pair axes contradict",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: [
+            "Evidence Coherence",
+            "Evidence Coherence (Safe vs Photos)",
+          ],
         },
         {
           ruleId: "CHECK-C010",

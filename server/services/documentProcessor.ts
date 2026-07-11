@@ -77,7 +77,14 @@ import {
   WASTED_JOURNEY_TEMPLATE_ID,
 } from "./wastedJourneyConsistency";
 import { computeDocumentationQualityScore } from "./documentationQuality";
-import { evaluatePhotoEvidenceConsistency } from "./photoEvidence";
+import {
+  evaluatePhotoEvidenceConsistency,
+  runPhotoPairCompare,
+  isPhotoPairCompareEnabled,
+} from "./photoEvidence";
+import { evaluateCommentQuality } from "./commentQuality";
+import { buildCommentDeepNoteAdvisory } from "./commentQuality/advisory";
+import { evaluateEvidenceCoherence } from "./evidenceCoherence";
 import { evaluateTyreCompliance } from "./tyreCompliance";
 import { evaluateChecklistCompleteness } from "./checklistCompleteness";
 import { applyAuditPolicy, resolveAuditFormFamily } from "./auditPolicy";
@@ -1726,6 +1733,19 @@ async function processJobSheetWithOptions(
   let auditFormFamily = resolveAuditFormFamily(null, false);
   let failurePathSignals: FailurePathSignals | null = null;
   let failurePathSignalSummary: string | null = null;
+  let commentQualitySignals:
+    | ReturnType<typeof evaluateCommentQuality>["signals"]
+    | null = null;
+  let commentDeepNote: Awaited<
+    ReturnType<typeof buildCommentDeepNoteAdvisory>
+  > | null = null;
+  let photoEvidenceArtifact: ReturnType<
+    typeof evaluatePhotoEvidenceConsistency
+  > | null = null;
+  let photoPairCompareArtifact: Awaited<
+    ReturnType<typeof runPhotoPairCompare>
+  > = null;
+  let evidenceCoherenceSummary: string | null = null;
   {
     const selectedSlug =
       buildSelectionCohortMeta(selectionResult, usedTemplateVersionId)
@@ -1766,6 +1786,7 @@ async function processJobSheetWithOptions(
       const jsrText = selectionMarksResult?.layoutText || extractedText;
       const consistency = evaluateJobSummaryConsistency(jsrText, {
         failMarkCount,
+        skipEngineerCommentRules: true,
       });
       failurePathSignals = consistency.signals;
       const jsrTextSource = selectionMarksResult?.layoutText
@@ -1797,12 +1818,78 @@ async function processJobSheetWithOptions(
             : undefined,
         });
       }
+
+      // Clinical comment quality (COMMENT-C*) — owns engineer narrative axis
+      const commentResult = evaluateCommentQuality(jsrText, {
+        failMarkCount,
+        signals: consistency.signals,
+      });
+      commentQualitySignals = commentResult.signals;
+      if (commentResult.findings.length > 0) {
+        analysisResult = {
+          ...analysisResult,
+          findings: [...analysisResult.findings, ...commentResult.findings],
+          summary: `${analysisResult.summary} [COMMENT_QUALITY] ${commentResult.summary}`,
+        };
+        recordStage({
+          stage: "Comment Quality",
+          status: "success",
+          durationMs: 0,
+        });
+      }
+      try {
+        commentDeepNote = await buildCommentDeepNoteAdvisory(commentResult);
+      } catch (err) {
+        console.warn(
+          "[DocumentProcessor] Comment Deep Note advisory failed (non-fatal):",
+          err
+        );
+      }
     }
   }
 
-  // Photo evidence scaffold (PHOTO-C010): advisory when parts/repairs present
+  // Photo evidence + optional pair compare + evidence coherence
   if (!isWastedJourneyDocument(extractedText)) {
-    const photoResult = evaluatePhotoEvidenceConsistency(extractedText);
+    const evidenceFileHash = sharedPdfBuffer
+      ? sha256(sharedPdfBuffer)
+      : sha256(extractedText);
+
+    if (isPhotoPairCompareEnabled()) {
+      try {
+        photoPairCompareArtifact = await runPhotoPairCompare({
+          text: extractedText,
+          totalPages: ocrResult.totalPages,
+          documentPdfBase64: sharedPdfBuffer
+            ? sharedPdfBuffer.toString("base64")
+            : null,
+          partsUsedSnippet: failurePathSignals?.partsUsedSnippet,
+        });
+        recordStage({
+          stage: "Photo Pair Compare",
+          status: "success",
+          durationMs: photoPairCompareArtifact?.processingTimeMs ?? 0,
+        });
+      } catch (err) {
+        console.warn(
+          "[DocumentProcessor] Photo pair compare failed (non-fatal):",
+          err
+        );
+        recordStage({
+          stage: "Photo Pair Compare",
+          status: "failed",
+          durationMs: 0,
+          error: err instanceof Error ? err.message : "pair compare failed",
+        });
+      }
+    }
+
+    const photoResult = evaluatePhotoEvidenceConsistency(extractedText, {
+      totalPages: ocrResult.totalPages,
+      fileHash: evidenceFileHash,
+      priorFileHashes: [],
+      pairCompare: photoPairCompareArtifact,
+    });
+    photoEvidenceArtifact = photoResult;
     if (photoResult.findings.length > 0) {
       analysisResult = {
         ...analysisResult,
@@ -1811,6 +1898,27 @@ async function processJobSheetWithOptions(
       };
       recordStage({
         stage: "Photo Evidence",
+        status: "success",
+        durationMs: 0,
+      });
+    }
+
+    const coherence = evaluateEvidenceCoherence({
+      commentSnippet: commentQualitySignals?.snippet,
+      commentSignals: commentQualitySignals,
+      failurePathSignals,
+      pairCompare: photoPairCompareArtifact,
+      worksCompleteYes: failurePathSignals?.worksCompleteYes,
+    });
+    evidenceCoherenceSummary = coherence.summary;
+    if (coherence.findings.length > 0) {
+      analysisResult = {
+        ...analysisResult,
+        findings: [...analysisResult.findings, ...coherence.findings],
+        summary: `${analysisResult.summary} [EVIDENCE_COHERENCE] ${coherence.summary}`,
+      };
+      recordStage({
+        stage: "Evidence Coherence",
         status: "success",
         durationMs: 0,
       });
@@ -2094,6 +2202,34 @@ async function processJobSheetWithOptions(
         ...(failurePathSignals
           ? { failurePathSignals, signalSummary: failurePathSignalSummary }
           : {}),
+        ...(commentQualitySignals
+          ? {
+              commentQualitySignals,
+              commentQualitySummary: [
+                `Present=${commentQualitySignals.present}`,
+                `What=${commentQualitySignals.hasWhat}`,
+                `PartsStance=${commentQualitySignals.hasPartsStance}`,
+                `NextAction=${commentQualitySignals.hasNextAction}`,
+                `Coherent=${commentQualitySignals.coherent}`,
+              ].join(" | "),
+            }
+          : {}),
+        ...(commentDeepNote ? { commentDeepNote } : {}),
+        ...(photoEvidenceArtifact
+          ? {
+              photoEvidence: {
+                hasPartsOrRepairs: photoEvidenceArtifact.hasPartsOrRepairs,
+                hasPhotoHints: photoEvidenceArtifact.hasPhotoHints,
+                hints: photoEvidenceArtifact.hints,
+                duplicateFileHash: photoEvidenceArtifact.duplicateFileHash,
+                summary: photoEvidenceArtifact.summary,
+              },
+            }
+          : {}),
+        ...(photoPairCompareArtifact
+          ? { photoPairCompare: photoPairCompareArtifact }
+          : {}),
+        ...(evidenceCoherenceSummary ? { evidenceCoherenceSummary } : {}),
         ...(vlmInkResult ? { vlmInkVerification: vlmInkResult.artifact } : {}),
         geminiMultimodal: {
           enabled: isGeminiMultimodalEnabled(),

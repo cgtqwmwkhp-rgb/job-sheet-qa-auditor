@@ -103,6 +103,13 @@ function resolveChips(signals: FailurePathSignals): SignalChip[] {
     variant: signals.partsStillRequired ? "negative" : "neutral",
   });
 
+  // EngineerComments
+  chips.push({
+    label: "EngineerComments",
+    value: signals.hasSubstantiveComments ? "Yes" : "No",
+    variant: signals.hasSubstantiveComments ? "positive" : "negative",
+  });
+
   return chips;
 }
 

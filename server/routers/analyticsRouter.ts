@@ -47,6 +47,7 @@ import {
   buildHoldQueueSlaSummary,
   buildOverturnAnalytics,
   buildRecurrenceSummary,
+  buildEvidenceRoiAnalytics,
   resolveExceptionPeriod,
   runDlqRetryPass,
   type HoldQueueItemRow,
@@ -699,6 +700,20 @@ export const analyticsRouter = router({
       const loaded = await loadExceptionAnalyticsInputs(input);
       return buildExceptionManagementSummary({
         holdItems: loaded.holdItems,
+        findings: loaded.findings,
+        startDate: loaded.period.start,
+        endDate: loaded.period.end,
+      });
+    }),
+
+  /**
+   * Evidence ROI — COMMENT/PHOTO/EVIDENCE fail rates (money-saving dashboard).
+   */
+  getEvidenceRoi: protectedProcedure
+    .input(periodInput)
+    .query(async ({ input }) => {
+      const loaded = await loadExceptionAnalyticsInputs(input);
+      return buildEvidenceRoiAnalytics({
         findings: loaded.findings,
         startDate: loaded.period.start,
         endDate: loaded.period.end,

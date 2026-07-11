@@ -91,13 +91,22 @@ export function hasSubstantiveEngineerComments(text: string): {
   present: boolean;
   snippet: string;
 } {
+  // Bound by signature headers only. Do not stop at "Parts Still Required" —
+  // clinical narratives often include that phrase as prose (Job-87).
+  // Also avoid a {15,...} minimum capture: that previously forced short notes
+  // like "VOR see above" to swallow "Technician Signature".
   const section =
     text.match(
-      /(?:engineer\s*comments?|work\s*notes?|repairs?\s*(?:needed|details?)|action\s*required|defect(?:s)?\s*(?:found|notes?))\s*[:-]?\s*([\s\S]{15,800}?)(?=\n(?:technician\s*signature|customer\s*signature|completion\s*details|asset\s*details|job\s*details)\b|$)/i
-    )?.[1] ?? "";
+      /(?:engineer\s*comments?|work\s*notes?)\s*[:-]?\s*([\s\S]{0,800}?)(?=\n(?:technician\s*signature|customer\s*signature|completion\s*details)\b|$)/i
+    )?.[1] ||
+    text.match(
+      /(?:repairs?\s*(?:needed|details?)|action\s*required|defect(?:s)?\s*(?:found|notes?))\s*[:-]?\s*([\s\S]{0,800}?)(?=\n(?:technician\s*signature|customer\s*signature)\b|$)/i
+    )?.[1] ||
+    "";
 
   const cleaned = section
     .replace(/\s+/g, " ")
+    .replace(/\b(?:technician|customer)\s+signature\b.*$/i, "")
     .replace(/^(?:none|n\/a|na|nil|-)\b\.?/i, "")
     .trim();
 
@@ -272,11 +281,12 @@ export function extractFailurePathSignals(
   ]);
   const serviceAnswer = extractCompletionYesNo(text, [
     /Was\s+the\s+service\s+fully\s+completed/i,
-    /Service\s+Completed\??/i,
+    // Field label only — avoid matching "Routine service completed, no defects..."
+    /(?:^[\t ]*|\n[\t ]*|\s{2,})Service\s+Completed\s*\??/im,
   ]);
   const additionalAnswer = extractCompletionYesNo(text, [
     /Have\s+all\s+of\s+the\s+additional\s+tasks\s+been\s+completed/i,
-    /Additional\s+Tasks\s+Complete\??/i,
+    /(?:^[\t ]*|\n[\t ]*|\s{2,})Additional\s+Tasks\s+Complete\s*\??/im,
   ]);
 
   // Legacy lineValue kept as soft fallback when grid extractor is unknown
@@ -298,15 +308,14 @@ export function extractFailurePathSignals(
   const serviceRaw =
     serviceAnswer !== "unknown"
       ? serviceAnswer
-      : (lineValue(text, /Was\s+the\s+service\s+fully\s+completed/i) ??
-        lineValue(text, /Service\s+Completed\??/i));
+      : lineValue(text, /Was\s+the\s+service\s+fully\s+completed/i);
   const additionalRaw =
     additionalAnswer !== "unknown"
       ? additionalAnswer
-      : (lineValue(
+      : lineValue(
           text,
           /Have\s+all\s+of\s+the\s+additional\s+tasks\s+been\s+completed/i
-        ) ?? lineValue(text, /Additional\s+Tasks\s+Complete\??/i));
+        );
 
   const serviceType =
     lineValue(text, /Type\s+of\s+service\s+completed/i) ??
@@ -447,7 +456,14 @@ function passed(
  */
 export function evaluateJobSummaryConsistency(
   text: string,
-  options: { failMarkCount?: number } = {}
+  options: {
+    failMarkCount?: number;
+    /**
+     * When true, skip JSR-C080/C081 — COMMENT-C* clinical narrative QA
+     * owns engineer-comment presence and quality instead.
+     */
+    skipEngineerCommentRules?: boolean;
+  } = {}
 ): ConsistencyJudgmentResult {
   const signals = extractFailurePathSignals(text, options);
   const raw = signalSummary(signals);
@@ -756,28 +772,31 @@ export function evaluateJobSummaryConsistency(
   }
 
   // H: Engineer comments required on failure path
-  if (!signals.hasSubstantiveComments) {
-    findings.push(
-      issue(
-        `${CONSISTENCY_RULE_PREFIX}080`,
-        "Engineer Comments (Failure Path)",
-        "INCOMPLETE_EVIDENCE",
-        "Failure-path signals are present but engineer comments do not detail what failed, why, parts required, or actions required.",
-        "Auditors and users need a written narrative of the defect and required action when the asset fails / is VOR / needs return.",
-        "Add engineer comments covering: what is wrong, why it failed, parts required (or none), and actions required.",
-        raw
-      )
-    );
-  } else {
-    findings.push(
-      passed(
-        `${CONSISTENCY_RULE_PREFIX}081`,
-        "Engineer Comments (Failure Path)",
-        `Engineer comments present on failure path: ${signals.commentSnippet}`,
-        "Failure narrative is available for auditors and users.",
-        raw
-      )
-    );
+  // Skipped when COMMENT-C clinical narrative QA owns this axis.
+  if (!options.skipEngineerCommentRules) {
+    if (!signals.hasSubstantiveComments) {
+      findings.push(
+        issue(
+          `${CONSISTENCY_RULE_PREFIX}080`,
+          "Engineer Comments (Failure Path)",
+          "INCOMPLETE_EVIDENCE",
+          "Failure-path signals are present but engineer comments do not detail what failed, why, parts required, or actions required.",
+          "Auditors and users need a written narrative of the defect and required action when the asset fails / is VOR / needs return.",
+          "Add engineer comments covering: what is wrong, why it failed, parts required (or none), and actions required.",
+          raw
+        )
+      );
+    } else {
+      findings.push(
+        passed(
+          `${CONSISTENCY_RULE_PREFIX}081`,
+          "Engineer Comments (Failure Path)",
+          `Engineer comments present on failure path: ${signals.commentSnippet}`,
+          "Failure narrative is available for auditors and users.",
+          raw
+        )
+      );
+    }
   }
 
   const hasBlockingIssues = findings.some(
