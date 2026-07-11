@@ -239,6 +239,7 @@ describe("evidence ROI analytics", () => {
           fieldName: "Engineer Comments",
           resolutionStatus: "open",
           siteInfo: "A",
+          technicianId: 42,
           occurredAt: new Date().toISOString(),
           resolvedAt: null,
         },
@@ -251,6 +252,7 @@ describe("evidence ROI analytics", () => {
           fieldName: "Before/After",
           resolutionStatus: "overridden",
           siteInfo: "A",
+          technicianId: 42,
           occurredAt: new Date().toISOString(),
           resolvedAt: new Date().toISOString(),
         },
@@ -259,6 +261,7 @@ describe("evidence ROI analytics", () => {
     expect(summary.commentMajorCount).toBe(1);
     expect(summary.photoMajorCount).toBe(1);
     expect(summary.cardsBlockedEstimate).toBe(2);
+    expect(summary.byEngineer[0]?.engineerKey).toBe("42");
     expect(summary.moneySignal).toMatch(/blocked/i);
   });
 });

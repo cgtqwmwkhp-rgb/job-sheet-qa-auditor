@@ -116,6 +116,24 @@ export const appRouter = router({
         return db.getJobSheets(input);
       }),
 
+    /** Users eligible for technician attribution on upload / assign. */
+    listTechnicians: protectedProcedure.query(async () => {
+      const all = await db.getAllUsers();
+      return all
+        .filter(u => Boolean(u.name?.trim() || u.email))
+        .map(u => ({
+          id: u.id,
+          name: u.name?.trim() || u.email || `User ${u.id}`,
+          role: u.role,
+        }))
+        .sort((a, b) => {
+          const rank = (role: string) =>
+            role === "technician" ? 0 : role === "qa_lead" ? 1 : 2;
+          const d = rank(a.role) - rank(b.role);
+          return d !== 0 ? d : a.name.localeCompare(b.name);
+        });
+    }),
+
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
@@ -331,6 +349,136 @@ export const appRouter = router({
         });
 
         return result;
+      }),
+
+    /**
+     * Assign / clear technician attribution for engineer analytics.
+     */
+    assignTechnician: qaLeadProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          technicianId: z.number().nullable(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const jobSheet = await db.getJobSheetById(input.id);
+        if (!jobSheet) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Job sheet not found",
+          });
+        }
+        if (input.technicianId != null) {
+          const user = await db.getUserById(input.technicianId);
+          if (!user) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Technician user not found",
+            });
+          }
+        }
+        await db.updateJobSheetTechnicianId(input.id, input.technicianId);
+        await db.logAction({
+          userId: ctx.user.id,
+          action: "ASSIGN_JOB_SHEET_TECHNICIAN",
+          entityType: "job_sheet",
+          entityId: input.id,
+          details: { technicianId: input.technicianId },
+        });
+        return { success: true, technicianId: input.technicianId };
+      }),
+
+    /**
+     * Backfill technicianId from OCR technicianName on unattributed sheets.
+     */
+    backfillTechnicianAttribution: qaLeadProcedure
+      .input(
+        z
+          .object({
+            limit: z.number().min(1).max(500).default(100),
+          })
+          .optional()
+      )
+      .mutation(async ({ ctx, input }) => {
+        const { extractTechnicianNameFromFields, resolveTechnicianIdFromName } =
+          await import("./services/technicianAttribution");
+
+        const users = await db.getAllUsers();
+        const candidates = users.map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+        }));
+        const sheets = await db.getUnattributedJobSheets({
+          limit: input?.limit ?? 100,
+        });
+
+        let attributed = 0;
+        let unresolved = 0;
+        let noName = 0;
+        const samples: Array<{
+          jobSheetId: number;
+          extractedName: string | null;
+          technicianId: number | null;
+        }> = [];
+
+        for (const sheet of sheets) {
+          const report = await db.getLatestAuditReportJson(sheet.id);
+          const fields =
+            report &&
+            typeof report === "object" &&
+            (report as { extractedFields?: Record<string, unknown> })
+              .extractedFields
+              ? (report as { extractedFields: Record<string, unknown> })
+                  .extractedFields
+              : null;
+          const name = extractTechnicianNameFromFields(fields);
+          const technicianId = resolveTechnicianIdFromName(name, candidates);
+          if (technicianId != null) {
+            await db.updateJobSheetTechnicianId(sheet.id, technicianId);
+            attributed++;
+            if (samples.length < 10) {
+              samples.push({
+                jobSheetId: sheet.id,
+                extractedName: name,
+                technicianId,
+              });
+            }
+          } else if (name) {
+            unresolved++;
+            if (samples.length < 10) {
+              samples.push({
+                jobSheetId: sheet.id,
+                extractedName: name,
+                technicianId: null,
+              });
+            }
+          } else {
+            noName++;
+          }
+        }
+
+        await db.logAction({
+          userId: ctx.user.id,
+          action: "BACKFILL_TECHNICIAN_ATTRIBUTION",
+          entityType: "job_sheet",
+          details: {
+            scanned: sheets.length,
+            attributed,
+            unresolved,
+            noName,
+          },
+        });
+
+        return {
+          scanned: sheets.length,
+          attributed,
+          unresolved,
+          noName,
+          samples,
+        };
       }),
 
     reprocess: protectedProcedure

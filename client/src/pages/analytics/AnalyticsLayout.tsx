@@ -40,9 +40,11 @@ const navItems = [
 ];
 
 const PERIOD_PRESETS: { value: AnalyticsPeriodPreset; label: string }[] = [
-  { value: "7d", label: "Last 7d" },
-  { value: "30d", label: "Last 30d" },
-  { value: "90d", label: "Last 90d" },
+  { value: "7d", label: "1 week" },
+  { value: "14d", label: "2 weeks" },
+  { value: "21d", label: "3 weeks" },
+  { value: "28d", label: "4 weeks" },
+  { value: "90d", label: "90d" },
 ];
 
 export function AnalyticsLayout({

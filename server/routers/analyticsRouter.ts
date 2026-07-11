@@ -12,7 +12,12 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { protectedProcedure, adminProcedure, router } from "../_core/trpc";
+import {
+  protectedProcedure,
+  adminProcedure,
+  qaLeadProcedure,
+  router,
+} from "../_core/trpc";
 import {
   getSelectionAnalytics,
   getAmbiguousTemplatePairs,
@@ -27,6 +32,11 @@ import {
   buildEngineerScoreCardDetail,
   resolvePeriod,
 } from "../services/engineerAnalytics/aggregateFromDb";
+import {
+  buildEngineerCoachingPack,
+  getCoachingSession,
+  markCoachingSessionCompleted,
+} from "../services/engineerAnalytics";
 import type { RawFindingRow } from "../services/engineerAnalytics/mapFindings";
 import {
   buildCohortAnalyticsSummary,
@@ -453,13 +463,22 @@ export const analyticsRouter = router({
     .input(periodInput)
     .query(async ({ input }) => {
       const loaded = await loadEngineerAnalyticsInputs(input);
-      return buildEngineerAnalyticsSummary({
+      const summary = buildEngineerAnalyticsSummary({
         users: loaded.users,
         documents: loaded.documents,
         findings: loaded.findings,
         startDate: loaded.period.start,
         endDate: loaded.period.end,
       });
+      const unattributed = await db.getUnattributedJobSheets({
+        startDate: new Date(loaded.period.start),
+        endDate: new Date(loaded.period.end),
+        limit: 500,
+      });
+      return {
+        ...summary,
+        unattributedCount: unattributed.length,
+      };
     }),
 
   /**
@@ -490,6 +509,74 @@ export const analyticsRouter = router({
         startDate: loaded.period.start,
         endDate: loaded.period.end,
       });
+    }),
+
+  /**
+   * Period-scoped analytical coaching pack for QA Lead 1:1s.
+   */
+  getEngineerCoachingPack: protectedProcedure
+    .input(
+      z.object({
+        engineerId: z.string().min(1),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        site: z.string().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const technicianId = Number(input.engineerId);
+      const loaded = await loadEngineerAnalyticsInputs({
+        startDate: input.startDate,
+        endDate: input.endDate,
+        technicianId: Number.isFinite(technicianId) ? technicianId : undefined,
+        site: input.site,
+      });
+      const pack = buildEngineerCoachingPack({
+        users: loaded.users,
+        documents: loaded.documents,
+        findings: loaded.findings,
+        engineerId: input.engineerId,
+        startDate: loaded.period.start,
+        endDate: loaded.period.end,
+      });
+      if (!pack) {
+        return { pack: null, session: null };
+      }
+      const session = getCoachingSession({
+        engineerId: input.engineerId,
+        periodStart: pack.period.start,
+        periodEnd: pack.period.end,
+      });
+      return { pack, session };
+    }),
+
+  /**
+   * QA Lead marks a coaching session completed (stores note + narrative snapshot).
+   */
+  markCoachingCompleted: qaLeadProcedure
+    .input(
+      z.object({
+        engineerId: z.string().min(1),
+        engineerName: z.string().min(1),
+        periodStart: z.string().min(1),
+        periodEnd: z.string().min(1),
+        qaLeadNote: z.string().max(4000).default(""),
+        narrativeOpening: z.string().max(4000),
+        coachingAsks: z.array(z.string().max(500)).max(10),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const session = markCoachingSessionCompleted({
+        engineerId: input.engineerId,
+        engineerName: input.engineerName,
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        qaLeadUserId: ctx.user.id,
+        qaLeadNote: input.qaLeadNote,
+        narrativeOpening: input.narrativeOpening,
+        coachingAsks: input.coachingAsks,
+      });
+      return { session };
     }),
 
   // ============ PR-16: COHORT ANALYTICS + COLLISION GOVERNANCE ============
@@ -713,10 +800,17 @@ export const analyticsRouter = router({
     .input(periodInput)
     .query(async ({ input }) => {
       const loaded = await loadExceptionAnalyticsInputs(input);
+      const engineerByFindingId: Record<number, string> = {};
+      for (const f of loaded.findings) {
+        if (f.technicianId != null) {
+          engineerByFindingId[f.findingId] = String(f.technicianId);
+        }
+      }
       return buildEvidenceRoiAnalytics({
         findings: loaded.findings,
         startDate: loaded.period.start,
         endDate: loaded.period.end,
+        engineerByFindingId,
       });
     }),
 

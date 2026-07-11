@@ -45,6 +45,7 @@ export default function UploadPage() {
   const [intakeRejections, setIntakeRejections] = useState<IntakeFeedback[]>(
     []
   );
+  const [technicianId, setTechnicianId] = useState<string>("");
 
   // Fetch recent uploads — poll while any are actively processing
   const {
@@ -64,6 +65,7 @@ export default function UploadPage() {
       },
     }
   );
+  const { data: technicians } = trpc.jobSheets.listTechnicians.useQuery();
   const uploadMutation = trpc.jobSheets.upload.useMutation();
   const processMutation = trpc.jobSheets.process.useMutation();
   const utils = trpc.useUtils();
@@ -94,6 +96,7 @@ export default function UploadPage() {
           fileType: file.type,
           fileBase64: base64,
           referenceNumber: generateReferenceNumber(),
+          ...(technicianId ? { technicianId: Number(technicianId) } : {}),
         });
 
         const uploadResult = result as {
@@ -278,6 +281,37 @@ export default function UploadPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label
+                htmlFor="upload-technician"
+                className="text-sm font-medium"
+              >
+                Technician (for performance analytics)
+              </label>
+              <select
+                id="upload-technician"
+                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                value={technicianId}
+                onChange={e => setTechnicianId(e.target.value)}
+                disabled={isUploading}
+              >
+                <option value="">
+                  Auto-match from OCR name (or leave unassigned)
+                </option>
+                {(technicians ?? []).map(t => (
+                  <option key={t.id} value={String(t.id)}>
+                    {t.name}
+                    {t.role === "technician" ? "" : ` (${t.role})`}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Scorecards only include cards with a technician. Prefer picking
+                one here, or ensure a user exists whose name matches the
+                engineer on the sheet.
+              </p>
+            </div>
+
             {showBusyOverlay ? (
               <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-lg bg-blue-50/50">
                 <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />

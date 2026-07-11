@@ -9,3 +9,7 @@ export * from "./types";
 export * from "./analyticsService";
 export * from "./mapFindings";
 export * from "./aggregateFromDb";
+export * from "./coachingThemes";
+export * from "./coachingNarrative";
+export * from "./coachingPack";
+export * from "./coachingSessions";

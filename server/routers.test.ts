@@ -119,6 +119,7 @@ vi.mock("./db", () => ({
       occurredAt: new Date("2024-06-10T11:00:00Z"),
     },
   ]),
+  getUnattributedJobSheets: vi.fn().mockResolvedValue([]),
   getCohortAnalyticsDocuments: vi.fn().mockResolvedValue([
     {
       jobSheetId: 1,

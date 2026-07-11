@@ -8,6 +8,7 @@ import {
   gte,
   lte,
   isNotNull,
+  isNull,
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
@@ -292,6 +293,81 @@ export async function updateJobSheetFileHash(id: number, fileHash: string) {
   if (!db) throw new Error("Database not available");
 
   await db.update(jobSheets).set({ fileHash }).where(eq(jobSheets.id, id));
+}
+
+/**
+ * Set / clear technician attribution on a job sheet (analytics scorecards).
+ */
+export async function updateJobSheetTechnicianId(
+  id: number,
+  technicianId: number | null
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(jobSheets).set({ technicianId }).where(eq(jobSheets.id, id));
+  return { success: true };
+}
+
+/**
+ * Job sheets missing technician attribution (for backfill + gap metrics).
+ */
+export async function getUnattributedJobSheets(options?: {
+  limit?: number;
+  startDate?: Date;
+  endDate?: Date;
+}): Promise<
+  Array<{
+    id: number;
+    referenceNumber: string | null;
+    createdAt: Date;
+    status: string;
+  }>
+> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [isNull(jobSheets.technicianId)];
+  if (options?.startDate) {
+    conditions.push(gte(jobSheets.createdAt, options.startDate));
+  }
+  if (options?.endDate) {
+    conditions.push(lte(jobSheets.createdAt, options.endDate));
+  }
+
+  const limit = options?.limit ?? 200;
+  const rows = await db
+    .select({
+      id: jobSheets.id,
+      referenceNumber: jobSheets.referenceNumber,
+      createdAt: jobSheets.createdAt,
+      status: jobSheets.status,
+    })
+    .from(jobSheets)
+    .where(and(...conditions))
+    .orderBy(desc(jobSheets.createdAt))
+    .limit(limit);
+
+  return rows;
+}
+
+/**
+ * Latest audit reportJson for a job sheet (technicianName backfill).
+ */
+export async function getLatestAuditReportJson(
+  jobSheetId: number
+): Promise<unknown | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const rows = await db
+    .select({ reportJson: auditResults.reportJson })
+    .from(auditResults)
+    .where(eq(auditResults.jobSheetId, jobSheetId))
+    .orderBy(desc(auditResults.createdAt))
+    .limit(1);
+
+  return rows[0]?.reportJson ?? null;
 }
 
 /**
@@ -981,6 +1057,10 @@ export async function saveAuditPolicy(
 export interface EngineerAnalyticsDocumentRow {
   technicianId: number;
   jobSheetId: number;
+  referenceNumber: string | null;
+  siteInfo: string | null;
+  result: "pass" | "fail" | "review_queue" | "waived" | null;
+  confidenceScore: number | null;
   processedAt: Date;
 }
 
@@ -1002,6 +1082,7 @@ export interface EngineerAnalyticsFindingRow {
     | "SPEC_GAP"
     | "SECURITY_RISK";
   fieldName: string;
+  ruleId: string | null;
   resolutionStatus: "open" | "waived" | "overridden" | "flagged" | "approved";
   occurredAt: Date;
 }
@@ -1037,23 +1118,58 @@ export async function getEngineerAnalyticsDocuments(options?: {
     .select({
       technicianId: jobSheets.technicianId,
       jobSheetId: jobSheets.id,
+      referenceNumber: jobSheets.referenceNumber,
+      siteInfo: jobSheets.siteInfo,
+      result: auditResults.result,
+      confidenceScore: auditResults.confidenceScore,
       processedAt: jobSheets.createdAt,
     })
     .from(jobSheets)
+    .leftJoin(auditResults, eq(auditResults.jobSheetId, jobSheets.id))
     .where(and(...conditions));
 
-  return rows
-    .filter(
-      (
-        r
-      ): r is { technicianId: number; jobSheetId: number; processedAt: Date } =>
-        r.technicianId != null
-    )
-    .map(r => ({
+  // Prefer latest audit result per job sheet when multiple exist
+  const latest = new Map<
+    number,
+    {
+      technicianId: number;
+      jobSheetId: number;
+      referenceNumber: string | null;
+      siteInfo: string | null;
+      result: EngineerAnalyticsDocumentRow["result"];
+      confidenceScore: number | null;
+      processedAt: Date;
+    }
+  >();
+
+  for (const r of rows) {
+    if (r.technicianId == null) continue;
+    const conf = r.confidenceScore != null ? Number(r.confidenceScore) : null;
+    const mapped = {
       technicianId: r.technicianId,
       jobSheetId: r.jobSheetId,
+      referenceNumber: r.referenceNumber,
+      siteInfo: r.siteInfo,
+      result: (r.result ?? null) as EngineerAnalyticsDocumentRow["result"],
+      confidenceScore: conf != null && Number.isFinite(conf) ? conf : null,
       processedAt: r.processedAt,
-    }));
+    };
+    const existing = latest.get(r.jobSheetId);
+    if (!existing || r.processedAt >= existing.processedAt) {
+      // Keep richer result when timestamps equal and we have an audit row
+      if (
+        existing &&
+        r.processedAt.getTime() === existing.processedAt.getTime() &&
+        existing.result != null &&
+        mapped.result == null
+      ) {
+        continue;
+      }
+      latest.set(r.jobSheetId, mapped);
+    }
+  }
+
+  return Array.from(latest.values());
 }
 
 /**
@@ -1091,6 +1207,7 @@ export async function getEngineerAnalyticsFindings(options?: {
       severity: auditFindings.severity,
       reasonCode: auditFindings.reasonCode,
       fieldName: auditFindings.fieldName,
+      ruleId: auditFindings.ruleId,
       resolutionStatus: auditFindings.resolutionStatus,
       occurredAt: auditFindings.createdAt,
     })
@@ -1110,6 +1227,7 @@ export async function getEngineerAnalyticsFindings(options?: {
         severity: EngineerAnalyticsFindingRow["severity"];
         reasonCode: EngineerAnalyticsFindingRow["reasonCode"];
         fieldName: string;
+        ruleId: string | null;
         resolutionStatus: EngineerAnalyticsFindingRow["resolutionStatus"];
         occurredAt: Date;
       } => r.technicianId != null
@@ -1121,6 +1239,7 @@ export async function getEngineerAnalyticsFindings(options?: {
       severity: r.severity,
       reasonCode: r.reasonCode,
       fieldName: r.fieldName,
+      ruleId: r.ruleId,
       resolutionStatus: r.resolutionStatus,
       occurredAt: r.occurredAt,
     }));
@@ -1311,6 +1430,7 @@ export interface ExceptionOverturnFindingRow {
   fieldName: string;
   resolutionStatus: "open" | "waived" | "overridden" | "flagged" | "approved";
   siteInfo: string | null;
+  technicianId: number | null;
   occurredAt: Date;
   resolvedAt: Date | null;
 }
@@ -1440,6 +1560,7 @@ export async function getExceptionOverturnFindings(options?: {
       fieldName: auditFindings.fieldName,
       resolutionStatus: auditFindings.resolutionStatus,
       siteInfo: jobSheets.siteInfo,
+      technicianId: jobSheets.technicianId,
       occurredAt: auditFindings.createdAt,
       resolvedAt: auditFindings.resolvedAt,
     })
@@ -1462,6 +1583,7 @@ export async function getExceptionOverturnFindings(options?: {
       | "flagged"
       | "approved",
     siteInfo: r.siteInfo,
+    technicianId: r.technicianId,
     occurredAt: r.occurredAt,
     resolvedAt: r.resolvedAt ?? null,
   }));

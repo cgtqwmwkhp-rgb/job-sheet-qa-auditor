@@ -56,6 +56,7 @@ export interface OverturnFindingRow {
   fieldName: string;
   resolutionStatus: "open" | "waived" | "overridden" | "flagged" | "approved";
   siteInfo: string | null;
+  technicianId: number | null;
   occurredAt: Date | string;
   resolvedAt: Date | string | null;
 }
