@@ -29,6 +29,13 @@ import { trpc } from "@/lib/trpc";
 import { useAnalyticsFilters } from "@/hooks/useAnalyticsFilters";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../../../server/routers";
+
+type CoachingPackResponse =
+  inferRouterOutputs<AppRouter>["analytics"]["getEngineerCoachingPack"];
+type PackData = NonNullable<CoachingPackResponse["pack"]>;
+type SessionData = CoachingPackResponse["session"];
 
 function outcomeLabel(outcome: string): string {
   switch (outcome) {
@@ -51,20 +58,13 @@ function trendLabel(trend: string): string {
   return "stable vs prior";
 }
 
-type PackData = NonNullable<
-  ReturnType<typeof trpc.analytics.getEngineerCoachingPack.useQuery>["data"]
->["pack"];
-type SessionData = NonNullable<
-  ReturnType<typeof trpc.analytics.getEngineerCoachingPack.useQuery>["data"]
->["session"];
-
 function CoachingPackView({
   pack,
   session,
   onMarkCompleted,
   markPending,
 }: {
-  pack: NonNullable<PackData>;
+  pack: PackData;
   session: SessionData;
   onMarkCompleted: (input: {
     qaLeadNote: string;

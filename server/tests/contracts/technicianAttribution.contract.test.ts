@@ -20,9 +20,9 @@ describe("technicianAttribution", () => {
         technicianName: { value: "Blake Chen", confidence: 0.9 },
       })
     ).toBe("Blake Chen");
-    expect(
-      extractTechnicianNameFromFields({ engineer_name: "Casey Ng" })
-    ).toBe("Casey Ng");
+    expect(extractTechnicianNameFromFields({ engineer_name: "Casey Ng" })).toBe(
+      "Casey Ng"
+    );
   });
 
   it("resolves exact name matches and prefers technician role", () => {

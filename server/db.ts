@@ -1144,8 +1144,7 @@ export async function getEngineerAnalyticsDocuments(options?: {
 
   for (const r of rows) {
     if (r.technicianId == null) continue;
-    const conf =
-      r.confidenceScore != null ? Number(r.confidenceScore) : null;
+    const conf = r.confidenceScore != null ? Number(r.confidenceScore) : null;
     const mapped = {
       technicianId: r.technicianId,
       jobSheetId: r.jobSheetId,
