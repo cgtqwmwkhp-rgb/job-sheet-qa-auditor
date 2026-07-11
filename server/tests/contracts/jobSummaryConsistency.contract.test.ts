@@ -374,9 +374,7 @@ Engineer Comments: Routine service complete; no parts required this visit.
       ])
     ).toBe("yes");
     expect(
-      extractCompletionYesNo(DV23_COMPLETION_GRID, [
-        /Service\s+Completed\??/i,
-      ])
+      extractCompletionYesNo(DV23_COMPLETION_GRID, [/Service\s+Completed\??/i])
     ).toBe("yes");
     expect(
       extractCompletionYesNo(DV23_COMPLETION_GRID, [

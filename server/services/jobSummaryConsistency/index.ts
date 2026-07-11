@@ -365,30 +365,30 @@ export function extractFailurePathSignals(
   const safeRaw =
     safeAnswer !== "unknown"
       ? safeAnswer
-      : lineValue(text, /Is\s+the\s+asset\s+safe\s+to\s+use\??/i) ??
-        lineValue(text, /Asset\s+Safe\s+To\s+Use\??/i);
+      : (lineValue(text, /Is\s+the\s+asset\s+safe\s+to\s+use\??/i) ??
+        lineValue(text, /Asset\s+Safe\s+To\s+Use\??/i));
   const returnRaw =
     returnAnswer !== "unknown"
       ? returnAnswer
-      : lineValue(text, /Is\s+a\s+return\s+visit\s+required\??/i) ??
-        lineValue(text, /Return\s+Visit\s+Needed\??/i);
+      : (lineValue(text, /Is\s+a\s+return\s+visit\s+required\??/i) ??
+        lineValue(text, /Return\s+Visit\s+Needed\??/i));
   const worksRaw =
     worksAnswer !== "unknown"
       ? worksAnswer
-      : lineValue(text, /Were\s+all\s+works\s+fully\s+completed\??/i) ??
-        lineValue(text, /All\s+Works\s+Completed\??/i);
+      : (lineValue(text, /Were\s+all\s+works\s+fully\s+completed\??/i) ??
+        lineValue(text, /All\s+Works\s+Completed\??/i));
   const serviceRaw =
     serviceAnswer !== "unknown"
       ? serviceAnswer
-      : lineValue(text, /Was\s+the\s+service\s+fully\s+completed/i) ??
-        lineValue(text, /Service\s+Completed\??/i);
+      : (lineValue(text, /Was\s+the\s+service\s+fully\s+completed/i) ??
+        lineValue(text, /Service\s+Completed\??/i));
   const additionalRaw =
     additionalAnswer !== "unknown"
       ? additionalAnswer
-      : lineValue(
+      : (lineValue(
           text,
           /Have\s+all\s+of\s+the\s+additional\s+tasks\s+been\s+completed/i
-        ) ?? lineValue(text, /Additional\s+Tasks\s+Complete\??/i);
+        ) ?? lineValue(text, /Additional\s+Tasks\s+Complete\??/i));
 
   const serviceType =
     lineValue(text, /Type\s+of\s+service\s+completed/i) ??
@@ -411,17 +411,14 @@ export function extractFailurePathSignals(
   const safeYes =
     safeAnswer === "yes" || (safeAnswer === "unknown" && isYes(safeRaw));
   const returnVisit =
-    returnAnswer === "yes" ||
-    (returnAnswer === "unknown" && isYes(returnRaw));
+    returnAnswer === "yes" || (returnAnswer === "unknown" && isYes(returnRaw));
   const returnVisitNo =
-    returnAnswer === "no" ||
-    (returnAnswer === "unknown" && isNo(returnRaw));
+    returnAnswer === "no" || (returnAnswer === "unknown" && isNo(returnRaw));
 
   const worksNo =
     worksAnswer === "no" || (worksAnswer === "unknown" && isNo(worksRaw));
   const serviceNo =
-    serviceAnswer === "no" ||
-    (serviceAnswer === "unknown" && isNo(serviceRaw));
+    serviceAnswer === "no" || (serviceAnswer === "unknown" && isNo(serviceRaw));
   const additionalNo =
     additionalAnswer === "no" ||
     (additionalAnswer === "unknown" && isNo(additionalRaw));
