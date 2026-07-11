@@ -70,6 +70,7 @@ import {
   evaluateWastedJourneyConsistency,
   isWastedJourneyDocument,
   isWastedJourneyExcludedField,
+  mergeWastedJourneyFindings,
   WASTED_JOURNEY_TEMPLATE_ID,
 } from "./wastedJourneyConsistency";
 import { computeDocumentationQualityScore } from "./documentationQuality";
@@ -1737,7 +1738,10 @@ async function processJobSheetWithOptions(
         analysisResult = {
           ...analysisResult,
           overallResult,
-          findings: [...analysisResult.findings, ...consistency.findings],
+          findings: mergeWastedJourneyFindings(
+            analysisResult.findings,
+            consistency.findings
+          ),
           summary:
             `${analysisResult.summary} ` +
             `[WASTED_JOURNEY] ${consistency.summary}`,

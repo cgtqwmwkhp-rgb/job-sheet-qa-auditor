@@ -143,7 +143,7 @@ export function initializeWastedJourneyTemplate(
     packRelative: WASTED_JOURNEY_PACK,
     label: "Wasted Journey",
     createdBy,
-    expectedVersion: "1.2.0",
+    expectedVersion: "1.3.0",
   });
 }
 

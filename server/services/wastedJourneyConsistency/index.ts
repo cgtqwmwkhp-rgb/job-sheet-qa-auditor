@@ -28,6 +28,18 @@ export const WASTED_JOURNEY_EXCLUDED_FIELDS = new Set([
   "Serial No",
 ]);
 
+/**
+ * Contact fields judged solely by WJ-C020 / WJ-C030.
+ * Gemini / ensemble findings on these fields are duplicates and double-penalise.
+ */
+const WASTED_JOURNEY_CONTACT_FIELD_KEYS = new Set([
+  "schedulingcontacted",
+  "schedulingteamcontacted",
+  "sitecontactconfirmed",
+  "bookingsitecontactconfirmed",
+  "bookingsitecontact",
+]);
+
 export interface WastedJourneySignals {
   isWastedJourneySheet: boolean;
   hasReason: boolean;
@@ -108,6 +120,57 @@ export function isWastedJourneyExcludedField(fieldName: string): boolean {
     compact === "serialnumber" ||
     compact === "serialno"
   );
+}
+
+/** True when a finding is about scheduling/control or booking-site contact. */
+export function isWastedJourneyContactField(fieldName: string): boolean {
+  const compact = fieldName
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_/-]+/g, "");
+  if (WASTED_JOURNEY_CONTACT_FIELD_KEYS.has(compact)) return true;
+  // Phrase forms from WJ-C findings / Gemini labels
+  if (
+    compact.includes("scheduling") &&
+    (compact.includes("contact") || compact.includes("team"))
+  ) {
+    return true;
+  }
+  if (compact.includes("booking") && compact.includes("contact")) {
+    return true;
+  }
+  if (compact.includes("sitecontact")) return true;
+  return false;
+}
+
+/**
+ * Merge WJ-C findings as SSOT for contact Yes policy.
+ * Drops prior Gemini/ensemble Issues on the same contact fields so engineers
+ * are not double-penalised (4 Issues for 2 failures).
+ */
+export function mergeWastedJourneyFindings(
+  existing: Finding[],
+  consistencyFindings: Finding[]
+): Finding[] {
+  const hasContactConsistency = consistencyFindings.some(
+    f =>
+      f.ruleId === `${WASTED_JOURNEY_RULE_PREFIX}020` ||
+      f.ruleId === `${WASTED_JOURNEY_RULE_PREFIX}021` ||
+      f.ruleId === `${WASTED_JOURNEY_RULE_PREFIX}030` ||
+      f.ruleId === `${WASTED_JOURNEY_RULE_PREFIX}031`
+  );
+
+  const filtered = hasContactConsistency
+    ? existing.filter(f => {
+        // Keep Passed / informational noise off contacts; drop Issue duplicates
+        if (!isWastedJourneyContactField(f.fieldName)) return true;
+        // Always drop non-WJ-C findings on contact fields when WJ-C ran
+        if (!f.ruleId?.startsWith(WASTED_JOURNEY_RULE_PREFIX)) return false;
+        return true;
+      })
+    : existing;
+
+  return [...filtered, ...consistencyFindings];
 }
 
 /**
