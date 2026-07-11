@@ -12,6 +12,7 @@ import { z } from "zod";
 import * as db from "./db";
 import { getStorageAdapter } from "./storage";
 import { nanoid } from "nanoid";
+import { calculateHash } from "./utils/fileValidation";
 import { orchestrateJobSheetProcessing } from "./services/documentProcessor";
 import {
   enqueueJobSheetProcessing,
@@ -232,6 +233,7 @@ export const appRouter = router({
           fileName: input.fileName,
           fileType: input.fileType,
           fileSizeBytes: buffer.length,
+          fileHash: calculateHash(buffer),
           status: "pending",
           technicianId: input.technicianId,
           siteInfo: input.siteInfo,
