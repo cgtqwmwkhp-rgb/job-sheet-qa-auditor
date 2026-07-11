@@ -7,9 +7,28 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   evaluateJobSummaryConsistency,
+  extractCompletionYesNo,
   extractFailurePathSignals,
   hasSubstantiveEngineerComments,
 } from "../../services/jobSummaryConsistency";
+
+/** Real pdftotext -layout excerpt from DV23VSJ inverter compliance sheet. */
+const DV23_COMPLETION_GRID = `
+                                                              Completion Details
+             Date:                    02/07/2026               Compliance Type:                               Service - SB
+
+     Next Service Date:               02/07/2027               Compliance Title:                           Inverter Inspection
+
+    Service Completed?                                      Additional Tasks Complete?
+                                           Yes                                                                    Yes
+
+    All Works Completed?                   Yes                Return Visit Needed?                                 No
+
+    Consumables Used?                       No                 Asset Safe To Use?                                 Yes
+
+
+   Job Duration:             0.8        Overtime:            No            Travel :           1.0      Job ID :           485
+`;
 
 const QSGGB1_LIKE = `
 Job Summary Report
@@ -336,5 +355,50 @@ Engineer Comments: Routine service complete; no parts required this visit.
     expect(signals.repairsPath).toBe(false);
     expect(signals.partsStillRequired).toBe(false);
     expect(signals.onFailurePath).toBe(false);
+  });
+
+  it("reads DV23 two-column completion grid (Safe Yes, Return No, works complete)", () => {
+    expect(
+      extractCompletionYesNo(DV23_COMPLETION_GRID, [
+        /Asset\s+Safe\s+To\s+Use\??/i,
+      ])
+    ).toBe("yes");
+    expect(
+      extractCompletionYesNo(DV23_COMPLETION_GRID, [
+        /Return\s+Visit\s+Needed\??/i,
+      ])
+    ).toBe("no");
+    expect(
+      extractCompletionYesNo(DV23_COMPLETION_GRID, [
+        /All\s+Works\s+Completed\??/i,
+      ])
+    ).toBe("yes");
+    expect(
+      extractCompletionYesNo(DV23_COMPLETION_GRID, [
+        /Service\s+Completed\??/i,
+      ])
+    ).toBe("yes");
+    expect(
+      extractCompletionYesNo(DV23_COMPLETION_GRID, [
+        /Additional\s+Tasks\s+Complete\??/i,
+      ])
+    ).toBe("yes");
+
+    const signals = extractFailurePathSignals(DV23_COMPLETION_GRID, {
+      failMarkCount: 0,
+    });
+    expect(signals.safeYes).toBe(true);
+    expect(signals.unsafe).toBe(false);
+    expect(signals.returnVisitNo).toBe(true);
+    expect(signals.returnVisit).toBe(false);
+    expect(signals.worksCompleteYes).toBe(true);
+    expect(signals.incomplete).toBe(false);
+    expect(signals.onFailurePath).toBe(false);
+
+    const result = evaluateJobSummaryConsistency(DV23_COMPLETION_GRID, {
+      failMarkCount: 0,
+    });
+    expect(result.hasBlockingIssues).toBe(false);
+    expect(result.findings).toEqual([]);
   });
 });

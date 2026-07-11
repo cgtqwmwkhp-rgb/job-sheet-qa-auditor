@@ -44,6 +44,29 @@ export interface ConsistencyJudgmentResult {
 
 const YES_NO_TOKEN_RE = /\b(yes|no|true|false)\b/i;
 
+/** Completion-grid labels that bound Yes/No answers on Job Summary / Compliance. */
+const COMPLETION_FIELD_BOUNDARIES = [
+  "Service Completed",
+  "Additional Tasks Complete",
+  "All Works Completed",
+  "Return Visit Needed",
+  "Consumables Used",
+  "Asset Safe To Use",
+  "Is the asset safe to use",
+  "Is a return visit required",
+  "Were all works fully completed",
+  "Was the service fully completed",
+  "Have all of the additional tasks been completed",
+  "Job Duration",
+  "Overtime",
+  "Travel",
+  "Job ID",
+  "Compliance Checklist",
+  "Next Service Date",
+  "Compliance Type",
+  "Compliance Title",
+];
+
 /**
  * Capture the short answer immediately after a label.
  * OCR often flattens the page into one line — never take the rest of the document.
@@ -54,9 +77,112 @@ function lineValue(text: string, label: RegExp): string | null {
   return m?.[1]?.trim() ?? null;
 }
 
+function completionBoundaryRe(): RegExp {
+  return new RegExp(
+    `(?:${COMPLETION_FIELD_BOUNDARIES.map(b =>
+      b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    ).join("|")})`,
+    "i"
+  );
+}
+
+function tokenToYesNo(token: string): "yes" | "no" {
+  return /^(yes|true)$/i.test(token) ? "yes" : "no";
+}
+
+/** Yes/No on the same line before the next completion-field label. */
+function yesNoBeforeBoundary(segment: string): "yes" | "no" | null {
+  const stopAt = segment.search(completionBoundaryRe());
+  const searchIn = stopAt >= 0 ? segment.slice(0, stopAt) : segment;
+  const token = searchIn.match(YES_NO_TOKEN_RE);
+  return token ? tokenToYesNo(token[1]) : null;
+}
+
+/**
+ * Find Yes/No for a completion field even when the answer sits on the next
+ * line under a two-column grid (common on Compliance / Inverter sheets).
+ *
+ * Layout example (DV23 inverter sheet):
+ *   Service Completed?          Additional Tasks Complete?
+ *              Yes                           Yes
+ *   All Works Completed?  Yes   Return Visit Needed?  No
+ *   Consumables Used?     No    Asset Safe To Use?    Yes
+ */
+export function extractCompletionYesNo(
+  text: string,
+  labelPatterns: RegExp[]
+): "yes" | "no" | "unknown" {
+  const lines = text.split(/\r?\n/);
+
+  for (const label of labelPatterns) {
+    const anchor = new RegExp(label.source, "i");
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const m = anchor.exec(line);
+      if (!m || m.index == null) continue;
+
+      const afterOnLine = line.slice(m.index + m[0].length);
+      const sameLine = yesNoBeforeBoundary(afterOnLine);
+      if (sameLine) return sameLine;
+
+      // Two-column grid: answers often sit on the next line under each label.
+      // Pick the Yes/No whose column is closest to this label (left vs right).
+      const labelCol = m.index;
+      const lineMid = Math.max(40, Math.floor(line.length / 2));
+      const preferLeft = labelCol < lineMid;
+
+      for (let j = i + 1; j <= i + 2 && j < lines.length; j++) {
+        const next = lines[j];
+        // Skip blank / decorative lines
+        if (!next.trim()) continue;
+        // If the next line starts a new labelled row with inline answers,
+        // only use tokens before any new boundary when this label had none.
+        const tokens = [
+          ...next.matchAll(new RegExp(YES_NO_TOKEN_RE.source, "gi")),
+        ];
+        if (tokens.length === 0) {
+          // Hit another label row with no answers yet — keep looking one more line
+          if (completionBoundaryRe().test(next)) continue;
+          continue;
+        }
+
+        let picked = tokens[0];
+        if (tokens.length >= 2) {
+          // Left-column labels take the first Yes/No; right-column take the last.
+          // Raw column distance alone fails when the left Yes is nearer a right label.
+          picked = preferLeft ? tokens[0] : tokens[tokens.length - 1];
+        }
+
+        return tokenToYesNo(picked[1]);
+      }
+    }
+
+    // Flattened OCR fallback: single-line document without newlines
+    const flat = anchor.exec(text);
+    if (flat && flat.index != null) {
+      const after = text.slice(
+        flat.index + flat[0].length,
+        flat.index + flat[0].length + 220
+      );
+      const flatAnswer = yesNoBeforeBoundary(after);
+      if (flatAnswer) return flatAnswer;
+    }
+  }
+  return "unknown";
+}
+
 /** First Yes/No token only — mutually exclusive. */
 function parseYesNo(value: string | null): "yes" | "no" | "unknown" {
   if (!value) return "unknown";
+  // If we accidentally captured the next field label, ignore
+  if (
+    COMPLETION_FIELD_BOUNDARIES.some(b =>
+      new RegExp(b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(value)
+    )
+  ) {
+    return "unknown";
+  }
   const m = value.match(YES_NO_TOKEN_RE);
   if (!m) return "unknown";
   return /^(yes|true)$/i.test(m[1]) ? "yes" : "no";
@@ -213,23 +339,57 @@ export function extractFailurePathSignals(
   text: string,
   options: { failMarkCount?: number } = {}
 ): FailurePathSignals {
+  // Prefer grid-aware Yes/No extraction (Compliance forms put answers under labels).
+  const safeAnswer = extractCompletionYesNo(text, [
+    /Is\s+the\s+asset\s+safe\s+to\s+use\??/i,
+    /Asset\s+Safe\s+To\s+Use\??/i,
+  ]);
+  const returnAnswer = extractCompletionYesNo(text, [
+    /Is\s+a\s+return\s+visit\s+required\??/i,
+    /Return\s+Visit\s+Needed\??/i,
+  ]);
+  const worksAnswer = extractCompletionYesNo(text, [
+    /Were\s+all\s+works\s+fully\s+completed\??/i,
+    /All\s+Works\s+Completed\??/i,
+  ]);
+  const serviceAnswer = extractCompletionYesNo(text, [
+    /Was\s+the\s+service\s+fully\s+completed/i,
+    /Service\s+Completed\??/i,
+  ]);
+  const additionalAnswer = extractCompletionYesNo(text, [
+    /Have\s+all\s+of\s+the\s+additional\s+tasks\s+been\s+completed/i,
+    /Additional\s+Tasks\s+Complete\??/i,
+  ]);
+
+  // Legacy lineValue kept as soft fallback when grid extractor is unknown
   const safeRaw =
-    lineValue(text, /Is\s+the\s+asset\s+safe\s+to\s+use\??/i) ??
-    lineValue(text, /Asset\s+Safe\s+To\s+Use\??/i);
+    safeAnswer !== "unknown"
+      ? safeAnswer
+      : lineValue(text, /Is\s+the\s+asset\s+safe\s+to\s+use\??/i) ??
+        lineValue(text, /Asset\s+Safe\s+To\s+Use\??/i);
   const returnRaw =
-    lineValue(text, /Is\s+a\s+return\s+visit\s+required\??/i) ??
-    lineValue(text, /Return\s+Visit\s+Needed\??/i);
+    returnAnswer !== "unknown"
+      ? returnAnswer
+      : lineValue(text, /Is\s+a\s+return\s+visit\s+required\??/i) ??
+        lineValue(text, /Return\s+Visit\s+Needed\??/i);
   const worksRaw =
-    lineValue(text, /Were\s+all\s+works\s+fully\s+completed\??/i) ??
-    lineValue(text, /All\s+Works\s+Completed\??/i);
+    worksAnswer !== "unknown"
+      ? worksAnswer
+      : lineValue(text, /Were\s+all\s+works\s+fully\s+completed\??/i) ??
+        lineValue(text, /All\s+Works\s+Completed\??/i);
   const serviceRaw =
-    lineValue(text, /Was\s+the\s+service\s+fully\s+completed/i) ??
-    lineValue(text, /Service\s+Completed\??/i);
+    serviceAnswer !== "unknown"
+      ? serviceAnswer
+      : lineValue(text, /Was\s+the\s+service\s+fully\s+completed/i) ??
+        lineValue(text, /Service\s+Completed\??/i);
   const additionalRaw =
-    lineValue(
-      text,
-      /Have\s+all\s+of\s+the\s+additional\s+tasks\s+been\s+completed/i
-    ) ?? lineValue(text, /Additional\s+Tasks\s+Complete\??/i);
+    additionalAnswer !== "unknown"
+      ? additionalAnswer
+      : lineValue(
+          text,
+          /Have\s+all\s+of\s+the\s+additional\s+tasks\s+been\s+completed/i
+        ) ?? lineValue(text, /Additional\s+Tasks\s+Complete\??/i);
+
   const serviceType =
     lineValue(text, /Type\s+of\s+service\s+completed/i) ??
     lineValue(text, /Compliance\s+Type/i) ??
@@ -246,15 +406,34 @@ export function extractFailurePathSignals(
   );
 
   const vor = hasVorBannerEvidence(text);
-  const unsafe = isNo(safeRaw);
-  const safeYes = isYes(safeRaw);
-  const returnVisit = isYes(returnRaw);
-  const returnVisitNo = isNo(returnRaw);
-  const incomplete = isNo(worksRaw) || isNo(serviceRaw) || isNo(additionalRaw);
+  const unsafe =
+    safeAnswer === "no" || (safeAnswer === "unknown" && isNo(safeRaw));
+  const safeYes =
+    safeAnswer === "yes" || (safeAnswer === "unknown" && isYes(safeRaw));
+  const returnVisit =
+    returnAnswer === "yes" ||
+    (returnAnswer === "unknown" && isYes(returnRaw));
+  const returnVisitNo =
+    returnAnswer === "no" ||
+    (returnAnswer === "unknown" && isNo(returnRaw));
+
+  const worksNo =
+    worksAnswer === "no" || (worksAnswer === "unknown" && isNo(worksRaw));
+  const serviceNo =
+    serviceAnswer === "no" ||
+    (serviceAnswer === "unknown" && isNo(serviceRaw));
+  const additionalNo =
+    additionalAnswer === "no" ||
+    (additionalAnswer === "unknown" && isNo(additionalRaw));
+  const incomplete = worksNo || serviceNo || additionalNo;
+
+  const worksYes =
+    worksAnswer === "yes" || (worksAnswer === "unknown" && isYes(worksRaw));
+  // Works fully complete when All Works is Yes and service/additional are not No
+  // (grid layout often puts Yes under the label on the next line).
   const worksCompleteYes =
-    isYes(worksRaw) &&
-    (serviceRaw == null || isYes(serviceRaw)) &&
-    (additionalRaw == null || isYes(additionalRaw));
+    worksYes && serviceAnswer !== "no" && additionalAnswer !== "no";
+
   // Do NOT key repairsPath off bare "parts required" / "Parts Used" — only
   // Repairs Required content or explicit "Specify in Repairs" service type.
   const repairsPath =
