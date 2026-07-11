@@ -79,6 +79,10 @@ export interface Finding {
   severity?: "critical" | "major" | "minor";
   /** Admin Audit Policy class (Major hard-fails; Minor is score-only). */
   failClass?: "major" | "minor" | "informational";
+  /** Engine rule identifier, e.g. "JSR-C060". */
+  ruleId?: string | null;
+  /** Human-readable reason code from Audit Policy, e.g. "MISSING_FIELD". */
+  reasonCode?: string | null;
   value?: string;
   message?: string;
   whyItMatters?: string;
@@ -124,6 +128,8 @@ export function mapFindingsFromApi(
     boundingBox: unknown;
     whyItMatters?: string | null;
     suggestedFix?: string | null;
+    ruleId?: string | null;
+    reasonCode?: string | null;
   }>
 ): Finding[] {
   return findingsData.map(f => {
@@ -170,6 +176,8 @@ export function mapFindingsFromApi(
       status,
       severity,
       failClass,
+      ruleId: f.ruleId ?? undefined,
+      reasonCode: f.reasonCode ?? undefined,
       value: f.rawSnippet || undefined,
       message: f.normalisedSnippet || undefined,
       whyItMatters: f.whyItMatters || undefined,
@@ -1314,9 +1322,29 @@ function FindingsList({
                   </Badge>
                 )}
               </div>
-              <Badge variant="outline" className="bg-white/50">
-                {(finding.confidence * 100).toFixed(0)}% Conf.
-              </Badge>
+              <div className="flex items-center gap-1.5">
+                {finding.ruleId && (
+                  <Badge
+                    variant="outline"
+                    className="font-mono text-[10px] px-1.5 bg-slate-50 text-slate-600 border-slate-300"
+                    title={`Rule: ${finding.ruleId}${finding.reasonCode ? ` — ${finding.reasonCode}` : ""}`}
+                  >
+                    {finding.ruleId}
+                  </Badge>
+                )}
+                {finding.reasonCode && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] px-1.5 bg-violet-50 text-violet-600 border-violet-300"
+                    title={`Reason code: ${finding.reasonCode}`}
+                  >
+                    {finding.reasonCode}
+                  </Badge>
+                )}
+                <Badge variant="outline" className="bg-white/50">
+                  {(finding.confidence * 100).toFixed(0)}% Conf.
+                </Badge>
+              </div>
             </div>
 
             {finding.value && (
