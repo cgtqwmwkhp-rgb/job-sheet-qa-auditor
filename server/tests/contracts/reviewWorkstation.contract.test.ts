@@ -100,6 +100,17 @@ describe("Review Workstation Contract (PR-13)", () => {
       expect(pane).toContain("Correct value");
       expect(pane).toContain("correctionDialog");
     });
+
+    it("wires BeforeAfterComparePane confirm/override to auditActions", () => {
+      expect(pane).toContain("resolvePhotoPairFindings");
+      expect(pane).toContain("onConfirmPair={handleConfirmPair}");
+      expect(pane).toContain("onOverridePair={handleOverridePair}");
+      expect(pane).toContain("auditActions.approve");
+      expect(pane).toContain('applyBeforeAfterPairAction(pairIndex, "approve")');
+      expect(pane).toContain(
+        'applyBeforeAfterPairAction(pairIndex, "override")'
+      );
+    });
   });
 
   describe("captureFieldCorrection API", () => {
@@ -124,5 +135,25 @@ describe("Review Workstation Contract (PR-13)", () => {
         expect(content.toLowerCase()).not.toContain("field_correction");
       }
     });
+  });
+});
+
+describe("BeforeAfterComparePane pair resolution", () => {
+  const root = path.resolve(__dirname, "../../..");
+  const beforeAfterPath = path.join(
+    root,
+    "client/src/components/review/BeforeAfterComparePane.tsx"
+  );
+  const src = fs.readFileSync(beforeAfterPath, "utf-8");
+
+  it("exports resolvePhotoPairFindings for PHOTO-C012/C013 mapping", () => {
+    expect(src).toContain("export function resolvePhotoPairFindings");
+    expect(src).toContain("PHOTO-C012");
+    expect(src).toContain("PHOTO-C013");
+  });
+
+  it("accepts onConfirmPair and onOverridePair callbacks", () => {
+    expect(src).toContain("onConfirmPair?: (pairIndex: number) => void");
+    expect(src).toContain("onOverridePair?: (pairIndex: number) => void");
   });
 });

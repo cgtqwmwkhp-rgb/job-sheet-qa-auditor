@@ -195,10 +195,13 @@ export function BeforeAfterComparePane({
                       disabled={!!decision}
                       onClick={() => {
                         setDecisions(d => ({ ...d, [idx]: "confirmed" }));
-                        onConfirmPair?.(idx);
-                        toast.success(
-                          "Pair confirmed — incomplete repair catch retained (cost avoided)."
-                        );
+                        if (onConfirmPair) {
+                          onConfirmPair(idx);
+                        } else {
+                          toast.success(
+                            "Pair confirmed — incomplete repair catch retained (cost avoided)."
+                          );
+                        }
                       }}
                     >
                       <Check className="h-3 w-3 mr-1" />
@@ -211,10 +214,13 @@ export function BeforeAfterComparePane({
                       disabled={!!decision}
                       onClick={() => {
                         setDecisions(d => ({ ...d, [idx]: "overridden" }));
-                        onOverridePair?.(idx);
-                        toast.message(
-                          "Pair overridden — finding waived for this review."
-                        );
+                        if (onOverridePair) {
+                          onOverridePair(idx);
+                        } else {
+                          toast.message(
+                            "Pair overridden — finding overturned for this review."
+                          );
+                        }
                       }}
                     >
                       <X className="h-3 w-3 mr-1" />
@@ -235,6 +241,33 @@ export function BeforeAfterComparePane({
       </Collapsible>
     </Card>
   );
+}
+
+
+/** Map a compare pair to open PHOTO-C012 / PHOTO-C013 findings (ruleId + page). */
+export function resolvePhotoPairFindings<
+  T extends {
+    ruleId?: string | null;
+    pageNumber?: number;
+    box?: { page: number };
+    status?: string;
+  },
+>(findings: T[], pair: PhotoPairResult): T[] {
+  const c012Page = pair.afterPage ?? pair.beforePage ?? 1;
+  const c013Page = pair.afterPage ?? 1;
+  const candidates = findings.filter(
+    f =>
+      f.status !== "passed" &&
+      (f.ruleId === "PHOTO-C012" || f.ruleId === "PHOTO-C013")
+  );
+  const byPage = candidates.filter(f => {
+    const page = f.pageNumber ?? f.box?.page ?? 1;
+    if (f.ruleId === "PHOTO-C012") return page === c012Page;
+    if (f.ruleId === "PHOTO-C013") return page === c013Page;
+    return false;
+  });
+  // Prefer page match; fall back to any open PHOTO-C012/C013 when pages differ.
+  return byPage.length > 0 ? byPage : candidates;
 }
 
 export function mapPhotoPairCompareFromReport(
