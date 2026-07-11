@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
+import OverturnMetricsCard from "@/components/OverturnMetricsCard";
 
 function TechnicianAnalyticsPreview() {
   const { data, isLoading, error } =
@@ -270,6 +271,7 @@ export default function Analytics() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
+            <OverturnMetricsCard />
             {hasData ? (
               <Card>
                 <CardHeader>
