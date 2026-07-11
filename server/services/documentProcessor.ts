@@ -79,6 +79,7 @@ import {
 import { computeDocumentationQualityScore } from "./documentationQuality";
 import { evaluatePhotoEvidenceConsistency } from "./photoEvidence";
 import { evaluateTyreCompliance } from "./tyreCompliance";
+import { evaluateChecklistCompleteness } from "./checklistCompleteness";
 import { applyAuditPolicy, resolveAuditFormFamily } from "./auditPolicy";
 import {
   runSelectionMarkDetection,
@@ -1827,6 +1828,23 @@ async function processJobSheetWithOptions(
       };
       recordStage({
         stage: "Tyre Compliance",
+        status: "success",
+        durationMs: 0,
+      });
+    }
+  }
+
+  // Checklist completeness: "Please select" placeholder → Minor/S2
+  if (!isWastedJourneyDocument(extractedText)) {
+    const checklistResult = evaluateChecklistCompleteness(extractedText);
+    if (checklistResult.findings.length > 0) {
+      analysisResult = {
+        ...analysisResult,
+        findings: [...analysisResult.findings, ...checklistResult.findings],
+        summary: `${analysisResult.summary} [CHECKLIST_COMPLETENESS] ${checklistResult.summary}`,
+      };
+      recordStage({
+        stage: "Checklist Completeness",
         status: "success",
         durationMs: 0,
       });

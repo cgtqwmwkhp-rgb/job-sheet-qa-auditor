@@ -215,6 +215,15 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           fieldAliases: ["Photo Evidence"],
         },
         {
+          ruleId: "CHECK-C010",
+          label: "Checklist Completion",
+          description:
+            'Compliance checklist field(s) still show placeholder "Please select" — checklist incomplete',
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: ["Checklist Completion", "Checklist Incomplete"],
+        },
+        {
           ruleId: "TYRE-C010",
           label: "Tyre Tread Depth",
           description: "Recorded tread depth below PlantExpand 2mm minimum",
