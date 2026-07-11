@@ -180,9 +180,18 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
         },
         {
           ruleId: "JSR-C090",
-          label: "Parts Still Required ↔ Return Visit",
+          label: "Parts Still Required ↔ Return Visit (conflict)",
           description:
-            "Parts Still Required has content but return visit is not Yes",
+            "Parts Still Required has content but return visit is marked No",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: ["Parts Still Required ↔ Return Visit"],
+        },
+        {
+          ruleId: "JSR-C093",
+          label: "Parts Still Required ↔ Return Visit (incomplete)",
+          description:
+            "Parts Still Required has content but return visit not confirmed Yes",
           failClass: "major",
           enabled: true,
           fieldAliases: ["Parts Still Required ↔ Return Visit"],
