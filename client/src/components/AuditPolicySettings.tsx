@@ -49,7 +49,7 @@ interface AuditPolicyForm {
 }
 
 interface AuditPolicy {
-  version: number;
+  version: string;
   weights: {
     major: number;
     minor: number;
