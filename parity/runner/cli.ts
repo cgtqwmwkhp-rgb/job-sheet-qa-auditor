@@ -151,7 +151,6 @@ async function main(): Promise<void> {
   }
 
   if (mode === "subset") {
-    // Subset mode: use prSubsetDocIds from thresholds.json
     const thresholds = loadThresholds();
     const subsetDocIds = new Set(thresholds.ci.prSubsetDocIds);
 
@@ -160,8 +159,6 @@ async function main(): Promise<void> {
     );
 
     const legacy = loadDataset(LEGACY_FIXTURES_PATH);
-
-    // Filter to only include subset documents
     const subsetDocs = legacy.documents.filter(d => subsetDocIds.has(d.id));
 
     if (subsetDocs.length === 0) {
@@ -169,7 +166,12 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    console.log(`✅ Found ${subsetDocs.length} documents in subset`);
+    const positiveDocs = subsetDocs.filter(d => d.expectedResult === "pass");
+    const negativeDocs = subsetDocs.filter(d => d.expectedResult === "fail");
+
+    console.log(
+      `✅ Found ${subsetDocs.length} documents: ${positiveDocs.length} positive, ${negativeDocs.length} negative`
+    );
 
     const actualResults = await resolveActualResultsOrSkip(
       subsetDocs,
@@ -177,9 +179,12 @@ async function main(): Promise<void> {
       mock
     );
 
-    // Run parity with proper subset (create temporary dataset files or use internal methods)
-    // For simplicity, we directly compare expected vs actual
-    const report = runSubsetParity(subsetDocs, actualResults, legacy.version);
+    const report = runSubsetParityV2(
+      positiveDocs,
+      negativeDocs,
+      actualResults,
+      legacy.version
+    );
 
     const reportPath = join(REPORTS_PATH, `parity-report-${report.runId}.json`);
     writeFileSync(reportPath, JSON.stringify(report, null, 2));
@@ -189,9 +194,9 @@ async function main(): Promise<void> {
     writeFileSync(latestPath, JSON.stringify(report, null, 2));
 
     const summaryPath = join(REPORTS_PATH, "latest-summary.md");
-    writeFileSync(summaryPath, generateSubsetSummary(report));
+    writeFileSync(summaryPath, generateSubsetSummaryV2(report));
 
-    printLegacyResults(report);
+    printSubsetResults(report);
     return;
   }
 
@@ -327,58 +332,70 @@ ${reasons.map(reason => `- ${reason}`).join("\n")}
 `;
 }
 
-/**
- * Run subset parity comparison directly (bypassing full dataset loading)
- */
-function runSubsetParity(
-  expectedDocs: GoldenDocument[],
-  actualDocs: GoldenDocument[],
-  goldenVersion: string
-): {
+interface SubsetReport {
   runId: string;
+  timestamp: string;
+  goldenVersion: string;
+  scope: "subset";
   status: string;
-  summary: {
+  positive: {
     totalDocuments: number;
     same: number;
-    improved: number;
     worse: number;
     totalFields: number;
     fieldsSame: number;
-    fieldsImproved: number;
     fieldsWorse: number;
+    documents: {
+      documentId: string;
+      documentName: string;
+      status: string;
+      fieldComparisons: { field: string; status: string }[];
+    }[];
   };
-  documents: unknown[];
+  negative: {
+    totalDocuments: number;
+    passed: number;
+    failed: number;
+    totalExpectedFailures: number;
+    matchedFailures: number;
+    missedFailures: number;
+    documents: {
+      documentId: string;
+      documentName: string;
+      status: string;
+      expectedFailures: string[];
+      matchedFailures: string[];
+      missedFailures: string[];
+    }[];
+  };
   violations: string[];
-} {
+}
+
+function runSubsetParityV2(
+  positiveDocs: GoldenDocument[],
+  negativeDocs: GoldenDocument[],
+  actualDocs: GoldenDocument[],
+  goldenVersion: string
+): SubsetReport {
   const runId = Math.random().toString(16).slice(2, 14);
-  const documentComparisons: {
-    documentId: string;
-    documentName: string;
-    status: string;
-    expectedResult: string;
-    actualResult: string | null;
-    fieldComparisons: unknown[];
-  }[] = [];
+  const violations: string[] = [];
 
-  let same = 0,
-    worse = 0;
-  const improved = 0;
-  let fieldsSame = 0,
-    fieldsWorse = 0;
-  const fieldsImproved = 0;
+  // --- Positive suite: field-level parity (golden vs actual) ---
+  let posSame = 0,
+    posWorse = 0;
+  let posFieldsSame = 0,
+    posFieldsWorse = 0;
+  const posDocResults: SubsetReport["positive"]["documents"] = [];
 
-  for (const expected of expectedDocs) {
+  for (const expected of positiveDocs) {
     const actual = actualDocs.find(d => d.id === expected.id);
-
     if (!actual) {
-      worse++;
-      fieldsWorse += expected.validatedFields.length;
-      documentComparisons.push({
+      posWorse++;
+      posFieldsWorse += expected.validatedFields.length;
+      posDocResults.push({
         documentId: expected.id,
         documentName: expected.name,
         status: "missing",
-        expectedResult: expected.expectedResult,
-        actualResult: null,
         fieldComparisons: expected.validatedFields.map(f => ({
           field: f.field,
           status: "missing",
@@ -387,7 +404,6 @@ function runSubsetParity(
       continue;
     }
 
-    // Compare fields
     let docFieldsSame = 0;
     const fieldComps: { field: string; status: string }[] = [];
 
@@ -395,102 +411,210 @@ function runSubsetParity(
       const actField = actual.validatedFields.find(
         f => f.ruleId === expField.ruleId
       );
-
-      if (!actField) {
-        fieldsWorse++;
-        fieldComps.push({ field: expField.field, status: "missing" });
-      } else if (
-        expField.status === actField.status &&
-        expField.value === actField.value
+      if (
+        !actField ||
+        expField.status !== actField.status ||
+        expField.value !== actField.value
       ) {
-        fieldsSame++;
+        posFieldsWorse++;
+        fieldComps.push({
+          field: expField.field,
+          status: actField ? "worse" : "missing",
+        });
+      } else {
+        posFieldsSame++;
         docFieldsSame++;
         fieldComps.push({ field: expField.field, status: "same" });
-      } else {
-        fieldsWorse++;
-        fieldComps.push({ field: expField.field, status: "worse" });
       }
     }
 
-    // Determine doc status
-    if (docFieldsSame === expected.validatedFields.length) {
-      same++;
-      documentComparisons.push({
-        documentId: expected.id,
-        documentName: expected.name,
-        status: "same",
-        expectedResult: expected.expectedResult,
-        actualResult: actual.expectedResult,
-        fieldComparisons: fieldComps,
-      });
-    } else {
-      worse++;
-      documentComparisons.push({
-        documentId: expected.id,
-        documentName: expected.name,
-        status: "worse",
-        expectedResult: expected.expectedResult,
-        actualResult: actual.expectedResult,
-        fieldComparisons: fieldComps,
-      });
-    }
+    const docStatus =
+      docFieldsSame === expected.validatedFields.length ? "same" : "worse";
+    if (docStatus === "same") posSame++;
+    else posWorse++;
+
+    posDocResults.push({
+      documentId: expected.id,
+      documentName: expected.name,
+      status: docStatus,
+      fieldComparisons: fieldComps,
+    });
   }
 
-  const totalDocs = expectedDocs.length;
-  const totalFields = expectedDocs.reduce(
-    (sum, d) => sum + d.validatedFields.length,
-    0
-  );
-  const samePercent = totalDocs > 0 ? (same / totalDocs) * 100 : 0;
-
-  const violations: string[] = [];
-  if (worse > 0)
-    violations.push(`Worse documents (${worse}) exceeds threshold (0)`);
-  if (fieldsWorse > 0)
-    violations.push(`Worse fields (${fieldsWorse}) exceeds threshold (0)`);
-  if (samePercent < 100)
+  if (posWorse > 0) {
     violations.push(
-      `Same percentage (${samePercent.toFixed(1)}%) below threshold (100%)`
+      `[POSITIVE] ${posWorse} document(s) regressed (${posFieldsWorse} field mismatches)`
     );
+  }
+
+  // --- Negative suite: expected-failure detection ---
+  let negPassed = 0,
+    negFailed = 0;
+  let negTotalExpected = 0,
+    negMatched = 0,
+    negMissed = 0;
+  const negDocResults: SubsetReport["negative"]["documents"] = [];
+
+  for (const expected of negativeDocs) {
+    const actual = actualDocs.find(d => d.id === expected.id);
+    const expectedFailures =
+      expected.expectedFailures && expected.expectedFailures.length > 0
+        ? expected.expectedFailures
+        : expected.validatedFields
+            .filter(f => f.status === "failed")
+            .map(f => ({
+              ruleId: f.ruleId,
+              field: f.field,
+              reasonCode: f.reasonCode ?? "MISSING_FIELD",
+              severity: f.severity,
+            }));
+    negTotalExpected += expectedFailures.length;
+
+    if (!actual) {
+      negFailed++;
+      negMissed += expectedFailures.length;
+      negDocResults.push({
+        documentId: expected.id,
+        documentName: expected.name,
+        status: "fail",
+        expectedFailures: expectedFailures.map(f => `${f.ruleId}/${f.field}`),
+        matchedFailures: [],
+        missedFailures: expectedFailures.map(f => `${f.ruleId}/${f.field}`),
+      });
+      continue;
+    }
+
+    const detectedFailedRules = actual.validatedFields
+      .filter(f => f.status === "failed")
+      .map(f => ({
+        ruleId: f.ruleId,
+        field: f.field,
+        reasonCode: f.reasonCode,
+      }));
+
+    const matched: string[] = [];
+    const missed: string[] = [];
+
+    for (const ef of expectedFailures) {
+      const found = detectedFailedRules.some(
+        d => d.ruleId === ef.ruleId && d.field === ef.field
+      );
+      const label = `${ef.ruleId}/${ef.field}`;
+      if (found) {
+        matched.push(label);
+        negMatched++;
+      } else {
+        missed.push(label);
+        negMissed++;
+      }
+    }
+
+    const docStatus = missed.length === 0 ? "pass" : "fail";
+    if (docStatus === "pass") negPassed++;
+    else negFailed++;
+
+    negDocResults.push({
+      documentId: expected.id,
+      documentName: expected.name,
+      status: docStatus,
+      expectedFailures: expectedFailures.map(f => `${f.ruleId}/${f.field}`),
+      matchedFailures: matched,
+      missedFailures: missed,
+    });
+  }
+
+  if (negFailed > 0) {
+    violations.push(
+      `[NEGATIVE] ${negFailed} document(s) failed expected-failure detection (${negMissed} missed)`
+    );
+  }
 
   return {
     runId,
+    timestamp: new Date().toISOString(),
+    goldenVersion,
+    scope: "subset",
     status: violations.length === 0 ? "pass" : "fail",
-    summary: {
-      totalDocuments: totalDocs,
-      same,
-      improved,
-      worse,
-      totalFields,
-      fieldsSame,
-      fieldsImproved,
-      fieldsWorse,
+    positive: {
+      totalDocuments: positiveDocs.length,
+      same: posSame,
+      worse: posWorse,
+      totalFields: posFieldsSame + posFieldsWorse,
+      fieldsSame: posFieldsSame,
+      fieldsWorse: posFieldsWorse,
+      documents: posDocResults,
     },
-    documents: documentComparisons,
+    negative: {
+      totalDocuments: negativeDocs.length,
+      passed: negPassed,
+      failed: negFailed,
+      totalExpectedFailures: negTotalExpected,
+      matchedFailures: negMatched,
+      missedFailures: negMissed,
+      documents: negDocResults,
+    },
     violations,
   };
 }
 
-/**
- * Generate subset summary markdown
- */
-function generateSubsetSummary(report: {
-  status: string;
-  summary: {
-    same: number;
-    worse: number;
-    fieldsSame: number;
-    fieldsWorse: number;
-  };
-}): string {
-  return `# Parity Subset Report
+function generateSubsetSummaryV2(report: SubsetReport): string {
+  const lines: string[] = [
+    "# Parity Subset Report",
+    "",
+    `**Status**: ${report.status.toUpperCase()}`,
+    `**Scope**: PR subset (${report.positive.totalDocuments} positive, ${report.negative.totalDocuments} negative)`,
+    "",
+    "## Positive Suite (field-level parity)",
+    "",
+    `- Documents: ${report.positive.same} same, ${report.positive.worse} regressed`,
+    `- Fields: ${report.positive.fieldsSame} same, ${report.positive.fieldsWorse} mismatched`,
+    "",
+  ];
 
-**Status**: ${report.status.toUpperCase()}
+  if (report.positive.documents.length > 0) {
+    for (const doc of report.positive.documents) {
+      const icon = doc.status === "same" ? "✅" : "❌";
+      lines.push(
+        `${icon} **${doc.documentName}** (${doc.documentId}): ${doc.status}`
+      );
+    }
+    lines.push("");
+  }
 
-## Summary
-- Documents: ${report.summary.same} same, ${report.summary.worse} worse
-- Fields: ${report.summary.fieldsSame} same, ${report.summary.fieldsWorse} worse
-`;
+  lines.push("## Negative Suite (expected-failure detection)");
+  lines.push("");
+  lines.push(
+    `- Documents: ${report.negative.passed} passed, ${report.negative.failed} failed`
+  );
+  lines.push(
+    `- Expected failures: ${report.negative.matchedFailures}/${report.negative.totalExpectedFailures} matched`
+  );
+  lines.push("");
+
+  if (report.negative.documents.length > 0) {
+    for (const doc of report.negative.documents) {
+      const icon = doc.status === "pass" ? "✅" : "❌";
+      const detail =
+        doc.missedFailures.length > 0
+          ? ` (missed: ${doc.missedFailures.join(", ")})`
+          : "";
+      lines.push(
+        `${icon} **${doc.documentName}** (${doc.documentId})${detail}`
+      );
+    }
+    lines.push("");
+  }
+
+  if (report.violations.length > 0) {
+    lines.push("## Violations");
+    lines.push("");
+    for (const v of report.violations) {
+      lines.push(`- ❌ ${v}`);
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
 }
 
 function printCombinedResults(report: CombinedParityReport): void {
@@ -529,26 +653,23 @@ function printCombinedResults(report: CombinedParityReport): void {
   console.log("✅ All parity checks passed!");
 }
 
-function printLegacyResults(report: {
-  status: string;
-  summary: {
-    same: number;
-    improved: number;
-    worse: number;
-    fieldsSame: number;
-    fieldsImproved: number;
-    fieldsWorse: number;
-  };
-  violations: string[];
-}): void {
+function printSubsetResults(report: SubsetReport): void {
   console.log("");
   console.log("═══════════════════════════════════════════");
-  console.log(`Status: ${report.status.toUpperCase()}`);
+  console.log(`SUBSET STATUS: ${report.status.toUpperCase()}`);
+  console.log("───────────────────────────────────────────");
   console.log(
-    `Documents: ${report.summary.same} same, ${report.summary.improved} improved, ${report.summary.worse} worse`
+    `POSITIVE: ${report.positive.same} same, ${report.positive.worse} worse`
   );
   console.log(
-    `Fields: ${report.summary.fieldsSame} same, ${report.summary.fieldsImproved} improved, ${report.summary.fieldsWorse} worse`
+    `  Fields: ${report.positive.fieldsSame} same, ${report.positive.fieldsWorse} mismatched`
+  );
+  console.log("───────────────────────────────────────────");
+  console.log(
+    `NEGATIVE: ${report.negative.passed} passed, ${report.negative.failed} failed`
+  );
+  console.log(
+    `  Expected failures: ${report.negative.matchedFailures}/${report.negative.totalExpectedFailures} matched`
   );
   console.log("═══════════════════════════════════════════");
 
@@ -562,7 +683,7 @@ function printLegacyResults(report: {
   }
 
   console.log("");
-  console.log("✅ Parity check passed!");
+  console.log("✅ Parity subset check passed!");
 }
 
 main().catch(err => {
