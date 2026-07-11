@@ -74,6 +74,7 @@ import {
   WASTED_JOURNEY_TEMPLATE_ID,
 } from "./wastedJourneyConsistency";
 import { computeDocumentationQualityScore } from "./documentationQuality";
+import { applyAuditPolicy, resolveAuditFormFamily } from "./auditPolicy";
 import {
   runSelectionMarkDetection,
   isSelectionMarksEnabled,
@@ -1712,6 +1713,8 @@ async function processJobSheetWithOptions(
 
   // Form-family consistency: Wasted Journey vs Job Summary failure-path.
   // Never run repair/VOR failure-path rules on wasted-journey sheets.
+  // Hard-fail vs score-only is decided by Admin Audit Policy after merge (not here).
+  let auditFormFamily = resolveAuditFormFamily(null, false);
   {
     const selectedSlug =
       buildSelectionCohortMeta(selectionResult, usedTemplateVersionId)
@@ -1719,25 +1722,13 @@ async function processJobSheetWithOptions(
     const isWastedJourney =
       selectedSlug === WASTED_JOURNEY_TEMPLATE_ID ||
       isWastedJourneyDocument(extractedText);
+    auditFormFamily = resolveAuditFormFamily(selectedSlug, isWastedJourney);
 
     if (isWastedJourney) {
       const consistency = evaluateWastedJourneyConsistency(extractedText);
       if (consistency.findings.length > 0) {
-        let overallResult = analysisResult.overallResult;
-        if (
-          consistency.hasBlockingIssues &&
-          analysisResult.overallResult === "PASS"
-        ) {
-          overallResult = "FAIL";
-        } else if (
-          consistency.hasBlockingIssues &&
-          analysisResult.overallResult === "REVIEW_QUEUE"
-        ) {
-          overallResult = "REVIEW_QUEUE";
-        }
         analysisResult = {
           ...analysisResult,
-          overallResult,
           findings: mergeWastedJourneyFindings(
             analysisResult.findings,
             consistency.findings
@@ -1763,22 +1754,8 @@ async function processJobSheetWithOptions(
         failMarkCount,
       });
       if (consistency.findings.length > 0) {
-        let overallResult = analysisResult.overallResult;
-        if (
-          consistency.hasBlockingIssues &&
-          analysisResult.overallResult === "PASS"
-        ) {
-          overallResult = "FAIL";
-        } else if (
-          consistency.hasBlockingIssues &&
-          analysisResult.overallResult === "REVIEW_QUEUE"
-        ) {
-          // Keep review queue, but findings will show the Issues.
-          overallResult = "REVIEW_QUEUE";
-        }
         analysisResult = {
           ...analysisResult,
-          overallResult,
           findings: [...analysisResult.findings, ...consistency.findings],
           summary:
             `${analysisResult.summary} ` +
@@ -1818,6 +1795,47 @@ async function processJobSheetWithOptions(
     });
   }
 
+  // Admin Audit Policy: Major → hard FAIL; Minor → Doc Quality only.
+  let auditPolicyDecision: {
+    formFamily: string;
+    hasMajorFails: boolean;
+    majorCount: number;
+    minorCount: number;
+    weights: { major: number; minor: number; informational: number };
+  } | null = null;
+  const auditPolicy = await db.getAuditPolicy();
+  {
+    const applied = applyAuditPolicy({
+      findings: analysisResult.findings,
+      formFamily: auditFormFamily,
+      policy: auditPolicy,
+      currentResult: analysisResult.overallResult,
+    });
+    auditPolicyDecision = {
+      formFamily: auditFormFamily,
+      hasMajorFails: applied.hasMajorFails,
+      majorCount: applied.majorCount,
+      minorCount: applied.minorCount,
+      weights: auditPolicy.weights,
+    };
+    analysisResult = {
+      ...analysisResult,
+      overallResult: applied.overallResult,
+      findings: applied.findings,
+      summary:
+        `${analysisResult.summary} ` +
+        `[AUDIT_POLICY] form=${auditFormFamily} majors=${applied.majorCount} minors=${applied.minorCount} → ${applied.overallResult}.`,
+    };
+    recordStage({
+      stage: "Audit Policy (Major/Minor)",
+      status: "success",
+      durationMs: 0,
+      error: applied.hasMajorFails
+        ? `${applied.majorCount} major fail(s)`
+        : undefined,
+    });
+  }
+
   // Replace LLM self-confidence with engineer documentation quality (0–100).
   // LLM confidence is retained in reportJson for ops; the stored/UI score is the mark.
   const llmConfidenceForReport = analysisResult.score;
@@ -1825,6 +1843,7 @@ async function processJobSheetWithOptions(
     const quality = computeDocumentationQualityScore(analysisResult.findings, {
       llmConfidence: llmConfidenceForReport,
       overallResult: analysisResult.overallResult,
+      weights: auditPolicy.weights,
     });
     analysisResult = {
       ...analysisResult,
@@ -1962,6 +1981,7 @@ async function processJobSheetWithOptions(
         extractedText,
         documentationQualityScore: analysisResult.score,
         llmConfidenceScore: llmConfidenceForReport,
+        ...(auditPolicyDecision ? { auditPolicyDecision } : {}),
         extractedFields: ensembleResult
           ? mergeExtractedFields(
               analysisResult.extractedFields,

@@ -19,6 +19,7 @@ import {
   type AuditData,
   type Finding,
 } from "@/components/review/ReviewWorkstationPane";
+import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
 import { perfMark, PERF_MARKS, perfClear } from "@/lib/perf";
 
 // No mock data - only show real audit results
@@ -341,6 +342,8 @@ export default function AuditResults() {
   const findings: Finding[] = mapFindingsFromApi(findingsData || []);
 
   // Convert real job sheet data to AuditData format
+  const hasMajorFails = mapHasMajorFailsFromReport(auditResult?.reportJson);
+
   const auditData: AuditData = {
     id: jobSheetData.referenceNumber || `JS-${jobSheetData.id}`,
     status:
@@ -358,6 +361,7 @@ export default function AuditResults() {
     technician: `User ${jobSheetData.uploadedBy}`,
     documentUrl: jobSheetData.fileUrl,
     findings,
+    hasMajorFails,
   };
 
   // Use the PDF proxy endpoint for same-origin loading (avoids CORS issues)

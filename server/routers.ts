@@ -5,6 +5,7 @@ import {
   publicProcedure,
   protectedProcedure,
   adminProcedure,
+  qaLeadProcedure,
   router,
 } from "./_core/trpc";
 import { z } from "zod";
@@ -28,6 +29,11 @@ import {
   RateLimitError,
   RATE_LIMITS,
 } from "./utils/rateLimiter";
+import {
+  DEFAULT_AUDIT_POLICY,
+  mergeAuditPolicy,
+  type FailClass,
+} from "./services/auditPolicy";
 import {
   isImageQaIntakeEnabled,
   runIntakeGate,
@@ -676,6 +682,78 @@ export const appRouter = router({
 
         return { success: true };
       }),
+  }),
+
+  // ============ AUDIT POLICY (Major / Minor fail) ============
+  auditPolicy: router({
+    get: protectedProcedure.query(async () => {
+      return db.getAuditPolicy();
+    }),
+
+    getDefaults: protectedProcedure.query(() => {
+      return DEFAULT_AUDIT_POLICY;
+    }),
+
+    save: qaLeadProcedure
+      .input(
+        z.object({
+          version: z.number().int().positive(),
+          weights: z.object({
+            major: z.number().min(0).max(100),
+            minor: z.number().min(0).max(100),
+            informational: z.number().min(0).max(100),
+          }),
+          forms: z.record(
+            z.string(),
+            z.object({
+              label: z.string(),
+              rules: z.array(
+                z.object({
+                  ruleId: z.string(),
+                  label: z.string(),
+                  description: z.string(),
+                  failClass: z.enum([
+                    "major",
+                    "minor",
+                    "informational",
+                  ] as const satisfies readonly FailClass[]),
+                  enabled: z.boolean(),
+                  fieldAliases: z.array(z.string()).optional(),
+                })
+              ),
+            })
+          ),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const policy = mergeAuditPolicy(input);
+        await db.saveAuditPolicy(policy, ctx.user.id);
+        await db.logAction({
+          userId: ctx.user.id,
+          action: "UPDATE_AUDIT_POLICY",
+          entityType: "audit_policy",
+          entityId: null,
+          details: {
+            version: policy.version,
+            formKeys: Object.keys(policy.forms),
+            weights: policy.weights,
+          },
+        });
+        return { success: true, policy };
+      }),
+
+    reset: qaLeadProcedure.mutation(async ({ ctx }) => {
+      const policy = mergeAuditPolicy(null);
+      await db.saveAuditPolicy(policy, ctx.user.id);
+      await db.logAction({
+        userId: ctx.user.id,
+        action: "RESET_AUDIT_POLICY",
+        entityType: "audit_policy",
+        entityId: null,
+        details: { version: policy.version },
+      });
+      return { success: true, policy };
+    }),
   }),
 });
 
