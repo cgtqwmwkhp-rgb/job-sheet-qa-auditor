@@ -25,11 +25,14 @@ import {
   CheckCircle2,
   Info,
   Loader2,
+  Lock,
   RefreshCw,
   Save,
   ShieldAlert,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { SAFETY_CRITICAL_RULE_IDS } from "@shared/const";
 import { toast } from "sonner";
 
 type FailClass = "major" | "minor" | "informational";
@@ -73,6 +76,9 @@ export function AuditPolicySettings() {
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [activeFormId, setActiveFormId] = useState<string>("");
+
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const { data, isLoading, refetch } = trpc.auditPolicy.get.useQuery();
   const saveMutation = trpc.auditPolicy.save.useMutation();
@@ -297,76 +303,93 @@ export function AuditPolicySettings() {
                       {form.rules.length} checks
                     </span>
                   </div>
-                  {form.rules.map(rule => (
-                    <div
-                      key={rule.ruleId}
-                      className="rounded-lg border p-4 space-y-3"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium">{rule.label}</span>
-                            {failClassBadge(rule.failClass)}
-                            <span className="text-xs font-mono text-muted-foreground">
-                              {rule.ruleId}
-                            </span>
+                  {form.rules.map(rule => {
+                    const isSafetyCritical = SAFETY_CRITICAL_RULE_IDS.has(rule.ruleId);
+                    const safetyLocked = isSafetyCritical && !isAdmin;
+
+                    return (
+                      <div
+                        key={rule.ruleId}
+                        className={`rounded-lg border p-4 space-y-3${safetyLocked ? " bg-muted/30" : ""}`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium">{rule.label}</span>
+                              {failClassBadge(rule.failClass)}
+                              <span className="text-xs font-mono text-muted-foreground">
+                                {rule.ruleId}
+                              </span>
+                              {isSafetyCritical && (
+                                <Badge variant="outline" className="text-xs gap-1 border-red-300 text-red-700">
+                                  <Lock className="h-3 w-3" />
+                                  Safety-critical
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {rule.description}
+                            </p>
+                            {safetyLocked && (
+                              <p className="text-xs text-red-600/80 mt-1">
+                                Admin required to change fail class or disable this rule.
+                              </p>
+                            )}
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            {rule.description}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-4 shrink-0">
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={rule.enabled}
-                              onCheckedChange={checked =>
+                          <div className="flex items-center gap-4 shrink-0">
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={rule.enabled}
+                                onCheckedChange={checked =>
+                                  updateRule(formId, rule.ruleId, {
+                                    enabled: checked,
+                                  })
+                                }
+                                disabled={safetyLocked}
+                                aria-label={`Enable ${rule.ruleId}`}
+                              />
+                              <Label className="text-xs text-muted-foreground">
+                                On
+                              </Label>
+                            </div>
+                            <Select
+                              value={rule.failClass}
+                              onValueChange={value =>
                                 updateRule(formId, rule.ruleId, {
-                                  enabled: checked,
+                                  failClass: value as FailClass,
                                 })
                               }
-                              aria-label={`Enable ${rule.ruleId}`}
-                            />
-                            <Label className="text-xs text-muted-foreground">
-                              On
-                            </Label>
+                              disabled={!rule.enabled || safetyLocked}
+                            >
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="major">
+                                  <span className="flex items-center gap-2">
+                                    <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
+                                    Major fail
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value="minor">
+                                  <span className="flex items-center gap-2">
+                                    <Info className="h-3.5 w-3.5 text-amber-600" />
+                                    Minor fail
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value="informational">
+                                  <span className="flex items-center gap-2">
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
+                                    Informational
+                                  </span>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
-                          <Select
-                            value={rule.failClass}
-                            onValueChange={value =>
-                              updateRule(formId, rule.ruleId, {
-                                failClass: value as FailClass,
-                              })
-                            }
-                            disabled={!rule.enabled}
-                          >
-                            <SelectTrigger className="w-[160px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="major">
-                                <span className="flex items-center gap-2">
-                                  <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
-                                  Major fail
-                                </span>
-                              </SelectItem>
-                              <SelectItem value="minor">
-                                <span className="flex items-center gap-2">
-                                  <Info className="h-3.5 w-3.5 text-amber-600" />
-                                  Minor fail
-                                </span>
-                              </SelectItem>
-                              <SelectItem value="informational">
-                                <span className="flex items-center gap-2">
-                                  <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
-                                  Informational
-                                </span>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </TabsContent>
               ))}
             </Tabs>

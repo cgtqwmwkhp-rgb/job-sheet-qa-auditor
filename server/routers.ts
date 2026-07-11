@@ -32,6 +32,7 @@ import {
 import {
   DEFAULT_AUDIT_POLICY,
   mergeAuditPolicy,
+  SAFETY_CRITICAL_RULE_IDS,
   type FailClass,
 } from "./services/auditPolicy";
 import {
@@ -54,6 +55,14 @@ function throwIfRateLimited(fn: () => void): void {
     }
     throw error;
   }
+}
+
+function bumpPatchVersion(version: string): string {
+  const parts = version.split(".");
+  if (parts.length !== 3) return version;
+  const patch = parseInt(parts[2], 10);
+  if (Number.isNaN(patch)) return version;
+  return `${parts[0]}.${parts[1]}.${patch + 1}`;
 }
 
 export const appRouter = router({
@@ -726,7 +735,55 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const policy = mergeAuditPolicy(input);
+        const currentPolicy = await db.getAuditPolicy();
+
+        // Optimistic version check: reject stale saves
+        if (currentPolicy.version !== input.version) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message:
+              "Audit policy was modified by another user. Please refresh and retry.",
+          });
+        }
+
+        // Safety-critical guard: changing failClass or enabled on
+        // safety-critical rules requires admin — qa_lead is not enough.
+        const isAdmin = ctx.user.role === "admin";
+        if (!isAdmin) {
+          const currentRuleMap = new Map<
+            string,
+            { failClass: string; enabled: boolean }
+          >();
+          for (const form of Object.values(currentPolicy.forms)) {
+            for (const rule of form.rules) {
+              currentRuleMap.set(rule.ruleId, {
+                failClass: rule.failClass,
+                enabled: rule.enabled,
+              });
+            }
+          }
+
+          for (const form of Object.values(input.forms)) {
+            for (const rule of form.rules) {
+              if (!SAFETY_CRITICAL_RULE_IDS.has(rule.ruleId)) continue;
+              const prev = currentRuleMap.get(rule.ruleId);
+              if (!prev) continue;
+              if (
+                rule.failClass !== prev.failClass ||
+                rule.enabled !== prev.enabled
+              ) {
+                throw new TRPCError({
+                  code: "FORBIDDEN",
+                  message:
+                    `Changing failClass or enabled on safety-critical rule ${rule.ruleId} requires admin privileges.`,
+                });
+              }
+            }
+          }
+        }
+
+        const nextVersion = bumpPatchVersion(input.version);
+        const policy = mergeAuditPolicy({ ...input, version: nextVersion });
         await db.saveAuditPolicy(policy, ctx.user.id);
         await db.logAction({
           userId: ctx.user.id,
