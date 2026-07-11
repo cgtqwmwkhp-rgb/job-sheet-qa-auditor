@@ -330,6 +330,51 @@ export const appRouter = router({
 
         return result;
       }),
+
+    reprocess: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        throwIfRateLimited(() =>
+          enforceRateLimit(
+            `user:${ctx.user.id}:processing`,
+            RATE_LIMITS.processing
+          )
+        );
+
+        const jobSheet = await db.getJobSheetById(input.id);
+        if (!jobSheet) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Job sheet not found",
+          });
+        }
+
+        await db.logAction({
+          userId: ctx.user.id,
+          action: "REPROCESS_JOB_SHEET",
+          entityType: "job_sheet",
+          entityId: input.id,
+          details: { previousStatus: jobSheet.status },
+        });
+
+        if (isAsyncProcessingEnabled()) {
+          return enqueueJobSheetProcessing({
+            source: "reprocess",
+            jobSheetId: input.id,
+            documentUrl: jobSheet.fileUrl,
+            userId: ctx.user.id,
+          });
+        }
+
+        const result = await orchestrateJobSheetProcessing({
+          source: "reprocess",
+          jobSheetId: input.id,
+          documentUrl: jobSheet.fileUrl,
+          userId: ctx.user.id,
+        });
+
+        return result;
+      }),
   }),
 
   // ============ AUDIT RESULTS ============

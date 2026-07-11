@@ -21,6 +21,7 @@ import {
   Loader2,
   MessageSquare,
   Pencil,
+  RotateCcw,
 } from "lucide-react";
 import {
   useState,
@@ -482,12 +483,35 @@ function ReviewWorkstationContent({
   const captureCorrection =
     trpc.auditActions.captureFieldCorrection.useMutation();
   const undoCorrection = trpc.auditActions.undoFieldCorrection.useMutation();
+  const reprocessMutation = trpc.jobSheets.reprocess.useMutation();
   const utils = trpc.useUtils();
 
   const invalidateFindings = () => {
     utils.audits.getFindings.invalidate();
     utils.audits.getByJobSheet.invalidate();
     utils.jobSheets.list.invalidate();
+  };
+
+  const handleReprocess = () => {
+    if (!jobSheetId) return;
+    reprocessMutation.mutate(
+      { id: jobSheetId },
+      {
+        onSuccess: () => {
+          toast.success("Reprocessing started — results will refresh automatically");
+          utils.jobSheets.get.invalidate({ id: jobSheetId });
+          invalidateFindings();
+        },
+        onError: err => {
+          const msg = err.message || "Reprocess failed";
+          if (msg.includes("UNAUTHORIZED") || msg.includes("FORBIDDEN")) {
+            toast.error("You don't have permission to reprocess this job sheet");
+          } else {
+            toast.error(msg);
+          }
+        },
+      }
+    );
   };
 
   const showUndoToast = (findingId: number, label: string) => {
@@ -933,6 +957,19 @@ function ReviewWorkstationContent({
               </Button>
             </>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReprocess}
+            disabled={reprocessMutation.isPending}
+          >
+            {reprocessMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RotateCcw className="w-4 h-4 mr-2" />
+            )}
+            Reprocess
+          </Button>
           <Button
             variant="outline"
             size="sm"
