@@ -72,6 +72,41 @@ describe("wastedJourneyConsistency", () => {
     expect(signals.hasAssetId).toBe(true);
   });
 
+  it("extracts Asset Number from two-column / next-line OCR layouts", () => {
+    expect(
+      extractAssetNo(`
+Asset Details
+Asset No Make/Model
+YH23WKA_1C Grouped Ancillaries
+Date: 10/07/2026
+`)
+    ).toBe("YH23WKA_1C");
+
+    expect(
+      extractAssetNo(`
+Asset No:
+YH23WKA_1C
+Make/Model: Grouped Ancillaries
+`)
+    ).toBe("YH23WKA_1C");
+
+    expect(
+      extractAssetNo("Asset No | YH23WKA_1C | Make/Model | Grouped Ancillaries")
+    ).toBe("YH23WKA_1C");
+
+    // OCR split underscore
+    expect(extractAssetNo("Asset Number: YH23WKA 1C")).toBe("YH23WKA_1C");
+  });
+
+  it("reports Asset Number (not Asset ID) in identity findings", () => {
+    const result = evaluateWastedJourneyConsistency(BOTH_NO);
+    const identity = result.findings.find(f => f.ruleId === "WJ-C051");
+    // BOTH_NO has asset+date so Passed identity when only contacts fail
+    expect(identity?.fieldName).toBe("Asset Number / Date");
+    expect(result.summary).toContain("AssetNumber=YH23WKA_1C");
+    expect(result.summary).not.toContain("AssetId=");
+  });
+
   it("excludes job number and serial from WJ requirements", () => {
     expect(isWastedJourneyExcludedField("jobNumber")).toBe(true);
     expect(isWastedJourneyExcludedField("Job Number")).toBe(true);

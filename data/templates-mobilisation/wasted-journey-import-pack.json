@@ -17,10 +17,10 @@
           "no-show"
         ]
       },
-      "version": "1.1.0",
+      "version": "1.2.0",
       "specJson": {
         "name": "Wasted Journey Spec",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "fields": [
           {
             "field": "jobReference",
@@ -38,17 +38,11 @@
           },
           {
             "field": "assetId",
-            "label": "Asset No",
+            "label": "Asset Number",
             "type": "string",
             "required": true,
-            "extractionHints": [
-              "asset no",
-              "asset number",
-              "asset id",
-              "registration",
-              "reg no"
-            ],
-            "aliases": ["Asset No", "Asset Number", "Asset ID"]
+            "extractionHints": ["asset no", "asset number", "asset #"],
+            "aliases": ["Asset No", "Asset Number"]
           },
           {
             "field": "date",
@@ -160,7 +154,7 @@
           {
             "ruleId": "WJ-R001",
             "field": "assetId",
-            "description": "Asset No is required on Wasted Journey sheets",
+            "description": "Asset Number (Asset No) is required on Wasted Journey sheets",
             "severity": "critical",
             "type": "required",
             "enabled": true
@@ -208,7 +202,7 @@
           {
             "ruleId": "WJ-R007",
             "field": "assetId",
-            "description": "Asset ID should be alphanumeric registration-style",
+            "description": "Asset Number should be alphanumeric registration-style (e.g. YH23WKA_1C)",
             "severity": "major",
             "type": "pattern",
             "pattern": "^[A-Z0-9][A-Z0-9_-]*$",
