@@ -10,24 +10,24 @@ on:
     branches: [main, develop]
   schedule:
     # Run nightly at 2 AM UTC
-    - cron: '0 2 * * *'
+    - cron: "0 2 * * *"
   workflow_dispatch:
     inputs:
       full_run:
-        description: 'Run full parity suite (not just subset)'
+        description: "Run full parity suite (not just subset)"
         required: false
-        default: 'false'
+        default: "false"
         type: boolean
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: "20"
 
 jobs:
   parity-subset:
     name: Parity Subset (PR Gate)
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
-    
+
     steps:
       - name: Log CI context
         env:
@@ -52,7 +52,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
+          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -123,27 +123,27 @@ jobs:
           script: |
             const fs = require('fs');
             let body = '## 🔍 Parity Check Results\n\n';
-            
+
             try {
               const summary = fs.readFileSync('parity/reports/latest-summary.md', 'utf-8');
               body += summary;
             } catch (e) {
               body += '⚠️ Parity report not available\n';
             }
-            
+
             body += '\n---\n';
             body += `📦 [View Artifacts](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n`;
             body += `🔗 [Workflow Run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n`;
-            
+
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
+
             const botComment = comments.find(c => c.body.includes('🔍 Parity Check Results'));
-            
+
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -167,7 +167,7 @@ jobs:
       github.event_name == 'schedule' ||
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && inputs.full_run == 'true')
-    
+
     steps:
       - name: Log CI context
         env:
@@ -192,7 +192,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
+          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -209,15 +209,15 @@ jobs:
           echo "Running full parity tests..."
           mkdir -p parity/reports
           pnpm test:parity:full 2>&1 | tee parity/reports/full-output.txt || true
-          
+
           # Generate comprehensive report
           node -e "
           const fs = require('fs');
-          
+
           // Read configs
           const thresholds = JSON.parse(fs.readFileSync('parity/config/thresholds.json', 'utf-8'));
           const dataset = JSON.parse(fs.readFileSync('parity/fixtures/golden-dataset.json', 'utf-8'));
-          
+
           // Calculate comprehensive stats
           let totalFields = 0;
           let passedFields = 0;
@@ -225,7 +225,7 @@ jobs:
           const bySeverity = { S0: { total: 0, passed: 0 }, S1: { total: 0, passed: 0 }, S2: { total: 0, passed: 0 }, S3: { total: 0, passed: 0 } };
           const byReasonCode = {};
           const docResults = [];
-          
+
           dataset.documents.forEach(doc => {
             let docPassed = 0;
             let docFailed = 0;
@@ -257,16 +257,16 @@ jobs:
               findings: doc.findings.length
             });
           });
-          
+
           const passRate = (passedFields / totalFields * 100).toFixed(1);
-          
+
           // Check thresholds
           const violations = [];
           const overallThreshold = thresholds.thresholds.overall.minPassRate * 100;
           if (parseFloat(passRate) < overallThreshold) {
             violations.push('Overall pass rate ' + passRate + '% below threshold ' + overallThreshold + '%');
           }
-          
+
           Object.entries(bySeverity).forEach(([sev, data]) => {
             const rate = data.total > 0 ? data.passed / data.total : 1;
             const threshold = thresholds.thresholds.bySeverity[sev]?.minPassRate || 0;
@@ -274,12 +274,12 @@ jobs:
               violations.push(sev + ' pass rate ' + (rate * 100).toFixed(1) + '% below threshold ' + (threshold * 100) + '%');
             }
           });
-          
+
           // Generate markdown summary
           let md = '## Parity Full Suite Report\\n\\n';
           md += '**Dataset Version:** ' + dataset.version + '\\n';
           md += '**Threshold Config:** ' + thresholds.version + '\\n\\n';
-          
+
           md += '### Overall Results\\n\\n';
           md += '| Metric | Value |\\n|--------|-------|\\n';
           md += '| Documents | ' + dataset.documents.length + ' |\\n';
@@ -288,7 +288,7 @@ jobs:
           md += '| Passed | ' + passedFields + ' |\\n';
           md += '| Failed | ' + failedFields + ' |\\n';
           md += '| **Pass Rate** | **' + passRate + '%** |\\n\\n';
-          
+
           md += '### By Severity\\n\\n';
           md += '| Severity | Passed | Total | Rate | Threshold | Status |\\n';
           md += '|----------|--------|-------|------|-----------|--------|\\n';
@@ -298,7 +298,7 @@ jobs:
             const status = parseFloat(rate) >= parseFloat(threshold) ? '✅' : '❌';
             md += '| ' + sev + ' | ' + data.passed + ' | ' + data.total + ' | ' + rate + '% | ' + threshold + '% | ' + status + ' |\\n';
           });
-          
+
           md += '\\n### By Reason Code\\n\\n';
           md += '| Reason Code | Count | Description |\\n';
           md += '|-------------|-------|-------------|\\n';
@@ -306,7 +306,7 @@ jobs:
             const desc = dataset.reasonCodes[code] || 'Unknown';
             md += '| ' + code + ' | ' + data.total + ' | ' + desc + ' |\\n';
           });
-          
+
           md += '\\n### Document Results\\n\\n';
           md += '| Status | ID | Name | Passed | Failed | Findings |\\n';
           md += '|--------|-----|------|--------|--------|----------|\\n';
@@ -314,16 +314,16 @@ jobs:
             const status = doc.expectedResult === 'pass' ? '✅' : '❌';
             md += '| ' + status + ' | ' + doc.id + ' | ' + doc.name + ' | ' + doc.passed + ' | ' + doc.failed + ' | ' + doc.findings + ' |\\n';
           });
-          
+
           if (violations.length > 0) {
             md += '\\n### ⚠️ Threshold Violations\\n\\n';
             violations.forEach(v => md += '- ' + v + '\\n');
           } else {
             md += '\\n### ✅ All Thresholds Met\\n';
           }
-          
+
           fs.writeFileSync('parity/reports/full-summary.md', md);
-          
+
           // Generate JSON report for CI
           const report = {
             timestamp: new Date().toISOString(),
@@ -340,7 +340,7 @@ jobs:
             violations
           };
           fs.writeFileSync('parity/reports/latest.json', JSON.stringify(report, null, 2));
-          
+
           console.log(md);
           "
 

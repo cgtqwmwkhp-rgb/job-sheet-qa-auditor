@@ -417,7 +417,10 @@ function runSubsetParityV2(
         expField.value !== actField.value
       ) {
         posFieldsWorse++;
-        fieldComps.push({ field: expField.field, status: actField ? "worse" : "missing" });
+        fieldComps.push({
+          field: expField.field,
+          status: actField ? "worse" : "missing",
+        });
       } else {
         posFieldsSame++;
         docFieldsSame++;
@@ -425,7 +428,8 @@ function runSubsetParityV2(
       }
     }
 
-    const docStatus = docFieldsSame === expected.validatedFields.length ? "same" : "worse";
+    const docStatus =
+      docFieldsSame === expected.validatedFields.length ? "same" : "worse";
     if (docStatus === "same") posSame++;
     else posWorse++;
 
@@ -482,7 +486,11 @@ function runSubsetParityV2(
 
     const detectedFailedRules = actual.validatedFields
       .filter(f => f.status === "failed")
-      .map(f => ({ ruleId: f.ruleId, field: f.field, reasonCode: f.reasonCode }));
+      .map(f => ({
+        ruleId: f.ruleId,
+        field: f.field,
+        reasonCode: f.reasonCode,
+      }));
 
     const matched: string[] = [];
     const missed: string[] = [];
@@ -566,7 +574,9 @@ function generateSubsetSummaryV2(report: SubsetReport): string {
   if (report.positive.documents.length > 0) {
     for (const doc of report.positive.documents) {
       const icon = doc.status === "same" ? "✅" : "❌";
-      lines.push(`${icon} **${doc.documentName}** (${doc.documentId}): ${doc.status}`);
+      lines.push(
+        `${icon} **${doc.documentName}** (${doc.documentId}): ${doc.status}`
+      );
     }
     lines.push("");
   }
