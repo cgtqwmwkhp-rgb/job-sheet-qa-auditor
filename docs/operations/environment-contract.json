@@ -38,6 +38,14 @@
           "default": "false",
           "value": "true",
           "addedIn": "#249"
+        },
+        "FEATURE_PHOTO_PAIR_COMPARE": {
+          "type": "env",
+          "description": "Enables before/after photo pair compare stage (PHOTO-C012/C013/C014). Heuristic by default; VLM path when FEATURE_VLM_VERIFICATION / PHOTO_PAIR_USE_VLM are also on.",
+          "required": false,
+          "default": "false",
+          "value": "true",
+          "addedIn": "#259"
         }
       }
     },
