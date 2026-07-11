@@ -218,7 +218,7 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           ruleId: "CHECK-C010",
           label: "Checklist Completion",
           description:
-            "Compliance checklist field(s) still show placeholder \"Please select\" — checklist incomplete",
+            'Compliance checklist field(s) still show placeholder "Please select" — checklist incomplete',
           failClass: "minor",
           enabled: true,
           fieldAliases: ["Checklist Completion", "Checklist Incomplete"],

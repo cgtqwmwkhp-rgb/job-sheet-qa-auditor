@@ -39,12 +39,15 @@ function normaliseFieldLabel(raw: string): string {
 }
 
 export function evaluateChecklistCompleteness(
-  text: string,
+  text: string
 ): ChecklistCompletenessResult {
   const incompleteFields: string[] = [];
   const seen = new Set<string>();
 
-  const re = new RegExp(PLEASE_SELECT_LINE_RE.source, PLEASE_SELECT_LINE_RE.flags);
+  const re = new RegExp(
+    PLEASE_SELECT_LINE_RE.source,
+    PLEASE_SELECT_LINE_RE.flags
+  );
   let match: RegExpExecArray | null;
   while ((match = re.exec(text)) !== null) {
     const label = normaliseFieldLabel(match[1]);
@@ -58,9 +61,7 @@ export function evaluateChecklistCompleteness(
   const findings: Finding[] = [];
 
   if (incompleteFields.length > 0) {
-    const snippet = incompleteFields
-      .map(f => `${f}: Please select`)
-      .join("; ");
+    const snippet = incompleteFields.map(f => `${f}: Please select`).join("; ");
 
     findings.push({
       ruleId: `${CHECK_RULE_PREFIX}010`,
@@ -75,7 +76,7 @@ export function evaluateChecklistCompleteness(
       confidence: 95,
       pageNumber: 1,
       whyItMatters:
-        "Compliance checklist fields left at the default \"Please select\" " +
+        'Compliance checklist fields left at the default "Please select" ' +
         "indicate the engineer did not complete the inspection checklist. " +
         "The checklist is incomplete — not a substantive field failure.",
       suggestedFix:

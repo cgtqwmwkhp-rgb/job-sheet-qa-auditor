@@ -160,7 +160,7 @@ describe("checklistCompleteness", () => {
       const failClass = classifyFinding(
         f,
         "job-summary-v1",
-        DEFAULT_AUDIT_POLICY,
+        DEFAULT_AUDIT_POLICY
       );
       expect(failClass).toBe("minor");
     });
