@@ -75,6 +75,48 @@ function verdictStyle(v: AxisVerdict): string {
   return "bg-slate-50 text-slate-600 border-slate-200";
 }
 
+const EMPTY_AXES: PhotoPairAxes = {
+  work_done: "inconclusive",
+  repaired_properly: "inconclusive",
+  clean: "inconclusive",
+  residual_risk: "inconclusive",
+};
+
+function isAxisVerdict(v: unknown): v is AxisVerdict {
+  return v === "pass" || v === "fail" || v === "inconclusive";
+}
+
+function normalizeAxes(raw: unknown): PhotoPairAxes {
+  if (!raw || typeof raw !== "object") return { ...EMPTY_AXES };
+  const o = raw as Record<string, unknown>;
+  return {
+    work_done: isAxisVerdict(o.work_done) ? o.work_done : "inconclusive",
+    repaired_properly: isAxisVerdict(o.repaired_properly)
+      ? o.repaired_properly
+      : "inconclusive",
+    clean: isAxisVerdict(o.clean) ? o.clean : "inconclusive",
+    residual_risk: isAxisVerdict(o.residual_risk)
+      ? o.residual_risk
+      : "inconclusive",
+  };
+}
+
+/** True when work_done or repaired_properly failed (actionable pair fail). */
+export function pairHasActionableFail(
+  pair: Pick<PhotoPairResult, "axes"> | null | undefined
+): boolean {
+  const axes = pair?.axes;
+  if (!axes) return false;
+  return axes.work_done === "fail" || axes.repaired_properly === "fail";
+}
+
+export function photoPairHasActionableFail(
+  artifact: PhotoPairCompareArtifact | null | undefined
+): boolean {
+  if (!artifact || !Array.isArray(artifact.pairs)) return false;
+  return artifact.pairs.some(p => pairHasActionableFail(p));
+}
+
 export function BeforeAfterComparePane({
   artifact,
   documentUrl,
@@ -88,14 +130,10 @@ export function BeforeAfterComparePane({
     Record<number, "confirmed" | "overridden">
   >({});
 
-  if (!artifact || artifact.pairs.length === 0) return null;
+  const pairs = Array.isArray(artifact?.pairs) ? artifact!.pairs : [];
+  if (!artifact || pairs.length === 0) return null;
 
-  const hasFail = artifact.pairs.some(
-    p =>
-      p.axes.work_done === "fail" ||
-      p.axes.repaired_properly === "fail" ||
-      p.axes.clean === "fail"
-  );
+  const hasFail = pairs.some(p => pairHasActionableFail(p));
 
   return (
     <Card className={cn("shadow-none", className)}>
@@ -133,8 +171,9 @@ export function BeforeAfterComparePane({
             <p className="text-[11px] text-muted-foreground">
               {artifact.summary} · {artifact.provider}/{artifact.model}
             </p>
-            {artifact.pairs.map((pair, idx) => {
+            {pairs.map((pair, idx) => {
               const decision = decisions[idx];
+              const axes = pair.axes ?? EMPTY_AXES;
               return (
                 <div
                   key={idx}
@@ -172,14 +211,15 @@ export function BeforeAfterComparePane({
                         variant="outline"
                         className={cn(
                           "text-[10px] font-normal",
-                          verdictStyle(pair.axes[axis])
+                          verdictStyle(axes[axis])
                         )}
                       >
-                        {axisLabels[axis]}: {pair.axes[axis]}
+                        {axisLabels[axis]}: {axes[axis]}
                       </Badge>
                     ))}
                     <Badge variant="outline" className="text-[10px]">
-                      {pair.confidenceBand} {Math.round(pair.confidence * 100)}%
+                      {pair.confidenceBand}{" "}
+                      {Math.round((pair.confidence ?? 0) * 100)}%
                     </Badge>
                   </div>
 
@@ -274,6 +314,47 @@ export function mapPhotoPairCompareFromReport(
 ): PhotoPairCompareArtifact | null {
   if (!reportJson || typeof reportJson !== "object") return null;
   const report = reportJson as Record<string, unknown>;
-  const art = report.photoPairCompare as PhotoPairCompareArtifact | undefined;
-  return art ?? null;
+  const art = report.photoPairCompare;
+  if (!art || typeof art !== "object") return null;
+  const raw = art as Record<string, unknown>;
+  if (!Array.isArray(raw.pairs)) return null;
+
+  const pairs: PhotoPairResult[] = raw.pairs
+    .filter((p): p is Record<string, unknown> => !!p && typeof p === "object")
+    .map(p => ({
+      beforePage:
+        typeof p.beforePage === "number"
+          ? p.beforePage
+          : p.beforePage == null
+            ? null
+            : Number(p.beforePage) || null,
+      afterPage:
+        typeof p.afterPage === "number"
+          ? p.afterPage
+          : p.afterPage == null
+            ? null
+            : Number(p.afterPage) || null,
+      axes: normalizeAxes(p.axes),
+      confidence: typeof p.confidence === "number" ? p.confidence : 0,
+      confidenceBand:
+        p.confidenceBand === "high" ||
+        p.confidenceBand === "medium" ||
+        p.confidenceBand === "low"
+          ? p.confidenceBand
+          : "low",
+      reasoning: typeof p.reasoning === "string" ? p.reasoning : "",
+    }));
+
+  return {
+    enabled: Boolean(raw.enabled),
+    provider: typeof raw.provider === "string" ? raw.provider : "unknown",
+    model: typeof raw.model === "string" ? raw.model : "unknown",
+    pairs,
+    pageRoles: Array.isArray(raw.pageRoles)
+      ? (raw.pageRoles as PhotoPairCompareArtifact["pageRoles"])
+      : [],
+    summary: typeof raw.summary === "string" ? raw.summary : "",
+    processingTimeMs:
+      typeof raw.processingTimeMs === "number" ? raw.processingTimeMs : 0,
+  };
 }

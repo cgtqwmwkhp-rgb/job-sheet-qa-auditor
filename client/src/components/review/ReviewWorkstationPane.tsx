@@ -8,9 +8,17 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import {
   AlertCircle,
   CheckCircle2,
@@ -20,6 +28,7 @@ import {
   Keyboard,
   Loader2,
   MessageSquare,
+  MoreHorizontal,
   Pencil,
   RotateCcw,
 } from "lucide-react";
@@ -60,13 +69,9 @@ import {
   syncSelectionFromFinding,
 } from "@/lib/pdfFindingSync";
 import { isTerminalJobSheetStatus } from "@shared/processingProgress";
-import {
-  SelectionTracePanel,
-  type SelectionTrace,
-} from "@/components/audit/SelectionTracePanel";
+import { type SelectionTrace } from "@/components/audit/SelectionTracePanel";
 import { mapSelectionTraceFromReport } from "@/components/review/mapSelectionTrace";
 import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
-import { SelectionMarksPanel } from "@/components/review/SelectionMarksPanel";
 import {
   DocQualityBreakdown,
   mapDocQualityPenaltiesFromReport,
@@ -86,28 +91,36 @@ import {
   TyreFindingsGroup,
   isTyreComplianceFinding,
 } from "@/components/review/TyreFindingsGroup";
+import {
+  CommentFindingsGroup,
+  isCommentQualityFinding,
+} from "@/components/review/CommentFindingsGroup";
+import {
+  PhotoEvidenceFindingsGroup,
+  isPhotoPairFinding,
+} from "@/components/review/PhotoEvidenceFindingsGroup";
 import { ReviewShortcutsLegend } from "@/components/review/ReviewShortcutsLegend";
 import {
-  FailurePathSignalsPanel,
   mapFailurePathSignalsFromReport,
   type FailurePathSignals,
 } from "@/components/review/FailurePathSignalsPanel";
 import {
-  CommentQualityPanel,
   mapCommentQualityFromReport,
   type CommentQualitySignals,
 } from "@/components/review/CommentQualityPanel";
 import {
-  BeforeAfterComparePane,
   mapPhotoPairCompareFromReport,
   resolvePhotoPairFindings,
   type PhotoPairCompareArtifact,
 } from "@/components/review/BeforeAfterComparePane";
 import {
-  DeepNoteAnalysis,
   mapDeepNoteFromReport,
   type DeepNoteAnalysisData,
 } from "@/components/DeepNoteAnalysis";
+import {
+  ClinicalContextStack,
+  hasActionableClinicalContext,
+} from "@/components/review/ClinicalContextStack";
 
 export interface Finding {
   id: number | string;
@@ -436,22 +449,24 @@ export function ReviewWorkstationPane({
   }
 
   return (
-    <ReviewWorkstationContent
-      key={jobSheetId}
-      auditData={auditData}
-      documentUrl={documentUrl}
-      jobSheetId={jobSheetId}
-      compact={compact}
-      showJobSheetActions={showJobSheetActions}
-      onApproveJobSheet={onApproveJobSheet}
-      onRejectJobSheet={onRejectJobSheet}
-      approvePending={approvePending}
-      rejectPending={rejectPending}
-      paneRef={paneRef}
-      commentQualityDerived={commentQualityDerived}
-      photoPairCompare={photoPairCompare}
-      deepNoteAnalysis={deepNoteAnalysis}
-    />
+    <ErrorBoundary>
+      <ReviewWorkstationContent
+        key={jobSheetId}
+        auditData={auditData}
+        documentUrl={documentUrl}
+        jobSheetId={jobSheetId}
+        compact={compact}
+        showJobSheetActions={showJobSheetActions}
+        onApproveJobSheet={onApproveJobSheet}
+        onRejectJobSheet={onRejectJobSheet}
+        approvePending={approvePending}
+        rejectPending={rejectPending}
+        paneRef={paneRef}
+        commentQualityDerived={commentQualityDerived}
+        photoPairCompare={photoPairCompare}
+        deepNoteAnalysis={deepNoteAnalysis}
+      />
+    </ErrorBoundary>
   );
 }
 
@@ -738,7 +753,10 @@ function ReviewWorkstationContent({
     pairIndex: number,
     action: "approve" | "override"
   ) => {
-    const pair = photoPairCompare?.pairs[pairIndex];
+    const pairs = Array.isArray(photoPairCompare?.pairs)
+      ? photoPairCompare!.pairs
+      : [];
+    const pair = pairs[pairIndex];
     if (!pair) {
       toast.error("Pair not found");
       return;
@@ -998,64 +1016,70 @@ function ReviewWorkstationContent({
   const passedFindings = auditData.findings.filter(f => f.status === "passed");
   const failedFindings = auditData.findings.filter(f => f.status !== "passed");
 
+  const hasMajor =
+    Boolean(auditData.hasMajorFails) ||
+    auditData.findings.some(
+      f => f.failClass === "major" && f.status !== "passed"
+    );
+  const outcome: {
+    label: "Pass" | "Needs review" | "Fail";
+    variant: "default" | "secondary" | "destructive";
+  } = hasMajor
+    ? { label: "Fail", variant: "destructive" }
+    : failedFindings.length > 0
+      ? { label: "Needs review", variant: "secondary" }
+      : auditData.status === "failed"
+        ? { label: "Fail", variant: "destructive" }
+        : { label: "Pass", variant: "default" };
+
   return (
     <div
       ref={resolvedPaneRef}
       tabIndex={-1}
-      className={`flex flex-col outline-none ${compact ? "h-full min-h-0" : "h-[calc(100vh-5.5rem)]"}`}
+      className="flex flex-col outline-none overflow-hidden h-full min-h-0"
     >
       <div
-        className={`flex items-center justify-between shrink-0 ${compact ? "mb-2 px-1" : "mb-2"}`}
+        className={`flex items-center justify-between shrink-0 gap-2 border-b border-border bg-white ${compact ? "px-2 py-1.5" : "px-3 py-2"}`}
       >
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h2
-              className={`font-bold tracking-tight ${compact ? "text-lg" : "text-2xl"}`}
-            >
-              {auditData.id}
-            </h2>
-            <Badge
-              variant={
-                auditData.status === "passed" ? "default" : "destructive"
-              }
-            >
-              {auditData.status.toUpperCase()}
-            </Badge>
-            {(auditData.hasMajorFails ||
-              (auditData.status === "failed" &&
-                auditData.findings.some(f => f.failClass === "major"))) && (
-              <Badge variant="destructive" className="font-semibold">
-                Major fail
-              </Badge>
-            )}
-            <DocQualityBreakdown
-              score={auditData.score}
-              penalties={auditData.docQualityPenalties ?? []}
-            />
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Technician: {auditData.technician} • Date: {auditData.date} •{" "}
-            {passedFindings.length} passed, {failedFindings.length} issues
-          </p>
+        <div className="min-w-0 flex items-center gap-2 flex-wrap">
+          <h2 className="font-semibold tracking-tight truncate text-base">
+            {auditData.id}
+          </h2>
+          <Badge
+            variant={outcome.variant}
+            className="font-semibold text-[10px]"
+          >
+            {outcome.label}
+          </Badge>
+          <DocQualityBreakdown
+            score={auditData.score}
+            penalties={auditData.docQualityPenalties ?? []}
+          />
+          <span className="text-xs text-muted-foreground truncate">
+            {auditData.technician} · {auditData.date} · {failedFindings.length}{" "}
+            issue{failedFindings.length === 1 ? "" : "s"}
+          </span>
         </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
+        <div className="flex items-center gap-1.5 shrink-0">
           {showJobSheetActions && (
             <>
               <Button
                 size="sm"
+                className="h-8"
                 onClick={onApproveJobSheet}
                 disabled={approvePending}
               >
                 {approvePending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  <CheckCircle2 className="w-4 h-4" />
                 )}
-                Approve
+                <span className="ml-1.5 hidden xl:inline">Approve</span>
               </Button>
               <Button
                 size="sm"
                 variant="destructive"
+                className="h-8"
                 onClick={onRejectJobSheet}
                 disabled={rejectPending}
               >
@@ -1066,144 +1090,108 @@ function ReviewWorkstationContent({
           <Button
             variant="outline"
             size="sm"
-            onClick={handleReprocess}
-            disabled={reprocessMutation.isPending}
-          >
-            {reprocessMutation.isPending ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RotateCcw className="w-4 h-4 mr-2" />
-            )}
-            Reprocess
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
+            className="h-8"
             onClick={handleBulkApproveFindings}
             disabled={
               bulkApproveMutation.isPending || failedFindings.length === 0
             }
           >
             {bulkApproveMutation.isPending ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
             ) : (
-              <CheckCircle2 className="w-4 h-4 mr-2" />
+              <CheckCircle2 className="w-4 h-4 mr-1.5" />
             )}
-            Approve open findings
+            Approve open
           </Button>
           <Button
             variant="outline"
             size="sm"
+            className="h-8"
             onClick={handleFlagForReview}
             disabled={flagMutation.isPending}
           >
             {flagMutation.isPending ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
             ) : (
-              <Flag className="w-4 h-4 mr-2" />
+              <Flag className="w-4 h-4 mr-1.5" />
             )}
             Flag
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowLegend(v => !v)}
-            aria-label="Toggle keyboard shortcuts"
-          >
-            <Keyboard className="w-4 h-4 mr-2" />
-            Shortcuts
-          </Button>
-          {!compact && (
-            <>
-              <ViewPdfButton jobSheetId={jobSheetId} auditId={auditData.id} />
-              <DownloadPdfButton
-                jobSheetId={jobSheetId}
-                auditId={auditData.id}
-              />
-            </>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                aria-label="More actions"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={handleReprocess}
+                disabled={reprocessMutation.isPending}
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Reprocess
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowLegend(v => !v)}>
+                <Keyboard className="w-4 h-4 mr-2" />
+                Shortcuts
+              </DropdownMenuItem>
+              {!compact && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (!jobSheetId) {
+                        toast.error("No job sheet ID available");
+                        return;
+                      }
+                      window.open(`/api/documents/${jobSheetId}/pdf`, "_blank");
+                    }}
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    View PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      const a = document.createElement("a");
+                      a.href = `/api/documents/${jobSheetId}/pdf`;
+                      a.download = `${auditData.id}.pdf`;
+                      a.click();
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
       {showLegend && (
         <ReviewShortcutsLegend
           variant="workstation"
-          className="bg-muted/40 mb-2"
+          className="bg-muted/40 shrink-0 border-b"
         />
       )}
 
-      <div className={compact ? "mb-2 px-1 space-y-2" : "mb-2 space-y-2"}>
-        <SelectionTracePanel
-          trace={auditData.selectionTrace ?? null}
-          defaultOpen={false}
-          className="shadow-none"
-        />
-        <SelectionMarksPanel
-          marks={auditData.selectionMarks ?? null}
-          defaultOpen={
-            (auditData.selectionMarks?.rows.some(r => r.choice === "Fail") ||
-              false) ??
-            false
-          }
-          className="shadow-none"
-          onRowClick={(_rowIndex, pageNumber) => {
-            setFocusPage(pageNumber);
-            if (!showPdfViewer) setShowPdfViewer(true);
-          }}
-        />
-        <FailurePathSignalsPanel
-          signals={auditData.failurePathSignals ?? null}
-          signalSummary={auditData.failurePathSignalSummary}
-          defaultOpen={auditData.failurePathSignals?.onFailurePath ?? false}
-          className="shadow-none"
-        />
-        <CommentQualityPanel
-          signals={commentQualityDerived.signals}
-          summary={commentQualityDerived.summary}
-          defaultOpen={Boolean(
-            commentQualityDerived.signals?.onFailurePath &&
-              !commentQualityDerived.signals?.coherent
-          )}
-          className="shadow-none"
-        />
-        <BeforeAfterComparePane
-          artifact={photoPairCompare}
-          documentUrl={documentUrl}
-          defaultOpen={Boolean(
-            photoPairCompare?.pairs.some(
-              p =>
-                p.axes.work_done === "fail" ||
-                p.axes.repaired_properly === "fail"
-            )
-          )}
-          className="shadow-none"
-          onConfirmPair={handleConfirmPair}
-          onOverridePair={handleOverridePair}
-        />
-        {deepNoteAnalysis ? (
-          <DeepNoteAnalysis
-            analysis={deepNoteAnalysis}
-            className="shadow-none"
-          />
-        ) : null}
-      </div>
-
-      {/* Document-first landscape: PDF takes ~70–75% width; findings are a narrow review rail */}
       <div
-        className={`flex-1 grid grid-cols-1 min-h-0 gap-3 ${
+        className={`flex-1 min-h-0 grid grid-cols-1 gap-0 ${
           compact
-            ? "lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)]"
-            : "lg:grid-cols-[minmax(0,1fr)_minmax(280px,22rem)] xl:grid-cols-[minmax(0,1fr)_minmax(300px,24rem)]"
+            ? "lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]"
+            : "lg:grid-cols-[minmax(0,1fr)_minmax(300px,26rem)]"
         }`}
       >
-        <div className="flex flex-col min-h-0 min-w-0 h-full overflow-hidden rounded-lg border border-border bg-white">
+        <div className="flex flex-col min-h-0 min-w-0 h-full overflow-hidden bg-white border-r border-border">
           {!showPdfViewer ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/20 p-6">
               <Eye className="w-12 h-12 mb-4 opacity-40" />
               <p className="text-sm font-medium mb-2">Document Preview</p>
-              <p className="text-xs text-center max-w-[220px] mb-4">
-                Load the document to review findings against the page.
-              </p>
               <Button
                 variant="secondary"
                 size="sm"
@@ -1227,40 +1215,35 @@ function ReviewWorkstationContent({
           )}
         </div>
 
-        <Card className="flex flex-col h-full min-h-0 overflow-hidden min-w-0">
-          <CardHeader className="py-2.5 px-3 border-b shrink-0">
-            <CardTitle className="text-sm font-medium">
-              Audit Findings
-            </CardTitle>
-          </CardHeader>
-
-          <Tabs defaultValue="all" className="flex-1 flex flex-col min-h-0">
-            <div className="px-3 pt-2 shrink-0">
-              <TabsList className="w-full grid grid-cols-3 h-9">
-                <TabsTrigger value="all" className="text-xs">
-                  All ({auditData.findings.length})
-                </TabsTrigger>
-                <TabsTrigger value="issues" className="text-xs">
+        <Card className="flex flex-col h-full min-h-0 overflow-hidden min-w-0 rounded-none border-0 shadow-none">
+          <Tabs defaultValue="issues" className="flex-1 flex flex-col min-h-0">
+            <div className="px-2 pt-2 shrink-0 border-b border-border pb-2">
+              <TabsList className="w-full grid grid-cols-4 h-8">
+                <TabsTrigger value="issues" className="text-[11px] px-1">
                   Issues ({failedFindings.length})
                 </TabsTrigger>
-                <TabsTrigger value="passed" className="text-xs">
-                  Passed ({passedFindings.length})
+                <TabsTrigger value="all" className="text-[11px] px-1">
+                  All ({auditData.findings.length})
+                </TabsTrigger>
+                <TabsTrigger value="passed" className="text-[11px] px-1">
+                  Passed
+                </TabsTrigger>
+                <TabsTrigger value="context" className="text-[11px] px-1">
+                  Context
+                  {hasActionableClinicalContext({
+                    commentSignals: commentQualityDerived.signals,
+                    photoPairCompare,
+                  }) ? (
+                    <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-destructive" />
+                  ) : null}
                 </TabsTrigger>
               </TabsList>
             </div>
 
-            <TabsContent value="all" className="flex-1 min-h-0 m-0">
-              <FindingsList
-                findings={auditData.findings}
-                activeBoxId={activeBoxId}
-                onFindingClick={handleFindingClick}
-                onReportIssue={handleReportIssue}
-                onOverride={handleOverrideClick}
-                onCorrect={handleCorrectClick}
-              />
-            </TabsContent>
-
-            <TabsContent value="issues" className="flex-1 min-h-0 m-0">
+            <TabsContent
+              value="issues"
+              className="flex-1 min-h-0 m-0 overflow-hidden data-[state=inactive]:hidden"
+            >
               <IssuesTabContent
                 findings={failedFindings}
                 activeBoxId={activeBoxId}
@@ -1271,7 +1254,24 @@ function ReviewWorkstationContent({
               />
             </TabsContent>
 
-            <TabsContent value="passed" className="flex-1 min-h-0 m-0">
+            <TabsContent
+              value="all"
+              className="flex-1 min-h-0 m-0 overflow-hidden data-[state=inactive]:hidden"
+            >
+              <FindingsList
+                findings={auditData.findings}
+                activeBoxId={activeBoxId}
+                onFindingClick={handleFindingClick}
+                onReportIssue={handleReportIssue}
+                onOverride={handleOverrideClick}
+                onCorrect={handleCorrectClick}
+              />
+            </TabsContent>
+
+            <TabsContent
+              value="passed"
+              className="flex-1 min-h-0 m-0 overflow-hidden data-[state=inactive]:hidden"
+            >
               <FindingsList
                 findings={passedFindings}
                 activeBoxId={activeBoxId}
@@ -1280,6 +1280,31 @@ function ReviewWorkstationContent({
                 onOverride={handleOverrideClick}
                 onCorrect={handleCorrectClick}
               />
+            </TabsContent>
+
+            <TabsContent
+              value="context"
+              className="flex-1 min-h-0 m-0 overflow-hidden data-[state=inactive]:hidden"
+            >
+              <ScrollArea className="h-full">
+                <ClinicalContextStack
+                  selectionTrace={auditData.selectionTrace ?? null}
+                  selectionMarks={auditData.selectionMarks ?? null}
+                  failurePathSignals={auditData.failurePathSignals ?? null}
+                  failurePathSignalSummary={auditData.failurePathSignalSummary}
+                  commentSignals={commentQualityDerived.signals}
+                  commentSummary={commentQualityDerived.summary}
+                  photoPairCompare={photoPairCompare}
+                  deepNoteAnalysis={deepNoteAnalysis}
+                  documentUrl={documentUrl}
+                  onConfirmPair={handleConfirmPair}
+                  onOverridePair={handleOverridePair}
+                  onMarksRowClick={(_rowIndex, pageNumber) => {
+                    setFocusPage(pageNumber);
+                    if (!showPdfViewer) setShowPdfViewer(true);
+                  }}
+                />
+              </ScrollArea>
             </TabsContent>
           </Tabs>
         </Card>
@@ -1586,18 +1611,10 @@ function FindingsList({
                     {finding.ruleId}
                   </Badge>
                 )}
-                {finding.reasonCode && (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] px-1.5 bg-violet-50 text-violet-600 border-violet-300"
-                    title={`Reason code: ${finding.reasonCode}`}
-                  >
-                    {finding.reasonCode}
-                  </Badge>
-                )}
-                <Badge variant="outline" className="bg-white/50">
-                  {(finding.confidence * 100).toFixed(0)}% Extract conf.
-                </Badge>
+                <span className="text-[10px] text-muted-foreground tabular-nums">
+                  {(finding.confidence * 100).toFixed(0)}%
+                  {finding.reasonCode ? ` · ${finding.reasonCode}` : ""}
+                </span>
               </div>
             </div>
 
@@ -1691,8 +1708,25 @@ function IssuesTabContent({
   const tyreFindings = findings.filter(
     f => !isRelationshipFinding(f) && isTyreComplianceFinding(f)
   );
+  const commentFindings = findings.filter(
+    f =>
+      !isRelationshipFinding(f) &&
+      !isTyreComplianceFinding(f) &&
+      isCommentQualityFinding(f)
+  );
+  const photoFindings = findings.filter(
+    f =>
+      !isRelationshipFinding(f) &&
+      !isTyreComplianceFinding(f) &&
+      !isCommentQualityFinding(f) &&
+      isPhotoPairFinding(f)
+  );
   const otherFindings = findings.filter(
-    f => !isRelationshipFinding(f) && !isTyreComplianceFinding(f)
+    f =>
+      !isRelationshipFinding(f) &&
+      !isTyreComplianceFinding(f) &&
+      !isCommentQualityFinding(f) &&
+      !isPhotoPairFinding(f)
   );
 
   if (findings.length === 0) {
@@ -1724,6 +1758,23 @@ function IssuesTabContent({
             onReportIssue={onReportIssue}
             onOverride={onOverride}
             onCorrect={onCorrect}
+          />
+        )}
+        {commentFindings.length > 0 && (
+          <CommentFindingsGroup
+            findings={commentFindings}
+            activeBoxId={activeBoxId}
+            onFindingClick={onFindingClick}
+            onReportIssue={onReportIssue}
+            onOverride={onOverride}
+            onCorrect={onCorrect}
+          />
+        )}
+        {photoFindings.length > 0 && (
+          <PhotoEvidenceFindingsGroup
+            findings={photoFindings}
+            activeBoxId={activeBoxId}
+            onFindingClick={onFindingClick}
           />
         )}
         {otherFindings.map(finding => (
@@ -1774,18 +1825,10 @@ function IssuesTabContent({
                     {finding.ruleId}
                   </Badge>
                 )}
-                {finding.reasonCode && (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] px-1.5 bg-violet-50 text-violet-600 border-violet-300"
-                    title={`Reason code: ${finding.reasonCode}`}
-                  >
-                    {finding.reasonCode}
-                  </Badge>
-                )}
-                <Badge variant="outline" className="bg-white/50">
-                  {(finding.confidence * 100).toFixed(0)}% Extract conf.
-                </Badge>
+                <span className="text-[10px] text-muted-foreground tabular-nums">
+                  {(finding.confidence * 100).toFixed(0)}%
+                  {finding.reasonCode ? ` · ${finding.reasonCode}` : ""}
+                </span>
               </div>
             </div>
 
@@ -1864,62 +1907,5 @@ function IssuesTabContent({
         ))}
       </div>
     </ScrollArea>
-  );
-}
-
-function ViewPdfButton({
-  jobSheetId,
-  auditId,
-}: {
-  jobSheetId: number;
-  auditId: string;
-}) {
-  const handleClick = () => {
-    if (!jobSheetId) {
-      toast.error("No job sheet ID available");
-      return;
-    }
-    window.open(`/api/documents/${jobSheetId}/pdf`, "_blank");
-  };
-
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={handleClick}
-      disabled={!jobSheetId}
-    >
-      <Eye className="w-4 h-4 mr-2" />
-      View PDF
-    </Button>
-  );
-}
-
-function DownloadPdfButton({
-  jobSheetId,
-  auditId,
-}: {
-  jobSheetId: number;
-  auditId: string;
-}) {
-  const handleClick = () => {
-    if (!jobSheetId) {
-      toast.error("No job sheet ID available");
-      return;
-    }
-    const link = document.createElement("a");
-    link.href = `/api/documents/${jobSheetId}/pdf?download=1`;
-    link.download = `${auditId}-document.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Download started");
-  };
-
-  return (
-    <Button size="sm" onClick={handleClick} disabled={!jobSheetId}>
-      <Download className="w-4 h-4 mr-2" />
-      Download
-    </Button>
   );
 }
