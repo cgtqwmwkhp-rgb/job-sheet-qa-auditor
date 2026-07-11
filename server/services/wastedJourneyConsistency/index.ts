@@ -162,20 +162,26 @@ export function extractAssetNo(text: string): string | null {
   }
 
   // Nearby window after "Asset No" / "Asset Number" (skip "Asset Details")
-  const labelHits = [...normalized.matchAll(/Asset\s*(?:No\.?|Number|#)\b/gi)];
+  const labelHits: RegExpExecArray[] = [];
+  const labelRe = /Asset\s*(?:No\.?|Number|#)\b/gi;
+  let labelMatch: RegExpExecArray | null;
+  while ((labelMatch = labelRe.exec(normalized)) !== null) {
+    labelHits.push(labelMatch);
+  }
   for (const hit of labelHits) {
     const start = hit.index ?? 0;
     const window = normalized.slice(start, start + 120);
     if (/^Asset\s*Details/i.test(window)) continue;
-    const tokenMatches = [
-      ...window.matchAll(
-        /\b([A-Z]{1,3}\d{2}[A-Z]{3}(?:[_\s-]?[A-Z0-9]+)?)\b/gi
-      ),
-      ...window.matchAll(/\b([A-Z0-9]{5,}(?:[_\s-][A-Z0-9]+)+)\b/gi),
+    const tokenPatterns = [
+      /\b([A-Z]{1,3}\d{2}[A-Z]{3}(?:[_\s-]?[A-Z0-9]+)?)\b/gi,
+      /\b([A-Z0-9]{5,}(?:[_\s-][A-Z0-9]+)+)\b/gi,
     ];
-    for (const tm of tokenMatches) {
-      const candidate = normalizeAssetCandidate(tm[1] ?? "");
-      if (candidate) return candidate;
+    for (const tokenRe of tokenPatterns) {
+      let tm: RegExpExecArray | null;
+      while ((tm = tokenRe.exec(window)) !== null) {
+        const candidate = normalizeAssetCandidate(tm[1] ?? "");
+        if (candidate) return candidate;
+      }
     }
   }
 
