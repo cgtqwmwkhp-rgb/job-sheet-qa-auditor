@@ -8,7 +8,10 @@
 
 export type FailClass = "major" | "minor" | "informational";
 
-export type AuditFormFamily = "wasted-journey-v1" | "job-summary-v1" | "default";
+export type AuditFormFamily =
+  | "wasted-journey-v1"
+  | "job-summary-v1"
+  | "default";
 
 export interface AuditPolicyRule {
   ruleId: string;

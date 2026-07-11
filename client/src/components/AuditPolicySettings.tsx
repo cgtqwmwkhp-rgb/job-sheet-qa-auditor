@@ -179,8 +179,8 @@ export function AuditPolicySettings() {
           </CardTitle>
           <CardDescription className="text-sm space-y-1">
             <span className="block">
-              <strong>Major</strong> = immediate job-card fail (supersedes pass /
-              fail). Doc Quality % still shows for coaching.
+              <strong>Major</strong> = immediate job-card fail (supersedes pass
+              / fail). Doc Quality % still shows for coaching.
             </span>
             <span className="block">
               <strong>Minor</strong> = documentation score only — never forces

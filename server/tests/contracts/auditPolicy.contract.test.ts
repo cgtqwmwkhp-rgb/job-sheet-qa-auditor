@@ -44,9 +44,9 @@ describe("auditPolicy", () => {
       fieldName: "Scheduling Team Contacted",
       severity: "S1",
     });
-    expect(
-      classifyFinding(f, "wasted-journey-v1", DEFAULT_AUDIT_POLICY)
-    ).toBe("major");
+    expect(classifyFinding(f, "wasted-journey-v1", DEFAULT_AUDIT_POLICY)).toBe(
+      "major"
+    );
   });
 
   it("forces FAIL when any major is present regardless of current PASS", () => {

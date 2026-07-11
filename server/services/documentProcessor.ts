@@ -74,10 +74,7 @@ import {
   WASTED_JOURNEY_TEMPLATE_ID,
 } from "./wastedJourneyConsistency";
 import { computeDocumentationQualityScore } from "./documentationQuality";
-import {
-  applyAuditPolicy,
-  resolveAuditFormFamily,
-} from "./auditPolicy";
+import { applyAuditPolicy, resolveAuditFormFamily } from "./auditPolicy";
 import {
   runSelectionMarkDetection,
   isSelectionMarksEnabled,
@@ -1984,9 +1981,7 @@ async function processJobSheetWithOptions(
         extractedText,
         documentationQualityScore: analysisResult.score,
         llmConfidenceScore: llmConfidenceForReport,
-        ...(auditPolicyDecision
-          ? { auditPolicyDecision }
-          : {}),
+        ...(auditPolicyDecision ? { auditPolicyDecision } : {}),
         extractedFields: ensembleResult
           ? mergeExtractedFields(
               analysisResult.extractedFields,

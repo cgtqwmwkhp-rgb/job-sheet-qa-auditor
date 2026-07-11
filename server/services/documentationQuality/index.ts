@@ -47,8 +47,7 @@ function pointsForFinding(
   if (points <= 0) return 0;
   if (
     f.severity === "S2" &&
-    (f.reasonCode === "LOW_CONFIDENCE" ||
-      /ocr\s*confidence/i.test(f.fieldName))
+    (f.reasonCode === "LOW_CONFIDENCE" || /ocr\s*confidence/i.test(f.fieldName))
   ) {
     return 0;
   }

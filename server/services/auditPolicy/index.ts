@@ -40,7 +40,10 @@ function isInformationalFinding(f: Finding): boolean {
 }
 
 function normalizeKey(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
 }
 
 function findRule(
@@ -274,7 +277,9 @@ export function applyAuditPolicy(input: {
 }
 
 /** Parse raw DB setting value into a partial policy. */
-export function parseStoredAuditPolicy(raw: unknown): Partial<AuditPolicy> | null {
+export function parseStoredAuditPolicy(
+  raw: unknown
+): Partial<AuditPolicy> | null {
   if (raw == null) return null;
   let value: unknown = raw;
   if (typeof raw === "object" && raw !== null && "value" in raw) {
