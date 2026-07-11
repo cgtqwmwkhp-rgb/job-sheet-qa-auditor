@@ -283,6 +283,32 @@ Technician Name: nicholas.lawrence
     expect(result.hasBlockingIssues).toBe(false);
   });
 
+  it("Parts Still Required + Return Visit unknown raises JSR-C093 INCOMPLETE_EVIDENCE", () => {
+    const text = `
+Job Summary Report
+All Works Completed? No
+Asset Safe To Use? Yes
+Repairs Required
+Parts Used
+Parts Still Required
+hinge assembly kit
+Technician Name: nicholas.lawrence
+Engineer Comments: Waiting on hinge kit; return to fit and retest.
+`;
+    const result = evaluateJobSummaryConsistency(text);
+    const issue093 = result.findings.find(
+      f =>
+        f.ruleId === "JSR-C093" &&
+        /Parts Still Required ↔ Return Visit/.test(f.fieldName)
+    );
+    expect(issue093?.severity).toBe("S1");
+    expect(issue093?.reasonCode).toBe("INCOMPLETE_EVIDENCE");
+    expect(result.hasBlockingIssues).toBe(true);
+    expect(
+      result.findings.some(f => f.ruleId === "JSR-C090")
+    ).toBe(false);
+  });
+
   it("Parts Still Required + Return Yes is coherent (JSR-C092 Passed)", () => {
     const text = `
 Job Summary Report

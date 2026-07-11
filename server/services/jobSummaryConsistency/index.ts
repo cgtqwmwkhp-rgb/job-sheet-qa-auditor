@@ -801,7 +801,7 @@ export function evaluateJobSummaryConsistency(
   } else if (signals.partsStillRequired && !signals.returnVisit) {
     findings.push(
       issue(
-        `${CONSISTENCY_RULE_PREFIX}090`,
+        `${CONSISTENCY_RULE_PREFIX}093`,
         "Parts Still Required ↔ Return Visit",
         "INCOMPLETE_EVIDENCE",
         `Parts Still Required is recorded (${signals.partsStillSnippet}) but return visit was not confirmed as Yes.`,
