@@ -154,8 +154,8 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     required: false,
     severity: "S2",
     regexPatterns: [
-      /Serial\s*(?:No|Number|#)?[:\s]*([A-Z0-9-]+)/i,
-      /S\/N[:\s]*([A-Z0-9-]+)/i,
+      /Serial\s*(?:No|Number|#)?[:\s]*(?!(?:Asset|Make|Model|Customer|Serial|null|Null|N\/A)\b)([A-Z0-9][A-Z0-9-]{2,})/i,
+      /S\/N[:\s]*(?!(?:Asset|Make|Model|Customer|Serial|null|Null|N\/A)\b)([A-Z0-9][A-Z0-9-]{2,})/i,
       /VIN[:\s]*([A-Z0-9]{17})/i,
     ],
     fuzzyLabels: ["Serial No", "Serial Number", "S/N", "VIN"],
@@ -168,12 +168,20 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     required: true,
     severity: "S0",
     regexPatterns: [
+      /Job\s*ID\s*[:\s]*(\d+)/i,
       /Job\s*(?:No|Number|#)?[:\s]*(\d+)/i,
       /Work\s*Order[:\s]*(\d+)/i,
       /WO[:\s]*#?(\d+)/i,
       /Reference[:\s]*(\d+)/i,
     ],
-    fuzzyLabels: ["Job No", "Job Number", "Work Order", "WO", "Reference"],
+    fuzzyLabels: [
+      "Job ID",
+      "Job No",
+      "Job Number",
+      "Work Order",
+      "WO",
+      "Reference",
+    ],
     llmPrompt: "Extract the job number or work order number.",
   },
   {
@@ -214,7 +222,7 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
       /Technician(?:\s*Name)?[:\s]*([A-Za-z][A-Za-z\s.]+?)(?=\n|$)/i,
       /Completed\s*By[:\s]*([A-Za-z][A-Za-z\s.]+?)(?=\n|$)/i,
       /Print\s*name[:\s]*([A-Za-z][A-Za-z\s.]+?)(?=\n|$)/i,
-      /Name[:\s]*([a-z]+\.[a-z]+)/i,
+      /Technician\s*Name\s*[:\s]*([A-Za-z][A-Za-z0-9.\s-]+?)(?=\s*Signature|\n|$)/i,
     ],
     fuzzyLabels: [
       "Engineer",
@@ -641,6 +649,40 @@ export function normalizeDateExtractionValue(
   return v;
 }
 
+/** True when value looks like letterhead/footer noise (URLs, emails, phone numbers, company). */
+export function isLetterheadNoise(value: string): boolean {
+  const v = value.trim();
+  if (!v) return false;
+  if (/www\./i.test(v)) return true;
+  if (/https?:\/\//i.test(v)) return true;
+  if (/@/.test(v)) return true;
+  if (/\.com\b/i.test(v)) return true;
+  if (/\.co\.uk\b/i.test(v)) return true;
+  if (/\d{5,}/.test(v)) return true;
+  if (/plantexpand/i.test(v)) return true;
+  return false;
+}
+
+/** True when value is shaped like a username (firstname.lastname). */
+export function isUsernameShaped(value: string): boolean {
+  return /^[A-Za-z][A-Za-z0-9]*\.[A-Za-z][A-Za-z0-9]*$/.test(value.trim());
+}
+
+/** True when value is blank, null-like, or a field label word. */
+function isBlankOrPlaceholder(value: string | null | undefined): boolean {
+  if (!value) return true;
+  const v = value.trim();
+  if (!v) return true;
+  return /^(null|n\/a|none|nil|-|—|–|\.+)$/i.test(v);
+}
+
+/** True when value looks like a field label rather than serial data. */
+function isFieldLabelWord(value: string): boolean {
+  return /^(Asset|Make|Model|Customer|Serial|Number|No|null|Null|N\/A)$/i.test(
+    value.trim()
+  );
+}
+
 /** Coerce signature extractions values to Present/Absent; drop asset IDs. */
 export function normalizeSignatureExtractionValue(
   value: string | null
@@ -774,6 +816,60 @@ export async function ensembleExtract(
         evidence: "Date strategies produced only non-date / asset-ID noise",
         reasonCode: field.required ? "LOW_CONFIDENCE" : null,
       };
+    }
+  }
+
+  // Job number digit normalization: if all values are the same digits, treat as agreement
+  if (field.name === "job_no" || field.name === "job_number") {
+    const digitValues = results
+      .filter(r => r.value)
+      .map(r => r.value!.replace(/\D/g, ""));
+    const uniqueDigits = new Set(digitValues.filter(d => d.length > 0));
+    if (uniqueDigits.size === 1 && results.length >= 2) {
+      const canonical = [...uniqueDigits][0];
+      const best = results.reduce((a, b) =>
+        a.confidence > b.confidence ? a : b
+      );
+      results.length = 0;
+      results.push({
+        ...best,
+        value: normalizeValue(canonical, field.normalizer),
+      });
+    }
+  }
+
+  // Serial number hygiene: if all values are blank/placeholder/label, return null (no CONFLICT)
+  if (field.name === "serial_no") {
+    const allBlank = results.every(
+      r => isBlankOrPlaceholder(r.value) || isFieldLabelWord(r.value ?? "")
+    );
+    if (allBlank) {
+      return {
+        displayName: field.displayName,
+        required: field.required,
+        severity: field.severity,
+        value: null,
+        confidence: 0,
+        strategy: "none",
+        evidence:
+          "Serial number values are all blank/placeholder/label — no data",
+        reasonCode: null,
+      };
+    }
+  }
+
+  // Engineer name hygiene: filter letterhead noise and prefer username-shaped values
+  if (field.name === "engineer_name") {
+    const cleaned = results.filter(r => !isLetterheadNoise(r.value ?? ""));
+    if (cleaned.length > 0 && cleaned.length < results.length) {
+      const usernames = cleaned.filter(r => isUsernameShaped(r.value ?? ""));
+      if (usernames.length > 0) {
+        results.length = 0;
+        results.push(...usernames);
+      } else {
+        results.length = 0;
+        results.push(...cleaned);
+      }
     }
   }
 
