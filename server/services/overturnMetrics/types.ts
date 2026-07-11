@@ -14,9 +14,7 @@ export const OVERTURN_ACTIONS: readonly FindingAction[] = [
 ] as const;
 
 /** Actions that are "agreement" — the human accepted the AI finding. */
-export const AGREEMENT_ACTIONS: readonly FindingAction[] = [
-  "approve",
-] as const;
+export const AGREEMENT_ACTIONS: readonly FindingAction[] = ["approve"] as const;
 
 /**
  * A single audit action log entry consumed by the metrics engine.

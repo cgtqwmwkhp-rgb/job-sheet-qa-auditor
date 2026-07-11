@@ -102,8 +102,8 @@ export function computeOverturnMetrics(
   const breakdown: OverturnBreakdown[] = (
     ["override", "waive", "field_correction"] as const
   )
-    .filter((cat) => categoryCounts.has(cat))
-    .map((cat) => {
+    .filter(cat => categoryCounts.has(cat))
+    .map(cat => {
       const count = categoryCounts.get(cat)!;
       return {
         category: cat,
@@ -146,7 +146,7 @@ export function computeOverturnRate(
   let removedCount = 0;
   let unchangedCount = 0;
 
-  for (const id of before) {
+  for (const id of Array.from(before)) {
     if (after.has(id)) {
       unchangedCount++;
     } else {
@@ -155,7 +155,7 @@ export function computeOverturnRate(
   }
 
   let addedCount = 0;
-  for (const id of after) {
+  for (const id of Array.from(after)) {
     if (!before.has(id)) addedCount++;
   }
 
