@@ -17,6 +17,7 @@ import {
   Download,
   Eye,
   Flag,
+  Keyboard,
   Loader2,
   MessageSquare,
   Pencil,
@@ -80,6 +81,7 @@ import {
   RelationshipFindingsGroup,
   isRelationshipFinding,
 } from "@/components/review/RelationshipFindingsGroup";
+import { ReviewShortcutsLegend } from "@/components/review/ReviewShortcutsLegend";
 
 export interface Finding {
   id: number | string;
@@ -431,6 +433,7 @@ function ReviewWorkstationContent({
   const [correctedValue, setCorrectedValue] = useState("");
   // Default true = auto-load PDF. Remount via key={jobSheetId} on parent resets state.
   const [showPdfViewer, setShowPdfViewer] = useState(true);
+  const [showLegend, setShowLegend] = useState(false);
   const localPaneRef = useRef<HTMLDivElement>(null);
   const resolvedPaneRef = paneRef ?? localPaneRef;
 
@@ -922,6 +925,15 @@ function ReviewWorkstationContent({
             )}
             Flag
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowLegend(v => !v)}
+            aria-label="Toggle keyboard shortcuts"
+          >
+            <Keyboard className="w-4 h-4 mr-2" />
+            Shortcuts
+          </Button>
           {!compact && (
             <>
               <ViewPdfButton jobSheetId={jobSheetId} auditId={auditData.id} />
@@ -933,6 +945,13 @@ function ReviewWorkstationContent({
           )}
         </div>
       </div>
+
+      {showLegend && (
+        <ReviewShortcutsLegend
+          variant="workstation"
+          className="bg-muted/40 mb-2"
+        />
+      )}
 
       <div className={compact ? "mb-2 px-1 space-y-2" : "mb-2 space-y-2"}>
         <SelectionTracePanel
@@ -1363,7 +1382,7 @@ function FindingsList({
                   </Badge>
                 )}
                 <Badge variant="outline" className="bg-white/50">
-                  {(finding.confidence * 100).toFixed(0)}% Conf.
+                  {(finding.confidence * 100).toFixed(0)}% Extract conf.
                 </Badge>
               </div>
             </div>
@@ -1536,7 +1555,7 @@ function IssuesTabContent({
                   </Badge>
                 )}
                 <Badge variant="outline" className="bg-white/50">
-                  {(finding.confidence * 100).toFixed(0)}% Conf.
+                  {(finding.confidence * 100).toFixed(0)}% Extract conf.
                 </Badge>
               </div>
             </div>
