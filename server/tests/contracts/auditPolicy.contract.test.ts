@@ -204,4 +204,70 @@ describe("auditPolicy", () => {
       "major"
     );
   });
+
+  it("resolves unknown template slug to 'default' form family", () => {
+    expect(resolveAuditFormFamily("custom-checklist-v3", false)).toBe(
+      "default"
+    );
+    expect(resolveAuditFormFamily("hvac-inspection-v1", false)).toBe("default");
+  });
+
+  it("classifies default-family safety rules as major for unknown templates", () => {
+    const vorConflict = finding({
+      ruleId: "DEF-C010",
+      fieldName: "VOR ↔ Safe to Use",
+      severity: "S1",
+    });
+    expect(classifyFinding(vorConflict, "default", DEFAULT_AUDIT_POLICY)).toBe(
+      "major"
+    );
+
+    const signature = finding({
+      ruleId: "DEF-C040",
+      fieldName: "Engineer Signature / Sign-off",
+      severity: "S1",
+    });
+    expect(classifyFinding(signature, "default", DEFAULT_AUDIT_POLICY)).toBe(
+      "major"
+    );
+  });
+
+  it("classifies default-family minor rules correctly", () => {
+    const dateFormat = finding({
+      ruleId: "DEF-R010",
+      fieldName: "Asset Number",
+      severity: "S2",
+    });
+    expect(classifyFinding(dateFormat, "default", DEFAULT_AUDIT_POLICY)).toBe(
+      "minor"
+    );
+  });
+
+  it("unmapped rule in default family still falls back to minor", () => {
+    const unknown = finding({
+      ruleId: "LLM-NOVEL",
+      fieldName: "Never Seen Before",
+      severity: "S1",
+    });
+    expect(classifyFinding(unknown, "default", DEFAULT_AUDIT_POLICY)).toBe(
+      "minor"
+    );
+  });
+
+  it("applyAuditPolicy with default family triggers FAIL on major", () => {
+    const applied = applyAuditPolicy({
+      findings: [
+        finding({
+          ruleId: "DEF-C030",
+          fieldName: "Return Visit Required",
+          severity: "S1",
+        }),
+      ],
+      formFamily: "default",
+      policy: DEFAULT_AUDIT_POLICY,
+      currentResult: "PASS",
+    });
+    expect(applied.hasMajorFails).toBe(true);
+    expect(applied.overallResult).toBe("FAIL");
+  });
 });
