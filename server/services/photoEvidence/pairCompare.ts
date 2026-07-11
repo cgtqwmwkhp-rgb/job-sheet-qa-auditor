@@ -125,10 +125,7 @@ export function parsePairAxesFromText(text: string): {
     // Require at least one explicit axis key in the JSON
     const hasAxis = AXIS_KEYS.some(k => k in axesRaw);
     if (!hasAxis) return null;
-    const confidence = Math.min(
-      1,
-      Math.max(0, Number(obj.confidence) || 0.7)
-    );
+    const confidence = Math.min(1, Math.max(0, Number(obj.confidence) || 0.7));
     const reasoning = String(obj.reasoning || "VLM pair axes");
     return { axes, confidence, reasoning };
   } catch {
@@ -243,7 +240,11 @@ export async function tryVlmPairAxes(input: {
   repairsSnippet?: string;
 }): Promise<VlmPairAxesResult> {
   const config = getVlmConfig();
-  const providerEnv = (process.env.VLM_PROVIDER || config.provider || "mock").toLowerCase();
+  const providerEnv = (
+    process.env.VLM_PROVIDER ||
+    config.provider ||
+    "mock"
+  ).toLowerCase();
 
   if (providerEnv !== "anthropic") {
     // Deterministic structured mock axes JSON (CI / local, no network).
@@ -348,8 +349,7 @@ export async function tryVlmPairAxes(input: {
     const json = (await response.json()) as {
       content?: Array<{ type: string; text?: string }>;
     };
-    const text =
-      json.content?.find(c => c.type === "text")?.text?.trim() || "";
+    const text = json.content?.find(c => c.type === "text")?.text?.trim() || "";
     const parsed = parsePairAxesFromText(text);
     if (!parsed) {
       return {
@@ -546,11 +546,7 @@ export async function runPhotoPairCompare(
   }
   try {
     // Explicit mockMode keeps deterministic test path (skip VLM).
-    if (
-      !input.mockMode &&
-      isPhotoPairVlmEnabled() &&
-      input.documentPdfBase64
-    ) {
+    if (!input.mockMode && isPhotoPairVlmEnabled() && input.documentPdfBase64) {
       try {
         const vlmArt = await runVlmPairCompare(input);
         if (vlmArt) return vlmArt;
