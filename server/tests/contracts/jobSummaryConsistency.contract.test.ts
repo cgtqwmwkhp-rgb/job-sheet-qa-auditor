@@ -381,6 +381,57 @@ Engineer Comments: Routine service complete; no parts required this visit.
     expect(signals.onFailurePath).toBe(false);
   });
 
+  it("prefers Azure layout text for completion-block extraction over flattened OCR", () => {
+    // Mistral flattens the grid: "Return Visit Needed? No Asset Safe To Use? Yes"
+    // becomes ambiguous (the No might attach to the wrong field).
+    const flattenedMistral =
+      "Job Summary Report This Vehicle is marked as VOR " +
+      "Type of service completed: Service - Other - Specify in Repairs " +
+      "Was the service fully completed: No " +
+      "All Works Completed? No Return Visit Needed? Yes Asset Safe To Use? No " +
+      "Engineer Comments: Tail lift hinge cracked at pin; ordered hinge kit. Return to replace.";
+
+    // Azure DI layout preserves line structure from the PDF
+    const azureLayout = `--- Page 1 ---
+Job Summary Report
+This Vehicle is marked as VOR
+Type of service completed: Service - Other - Specify in Repairs
+Was the service fully completed: No
+All Works Completed?                   No
+Return Visit Needed?                   Yes
+Asset Safe To Use?                     No
+Engineer Comments: Tail lift hinge cracked at pin; ordered hinge kit. Return to replace.`;
+
+    // Both should detect the failure path correctly
+    const flatResult = evaluateJobSummaryConsistency(flattenedMistral);
+    const layoutResult = evaluateJobSummaryConsistency(azureLayout);
+
+    // Azure layout text should parse the same signals
+    expect(layoutResult.signals.vor).toBe(true);
+    expect(layoutResult.signals.unsafe).toBe(true);
+    expect(layoutResult.signals.returnVisit).toBe(true);
+    expect(layoutResult.signals.incomplete).toBe(true);
+    expect(layoutResult.signals.onFailurePath).toBe(true);
+
+    // Both should be consistent (no S1 issues) for this well-documented sheet
+    expect(layoutResult.hasBlockingIssues).toBe(false);
+    expect(flatResult.hasBlockingIssues).toBe(false);
+
+    // Verify the layout path parses return visit correctly (grid-aware)
+    expect(layoutResult.signals.returnVisitNo).toBe(false);
+    expect(layoutResult.signals.returnVisit).toBe(true);
+  });
+
+  it("documentProcessor wires Azure layout text preference for FAILURE_PATH", () => {
+    const src = fs.readFileSync(
+      path.join(__dirname, "../../services/documentProcessor.ts"),
+      "utf8"
+    );
+    expect(src).toContain("selectionMarksResult?.layoutText || extractedText");
+    expect(src).toContain("jsrText");
+    expect(src).toContain('TextSource=');
+  });
+
   it("reads DV23 two-column completion grid (Safe Yes, Return No, works complete)", () => {
     expect(
       extractCompletionYesNo(DV23_COMPLETION_GRID, [
