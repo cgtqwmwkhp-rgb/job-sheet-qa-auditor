@@ -255,6 +255,53 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     normalizer: "boolean",
   },
   {
+    name: "return_visit",
+    displayName: "Return Visit Needed",
+    required: false,
+    severity: "S2",
+    regexPatterns: [
+      /Return\s+Visit\s+(?:Needed|Required)\??\s*:?\s*(Yes|No|Y|N)/i,
+      /Is\s+a\s+return\s+visit\s+required\??\s*:?\s*(Yes|No|Y|N)/i,
+    ],
+    fuzzyLabels: [
+      "Return Visit Needed",
+      "Return Visit Required",
+      "Return Visit",
+    ],
+    llmPrompt: "Is a return visit needed or required? Extract Yes or No.",
+    normalizer: "boolean",
+  },
+  {
+    name: "all_works",
+    displayName: "All Works Completed",
+    required: false,
+    severity: "S2",
+    regexPatterns: [
+      /All\s+Works\s+(?:Completed|Complete)\??\s*:?\s*(Yes|No|Y|N)/i,
+      /Were\s+all\s+works\s+fully\s+completed\??\s*:?\s*(Yes|No|Y|N)/i,
+    ],
+    fuzzyLabels: [
+      "All Works Completed",
+      "All Works Complete",
+      "Works Completed",
+    ],
+    llmPrompt: "Were all works fully completed? Extract Yes or No.",
+    normalizer: "boolean",
+  },
+  {
+    name: "service_completed",
+    displayName: "Service Completed",
+    required: false,
+    severity: "S2",
+    regexPatterns: [
+      /Service\s+Completed\??\s*:?\s*(Yes|No|Y|N)/i,
+      /Was\s+the\s+service\s+fully\s+completed\??\s*:?\s*(Yes|No|Y|N)/i,
+    ],
+    fuzzyLabels: ["Service Completed", "Service Complete"],
+    llmPrompt: "Was the service fully completed? Extract Yes or No.",
+    normalizer: "boolean",
+  },
+  {
     name: "engineer_comments",
     displayName: "Engineer Comments",
     required: true,
@@ -1085,6 +1132,63 @@ export async function processDocument(
         evidence: `Completion-grid extraction: safe_to_use=${gridAnswer}`,
         reasonCode: null,
       };
+    }
+  }
+
+  // Grid-aware hints for return_visit, all_works, service_completed
+  const GRID_HINT_FIELDS: Array<{
+    name: string;
+    displayName: string;
+    severity: string;
+    labels: RegExp[];
+  }> = [
+    {
+      name: "return_visit",
+      displayName: "Return Visit Needed",
+      severity: "S2",
+      labels: [
+        /Return\s+Visit\s+(?:Needed|Required)\??/i,
+        /Is\s+a\s+return\s+visit\s+required\??/i,
+      ],
+    },
+    {
+      name: "all_works",
+      displayName: "All Works Completed",
+      severity: "S2",
+      labels: [
+        /All\s+Works\s+(?:Completed|Complete)\??/i,
+        /Were\s+all\s+works\s+fully\s+completed\??/i,
+      ],
+    },
+    {
+      name: "service_completed",
+      displayName: "Service Completed",
+      severity: "S2",
+      labels: [
+        /Service\s+Completed\??/i,
+        /Was\s+the\s+service\s+fully\s+completed\??/i,
+      ],
+    },
+  ];
+
+  for (const gh of GRID_HINT_FIELDS) {
+    const existing = fieldDetails[gh.name];
+    if (!existing?.value || existing.confidence < llmConfidenceThreshold) {
+      const gridAnswer = extractCompletionYesNo(correctedText, gh.labels);
+      if (gridAnswer !== "unknown") {
+        const normalized = gridAnswer === "yes" ? "Yes" : "No";
+        extractedData[gh.name] = normalized;
+        fieldDetails[gh.name] = {
+          displayName: existing?.displayName ?? gh.displayName,
+          required: existing?.required ?? false,
+          severity: existing?.severity ?? gh.severity,
+          value: normalized,
+          confidence: Math.max(existing?.confidence ?? 0, 85),
+          strategy: "ensemble(completionGrid)",
+          evidence: `Completion-grid extraction: ${gh.name}=${gridAnswer}`,
+          reasonCode: null,
+        };
+      }
     }
   }
 

@@ -6,6 +6,7 @@
 
 import {
   PIPELINE_STAGE_LABELS,
+  PIPELINE_CORE_STAGES,
   derivePercentComplete,
   normalizeReportStages,
   type JobSheetProcessStatus,
@@ -45,7 +46,7 @@ function ensureEntry(jobSheetId: number): LiveEntry {
     jobSheetId,
     status: "processing",
     stages,
-    currentStage: "OCR Text Extraction",
+    currentStage: PIPELINE_STAGE_LABELS[1],
     startedAt: nowIso(),
     updatedAt: nowIso(),
   };
