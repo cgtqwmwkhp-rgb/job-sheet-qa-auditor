@@ -134,17 +134,22 @@ const PARTS_SECTION_HEADERS = [
   "Work Notes",
 ] as const;
 
+/** Convert a header name's literal spaces to `\s+` for OCR spacing tolerance. */
+function flexPattern(name: string): string {
+  return name.replace(/\s+/g, "\\s+");
+}
+
+const PAGE_PHOTO_RE = /^(?:Photo|Page)\s+\d/i;
+
 function isSectionHeaderLine(line: string): string | null {
   const trimmed = line.trim();
-  if (/^Photo\s+\d/i.test(trimmed) || /^Page\s+\d/i.test(trimmed)) {
+  if (PAGE_PHOTO_RE.test(trimmed)) {
     return trimmed;
   }
   for (const h of PARTS_SECTION_HEADERS) {
-    // Exact header line, or "Header: inline content"
-    const re = new RegExp(`^${h}\\s*[:-]?\\s*(.*)$`, "i");
+    const re = new RegExp(`^${flexPattern(h)}\\s*[:-]?\\s*(.*)$`, "i");
     const m = trimmed.match(re);
     if (!m) continue;
-    // Avoid "Parts Used" matching inside "Parts Still Required"
     if (h === "Parts Used" && /^Still\b/i.test(m[1] ?? "")) continue;
     if (
       h === "Parts Used" &&
@@ -152,7 +157,6 @@ function isSectionHeaderLine(line: string): string | null {
     ) {
       continue;
     }
-    // "Parts Still Required" must not match as "Parts Used"
     if (h === "Parts Used" && /Parts\s+Still\s+Required/i.test(trimmed)) {
       continue;
     }
@@ -163,27 +167,44 @@ function isSectionHeaderLine(line: string): string | null {
 
 /**
  * Body text under a named section header until the next known header.
+ *
+ * Handles OCR spacing variance (double-spaces between words), page/photo
+ * markers mid-section, and two-column layouts where the target header
+ * appears after another header on the same line.
  */
 export function extractNamedSection(text: string, headerName: string): string {
   const lines = text.split(/\r?\n/);
   const headerNorm = headerName.trim().toLowerCase();
+  const escaped = flexPattern(headerName);
   let start = -1;
   let inline = "";
+  let colOffset = -1;
+
+  const startRe = new RegExp(`^${escaped}\\s*[:-]?\\s*(.*)$`, "i");
+  const midLineRe = new RegExp(`\\s{3,}(${escaped})\\s*[:-]?\\s*(.*)$`, "i");
 
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
-    const re = new RegExp(
-      `^${headerName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*[:-]?\\s*(.*)$`,
-      "i"
-    );
-    const m = trimmed.match(re);
-    if (!m) continue;
-    if (headerNorm === "parts used" && /still\s+required/i.test(trimmed)) {
-      continue;
+    const m = trimmed.match(startRe);
+    if (m) {
+      if (headerNorm === "parts used" && /still\s+required/i.test(trimmed)) {
+        continue;
+      }
+      start = i;
+      inline = (m[1] ?? "").trim();
+      break;
     }
-    start = i;
-    inline = (m[1] ?? "").trim();
-    break;
+    // Fallback: header appears mid-line in a two-column layout
+    const mid = lines[i].match(midLineRe);
+    if (mid) {
+      if (headerNorm === "parts used" && /still\s+required/i.test(lines[i])) {
+        continue;
+      }
+      start = i;
+      colOffset = lines[i].indexOf(mid[1]);
+      inline = (mid[2] ?? "").trim();
+      break;
+    }
   }
 
   if (start < 0) return "";
@@ -194,9 +215,18 @@ export function extractNamedSection(text: string, headerName: string): string {
   for (let j = start + 1; j < lines.length; j++) {
     const hdr = isSectionHeaderLine(lines[j]);
     if (hdr && hdr.toLowerCase() !== headerNorm) {
+      // Skip page/photo markers — they are not semantic section boundaries
+      if (PAGE_PHOTO_RE.test(lines[j].trim())) continue;
       break;
     }
-    body.push(lines[j]);
+    if (colOffset >= 0) {
+      // Two-column: only take content from this header's column onward
+      const slice =
+        lines[j].length > colOffset ? lines[j].substring(colOffset).trim() : "";
+      if (slice) body.push(slice);
+    } else {
+      body.push(lines[j]);
+    }
   }
 
   return body.join("\n").trim();

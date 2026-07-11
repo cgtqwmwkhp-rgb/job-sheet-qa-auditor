@@ -9,7 +9,9 @@ import {
   evaluateJobSummaryConsistency,
   extractCompletionYesNo,
   extractFailurePathSignals,
+  extractNamedSection,
   hasSubstantiveEngineerComments,
+  sectionHasContent,
 } from "../../services/jobSummaryConsistency";
 
 /** Real pdftotext -layout excerpt from DV23VSJ inverter compliance sheet. */
@@ -430,6 +432,106 @@ Engineer Comments: Tail lift hinge cracked at pin; ordered hinge kit. Return to 
     expect(src).toContain("selectionMarksResult?.layoutText || extractedText");
     expect(src).toContain("jsrText");
     expect(src).toContain("TextSource=");
+  });
+
+  // -----------------------------------------------------------------------
+  // PlantExpand "Parts Still Required" section extraction (Job 87 / 249200123)
+  // -----------------------------------------------------------------------
+
+  it("extracts Parts Still Required with OCR double-spaced header", () => {
+    const text = [
+      "Parts Used",
+      "",
+      "Parts  Still  Required",
+      "Wheel tyre combo 195/50R13C",
+      "Coupling 40NB",
+      "Technician Name: Richard.Newton",
+    ].join("\n");
+    const body = extractNamedSection(text, "Parts Still Required");
+    expect(sectionHasContent(body).present).toBe(true);
+    expect(body).toContain("Wheel tyre combo");
+    expect(body).toContain("Coupling 40NB");
+  });
+
+  it("extracts Parts Still Required across a Page marker mid-section", () => {
+    const text = [
+      "Parts Still Required",
+      "Page 2",
+      "Wheel tyre combo 195/50R13C",
+      "Coupling 40NB",
+      "Technician Name: Richard.Newton",
+    ].join("\n");
+    const body = extractNamedSection(text, "Parts Still Required");
+    expect(sectionHasContent(body).present).toBe(true);
+    expect(body).toContain("Wheel tyre combo");
+    expect(body).toContain("Coupling 40NB");
+    expect(body).not.toContain("Page 2");
+  });
+
+  it("extracts Parts Still Required from two-column layout", () => {
+    const text = [
+      "Parts Used                              Parts Still Required",
+      "Oil filter                              Wheel tyre combo 195/50R13C",
+      "                                        Coupling 40NB",
+      "Technician Name: Richard.Newton",
+    ].join("\n");
+    const body = extractNamedSection(text, "Parts Still Required");
+    expect(sectionHasContent(body).present).toBe(true);
+    expect(body).toContain("Wheel tyre combo");
+    expect(body).toContain("Coupling 40NB");
+  });
+
+  it("PlantExpand VOR trailer with double-spaced Parts Still Required → partsStillRequired=true (Job 87)", () => {
+    const text = [
+      "Job Summary Report",
+      "PlantExpand",
+      "This Vehicle is marked as VOR",
+      "Asset No: 249200123",
+      "Make/Model: Trailer",
+      "Job ID : 87",
+      "Was the service fully completed: No",
+      "Were all works fully completed?: No",
+      "Is a return visit required?: Yes",
+      "Is the asset safe to use?: No",
+      "",
+      "Repairs Required",
+      "Replace wheel tyre assembly and coupling",
+      "",
+      "Parts Used",
+      "",
+      "Parts  Still  Required",
+      "Wheel tyre combo 195/50R13C",
+      "Coupling 40NB",
+      "",
+      "Technician Name: Richard.Newton",
+      "Engineer Comments: Nearside tyre worn below 2mm. Coupling cracked on visual inspection. Parts on order; return visit to fit.",
+    ].join("\n");
+    const signals = extractFailurePathSignals(text);
+    expect(signals.partsStillRequired).toBe(true);
+    expect(signals.partsStillSnippet).toContain("Wheel tyre combo");
+    expect(signals.partsUsed).toBe(false);
+    expect(signals.vor).toBe(true);
+    expect(signals.onFailurePath).toBe(true);
+    expect(signals.returnVisit).toBe(true);
+
+    const result = evaluateJobSummaryConsistency(text);
+    const c092 = result.findings.find(f => f.ruleId === "JSR-C092");
+    expect(c092).toBeDefined();
+    expect(c092?.severity).toBe("S3");
+    expect(c092?.normalisedSnippet).toMatch(/Consistent/i);
+  });
+
+  it("two-column layout: Parts Used content does not bleed into Parts Still Required", () => {
+    const text = [
+      "Parts Used                              Parts Still Required",
+      "Oil filter x1                           Wheel tyre combo 195/50R13C",
+      "                                        Coupling 40NB",
+      "Technician Name: bob",
+    ].join("\n");
+    const signals = extractFailurePathSignals(text);
+    expect(signals.partsStillRequired).toBe(true);
+    expect(signals.partsStillSnippet).toContain("Wheel tyre combo");
+    expect(signals.partsStillSnippet).not.toContain("Oil filter");
   });
 
   it("reads DV23 two-column completion grid (Safe Yes, Return No, works complete)", () => {
