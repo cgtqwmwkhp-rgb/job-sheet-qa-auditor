@@ -3,7 +3,7 @@
   "title": "Environment Contract",
   "description": "Source of truth for GitHub Environment variables required by deployment workflows",
   "version": "1.0.0",
-  "lastUpdated": "2026-01-11",
+  "lastUpdated": "2026-07-11",
   
   "environments": {
     "staging": {
@@ -29,6 +29,16 @@
           "pattern": "^https://",
           "example": "https://ca-job-sheet-qa-auditor-staging.graywater-15013590.uksouth.azurecontainerapps.io"
         }
+      },
+      "featureFlags": {
+        "FEATURE_OVERTURN_METRICS": {
+          "type": "env",
+          "description": "Enables the server-side overturn-metrics analytics endpoint (PR #249). Client card visibility is controlled by the VITE_FEATURE_OVERTURN_METRICS Docker build arg.",
+          "required": false,
+          "default": "false",
+          "value": "true",
+          "addedIn": "#249"
+        }
       }
     },
     "production": {
@@ -53,6 +63,15 @@
           "required": true,
           "pattern": "^https://",
           "example": "https://plantex-assist.graywater-15013590.uksouth.azurecontainerapps.io"
+        }
+      },
+      "featureFlags": {
+        "FEATURE_OVERTURN_METRICS": {
+          "type": "env",
+          "description": "Enables the server-side overturn-metrics analytics endpoint. Not set in production until validated in staging.",
+          "required": false,
+          "default": "false",
+          "value": "false"
         }
       }
     }
@@ -103,6 +122,18 @@
     ]
   },
   
+  "buildArgs": {
+    "description": "Docker build-time arguments passed via --build-arg. Vite inlines VITE_* values at compile time so a single image serves all environments; server-side feature flags gate actual data access per-environment.",
+    "args": {
+      "VITE_FEATURE_OVERTURN_METRICS": {
+        "description": "Enables the OverturnMetricsCard in the Vite client bundle. Server-side FEATURE_OVERTURN_METRICS still gates the analytics endpoint.",
+        "default": "false",
+        "current": "true",
+        "addedIn": "#249"
+      }
+    }
+  },
+
   "validation": {
     "rules": [
       {
