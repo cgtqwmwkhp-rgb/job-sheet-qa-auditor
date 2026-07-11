@@ -697,7 +697,7 @@ export const appRouter = router({
     save: qaLeadProcedure
       .input(
         z.object({
-          version: z.number().int().positive(),
+          version: z.string().min(1),
           weights: z.object({
             major: z.number().min(0).max(100),
             minor: z.number().min(0).max(100),
