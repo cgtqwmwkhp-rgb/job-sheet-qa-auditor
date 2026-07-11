@@ -71,6 +71,10 @@ import {
 } from "@/components/review/mapSelectionMarks";
 import { useReviewFindingKeyboard } from "@/hooks/useReviewFindingKeyboard";
 import { usePersistFn } from "@/hooks/usePersistFn";
+import {
+  RelationshipFindingsGroup,
+  isRelationshipFinding,
+} from "@/components/review/RelationshipFindingsGroup";
 
 export interface Finding {
   id: number | string;
@@ -1007,7 +1011,7 @@ function ReviewWorkstationContent({
             </TabsContent>
 
             <TabsContent value="issues" className="flex-1 min-h-0 m-0">
-              <FindingsList
+              <IssuesTabContent
                 findings={failedFindings}
                 activeBoxId={activeBoxId}
                 onFindingClick={handleFindingClick}
@@ -1285,6 +1289,179 @@ function FindingsList({
     <ScrollArea className="h-full">
       <div className="p-4 space-y-3">
         {findings.map(finding => (
+          <div
+            key={finding.id}
+            id={`finding-${finding.id}`}
+            className={`p-4 rounded-lg border cursor-pointer transition-all ${
+              activeBoxId === finding.id
+                ? "ring-2 ring-primary border-primary bg-primary/5"
+                : "hover:bg-muted/50"
+            } ${
+              finding.status === "missing"
+                ? "bg-red-50/50 border-red-200"
+                : finding.status === "warning"
+                  ? "bg-orange-50/50 border-orange-200"
+                  : "bg-green-50/50 border-green-200"
+            }`}
+            onClick={() => onFindingClick(finding.id)}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                {finding.status === "missing" ? (
+                  <AlertCircle className="w-5 h-5 text-red-600" />
+                ) : finding.status === "warning" ? (
+                  <AlertCircle className="w-5 h-5 text-orange-600" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                )}
+                <h3 className="font-semibold text-sm">{finding.field}</h3>
+                {finding.failClass === "major" && (
+                  <Badge variant="destructive" className="text-[10px] px-1.5">
+                    Major
+                  </Badge>
+                )}
+                {finding.failClass === "minor" && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5">
+                    Minor
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                {finding.ruleId && (
+                  <Badge
+                    variant="outline"
+                    className="font-mono text-[10px] px-1.5 bg-slate-50 text-slate-600 border-slate-300"
+                    title={`Rule: ${finding.ruleId}${finding.reasonCode ? ` — ${finding.reasonCode}` : ""}`}
+                  >
+                    {finding.ruleId}
+                  </Badge>
+                )}
+                {finding.reasonCode && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] px-1.5 bg-violet-50 text-violet-600 border-violet-300"
+                    title={`Reason code: ${finding.reasonCode}`}
+                  >
+                    {finding.reasonCode}
+                  </Badge>
+                )}
+                <Badge variant="outline" className="bg-white/50">
+                  {(finding.confidence * 100).toFixed(0)}% Conf.
+                </Badge>
+              </div>
+            </div>
+
+            {finding.value && (
+              <div className="mb-2 p-2 bg-white/60 rounded border border-black/5 font-mono text-sm">
+                {finding.value}
+              </div>
+            )}
+
+            {finding.message && (
+              <p
+                className={`text-sm ${
+                  finding.status === "missing"
+                    ? "text-red-700"
+                    : finding.status === "warning"
+                      ? "text-orange-700"
+                      : "text-emerald-800"
+                }`}
+              >
+                {finding.message}
+              </p>
+            )}
+
+            {finding.whyItMatters && (
+              <p className="mt-1.5 text-xs text-muted-foreground leading-snug">
+                {finding.whyItMatters}
+              </p>
+            )}
+
+            {finding.suggestedFix && finding.status !== "passed" && (
+              <p className="mt-1 text-xs text-slate-700">
+                Suggested fix: {finding.suggestedFix}
+              </p>
+            )}
+
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={e => {
+                  e.stopPropagation();
+                  onFindingClick(finding.id);
+                }}
+              >
+                <Eye className="w-3 h-3 mr-1" /> View on Doc
+              </Button>
+              {finding.status !== "passed" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs hover:text-destructive"
+                  onClick={e => onOverride(finding, e)}
+                >
+                  Override
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={e => onCorrect(finding, e)}
+              >
+                <Pencil className="w-3 h-3 mr-1" /> Correct value
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-muted-foreground hover:text-primary ml-auto"
+                onClick={e => onReportIssue(finding, e)}
+              >
+                <MessageSquare className="w-3 h-3 mr-1" /> Report Issue
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </ScrollArea>
+  );
+}
+
+function IssuesTabContent({
+  findings,
+  activeBoxId,
+  onFindingClick,
+  onReportIssue,
+  onOverride,
+  onCorrect,
+}: FindingsListProps) {
+  const relationshipFindings = findings.filter(isRelationshipFinding);
+  const otherFindings = findings.filter(f => !isRelationshipFinding(f));
+
+  if (findings.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground">
+        No findings in this category.
+      </div>
+    );
+  }
+
+  return (
+    <ScrollArea className="h-full">
+      <div className="p-4 space-y-3">
+        {relationshipFindings.length > 0 && (
+          <RelationshipFindingsGroup
+            findings={relationshipFindings}
+            activeBoxId={activeBoxId}
+            onFindingClick={onFindingClick}
+            onReportIssue={onReportIssue}
+            onOverride={onOverride}
+            onCorrect={onCorrect}
+          />
+        )}
+        {otherFindings.map(finding => (
           <div
             key={finding.id}
             id={`finding-${finding.id}`}
