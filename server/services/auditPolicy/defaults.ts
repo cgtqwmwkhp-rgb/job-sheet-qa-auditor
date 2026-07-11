@@ -215,6 +215,15 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           fieldAliases: ["Photo Evidence"],
         },
         {
+          ruleId: "PHOTO-C011",
+          label: "Photo Evidence Labels Present",
+          description:
+            "Before/after photo labels detected in OCR text (visual QA not verified)",
+          failClass: "informational",
+          enabled: true,
+          fieldAliases: ["Photo Evidence"],
+        },
+        {
           ruleId: "CHECK-C010",
           label: "Checklist Completion",
           description:
