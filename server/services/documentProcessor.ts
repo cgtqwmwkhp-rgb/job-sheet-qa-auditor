@@ -78,6 +78,7 @@ import {
 } from "./wastedJourneyConsistency";
 import { computeDocumentationQualityScore } from "./documentationQuality";
 import { evaluatePhotoEvidenceConsistency } from "./photoEvidence";
+import { evaluateTyreCompliance } from "./tyreCompliance";
 import { applyAuditPolicy, resolveAuditFormFamily } from "./auditPolicy";
 import {
   runSelectionMarkDetection,
@@ -1809,6 +1810,23 @@ async function processJobSheetWithOptions(
       };
       recordStage({
         stage: "Photo Evidence",
+        status: "success",
+        durationMs: 0,
+      });
+    }
+  }
+
+  // Tyre tread depth + PSI compliance (trailer / moveable-plant checklists)
+  if (!isWastedJourneyDocument(extractedText)) {
+    const tyreResult = evaluateTyreCompliance(extractedText);
+    if (tyreResult.findings.length > 0) {
+      analysisResult = {
+        ...analysisResult,
+        findings: [...analysisResult.findings, ...tyreResult.findings],
+        summary: `${analysisResult.summary} [TYRE_COMPLIANCE] ${tyreResult.summary}`,
+      };
+      recordStage({
+        stage: "Tyre Compliance",
         status: "success",
         durationMs: 0,
       });
