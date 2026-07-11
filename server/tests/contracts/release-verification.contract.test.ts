@@ -46,8 +46,7 @@ describe("Release Verification Contract Tests", () => {
 
     beforeAll(() => {
       scriptContent = fs.readFileSync(
-        path.join(SCRIPTS_DIR
-, "smoke-check.sh"),
+        path.join(SCRIPTS_DIR, "smoke-check.sh"),
         "utf-8"
       );
     });
@@ -67,6 +66,7 @@ describe("Release Verification Contract Tests", () => {
     it("creates required output files", () => {
       expect(scriptContent).toContain("homepage.txt");
       expect(scriptContent).toContain("health.txt");
+      expect(scriptContent).toContain("readyz.json");
       expect(scriptContent).toContain("version.json");
       expect(scriptContent).toContain("deployed_sha.txt");
       expect(scriptContent).toContain("summary.json");
@@ -79,6 +79,47 @@ describe("Release Verification Contract Tests", () => {
     it("exits non-zero in strict mode when evidence missing", () => {
       expect(scriptContent).toContain('MODE" == "strict"');
       expect(scriptContent).toContain("exit 1");
+    });
+
+    it("prefers /readyz for SHA proof over tRPC", () => {
+      const readyzIdx = scriptContent.indexOf("/readyz");
+      const trpcVersionIdx = scriptContent.indexOf(
+        "api/trpc/system.version",
+        scriptContent.indexOf("Check 3")
+      );
+      expect(readyzIdx).toBeGreaterThan(-1);
+      expect(trpcVersionIdx).toBeGreaterThan(-1);
+      expect(readyzIdx).toBeLessThan(trpcVersionIdx);
+    });
+
+    it("extracts SHA from readyz version.sha field", () => {
+      expect(scriptContent).toContain(".version.sha");
+    });
+
+    it("tracks shaSource in summary", () => {
+      expect(scriptContent).toContain("shaSource");
+      expect(scriptContent).toContain("SHA_SOURCE");
+    });
+
+    it("classifies auth-walled responses as AUTH_WALLED not FAIL", () => {
+      expect(scriptContent).toContain("AUTH_WALLED");
+      expect(scriptContent).toContain("is_auth_walled_code");
+      expect(scriptContent).toContain("log_auth_walled");
+    });
+
+    it("does not set OVERALL_STATUS to FAIL for auth-walled checks", () => {
+      const lines = scriptContent.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('STATUS="AUTH_WALLED"')) {
+          const nearby = lines.slice(i, i + 3).join("\n");
+          expect(nearby).not.toContain('OVERALL_STATUS="FAIL"');
+        }
+      }
+    });
+
+    it("includes authWalledCount in summary.json", () => {
+      expect(scriptContent).toContain("authWalledCount");
+      expect(scriptContent).toContain("authWalledChecks");
     });
   });
 
@@ -141,7 +182,7 @@ describe("Release Verification Contract Tests", () => {
     it("only one release-verification workflow exists", () => {
       const workflowFiles = fs
         .readdirSync(WORKFLOWS_DIR)
-        .filter((f) => f.includes("release-verification"));
+        .filter(f => f.includes("release-verification"));
       expect(workflowFiles).toHaveLength(1);
       expect(workflowFiles[0]).toBe("release-verification.yml");
     });
@@ -176,7 +217,9 @@ describe("Release Verification Contract Tests", () => {
     });
 
     it("workflow invokes monitor-snapshot.sh with correct arguments", () => {
-      expect(workflowContent).toContain("./scripts/release/monitor-snapshot.sh");
+      expect(workflowContent).toContain(
+        "./scripts/release/monitor-snapshot.sh"
+      );
     });
 
     it("workflow reads deployed_sha.txt and surfaces in outputs", () => {
@@ -186,7 +229,9 @@ describe("Release Verification Contract Tests", () => {
 
     it("production verification requires staging to pass first", () => {
       expect(workflowContent).toContain("needs: [verify-staging]");
-      expect(workflowContent).toContain("needs.verify-staging.outputs.smoke_status");
+      expect(workflowContent).toContain(
+        "needs.verify-staging.outputs.smoke_status"
+      );
     });
 
     it("production always uses strict mode", () => {
@@ -218,16 +263,20 @@ describe("Release Verification Contract Tests", () => {
       });
 
       it("reads HEALTH_ONLY environment variable", () => {
-        expect(monitorScript).toContain('HEALTH_ONLY_ENV="${HEALTH_ONLY:-false}"');
+        expect(monitorScript).toContain(
+          'HEALTH_ONLY_ENV="${HEALTH_ONLY:-false}"'
+        );
       });
 
       it("reads ENVIRONMENT environment variable", () => {
-        expect(monitorScript).toContain('ENVIRONMENT="${ENVIRONMENT:-unknown}"');
+        expect(monitorScript).toContain(
+          'ENVIRONMENT="${ENVIRONMENT:-unknown}"'
+        );
       });
 
       it("enforces ADR-003 policy for production", () => {
         expect(monitorScript).toContain('"production"');
-        expect(monitorScript).toContain('ADR-003 POLICY VIOLATION');
+        expect(monitorScript).toContain("ADR-003 POLICY VIOLATION");
       });
 
       it("enforces ADR-003 policy for staging", () => {
@@ -235,13 +284,13 @@ describe("Release Verification Contract Tests", () => {
       });
 
       it("includes adr003Compliant in summary.json", () => {
-        expect(monitorScript).toContain('adr003Compliant');
+        expect(monitorScript).toContain("adr003Compliant");
       });
 
       it("passes when health_only=true and environment is sandbox", () => {
         // Script should NOT block sandbox with health_only=true
-        expect(monitorScript).toContain('$HEALTH_ONLY_FLAG');
-        expect(monitorScript).toContain('per ADR-003');
+        expect(monitorScript).toContain("$HEALTH_ONLY_FLAG");
+        expect(monitorScript).toContain("per ADR-003");
       });
     });
 
@@ -259,29 +308,37 @@ describe("Release Verification Contract Tests", () => {
       });
 
       it("passes ENVIRONMENT to monitor-snapshot.sh", () => {
-        expect(workflowContent).toContain('ENVIRONMENT:');
+        expect(workflowContent).toContain("ENVIRONMENT:");
       });
 
       it("passes HEALTH_ONLY to monitor-snapshot.sh", () => {
-        expect(workflowContent).toContain('HEALTH_ONLY:');
+        expect(workflowContent).toContain("HEALTH_ONLY:");
       });
 
       it("staging job enforces ADR-003 (blocks health_only=true)", () => {
-        expect(workflowContent).toContain('Enforce ADR-003 (staging cannot use health_only)');
-        expect(workflowContent).toContain('ADR-003 VIOLATION: health_only=true is NOT allowed for staging');
+        expect(workflowContent).toContain(
+          "Enforce ADR-003 (staging cannot use health_only)"
+        );
+        expect(workflowContent).toContain(
+          "ADR-003 VIOLATION: health_only=true is NOT allowed for staging"
+        );
       });
 
       it("production job enforces ADR-003 (blocks health_only=true)", () => {
-        expect(workflowContent).toContain('Enforce ADR-003 (production cannot use health_only)');
-        expect(workflowContent).toContain('ADR-003 VIOLATION: health_only=true is NOT allowed for production');
+        expect(workflowContent).toContain(
+          "Enforce ADR-003 (production cannot use health_only)"
+        );
+        expect(workflowContent).toContain(
+          "ADR-003 VIOLATION: health_only=true is NOT allowed for production"
+        );
       });
 
       it("staging explicitly sets HEALTH_ONLY=false", () => {
-        expect(workflowContent).toContain('ENVIRONMENT: staging');
+        expect(workflowContent).toContain("ENVIRONMENT: staging");
       });
 
       it("production explicitly sets HEALTH_ONLY=false", () => {
-        expect(workflowContent).toContain('ENVIRONMENT: production');
+        expect(workflowContent).toContain("ENVIRONMENT: production");
       });
     });
   });
