@@ -1798,7 +1798,11 @@ async function processJobSheetWithOptions(
         findings: [...analysisResult.findings, ...photoResult.findings],
         summary: `${analysisResult.summary} [PHOTO_EVIDENCE] ${photoResult.summary}`,
       };
-      recordStage({ stage: "Photo Evidence", status: "success", durationMs: 0 });
+      recordStage({
+        stage: "Photo Evidence",
+        status: "success",
+        durationMs: 0,
+      });
     }
   }
 
