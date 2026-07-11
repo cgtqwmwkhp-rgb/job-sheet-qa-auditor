@@ -819,7 +819,9 @@ export async function ensembleExtract(
     }
   }
 
-  // Job number digit normalization: if all values are the same digits, treat as agreement
+  // Job number digit normalization: if all values share the same digits,
+  // coerce each to the canonical form so voting sees agreement (do not
+  // collapse to a single result — that would wipe consensusCount).
   if (field.name === "job_no" || field.name === "job_number") {
     const digitValues = results
       .filter(r => r.value)
@@ -827,14 +829,15 @@ export async function ensembleExtract(
     const uniqueDigits = new Set(digitValues.filter(d => d.length > 0));
     if (uniqueDigits.size === 1 && results.length >= 2) {
       const canonical = Array.from(uniqueDigits)[0];
-      const best = results.reduce((a, b) =>
-        a.confidence > b.confidence ? a : b
-      );
-      results.length = 0;
-      results.push({
-        ...best,
-        value: normalizeValue(canonical, field.normalizer),
-      });
+      const normalizedCanonical = normalizeValue(canonical, field.normalizer);
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i];
+        if (!r.value) continue;
+        const digits = r.value.replace(/\D/g, "");
+        if (digits === canonical) {
+          results[i] = { ...r, value: normalizedCanonical };
+        }
+      }
     }
   }
 
