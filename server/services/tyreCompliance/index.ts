@@ -157,8 +157,7 @@ export function evaluateTyreCompliance(text: string): TyreComplianceResult {
           whyItMatters:
             `Industry published inflation for ${tyreSize} is ${band.max} PSI / 6.5 bar ` +
             `(Trident Towing, ETD datasheets). Acceptable range is ${band.min}–${band.max} PSI.`,
-          suggestedFix:
-            `Adjust tyre inflation to within ${band.min}–${band.max} PSI for ${tyreSize} tyres.`,
+          suggestedFix: `Adjust tyre inflation to within ${band.min}–${band.max} PSI for ${tyreSize} tyres.`,
         });
       } else {
         findings.push({
@@ -167,12 +166,10 @@ export function evaluateTyreCompliance(text: string): TyreComplianceResult {
           severity: "S3",
           reasonCode: "OUT_OF_POLICY",
           rawSnippet: `PSI: ${psiValue}, Size: ${tyreSize}`,
-          normalisedSnippet:
-            `Recorded PSI ${psiValue} is within the ${band.min}–${band.max} PSI band for ${tyreSize}. Passed.`,
+          normalisedSnippet: `Recorded PSI ${psiValue} is within the ${band.min}–${band.max} PSI band for ${tyreSize}. Passed.`,
           confidence: 90,
           pageNumber: 1,
-          whyItMatters:
-            `Tyre inflation is within the acceptable range for ${tyreSize}.`,
+          whyItMatters: `Tyre inflation is within the acceptable range for ${tyreSize}.`,
           suggestedFix: "No action required.",
         });
       }

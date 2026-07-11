@@ -217,8 +217,7 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
         {
           ruleId: "TYRE-C010",
           label: "Tyre Tread Depth",
-          description:
-            "Recorded tread depth below PlantExpand 2mm minimum",
+          description: "Recorded tread depth below PlantExpand 2mm minimum",
           failClass: "major",
           enabled: true,
           fieldAliases: ["Tyre Tread Depth", "Tread Depth"],

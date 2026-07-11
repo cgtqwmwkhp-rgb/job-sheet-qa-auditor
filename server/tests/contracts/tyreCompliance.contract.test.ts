@@ -172,9 +172,7 @@ describe("tyreCompliance", () => {
   describe("PSI / inflation", () => {
     it("PSI 95 + 195/50R13C → Passed (S3)", () => {
       const result = evaluateTyreCompliance(TRAILER_ALL_PASS);
-      const psiFindings = result.findings.filter(
-        f => f.ruleId === "TYRE-C020"
-      );
+      const psiFindings = result.findings.filter(f => f.ruleId === "TYRE-C020");
       expect(psiFindings).toHaveLength(1);
       expect(psiFindings[0].severity).toBe("S3");
       expect(psiFindings[0].normalisedSnippet).toContain("Passed");
@@ -195,9 +193,7 @@ describe("tyreCompliance", () => {
 
     it("PSI 95 without tyre size → no PSI fail, S3 informational", () => {
       const result = evaluateTyreCompliance(TRAILER_PSI_NO_SIZE);
-      const psiFindings = result.findings.filter(
-        f => f.ruleId === "TYRE-C020"
-      );
+      const psiFindings = result.findings.filter(f => f.ruleId === "TYRE-C020");
       expect(psiFindings).toHaveLength(1);
       expect(psiFindings[0].severity).toBe("S3");
       expect(psiFindings[0].normalisedSnippet).toContain("not configured");
@@ -207,9 +203,7 @@ describe("tyreCompliance", () => {
 
     it("PSI 90 + 195/50 R13C (space variant) → Passed (S3)", () => {
       const result = evaluateTyreCompliance(TRAILER_PSI_LOWER_BOUND);
-      const psiFindings = result.findings.filter(
-        f => f.ruleId === "TYRE-C020"
-      );
+      const psiFindings = result.findings.filter(f => f.ruleId === "TYRE-C020");
       expect(psiFindings).toHaveLength(1);
       expect(psiFindings[0].severity).toBe("S3");
       expect(psiFindings[0].normalisedSnippet).toContain("Passed");
@@ -244,10 +238,7 @@ Tyre Inflation: 50 PSI
       const result = evaluateTyreCompliance(text);
       const s1 = result.findings.filter(f => f.severity === "S1");
       expect(s1).toHaveLength(2);
-      expect(s1.map(f => f.ruleId).sort()).toEqual([
-        "TYRE-C010",
-        "TYRE-C020",
-      ]);
+      expect(s1.map(f => f.ruleId).sort()).toEqual(["TYRE-C010", "TYRE-C020"]);
     });
   });
 });
