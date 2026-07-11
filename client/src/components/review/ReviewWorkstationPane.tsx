@@ -81,6 +81,10 @@ import {
   RelationshipFindingsGroup,
   isRelationshipFinding,
 } from "@/components/review/RelationshipFindingsGroup";
+import {
+  TyreFindingsGroup,
+  isTyreComplianceFinding,
+} from "@/components/review/TyreFindingsGroup";
 import { ReviewShortcutsLegend } from "@/components/review/ReviewShortcutsLegend";
 import {
   FailurePathSignalsPanel,
@@ -1516,7 +1520,12 @@ function IssuesTabContent({
   onCorrect,
 }: FindingsListProps) {
   const relationshipFindings = findings.filter(isRelationshipFinding);
-  const otherFindings = findings.filter(f => !isRelationshipFinding(f));
+  const tyreFindings = findings.filter(
+    f => !isRelationshipFinding(f) && isTyreComplianceFinding(f)
+  );
+  const otherFindings = findings.filter(
+    f => !isRelationshipFinding(f) && !isTyreComplianceFinding(f)
+  );
 
   if (findings.length === 0) {
     return (
@@ -1532,6 +1541,16 @@ function IssuesTabContent({
         {relationshipFindings.length > 0 && (
           <RelationshipFindingsGroup
             findings={relationshipFindings}
+            activeBoxId={activeBoxId}
+            onFindingClick={onFindingClick}
+            onReportIssue={onReportIssue}
+            onOverride={onOverride}
+            onCorrect={onCorrect}
+          />
+        )}
+        {tyreFindings.length > 0 && (
+          <TyreFindingsGroup
+            findings={tyreFindings}
             activeBoxId={activeBoxId}
             onFindingClick={onFindingClick}
             onReportIssue={onReportIssue}
