@@ -246,9 +246,10 @@ describe('OCR Reconciliation Contract Tests', () => {
       // Normalize non-deterministic fields for comparison:
       // - processedAt: ISO timestamp varies between calls
       // - processingTimeMs: execution time varies based on system load/timing
+      // Allow optional whitespace — artifact JSON is pretty-printed (JSON.stringify(..., null, 2)).
       const normalizeArtifact = (s: string) =>
-        s.replace(/"processedAt":"[^"]+"/g, '"processedAt":"X"')
-         .replace(/"processingTimeMs":\s*\d+/g, '"processingTimeMs":0');
+        s.replace(/"processedAt"\s*:\s*"[^"]+"/g, '"processedAt":"X"')
+         .replace(/"processingTimeMs"\s*:\s*\d+/g, '"processingTimeMs":0');
       
       const normalized1 = normalizeArtifact(artifact1);
       const normalized2 = normalizeArtifact(artifact2);
