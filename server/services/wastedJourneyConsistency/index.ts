@@ -63,7 +63,7 @@ export function extractWastedJourneySignals(
     lineValue(text, /Wasted\s*Journey\s*Reason/i) ??
     lineValue(
       text,
-      /Repair\s*Issue\s*[:\-]?\s*Wasted\s*Journey[\s\S]{0,40}?Reason/i
+      /Repair\s*Issue\s*[-:]?\s*Wasted\s*Journey[\s\S]{0,40}?Reason/i
     );
 
   let reasonSnippet = (reasonRaw ?? "").replace(/\s+/g, " ").trim();
@@ -98,7 +98,7 @@ export function extractWastedJourneySignals(
     lineValue(text, /Techni(?:ci)?an\s*Name/i) ?? lineValue(text, /Name/i);
 
   const hasSignOff =
-    /signature\s*[:\-]?\s*(?:signed|present|yes|[a-z0-9._-]{2,})/i.test(text) ||
+    /signature\s*[-:]?\s*(?:signed|present|yes|[a-z0-9._-]{2,})/i.test(text) ||
     /(?:technician|technican|engineer)\s+signature/i.test(text);
 
   return {
