@@ -1,8 +1,9 @@
 /**
  * Tyre compliance contract tests.
  *
- * Covers PlantExpand trailer tread-depth (≥ 2mm) and PSI band
- * (90–95 PSI for 195/50R13C) rules.
+ * Covers PlantExpand trailer tread-depth (≥ 2mm) and PSI band rules
+ * for multiple C-rated tyre sizes (195/50R13C, 155/70R12C, 185/70R13C,
+ * 195/55R10C).
  */
 
 import { describe, it, expect } from "vitest";
@@ -99,6 +100,67 @@ NSR Tyre Tread Depth: 6mm
 
 Tyre Size: 195/50 R13C
 Tyre Pressure: 90 PSI
+`;
+
+/** 155/70R12C at 93 PSI — within the 90–95 band. */
+const TRAILER_155_70R12C_PASS = `
+OSF Tyre Tread Depth: 6mm
+NSF Tyre Tread Depth: 6mm
+OSR Tyre Tread Depth: 6mm
+NSR Tyre Tread Depth: 6mm
+
+Tyre Size: 155/70R12C
+Tyre Inflation: 93 PSI
+`;
+
+/** 155/70R12C at 80 PSI — below the 90–95 band. */
+const TRAILER_155_70R12C_FAIL = `
+OSF Tyre Tread Depth: 6mm
+Tyre Size: 155/70R12C
+Tyre Inflation: 80 PSI
+`;
+
+/** 185/70R13C at 85 PSI — within the 83–87 band. */
+const TRAILER_185_70R13C_PASS = `
+OSF Tyre Tread Depth: 6mm
+NSF Tyre Tread Depth: 6mm
+OSR Tyre Tread Depth: 6mm
+NSR Tyre Tread Depth: 6mm
+
+Tyre Size: 185/70R13C
+Tyre Inflation: 85 PSI
+`;
+
+/** 185/70R13C at 92 PSI — above the 83–87 band. */
+const TRAILER_185_70R13C_FAIL = `
+OSF Tyre Tread Depth: 6mm
+Tyre Size: 185/70R13C
+Tyre Inflation: 92 PSI
+`;
+
+/** 195/55R10C at 89 PSI — within the 87–91 band. */
+const TRAILER_195_55R10C_PASS = `
+OSF Tyre Tread Depth: 6mm
+NSF Tyre Tread Depth: 6mm
+OSR Tyre Tread Depth: 6mm
+NSR Tyre Tread Depth: 6mm
+
+Tyre Size: 195/55R10C
+Tyre Inflation: 89 PSI
+`;
+
+/** 195/55R10C at 80 PSI — below the 87–91 band. */
+const TRAILER_195_55R10C_FAIL = `
+OSF Tyre Tread Depth: 6mm
+Tyre Size: 195/55R10C
+Tyre Inflation: 80 PSI
+`;
+
+/** Unknown C-rated size 205/65R15C — PSI should not fail. */
+const TRAILER_UNKNOWN_SIZE = `
+OSF Tyre Tread Depth: 6mm
+Tyre Size: 205/65R15C
+Tyre Inflation: 70 PSI
 `;
 
 /** Exact 2.0mm — should be a pass (≥ 2.0). */
@@ -208,6 +270,69 @@ describe("tyreCompliance", () => {
       expect(psiFindings[0].severity).toBe("S3");
       expect(psiFindings[0].normalisedSnippet).toContain("Passed");
       expect(result.psiValue).toBe(90);
+    });
+
+    it("PSI 93 + 155/70R12C → Passed (S3)", () => {
+      const result = evaluateTyreCompliance(TRAILER_155_70R12C_PASS);
+      const psiFindings = result.findings.filter(f => f.ruleId === "TYRE-C020");
+      expect(psiFindings).toHaveLength(1);
+      expect(psiFindings[0].severity).toBe("S3");
+      expect(psiFindings[0].normalisedSnippet).toContain("Passed");
+      expect(result.psiValue).toBe(93);
+    });
+
+    it("PSI 80 + 155/70R12C → S1 OUT_OF_POLICY", () => {
+      const result = evaluateTyreCompliance(TRAILER_155_70R12C_FAIL);
+      const s1 = result.findings.filter(
+        f => f.ruleId === "TYRE-C020" && f.severity === "S1"
+      );
+      expect(s1).toHaveLength(1);
+      expect(s1[0].normalisedSnippet).toContain("90–95");
+    });
+
+    it("PSI 85 + 185/70R13C → Passed (S3)", () => {
+      const result = evaluateTyreCompliance(TRAILER_185_70R13C_PASS);
+      const psiFindings = result.findings.filter(f => f.ruleId === "TYRE-C020");
+      expect(psiFindings).toHaveLength(1);
+      expect(psiFindings[0].severity).toBe("S3");
+      expect(psiFindings[0].normalisedSnippet).toContain("Passed");
+      expect(result.psiValue).toBe(85);
+    });
+
+    it("PSI 92 + 185/70R13C → S1 OUT_OF_POLICY (above 83–87)", () => {
+      const result = evaluateTyreCompliance(TRAILER_185_70R13C_FAIL);
+      const s1 = result.findings.filter(
+        f => f.ruleId === "TYRE-C020" && f.severity === "S1"
+      );
+      expect(s1).toHaveLength(1);
+      expect(s1[0].normalisedSnippet).toContain("83–87");
+    });
+
+    it("PSI 89 + 195/55R10C → Passed (S3)", () => {
+      const result = evaluateTyreCompliance(TRAILER_195_55R10C_PASS);
+      const psiFindings = result.findings.filter(f => f.ruleId === "TYRE-C020");
+      expect(psiFindings).toHaveLength(1);
+      expect(psiFindings[0].severity).toBe("S3");
+      expect(psiFindings[0].normalisedSnippet).toContain("Passed");
+      expect(result.psiValue).toBe(89);
+    });
+
+    it("PSI 80 + 195/55R10C → S1 OUT_OF_POLICY (below 87–91)", () => {
+      const result = evaluateTyreCompliance(TRAILER_195_55R10C_FAIL);
+      const s1 = result.findings.filter(
+        f => f.ruleId === "TYRE-C020" && f.severity === "S1"
+      );
+      expect(s1).toHaveLength(1);
+      expect(s1[0].normalisedSnippet).toContain("87–91");
+    });
+
+    it("unknown size 205/65R15C → S3 informational, no PSI fail", () => {
+      const result = evaluateTyreCompliance(TRAILER_UNKNOWN_SIZE);
+      const psiFindings = result.findings.filter(f => f.ruleId === "TYRE-C020");
+      expect(psiFindings).toHaveLength(1);
+      expect(psiFindings[0].severity).toBe("S3");
+      expect(psiFindings[0].normalisedSnippet).toContain("not configured");
+      expect(result.psiValue).toBe(70);
     });
 
     it("no PSI data → no PSI findings", () => {

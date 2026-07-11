@@ -6,10 +6,17 @@
  *   Any recorded numeric depth < 2.0 mm → S1 CONFLICT/OUT_OF_POLICY.
  *
  * PSI / inflation (size-specific):
- *   195/50R13C (common PlantExpand trailer tyre): industry published max
- *   inflation 95 PSI / 6.5 bar (Trident Towing, Wanda 900 kg @ 95 PSI,
- *   ETD datasheets). Acceptable band: 90–95 PSI inclusive.
- *   Recorded PSI outside that band when size matches → S1 OUT_OF_POLICY.
+ *   A lookup table maps common C-rated trailer sizes to acceptable cold-
+ *   inflation PSI bands derived from manufacturer datasheets (Wanda, Kenda,
+ *   GT Savero, Trident Towing) and the Westwood Trailers pressure chart:
+ *
+ *     195/50R13C  → 90–95 PSI  (6.5 bar max; Wanda WR068, ETD)
+ *     155/70R12C  → 90–95 PSI  (6.2–6.5 bar; Wanda WR068, Kenda, ETD)
+ *     185/70R13C  → 83–87 PSI  (6.0 bar max; Trident Towing, Kenda KR103)
+ *     195/55R10C  → 87–91 PSI  (6.25 bar max; Wanda WR301/068)
+ *
+ *   Recorded PSI outside the band for a matched size → S1 OUT_OF_POLICY.
+ *   Unknown / unconfigured size → S3 informational, PSI noted but no fail.
  *
  * Rules:
  *   TYRE-C010  Tread depth  (Major)
@@ -25,6 +32,12 @@ const MIN_TREAD_MM = 2.0;
 const KNOWN_SIZE_PSI: Record<string, { min: number; max: number }> = {
   "195/50R13C": { min: 90, max: 95 },
   "195/50 R13C": { min: 90, max: 95 },
+  "155/70R12C": { min: 90, max: 95 },
+  "155/70 R12C": { min: 90, max: 95 },
+  "185/70R13C": { min: 83, max: 87 },
+  "185/70 R13C": { min: 83, max: 87 },
+  "195/55R10C": { min: 87, max: 91 },
+  "195/55 R10C": { min: 87, max: 91 },
 };
 
 function normaliseTyreSize(raw: string): string {
@@ -155,8 +168,8 @@ export function evaluateTyreCompliance(text: string): TyreComplianceResult {
           confidence: 90,
           pageNumber: 1,
           whyItMatters:
-            `Industry published inflation for ${tyreSize} is ${band.max} PSI / 6.5 bar ` +
-            `(Trident Towing, ETD datasheets). Acceptable range is ${band.min}–${band.max} PSI.`,
+            `Manufacturer-published max cold inflation for ${tyreSize} gives an acceptable ` +
+            `range of ${band.min}–${band.max} PSI. Sources: Wanda / Kenda / Trident Towing datasheets.`,
           suggestedFix: `Adjust tyre inflation to within ${band.min}–${band.max} PSI for ${tyreSize} tyres.`,
         });
       } else {
