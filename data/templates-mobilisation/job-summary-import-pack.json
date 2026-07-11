@@ -22,13 +22,14 @@
             "type": "string",
             "required": true,
             "extractionHints": [
+              "job id",
               "job no",
               "job number",
               "job reference",
               "work order",
               "reference"
             ],
-            "aliases": ["Job No", "Job Number", "Job Ref"]
+            "aliases": ["Job ID", "Job No", "Job Number", "Job Ref"]
           },
           {
             "field": "assetId",
