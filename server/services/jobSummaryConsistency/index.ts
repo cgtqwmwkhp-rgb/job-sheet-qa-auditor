@@ -180,14 +180,8 @@ export function extractNamedSection(text: string, headerName: string): string {
   let inline = "";
   let colOffset = -1;
 
-  const startRe = new RegExp(
-    `^${escaped}\\s*[:-]?\\s*(.*)$`,
-    "i"
-  );
-  const midLineRe = new RegExp(
-    `\\s{3,}(${escaped})\\s*[:-]?\\s*(.*)$`,
-    "i"
-  );
+  const startRe = new RegExp(`^${escaped}\\s*[:-]?\\s*(.*)$`, "i");
+  const midLineRe = new RegExp(`\\s{3,}(${escaped})\\s*[:-]?\\s*(.*)$`, "i");
 
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
@@ -227,9 +221,8 @@ export function extractNamedSection(text: string, headerName: string): string {
     }
     if (colOffset >= 0) {
       // Two-column: only take content from this header's column onward
-      const slice = lines[j].length > colOffset
-        ? lines[j].substring(colOffset).trim()
-        : "";
+      const slice =
+        lines[j].length > colOffset ? lines[j].substring(colOffset).trim() : "";
       if (slice) body.push(slice);
     } else {
       body.push(lines[j]);
