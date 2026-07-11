@@ -77,6 +77,11 @@ import {
   RATE_LIMITS,
 } from "../utils/rateLimiter";
 import { getDLQStats, getRecoverableJobs } from "../utils/deadLetterQueue";
+import {
+  computeOverturnMetrics,
+  isOverturnMetricsEnabled,
+  type AuditActionLogEntry,
+} from "../services/overturnMetrics";
 
 const periodInput = z
   .object({
@@ -625,6 +630,35 @@ export const analyticsRouter = router({
         startDate: period.start,
         endDate: period.end,
       });
+    }),
+
+  /**
+   * Overturn metrics summary from audit action logs (scaffold #248).
+   * Gated by FEATURE_OVERTURN_METRICS env var.
+   */
+  getOverturnMetricsSummary: protectedProcedure
+    .input(periodInput)
+    .query(async ({ input }) => {
+      if (!isOverturnMetricsEnabled()) {
+        return { enabled: false as const };
+      }
+      const period = resolveExceptionPeriod(input?.startDate, input?.endDate);
+      const rows = await db.getOverturnMetricsActionLogs({
+        startDate: new Date(period.start),
+        endDate: new Date(period.end),
+      });
+
+      const entries: AuditActionLogEntry[] = rows.map(r => ({
+        action: r.action,
+        entityType: r.entityType,
+        entityId: r.entityId ?? 0,
+        userId: r.userId ?? 0,
+        timestamp: r.createdAt.toISOString(),
+        details: (r.details as Record<string, unknown>) ?? {},
+      }));
+
+      const summary = computeOverturnMetrics(entries);
+      return { enabled: true as const, period, ...summary };
     }),
 
   /**
