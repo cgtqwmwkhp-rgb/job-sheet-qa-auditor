@@ -3,7 +3,7 @@
  */
 
 import type { Finding } from "../analyzer";
-import { DEFAULT_AUDIT_POLICY, AUDIT_POLICY_SETTING_KEY } from "./defaults";
+import { DEFAULT_AUDIT_POLICY } from "./defaults";
 import type {
   AuditPolicy,
   AuditPolicyRule,
