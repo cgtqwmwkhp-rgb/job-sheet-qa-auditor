@@ -259,7 +259,8 @@ jobs:
               AZURE_STORAGE_CONTAINER_NAME="${{ vars.AZURE_STORAGE_CONTAINER_NAME || 'jobsheets-staging' }}" \
               ENABLE_PURGE_EXECUTION="${{ vars.ENABLE_PURGE_EXECUTION || 'false' }}" \
               ENABLE_SCHEDULER="${{ vars.ENABLE_SCHEDULER || 'false' }}" \
-              FEATURE_OVERTURN_METRICS=true
+              FEATURE_OVERTURN_METRICS=true \
+              FEATURE_PHOTO_PAIR_COMPARE=true
 
       - name: Set secrets as environment variables
         run: |
