@@ -58,6 +58,12 @@ export default function DefectAnalysis() {
     refetch,
   } = trpc.analytics.getExceptionSummary.useQuery({ startDate, endDate, site });
 
+  const { data: evidenceRoi } = trpc.analytics.getEvidenceRoi.useQuery({
+    startDate,
+    endDate,
+    site,
+  });
+
   const { data: dlqStatus } = trpc.analytics.getDlqStatus.useQuery(undefined, {
     retry: false,
   });
@@ -178,6 +184,73 @@ export default function DefectAnalysis() {
             </CardContent>
           </Card>
         </div>
+
+        {evidenceRoi && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Evidence ROI (comments + photos)</CardTitle>
+              <CardDescription>{evidenceRoi.moneySignal}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Comment Majors
+                  </p>
+                  <p className="text-2xl font-semibold">
+                    {evidenceRoi.commentMajorCount}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Photo Majors</p>
+                  <p className="text-2xl font-semibold">
+                    {evidenceRoi.photoMajorCount}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Coherence Majors
+                  </p>
+                  <p className="text-2xl font-semibold">
+                    {evidenceRoi.coherenceMajorCount}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Cards blocked (est.)
+                  </p>
+                  <p className="text-2xl font-semibold text-destructive">
+                    {evidenceRoi.cardsBlockedEstimate}
+                  </p>
+                </div>
+              </div>
+              {evidenceRoi.byRule.length > 0 && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Rule</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Major</TableHead>
+                      <TableHead>Overturn</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {evidenceRoi.byRule.slice(0, 8).map(rule => (
+                      <TableRow key={rule.ruleId}>
+                        <TableCell className="font-mono text-xs">
+                          {rule.ruleId}
+                        </TableCell>
+                        <TableCell>{rule.totalFindings}</TableCell>
+                        <TableCell>{rule.majorCount}</TableCell>
+                        <TableCell>{pct(rule.overturnRate)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>

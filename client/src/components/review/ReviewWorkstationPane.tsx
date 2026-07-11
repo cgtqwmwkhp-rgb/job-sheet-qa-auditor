@@ -92,6 +92,21 @@ import {
   mapFailurePathSignalsFromReport,
   type FailurePathSignals,
 } from "@/components/review/FailurePathSignalsPanel";
+import {
+  CommentQualityPanel,
+  mapCommentQualityFromReport,
+  type CommentQualitySignals,
+} from "@/components/review/CommentQualityPanel";
+import {
+  BeforeAfterComparePane,
+  mapPhotoPairCompareFromReport,
+  type PhotoPairCompareArtifact,
+} from "@/components/review/BeforeAfterComparePane";
+import {
+  DeepNoteAnalysis,
+  mapDeepNoteFromReport,
+  type DeepNoteAnalysisData,
+} from "@/components/DeepNoteAnalysis";
 
 export interface Finding {
   id: number | string;
@@ -346,6 +361,14 @@ export function ReviewWorkstationPane({
     return mapFailurePathSignalsFromReport(auditResult?.reportJson);
   })();
 
+  const commentQualityDerived = mapCommentQualityFromReport(
+    auditResult?.reportJson
+  );
+  const photoPairCompare = mapPhotoPairCompareFromReport(
+    auditResult?.reportJson
+  );
+  const deepNoteAnalysis = mapDeepNoteFromReport(auditResult?.reportJson);
+
   const auditData = auditDataProp
     ? {
         ...auditDataProp,
@@ -424,6 +447,9 @@ export function ReviewWorkstationPane({
       approvePending={approvePending}
       rejectPending={rejectPending}
       paneRef={paneRef}
+      commentQualityDerived={commentQualityDerived}
+      photoPairCompare={photoPairCompare}
+      deepNoteAnalysis={deepNoteAnalysis}
     />
   );
 }
@@ -439,6 +465,9 @@ function ReviewWorkstationContent({
   approvePending,
   rejectPending,
   paneRef,
+  commentQualityDerived,
+  photoPairCompare,
+  deepNoteAnalysis,
 }: {
   auditData: AuditData;
   documentUrl?: string;
@@ -450,6 +479,12 @@ function ReviewWorkstationContent({
   approvePending?: boolean;
   rejectPending?: boolean;
   paneRef?: RefObject<HTMLDivElement | null>;
+  commentQualityDerived: {
+    signals: CommentQualitySignals | null;
+    summary: string | null;
+  };
+  photoPairCompare: PhotoPairCompareArtifact | null;
+  deepNoteAnalysis: DeepNoteAnalysisData | null;
 }) {
   const [activeBoxId, setActiveBoxId] = useState<string | number | null>(null);
   const [focusPage, setFocusPage] = useState<number | null>(null);
@@ -1059,6 +1094,32 @@ function ReviewWorkstationContent({
           defaultOpen={auditData.failurePathSignals?.onFailurePath ?? false}
           className="shadow-none"
         />
+        <CommentQualityPanel
+          signals={commentQualityDerived.signals}
+          summary={commentQualityDerived.summary}
+          defaultOpen={
+            Boolean(
+              commentQualityDerived.signals?.onFailurePath &&
+                !commentQualityDerived.signals?.coherent
+            )
+          }
+          className="shadow-none"
+        />
+        <BeforeAfterComparePane
+          artifact={photoPairCompare}
+          documentUrl={documentUrl}
+          defaultOpen={Boolean(
+            photoPairCompare?.pairs.some(
+              p =>
+                p.axes.work_done === "fail" ||
+                p.axes.repaired_properly === "fail"
+            )
+          )}
+          className="shadow-none"
+        />
+        {deepNoteAnalysis ? (
+          <DeepNoteAnalysis analysis={deepNoteAnalysis} className="shadow-none" />
+        ) : null}
       </div>
 
       {/* Document-first landscape: PDF takes ~70–75% width; findings are a narrow review rail */}

@@ -16,44 +16,36 @@ import {
   FileText,
 } from "lucide-react";
 
-interface AnalysisResult {
+export interface DeepNoteFlag {
+  type: "warning" | "error" | "success";
+  message: string;
+}
+
+export interface DeepNoteAnalysisData {
   completenessScore: number;
   toneScore: number;
   clarityScore: number;
-  flags: {
-    type: "warning" | "error" | "success";
-    message: string;
-  }[];
+  flags: DeepNoteFlag[];
   summary: string;
+  coachRewrite?: string;
+  gaps?: string[];
+  recommendEscalate?: boolean;
+  provider?: string;
 }
 
-const MOCK_ANALYSIS: AnalysisResult = {
-  completenessScore: 85,
-  toneScore: 92,
-  clarityScore: 78,
-  flags: [
-    {
-      type: "success",
-      message:
-        "Clear root cause identified: 'Pump failure due to scale buildup'.",
-    },
-    {
-      type: "warning",
-      message: "Missing part number for the replacement seal.",
-    },
-    {
-      type: "warning",
-      message:
-        "Vague timeline: 'Will return soon' - specific date recommended.",
-    },
-  ],
-  summary:
-    "The engineer provides a good technical diagnosis but lacks specific inventory details for the follow-up visit. Tone is professional.",
-};
+export interface DeepNoteAnalysisProps {
+  analysis?: DeepNoteAnalysisData | null;
+  className?: string;
+}
 
-export function DeepNoteAnalysis() {
+export function DeepNoteAnalysis({
+  analysis,
+  className,
+}: DeepNoteAnalysisProps) {
+  if (!analysis) return null;
+
   return (
-    <Card className="bg-[#F9F9F9] border-[#EBE8E8]">
+    <Card className={className ?? "bg-[#F9F9F9] border-[#EBE8E8]"}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -66,56 +58,53 @@ export function DeepNoteAnalysis() {
             variant="outline"
             className="bg-[rgba(190,218,65,0.15)] text-[#333030] border-primary/40"
           >
-            AI Audit Active
+            {analysis.recommendEscalate ? "Escalate suggested" : "AI advisory"}
           </Badge>
         </div>
         <CardDescription>
-          Automated evaluation of engineer notes for quality and completeness.
+          Clinical evaluation of engineer notes — advisory only; Majors come
+          from COMMENT-C rules.
+          {analysis.provider ? ` (${analysis.provider})` : ""}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Scores */}
         <div className="grid grid-cols-3 gap-4">
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-medium text-slate-600">
               <span>Completeness</span>
-              <span>{MOCK_ANALYSIS.completenessScore}%</span>
+              <span>{analysis.completenessScore}%</span>
             </div>
             <Progress
-              value={MOCK_ANALYSIS.completenessScore}
+              value={analysis.completenessScore}
               className="h-2 bg-[#EBE8E8]"
             />
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-medium text-slate-600">
               <span>Tone & Professionalism</span>
-              <span>{MOCK_ANALYSIS.toneScore}%</span>
+              <span>{analysis.toneScore}%</span>
             </div>
-            <Progress
-              value={MOCK_ANALYSIS.toneScore}
-              className="h-2 bg-[#EBE8E8]"
-            />
+            <Progress value={analysis.toneScore} className="h-2 bg-[#EBE8E8]" />
           </div>
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-medium text-slate-600">
               <span>Technical Clarity</span>
-              <span>{MOCK_ANALYSIS.clarityScore}%</span>
+              <span>{analysis.clarityScore}%</span>
             </div>
             <Progress
-              value={MOCK_ANALYSIS.clarityScore}
+              value={analysis.clarityScore}
               className="h-2 bg-[#EBE8E8]"
             />
           </div>
         </div>
 
-        {/* Findings */}
         <div className="space-y-3 bg-white p-4 rounded-lg border border-[#EBE8E8]">
           <h4 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Key Findings
           </h4>
           <div className="space-y-2">
-            {MOCK_ANALYSIS.flags.map((flag, idx) => (
+            {analysis.flags.map((flag, idx) => (
               <div key={idx} className="flex items-start gap-2 text-sm">
                 {flag.type === "success" && (
                   <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
@@ -132,16 +121,57 @@ export function DeepNoteAnalysis() {
           </div>
         </div>
 
-        {/* AI Summary */}
+        {analysis.coachRewrite ? (
+          <div className="bg-white p-3 rounded-md border border-[#EBE8E8]">
+            <p className="text-xs font-medium text-slate-700 mb-1">
+              Coach rewrite suggestion
+            </p>
+            <p className="text-sm text-slate-600">{analysis.coachRewrite}</p>
+          </div>
+        ) : null}
+
         <div className="bg-[rgba(190,218,65,0.12)] p-3 rounded-md border border-primary/30">
           <div className="flex gap-2">
             <MessageSquare className="h-4 w-4 text-[#706D6D] mt-0.5 shrink-0" />
             <p className="text-sm text-[#4A4646] italic">
-              "{MOCK_ANALYSIS.summary}"
+              &ldquo;{analysis.summary}&rdquo;
             </p>
           </div>
         </div>
       </CardContent>
     </Card>
   );
+}
+
+export function mapDeepNoteFromReport(
+  reportJson: unknown
+): DeepNoteAnalysisData | null {
+  if (!reportJson || typeof reportJson !== "object") return null;
+  const report = reportJson as Record<string, unknown>;
+  const note = report.commentDeepNote as
+    | {
+        completenessScore?: number;
+        toneScore?: number;
+        clarityScore?: number;
+        flags?: DeepNoteFlag[];
+        summary?: string;
+        coachRewrite?: string;
+        gaps?: string[];
+        recommendEscalate?: boolean;
+        provider?: string;
+        enabled?: boolean;
+      }
+    | undefined;
+  if (!note || note.enabled === false) return null;
+  return {
+    completenessScore: note.completenessScore ?? 0,
+    toneScore: note.toneScore ?? 0,
+    clarityScore: note.clarityScore ?? 0,
+    flags: note.flags ?? [],
+    summary: note.summary ?? "",
+    coachRewrite: note.coachRewrite,
+    gaps: note.gaps,
+    recommendEscalate: note.recommendEscalate,
+    provider: note.provider,
+  };
 }
