@@ -1,4 +1,14 @@
-import { eq, ne, desc, and, sql, count, gte, lte, isNotNull } from "drizzle-orm";
+import {
+  eq,
+  ne,
+  desc,
+  and,
+  sql,
+  count,
+  gte,
+  lte,
+  isNotNull,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -281,10 +291,7 @@ export async function updateJobSheetFileHash(id: number, fileHash: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db
-    .update(jobSheets)
-    .set({ fileHash })
-    .where(eq(jobSheets.id, id));
+  await db.update(jobSheets).set({ fileHash }).where(eq(jobSheets.id, id));
 }
 
 /**
