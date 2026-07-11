@@ -65,7 +65,10 @@ import {
   hasOnlyInformationalFindings,
   sanitizeExtractedFieldsForSignatures,
 } from "./findingHygiene";
-import { evaluateJobSummaryConsistency } from "./jobSummaryConsistency";
+import {
+  evaluateJobSummaryConsistency,
+  type FailurePathSignals,
+} from "./jobSummaryConsistency";
 import {
   evaluateWastedJourneyConsistency,
   isWastedJourneyDocument,
@@ -1716,6 +1719,8 @@ async function processJobSheetWithOptions(
   // Never run repair/VOR failure-path rules on wasted-journey sheets.
   // Hard-fail vs score-only is decided by Admin Audit Policy after merge (not here).
   let auditFormFamily = resolveAuditFormFamily(null, false);
+  let failurePathSignals: FailurePathSignals | null = null;
+  let failurePathSignalSummary: string | null = null;
   {
     const selectedSlug =
       buildSelectionCohortMeta(selectionResult, usedTemplateVersionId)
@@ -1754,6 +1759,15 @@ async function processJobSheetWithOptions(
       const consistency = evaluateJobSummaryConsistency(extractedText, {
         failMarkCount,
       });
+      failurePathSignals = consistency.signals;
+      failurePathSignalSummary = [
+        `VOR=${consistency.signals.vor}`,
+        `SafeToUse=${consistency.signals.unsafe ? "No" : consistency.signals.safeYes ? "Yes" : "Unknown"}`,
+        `ReturnVisit=${consistency.signals.returnVisit ? "Yes" : consistency.signals.returnVisitNo ? "No" : "Unknown"}`,
+        `Incomplete=${consistency.signals.incomplete ? "Yes" : consistency.signals.worksCompleteYes ? "No" : "Unknown"}`,
+        `FailMarks=${consistency.signals.failMarkCount}`,
+        `PartsStillRequired=${consistency.signals.partsStillRequired}`,
+      ].join(" | ");
       if (consistency.findings.length > 0) {
         analysisResult = {
           ...analysisResult,
@@ -2004,6 +2018,9 @@ async function processJobSheetWithOptions(
           : {}),
         ...(selectionMarksResult
           ? { selectionMarks: selectionMarksResult.artifact }
+          : {}),
+        ...(failurePathSignals
+          ? { failurePathSignals, signalSummary: failurePathSignalSummary }
           : {}),
         ...(vlmInkResult ? { vlmInkVerification: vlmInkResult.artifact } : {}),
         geminiMultimodal: {
