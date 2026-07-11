@@ -285,8 +285,7 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
       "All Works Complete",
       "Works Completed",
     ],
-    llmPrompt:
-      "Were all works fully completed? Extract Yes or No.",
+    llmPrompt: "Were all works fully completed? Extract Yes or No.",
     normalizer: "boolean",
   },
   {
@@ -298,12 +297,8 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
       /Service\s+Completed\??\s*:?\s*(Yes|No|Y|N)/i,
       /Was\s+the\s+service\s+fully\s+completed\??\s*:?\s*(Yes|No|Y|N)/i,
     ],
-    fuzzyLabels: [
-      "Service Completed",
-      "Service Complete",
-    ],
-    llmPrompt:
-      "Was the service fully completed? Extract Yes or No.",
+    fuzzyLabels: ["Service Completed", "Service Complete"],
+    llmPrompt: "Was the service fully completed? Extract Yes or No.",
     normalizer: "boolean",
   },
   {
