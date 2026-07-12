@@ -33,13 +33,14 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "wouter";
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  // Settings is already admin/qa_lead gated; cost tracking is visible to both.
+  const { hasRole } = useAuth();
+  const canViewApiCosts = hasRole(["admin", "qa_lead"]);
 
   return (
     <DashboardLayout>
@@ -124,11 +125,11 @@ export default function Settings() {
                   <Shield className="w-4 h-4 mr-2" />
                   Security
                 </TabsTrigger>
-                {isAdmin ? (
+                {canViewApiCosts ? (
                   <>
                     <div className="pt-3 pb-1 px-4">
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Admin
+                        FinOps
                       </p>
                     </div>
                     <TabsTrigger
@@ -360,7 +361,7 @@ export default function Settings() {
                 </Card>
               </TabsContent>
 
-              {isAdmin ? (
+              {canViewApiCosts ? (
                 <TabsContent value="api-costs" className="mt-0 space-y-6">
                   <ApiCostSettings />
                 </TabsContent>

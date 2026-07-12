@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { notifyOwner } from "./notification";
-import { adminProcedure, publicProcedure, router } from "./trpc";
+import {
+  adminProcedure,
+  publicProcedure,
+  qaLeadProcedure,
+  router,
+} from "./trpc";
 import { ENV } from "./env";
 import { getModelRegistry } from "../services/modelRegistry";
 import { summarizeApiCosts } from "../services/finOps";
@@ -58,9 +63,10 @@ export const systemRouter = router({
     }),
 
   /**
-   * Admin API cost dashboard — estimated spend from recorded LLM usage.
+   * API cost dashboard — estimated spend from recorded LLM usage.
+   * Visible to admin and QA lead (same gate as Settings).
    */
-  apiCostSummary: adminProcedure
+  apiCostSummary: qaLeadProcedure
     .input(
       z
         .object({
