@@ -104,7 +104,11 @@ export function AnalyticsLayout({
 
         <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit flex-wrap">
           {navItems.map(item => {
-            const isActive = location === item.href;
+            const isActive =
+              item.href === "/analytics"
+                ? location === "/analytics" || location === "/analytics/"
+                : location === item.href ||
+                  location.startsWith(`${item.href}/`);
             return (
               <Link key={item.href} href={item.href}>
                 <a

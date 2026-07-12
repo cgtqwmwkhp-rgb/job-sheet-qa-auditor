@@ -711,18 +711,19 @@ export default function HelpCenter() {
                 <div className="rounded-lg border border-green-200 bg-green-50/50 dark:bg-green-950/20 p-4">
                   <div className="flex items-center gap-2 font-semibold text-foreground mb-1">
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    PASS = good docs
+                    <strong>PASS · docs</strong> = good documentation
                   </div>
                   <p>
                     All VOR-related fields tell a consistent story. The
                     paperwork matches reality — no contradictions between VOR
-                    status, safety flags, and completion fields.
+                    status, safety flags, and completion fields. This is not an
+                    asset pass.
                   </p>
                 </div>
                 <div className="rounded-lg border border-red-200 bg-red-50/50 dark:bg-red-950/20 p-4">
                   <div className="flex items-center gap-2 font-semibold text-foreground mb-1">
                     <AlertTriangle className="h-4 w-4 text-red-600" />
-                    FAIL = contradictory docs
+                    <strong>FAIL · docs</strong> = contradictory documentation
                   </div>
                   <p>
                     The system found a mismatch — for example, VOR flagged but

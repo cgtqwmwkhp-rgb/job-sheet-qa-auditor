@@ -15,8 +15,27 @@ export interface ResourceOwnership {
   /** The user ID who created or owns this resource */
   createdById?: number | null;
   uploadedById?: number | null;
+  /** Schema field on job_sheets */
+  uploadedBy?: number | null;
   userId?: number | null;
   [key: string]: unknown; // Allow additional properties from full objects
+}
+
+/** Resolve owner user id across schema / DTO naming variants. */
+export function resolveResourceOwnerId(
+  resource: ResourceOwnership | null | undefined
+): number | null {
+  if (!resource) return null;
+  const candidates = [
+    resource.createdById,
+    resource.uploadedById,
+    resource.uploadedBy,
+    resource.userId,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "number" && Number.isFinite(c) && c > 0) return c;
+  }
+  return null;
 }
 
 /**
@@ -45,8 +64,7 @@ export function enforceJobSheetAccess(
   }
 
   // Regular users can only access their own uploads
-  const ownerId =
-    resource.createdById ?? resource.uploadedById ?? resource.userId;
+  const ownerId = resolveResourceOwnerId(resource);
   if (!ownerId || ownerId !== currentUser.id) {
     throw new TRPCError({
       code: "FORBIDDEN",
@@ -89,10 +107,7 @@ export function enforceAuditAccess(
     });
   }
 
-  const ownerId =
-    jobSheetResource.createdById ??
-    jobSheetResource.uploadedById ??
-    jobSheetResource.userId;
+  const ownerId = resolveResourceOwnerId(jobSheetResource);
   if (!ownerId || ownerId !== currentUser.id) {
     throw new TRPCError({
       code: "FORBIDDEN",

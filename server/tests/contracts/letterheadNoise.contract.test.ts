@@ -170,3 +170,33 @@ describe("scrubLetterheadFromSnippets", () => {
     expect(scrubbed.normalisedSnippet).toBe("");
   });
 });
+
+describe("attribution + hybrid letterhead reject", () => {
+  it("rejects letterhead as technician name from fields", async () => {
+    const { extractTechnicianNameFromFields } = await import(
+      "../../services/technicianAttribution"
+    );
+    expect(
+      extractTechnicianNameFromFields({
+        technicianName: "01268 562102 www.plantexpand.com Email",
+      })
+    ).toBeNull();
+    expect(
+      extractTechnicianNameFromFields({
+        technicianName: "Richard.Newton",
+      })
+    ).toBe("Richard.Newton");
+  });
+
+  it("rejects letterhead job reference in hybrid extraction", async () => {
+    const { extractUniversalFields } = await import(
+      "../../services/hybridAssessment"
+    );
+    const fields = extractUniversalFields(
+      "Job Number: 01268 562102 www.plantexpand.com Email\nDate: 01/01/2026",
+      ["Job Number: 01268 562102 www.plantexpand.com Email\nDate: 01/01/2026"]
+    );
+    expect(fields.find(f => f.field === "jobReference")).toBeUndefined();
+    expect(JSON.stringify(fields)).not.toMatch(/01268|plantexpand|Email/i);
+  });
+});

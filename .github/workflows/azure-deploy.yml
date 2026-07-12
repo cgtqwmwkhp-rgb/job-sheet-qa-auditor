@@ -241,6 +241,24 @@ jobs:
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --image "${IMAGE_TAG}"
 
+          # Single-revision mode can leave prior revisions Active=true with traffic 0,
+          # and they may still answer probes. Deactivate everything except the latest.
+          LATEST=$(az containerapp revision list \
+            --name "${{ vars.CONTAINER_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query "sort_by([].{name:name,created:properties.createdTime}, &created)[-1].name" -o tsv)
+          echo "Latest revision: $LATEST"
+          for rev in $(az containerapp revision list \
+            --name "${{ vars.CONTAINER_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query "[?name!='${LATEST}' && properties.active].name" -o tsv); do
+            echo "Deactivating stale revision: $rev"
+            az containerapp revision deactivate \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --revision "$rev" || true
+          done
+
       - name: Set environment variables
         env:
           DEPLOY_SHA: ${{ needs.build-and-push.outputs.deploy_sha }}
@@ -343,6 +361,21 @@ jobs:
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "OPENAI_API_KEY=secretref:openai-api-key" \
                 "FEATURE_COACHING_VERIFIER=true"
+          fi
+
+          # Session / cookie signing (required at app boot since #275)
+          if [ -n "${{ secrets.JWT_SECRET }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "jwt-secret=${{ secrets.JWT_SECRET }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "JWT_SECRET=secretref:jwt-secret"
+          else
+            echo "::warning::JWT_SECRET secret missing — staging may crash-loop on boot"
           fi
 
           # Azure Document Intelligence (selectionMarks / layout pass)
@@ -503,8 +536,9 @@ jobs:
           chmod +x scripts/release/smoke-check.sh
           chmod +x scripts/release/monitor-snapshot.sh
 
-          # Run smoke checks (soft mode for staging)
-          ./scripts/release/smoke-check.sh "$STAGING_URL" "$EXPECTED_SHA" "soft"
+          # Run smoke checks — SHA must match tip (strict). Soft previously
+          # allowed stale revisions to keep answering /readyz after a "successful" deploy.
+          ./scripts/release/smoke-check.sh "$STAGING_URL" "$EXPECTED_SHA" "strict"
 
           # Run monitoring snapshot — capture exit code so auth noise doesn't
           # fail the whole workflow when /readyz already proved the deploy is healthy.
@@ -676,6 +710,24 @@ jobs:
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --image "${IMAGE_TAG}"
 
+          # Single-revision mode can leave prior revisions Active=true with traffic 0,
+          # and they may still answer probes. Deactivate everything except the latest.
+          LATEST=$(az containerapp revision list \
+            --name "${{ vars.CONTAINER_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query "sort_by([].{name:name,created:properties.createdTime}, &created)[-1].name" -o tsv)
+          echo "Latest revision: $LATEST"
+          for rev in $(az containerapp revision list \
+            --name "${{ vars.CONTAINER_APP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query "[?name!='${LATEST}' && properties.active].name" -o tsv); do
+            echo "Deactivating stale revision: $rev"
+            az containerapp revision deactivate \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --revision "$rev" || true
+          done
+
       - name: Set environment variables
         env:
           DEPLOY_SHA: ${{ needs.build-and-push.outputs.deploy_sha }}
@@ -776,6 +828,21 @@ jobs:
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "OPENAI_API_KEY=secretref:openai-api-key" \
                 "FEATURE_COACHING_VERIFIER=true"
+          fi
+
+          # Session / cookie signing (required at app boot since #275)
+          if [ -n "${{ secrets.JWT_SECRET }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "jwt-secret=${{ secrets.JWT_SECRET }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "JWT_SECRET=secretref:jwt-secret"
+          else
+            echo "::warning::JWT_SECRET secret missing — production may crash-loop on boot"
           fi
 
       - name: Get production URL
