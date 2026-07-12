@@ -164,7 +164,7 @@ export function filterJobSheetsByAccess<T extends ResourceOwnership>(
 
   // Regular users only see their own uploads
   return resources.filter(r => {
-    const ownerId = r.createdById ?? r.uploadedById ?? r.userId;
+    const ownerId = resolveResourceOwnerId(r);
     return ownerId === currentUser.id;
   });
 }

@@ -36,3 +36,21 @@ describe("enforceJobSheetAccess", () => {
     ).toThrow(TRPCError);
   });
 });
+
+describe("filterJobSheetsByAccess", () => {
+  it("uses uploadedBy for ownership filtering", async () => {
+    const { filterJobSheetsByAccess } = await import(
+      "../../utils/authorization"
+    );
+    const rows = [
+      { id: 1, uploadedBy: 5 },
+      { id: 2, uploadedBy: 8 },
+    ];
+    expect(filterJobSheetsByAccess(rows, { id: 5, role: "user" })).toEqual([
+      rows[0],
+    ]);
+    expect(filterJobSheetsByAccess(rows, { id: 1, role: "qa_lead" })).toEqual(
+      rows
+    );
+  });
+});

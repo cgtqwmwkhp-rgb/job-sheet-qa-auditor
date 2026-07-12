@@ -11,10 +11,12 @@
  */
 
 import { Router, Request, Response, NextFunction } from "express";
+import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { getStorageAdapter } from "../storage";
 import { createSafeLogger } from "../utils/safeLogger";
-import { mapAzureRolesToDbRole } from "./azureRoles";
+import { enforceJobSheetAccess } from "../utils/authorization";
+import { sdk } from "./sdk";
 
 const router = Router();
 const logger = createSafeLogger("PDFProxy");
@@ -27,83 +29,55 @@ export const pdfProxyMetrics = {
   errorCount: 0,
 };
 
-interface AuthenticatedUser {
-  userId: string;
-  userDetails?: string;
-  roles?: string[];
-}
-
 /**
- * Middleware to verify authentication via Azure Easy Auth headers
+ * Authenticate via the same Easy Auth / session path as tRPC (sdk.authenticateRequest).
+ * Previous PDF-only parsing used email as a fallback userId and missed oid claims,
+ * so DB role lookup failed and admin/qa_lead reviewers got 403 on every PDF.
  */
 function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const principalHeader = req.headers["x-ms-client-principal"];
   const correlationId = req.headers["x-correlation-id"] || `pdf-${Date.now()}`;
+  (req as any).correlationId = correlationId;
 
-  if (!principalHeader) {
-    logger.warn("Authentication required - no principal header", {
-      correlationId,
-    });
-    res
-      .status(401)
-      .json({ error: "Unauthorized", message: "Authentication required" });
-    return;
-  }
-
-  try {
-    const decoded = Buffer.from(principalHeader as string, "base64").toString(
-      "utf-8"
-    );
-    const principal = JSON.parse(decoded);
-    const user: AuthenticatedUser = {
-      userId:
-        principal.userId || principal.nameIdentifier || principal.userDetails,
-      userDetails: principal.userDetails,
-      roles:
-        principal.claims
-          ?.filter((c: any) => c.typ === "roles")
-          ?.map((c: any) => c.val) || [],
-    };
-    (req as any).authenticatedUser = user;
-    (req as any).correlationId = correlationId;
-    logger.debug("User authenticated", { correlationId, userId: user.userId });
-    next();
-  } catch (error) {
-    logger.warn("Invalid authentication token", {
-      correlationId,
-      error: String(error),
-    });
-    res
-      .status(401)
-      .json({ error: "Unauthorized", message: "Invalid authentication token" });
-  }
+  void (async () => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      (req as any).dbUser = user;
+      logger.debug("User authenticated", {
+        correlationId,
+        userId: user.id,
+        openId: user.openId,
+        role: user.role,
+      });
+      next();
+    } catch (error) {
+      logger.warn("Authentication required", {
+        correlationId,
+        error: String(error),
+      });
+      res
+        .status(401)
+        .json({ error: "Unauthorized", message: "Authentication required" });
+    }
+  })();
 }
 
 /**
- * RBAC check: verify user has access to the job sheet.
- * Aligns with enforceJobSheetAccess: admin/qa_lead → all; others → own uploads only.
+ * RBAC check: same object-level rules as tRPC job-sheet access.
+ * admin/qa_lead → all sheets; others → own uploads only.
  */
-async function checkRbacAccess(
-  user: AuthenticatedUser,
-  jobSheet: any
-): Promise<boolean> {
-  const claimRole = mapAzureRolesToDbRole(user.roles ?? []);
-  if (claimRole === "admin" || claimRole === "qa_lead") {
+function checkRbacAccess(user: User, jobSheet: unknown): boolean {
+  try {
+    enforceJobSheetAccess(
+      jobSheet as Parameters<typeof enforceJobSheetAccess>[0],
+      {
+        id: user.id,
+        role: user.role,
+      }
+    );
     return true;
+  } catch {
+    return false;
   }
-
-  const uploaderOpenId = `azure-${user.userId}`;
-  const dbUser = await db.getUserByOpenId(uploaderOpenId);
-
-  if (dbUser && (dbUser.role === "admin" || dbUser.role === "qa_lead")) {
-    return true;
-  }
-
-  if (dbUser && jobSheet.uploadedBy === dbUser.id) {
-    return true;
-  }
-
-  return false;
 }
 
 /**
@@ -119,7 +93,7 @@ router.get(
   async (req: Request, res: Response) => {
     const startTime = Date.now();
     const correlationId = (req as any).correlationId || `pdf-${Date.now()}`;
-    const user = (req as any).authenticatedUser as AuthenticatedUser;
+    const user = (req as any).dbUser as User;
 
     try {
       const jobSheetId = parseInt(req.params.jobSheetId, 10);
@@ -132,7 +106,7 @@ router.get(
       logger.debug("PDF request received", {
         correlationId,
         jobSheetId,
-        userId: user?.userId,
+        userId: user?.id,
       });
 
       // Get job sheet from database
@@ -145,13 +119,14 @@ router.get(
       }
 
       // RBAC check
-      const hasAccess = await checkRbacAccess(user, jobSheet);
+      const hasAccess = checkRbacAccess(user, jobSheet);
       if (!hasAccess) {
         pdfProxyMetrics.accessDeniedCount++;
         logger.warn("RBAC access denied", {
           correlationId,
           jobSheetId,
-          userId: user?.userId,
+          userId: user?.id,
+          role: user?.role,
         });
         res.status(403).json({
           error: "Forbidden",
@@ -303,7 +278,7 @@ router.head(
   async (req: Request, res: Response) => {
     const correlationId =
       (req as any).correlationId || `pdf-head-${Date.now()}`;
-    const user = (req as any).authenticatedUser as AuthenticatedUser;
+    const user = (req as any).dbUser as User;
 
     try {
       const jobSheetId = parseInt(req.params.jobSheetId, 10);
@@ -321,13 +296,14 @@ router.head(
       }
 
       // RBAC check
-      const hasAccess = await checkRbacAccess(user, jobSheet);
+      const hasAccess = checkRbacAccess(user, jobSheet);
       if (!hasAccess) {
         pdfProxyMetrics.accessDeniedCount++;
         logger.warn("RBAC access denied (HEAD)", {
           correlationId,
           jobSheetId,
-          userId: user?.userId,
+          userId: user?.id,
+          role: user?.role,
         });
         res.status(403).end();
         return;
