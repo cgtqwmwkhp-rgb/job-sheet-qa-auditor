@@ -41,6 +41,7 @@ import { Loader2, MoreHorizontal, Search, Shield, User, UserPlus } from "lucide-
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { showSaveSuccessToast, showSaveErrorToast, showMutationErrorToast } from "@/lib/toastHelpers";
 
 export default function UserManagement() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -54,11 +55,11 @@ export default function UserManagement() {
   const handleRoleChange = (userId: number, newRole: string) => {
     updateRole.mutate({ id: userId, role: newRole as any }, {
       onSuccess: () => {
-        toast.success("User role updated successfully");
+        showSaveSuccessToast("User role");
         utils.users.list.invalidate();
       },
-      onError: () => {
-        toast.error("Failed to update user role");
+      onError: (error) => {
+        showMutationErrorToast(error, "update user role");
       }
     });
   };

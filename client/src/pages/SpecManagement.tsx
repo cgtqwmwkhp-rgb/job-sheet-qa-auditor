@@ -24,6 +24,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { 
+  showSaveSuccessToast, 
+  showMutationErrorToast,
+  showErrorToast,
+  showSuccessToast 
+} from "@/lib/toastHelpers";
 
 // Mock rules for demo (would be stored in spec JSON in real implementation)
 const mockRules = [
