@@ -3,6 +3,21 @@
  * 
  * Standardized toast notifications for common operations.
  * Provides consistent messaging and styling across the app.
+ * 
+ * @module toastHelpers
+ * @see {@link https://sonner.emilkowal.ski/} Sonner documentation
+ * 
+ * @example
+ * import { showSuccessToast, showErrorToast } from '@/lib/toastHelpers';
+ * 
+ * // Simple success
+ * showSuccessToast("Settings saved");
+ * 
+ * // Success with description
+ * showSuccessToast("User created", "john@example.com has been added");
+ * 
+ * // Error with context
+ * showMutationErrorToast(error, "save settings");
  */
 
 import { toast } from "sonner";

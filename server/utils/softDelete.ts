@@ -2,9 +2,24 @@
  * Soft Delete Utilities
  * 
  * Framework for soft delete pattern across the application.
+ * Provides type-safe helpers for implementing recoverable deletions.
+ * 
+ * @module softDelete
  * 
  * NOTE: Full implementation requires database migration to add `deletedAt` columns.
  * This file provides the interface and helper functions for when migrations are applied.
+ * 
+ * @example
+ * // Check if record is deleted
+ * if (isDeleted(record)) {
+ *   console.log("Record was deleted");
+ * }
+ * 
+ * // Filter active records only
+ * const activeRecords = filterActive(allRecords);
+ * 
+ * // Create deletion metadata
+ * const metadata = createSoftDeleteMetadata(userId, "User requested deletion");
  * 
  * Migration needed:
  * ```sql
