@@ -1,11 +1,11 @@
 /**
  * Selection Fixtures for Template Matching Tests
- * 
+ *
  * PR-3: Expanded fixtures for rigorous template selection testing:
  * - Near-miss tests: documents that almost match but shouldn't
  * - Ambiguity tests: documents that match multiple templates
  * - Edge cases: minimal content, wrong format, partial matches
- * 
+ *
  * NON-NEGOTIABLES:
  * - All fixtures must be deterministic
  * - Each fixture must have expected outcome documented
@@ -16,12 +16,12 @@
 /**
  * Expected selection outcome
  */
-export type ExpectedOutcome = 
-  | 'HIGH_CONFIDENCE_MATCH'
-  | 'MEDIUM_CONFIDENCE_MATCH'
-  | 'LOW_CONFIDENCE_BLOCK'
-  | 'AMBIGUITY_BLOCK'
-  | 'NO_MATCH';
+export type ExpectedOutcome =
+  | "HIGH_CONFIDENCE_MATCH"
+  | "MEDIUM_CONFIDENCE_MATCH"
+  | "LOW_CONFIDENCE_BLOCK"
+  | "AMBIGUITY_BLOCK"
+  | "NO_MATCH";
 
 /**
  * Selection fixture definition
@@ -32,7 +32,7 @@ export interface SelectionFixture {
   /** Human-readable description */
   description: string;
   /** Category for grouping */
-  category: 'positive' | 'near-miss' | 'ambiguity' | 'edge-case';
+  category: "positive" | "near-miss" | "ambiguity" | "edge-case";
   /** Document text to test */
   documentText: string;
   /** Page texts (for multi-page documents) */
@@ -40,14 +40,14 @@ export interface SelectionFixture {
   /** Document metadata */
   metadata?: {
     pageCount: number;
-    formType?: 'handwritten' | 'printed' | 'hybrid';
+    formType?: "handwritten" | "printed" | "hybrid";
   };
   /** Expected template ID to match (if any) */
   expectedTemplateId?: string;
   /** Expected outcome */
   expectedOutcome: ExpectedOutcome;
   /** Expected confidence band */
-  expectedConfidenceBand?: 'HIGH' | 'MEDIUM' | 'LOW';
+  expectedConfidenceBand?: "HIGH" | "MEDIUM" | "LOW";
   /** Minimum score threshold */
   minScore?: number;
   /** Maximum score threshold */
@@ -67,7 +67,7 @@ export interface FixtureRunResult {
   actualOutcome: ExpectedOutcome;
   actualTemplateId?: string;
   actualScore: number;
-  actualConfidenceBand: 'HIGH' | 'MEDIUM' | 'LOW';
+  actualConfidenceBand: "HIGH" | "MEDIUM" | "LOW";
   actualBlockReason?: string;
   errors: string[];
 }
@@ -78,9 +78,9 @@ export interface FixtureRunResult {
 
 export const POSITIVE_FIXTURES: SelectionFixture[] = [
   {
-    id: 'POS-001',
-    description: 'Standard job sheet with all expected fields',
-    category: 'positive',
+    id: "POS-001",
+    description: "Standard job sheet with all expected fields",
+    category: "positive",
     documentText: `
       JOB SHEET
       Reference: JOB-123456
@@ -103,15 +103,15 @@ export const POSITIVE_FIXTURES: SelectionFixture[] = [
       
       Customer Signature: _________
     `,
-    expectedOutcome: 'MEDIUM_CONFIDENCE_MATCH', // Updated: ultra-permissive default template
-    expectedConfidenceBand: 'LOW', // Updated: optional-only scoring
+    expectedOutcome: "MEDIUM_CONFIDENCE_MATCH", // Updated: ultra-permissive default template
+    expectedConfidenceBand: "LOW", // Updated: optional-only scoring
     minScore: 30, // Updated: much lower threshold with catch-all template
-    tags: ['happy-path', 'standard'],
+    tags: ["happy-path", "standard"],
   },
   {
-    id: 'POS-002',
-    description: 'Job sheet with maintenance keywords',
-    category: 'positive',
+    id: "POS-002",
+    description: "Job sheet with maintenance keywords",
+    category: "positive",
     documentText: `
       MAINTENANCE SERVICE REPORT
       Job Reference: JOB-999888
@@ -123,10 +123,10 @@ export const POSITIVE_FIXTURES: SelectionFixture[] = [
       
       Work Completed: Annual inspection and service.
     `,
-    expectedOutcome: 'MEDIUM_CONFIDENCE_MATCH', // Updated: with single-template bypass, this will pass
-    expectedConfidenceBand: 'LOW',
+    expectedOutcome: "MEDIUM_CONFIDENCE_MATCH", // Updated: with single-template bypass, this will pass
+    expectedConfidenceBand: "LOW",
     minScore: 20, // Updated: much lower threshold with catch-all template
-    tags: ['maintenance', 'service-report'],
+    tags: ["maintenance", "service-report"],
   },
 ];
 
@@ -136,9 +136,10 @@ export const POSITIVE_FIXTURES: SelectionFixture[] = [
 
 export const NEAR_MISS_FIXTURES: SelectionFixture[] = [
   {
-    id: 'NEAR-001',
-    description: 'Document with job/sheet keywords but wrong context (job application)',
-    category: 'near-miss',
+    id: "NEAR-001",
+    description:
+      "Document with job/sheet keywords but wrong context (job application)",
+    category: "near-miss",
     documentText: `
       JOB APPLICATION FORM
       
@@ -150,16 +151,16 @@ export const NEAR_MISS_FIXTURES: SelectionFixture[] = [
       Please describe your work experience:
       I have worked as a sheet metal fabricator for 10 years.
     `,
-    expectedOutcome: 'LOW_CONFIDENCE_BLOCK',
-    expectedConfidenceBand: 'LOW',
+    expectedOutcome: "LOW_CONFIDENCE_BLOCK",
+    expectedConfidenceBand: "LOW",
     maxScore: 49,
     expectedBlockReasonPattern: /LOW_CONFIDENCE/,
-    tags: ['near-miss', 'wrong-context'],
+    tags: ["near-miss", "wrong-context"],
   },
   {
-    id: 'NEAR-002',
-    description: 'Invoice with some overlapping fields (date, serial)',
-    category: 'near-miss',
+    id: "NEAR-002",
+    description: "Invoice with some overlapping fields (date, serial)",
+    category: "near-miss",
     documentText: `
       SALES INVOICE
       Invoice Number: INV-2026-0001
@@ -173,31 +174,32 @@ export const NEAR_MISS_FIXTURES: SelectionFixture[] = [
       
       Payment Due: 30 days net
     `,
-    expectedOutcome: 'LOW_CONFIDENCE_BLOCK',
-    expectedConfidenceBand: 'LOW',
+    expectedOutcome: "LOW_CONFIDENCE_BLOCK",
+    expectedConfidenceBand: "LOW",
     maxScore: 49,
     expectedBlockReasonPattern: /LOW_CONFIDENCE/,
-    tags: ['near-miss', 'invoice'],
+    tags: ["near-miss", "invoice"],
   },
   {
-    id: 'NEAR-003',
-    description: 'Partial job sheet missing critical fields',
-    category: 'near-miss',
+    id: "NEAR-003",
+    description: "Partial job sheet missing critical fields",
+    category: "near-miss",
     documentText: `
       JOB SHEET (DRAFT)
       
       Notes: Equipment inspection required
       Location: Building B
     `,
-    expectedOutcome: 'LOW_CONFIDENCE_BLOCK',
-    expectedConfidenceBand: 'LOW',
+    expectedOutcome: "LOW_CONFIDENCE_BLOCK",
+    expectedConfidenceBand: "LOW",
     maxScore: 49,
-    tags: ['near-miss', 'incomplete'],
+    tags: ["near-miss", "incomplete"],
   },
   {
-    id: 'NEAR-004',
-    description: 'Document with service keywords but different industry (restaurant)',
-    category: 'near-miss',
+    id: "NEAR-004",
+    description:
+      "Document with service keywords but different industry (restaurant)",
+    category: "near-miss",
     documentText: `
       CUSTOMER SERVICE FEEDBACK
       
@@ -210,10 +212,10 @@ export const NEAR_MISS_FIXTURES: SelectionFixture[] = [
       Customer Name: Sarah Wilson
       Signature: _________
     `,
-    expectedOutcome: 'LOW_CONFIDENCE_BLOCK',
-    expectedConfidenceBand: 'LOW',
+    expectedOutcome: "LOW_CONFIDENCE_BLOCK",
+    expectedConfidenceBand: "LOW",
     maxScore: 49,
-    tags: ['near-miss', 'wrong-industry'],
+    tags: ["near-miss", "wrong-industry"],
   },
 ];
 
@@ -223,9 +225,9 @@ export const NEAR_MISS_FIXTURES: SelectionFixture[] = [
 
 export const AMBIGUITY_FIXTURES: SelectionFixture[] = [
   {
-    id: 'AMB-001',
-    description: 'Generic service document matching multiple templates',
-    category: 'ambiguity',
+    id: "AMB-001",
+    description: "Generic service document matching multiple templates",
+    category: "ambiguity",
     documentText: `
       SERVICE DOCUMENT
       Date: 15/03/2026
@@ -235,14 +237,14 @@ export const AMBIGUITY_FIXTURES: SelectionFixture[] = [
       
       Description of Work
     `,
-    expectedOutcome: 'AMBIGUITY_BLOCK',
+    expectedOutcome: "AMBIGUITY_BLOCK",
     expectedBlockReasonPattern: /AMBIGUITY|gap/i,
-    tags: ['ambiguity', 'generic'],
+    tags: ["ambiguity", "generic"],
   },
   {
-    id: 'AMB-002',
-    description: 'Document with mixed keywords from different templates',
-    category: 'ambiguity',
+    id: "AMB-002",
+    description: "Document with mixed keywords from different templates",
+    category: "ambiguity",
     documentText: `
       WORK ORDER / INSPECTION REPORT
       
@@ -254,9 +256,9 @@ export const AMBIGUITY_FIXTURES: SelectionFixture[] = [
       
       Work Type: Installation and Inspection
     `,
-    expectedOutcome: 'AMBIGUITY_BLOCK',
+    expectedOutcome: "AMBIGUITY_BLOCK",
     expectedBlockReasonPattern: /AMBIGUITY|gap/i,
-    tags: ['ambiguity', 'mixed-keywords'],
+    tags: ["ambiguity", "mixed-keywords"],
   },
 ];
 
@@ -266,55 +268,55 @@ export const AMBIGUITY_FIXTURES: SelectionFixture[] = [
 
 export const EDGE_CASE_FIXTURES: SelectionFixture[] = [
   {
-    id: 'EDGE-001',
-    description: 'Empty document',
-    category: 'edge-case',
-    documentText: '',
-    expectedOutcome: 'NO_MATCH',
-    expectedConfidenceBand: 'LOW',
-    tags: ['edge-case', 'empty'],
+    id: "EDGE-001",
+    description: "Empty document",
+    category: "edge-case",
+    documentText: "",
+    expectedOutcome: "NO_MATCH",
+    expectedConfidenceBand: "LOW",
+    tags: ["edge-case", "empty"],
   },
   {
-    id: 'EDGE-002',
-    description: 'Single word document',
-    category: 'edge-case',
-    documentText: 'Job',
-    expectedOutcome: 'LOW_CONFIDENCE_BLOCK',
-    expectedConfidenceBand: 'LOW',
+    id: "EDGE-002",
+    description: "Single word document",
+    category: "edge-case",
+    documentText: "Job",
+    expectedOutcome: "LOW_CONFIDENCE_BLOCK",
+    expectedConfidenceBand: "LOW",
     maxScore: 30,
-    tags: ['edge-case', 'minimal'],
+    tags: ["edge-case", "minimal"],
   },
   {
-    id: 'EDGE-003',
-    description: 'Document with special characters only',
-    category: 'edge-case',
-    documentText: '!@#$%^&*()_+-=[]{}|;:,.<>?',
-    expectedOutcome: 'NO_MATCH',
-    expectedConfidenceBand: 'LOW',
-    tags: ['edge-case', 'special-chars'],
+    id: "EDGE-003",
+    description: "Document with special characters only",
+    category: "edge-case",
+    documentText: "!@#$%^&*()_+-=[]{}|;:,.<>?",
+    expectedOutcome: "NO_MATCH",
+    expectedConfidenceBand: "LOW",
+    tags: ["edge-case", "special-chars"],
   },
   {
-    id: 'EDGE-004',
-    description: 'Very long document with repeated keywords',
-    category: 'edge-case',
-    documentText: Array(100).fill('job sheet maintenance service').join(' '),
-    expectedOutcome: 'MEDIUM_CONFIDENCE_MATCH', // Updated: with single-template bypass, this will pass
+    id: "EDGE-004",
+    description: "Very long document with repeated keywords",
+    category: "edge-case",
+    documentText: Array(100).fill("job sheet maintenance service").join(" "),
+    expectedOutcome: "MEDIUM_CONFIDENCE_MATCH", // Updated: with single-template bypass, this will pass
     minScore: 10, // Updated: catch-all template has low scores
-    tags: ['edge-case', 'long-document'],
+    tags: ["edge-case", "long-document"],
   },
   {
-    id: 'EDGE-005',
-    description: 'Document in wrong language (simulated)',
-    category: 'edge-case',
+    id: "EDGE-005",
+    description: "Document in wrong language (simulated)",
+    category: "edge-case",
     documentText: `
       FICHE DE TRAVAIL
       Date: 15/03/2026
       Technicien: Pierre Dupont
       Description: Maintenance préventive
     `,
-    expectedOutcome: 'LOW_CONFIDENCE_BLOCK',
-    expectedConfidenceBand: 'LOW',
-    tags: ['edge-case', 'language'],
+    expectedOutcome: "LOW_CONFIDENCE_BLOCK",
+    expectedConfidenceBand: "LOW",
+    tags: ["edge-case", "language"],
   },
 ];
 
@@ -332,7 +334,9 @@ export const ALL_SELECTION_FIXTURES: SelectionFixture[] = [
 /**
  * Get fixtures by category
  */
-export function getFixturesByCategory(category: SelectionFixture['category']): SelectionFixture[] {
+export function getFixturesByCategory(
+  category: SelectionFixture["category"]
+): SelectionFixture[] {
   return ALL_SELECTION_FIXTURES.filter(f => f.category === category);
 }
 
@@ -354,45 +358,58 @@ export function getFixtureById(id: string): SelectionFixture | undefined {
 // FIXTURE RUNNER
 // ============================================================================
 
-import { selectTemplateMultiSignal, type MultiSignalSelectionResult } from './selectorService';
+import {
+  selectTemplateMultiSignal,
+  type MultiSignalSelectionResult,
+} from "./selectorService";
 
 /**
  * Run a single selection fixture
  */
 export function runSelectionFixture(
   fixture: SelectionFixture,
-  selectionFn: (documentText: string) => MultiSignalSelectionResult = (text) => 
-    selectTemplateMultiSignal({ documentText: text, metadata: fixture.metadata })
+  selectionFn: (documentText: string) => MultiSignalSelectionResult = text =>
+    selectTemplateMultiSignal({
+      documentText: text,
+      metadata: fixture.metadata,
+    })
 ): FixtureRunResult {
   const result = selectionFn(fixture.documentText);
   const errors: string[] = [];
-  
+
   // Determine actual outcome
   let actualOutcome: ExpectedOutcome;
   if (result.candidates.length === 0) {
-    actualOutcome = 'NO_MATCH';
+    actualOutcome = "NO_MATCH";
   } else if (!result.autoProcessingAllowed) {
-    if (result.blockReason?.includes('AMBIGUITY')) {
-      actualOutcome = 'AMBIGUITY_BLOCK';
+    if (result.blockReason?.includes("AMBIGUITY")) {
+      actualOutcome = "AMBIGUITY_BLOCK";
     } else {
-      actualOutcome = 'LOW_CONFIDENCE_BLOCK';
+      actualOutcome = "LOW_CONFIDENCE_BLOCK";
     }
-  } else if (result.confidenceBand === 'HIGH') {
-    actualOutcome = 'HIGH_CONFIDENCE_MATCH';
+  } else if (result.confidenceBand === "HIGH") {
+    actualOutcome = "HIGH_CONFIDENCE_MATCH";
   } else {
-    actualOutcome = 'MEDIUM_CONFIDENCE_MATCH';
+    actualOutcome = "MEDIUM_CONFIDENCE_MATCH";
   }
-  
+
   // Check expected outcome
   if (actualOutcome !== fixture.expectedOutcome) {
-    errors.push(`Expected outcome ${fixture.expectedOutcome}, got ${actualOutcome}`);
+    errors.push(
+      `Expected outcome ${fixture.expectedOutcome}, got ${actualOutcome}`
+    );
   }
-  
+
   // Check confidence band
-  if (fixture.expectedConfidenceBand && result.confidenceBand !== fixture.expectedConfidenceBand) {
-    errors.push(`Expected confidence ${fixture.expectedConfidenceBand}, got ${result.confidenceBand}`);
+  if (
+    fixture.expectedConfidenceBand &&
+    result.confidenceBand !== fixture.expectedConfidenceBand
+  ) {
+    errors.push(
+      `Expected confidence ${fixture.expectedConfidenceBand}, got ${result.confidenceBand}`
+    );
   }
-  
+
   // Check score thresholds
   if (fixture.minScore !== undefined && result.topScore < fixture.minScore) {
     errors.push(`Score ${result.topScore} below minimum ${fixture.minScore}`);
@@ -400,27 +417,35 @@ export function runSelectionFixture(
   if (fixture.maxScore !== undefined && result.topScore > fixture.maxScore) {
     errors.push(`Score ${result.topScore} above maximum ${fixture.maxScore}`);
   }
-  
+
   // Check block reason pattern
   if (fixture.expectedBlockReasonPattern && result.blockReason) {
     if (!fixture.expectedBlockReasonPattern.test(result.blockReason)) {
-      errors.push(`Block reason "${result.blockReason}" doesn't match pattern ${fixture.expectedBlockReasonPattern}`);
+      errors.push(
+        `Block reason "${result.blockReason}" doesn't match pattern ${fixture.expectedBlockReasonPattern}`
+      );
     }
   }
-  
+
   // Check expected template
   if (fixture.expectedTemplateId && result.selected) {
-    const selectedSlug = result.candidates.find(c => c.templateId === result.templateId)?.templateSlug;
+    const selectedSlug = result.candidates.find(
+      c => c.templateId === result.templateId
+    )?.templateSlug;
     if (selectedSlug !== fixture.expectedTemplateId) {
-      errors.push(`Expected template ${fixture.expectedTemplateId}, got ${selectedSlug}`);
+      errors.push(
+        `Expected template ${fixture.expectedTemplateId}, got ${selectedSlug}`
+      );
     }
   }
-  
+
   return {
     fixture,
     passed: errors.length === 0,
     actualOutcome,
-    actualTemplateId: result.candidates.find(c => c.templateId === result.templateId)?.templateSlug,
+    actualTemplateId: result.candidates.find(
+      c => c.templateId === result.templateId
+    )?.templateSlug,
     actualScore: result.topScore,
     actualConfidenceBand: result.confidenceBand,
     actualBlockReason: result.blockReason,
@@ -432,7 +457,7 @@ export function runSelectionFixture(
  * Run all fixtures in a category
  */
 export function runFixtureCategory(
-  category: SelectionFixture['category']
+  category: SelectionFixture["category"]
 ): FixtureRunResult[] {
   const fixtures = getFixturesByCategory(category);
   return fixtures.map(f => runSelectionFixture(f));
@@ -449,7 +474,7 @@ export function runAllFixtures(): {
   byCategory: Record<string, { passed: number; failed: number }>;
 } {
   const results = ALL_SELECTION_FIXTURES.map(f => runSelectionFixture(f));
-  
+
   const byCategory: Record<string, { passed: number; failed: number }> = {};
   for (const result of results) {
     const cat = result.fixture.category;
@@ -462,7 +487,7 @@ export function runAllFixtures(): {
       byCategory[cat].failed++;
     }
   }
-  
+
   return {
     total: results.length,
     passed: results.filter(r => r.passed).length,

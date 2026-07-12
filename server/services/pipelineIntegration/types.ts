@@ -1,11 +1,17 @@
 /**
  * Pipeline Integration Types
- * 
+ *
  * PR-6: Types for the integrated pipeline with enhancement modules.
  */
 
-import type { FieldExtractionResult, ValidationTrace } from '../extraction/criticalFieldExtractor';
-import type { FusedFieldResult, FusionEvidence } from '../imageQaFusion/fusionService';
+import type {
+  FieldExtractionResult,
+  ValidationTrace,
+} from "../extraction/criticalFieldExtractor";
+import type {
+  FusedFieldResult,
+  FusionEvidence,
+} from "../imageQaFusion/fusionService";
 
 /**
  * Feature flags for pipeline enhancements
@@ -56,7 +62,7 @@ export interface PipelineOutput {
   /** Document ID */
   documentId: string;
   /** Overall status */
-  status: 'PASS' | 'FAIL' | 'REVIEW_QUEUE';
+  status: "PASS" | "FAIL" | "REVIEW_QUEUE";
   /** Critical field extraction results */
   criticalFields: FieldExtractionResult[];
   /** Validation trace artifact */

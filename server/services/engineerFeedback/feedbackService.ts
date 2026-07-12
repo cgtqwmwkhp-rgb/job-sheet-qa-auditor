@@ -1,22 +1,22 @@
 /**
  * Engineer Feedback Framework - PR-4
- * 
+ *
  * Provides aggregation framework for:
  * - Engineer scorecards (daily/weekly/monthly)
  * - Fix pack generation per engineer/template
  * - Template quality metrics
- * 
+ *
  * All outputs are deterministic with stable ordering.
  */
 
-import { createSafeLogger } from '../../utils/safeLogger';
+import { createSafeLogger } from "../../utils/safeLogger";
 
-const logger = createSafeLogger('engineerFeedback');
+const logger = createSafeLogger("engineerFeedback");
 
 /**
  * Time period for aggregation
  */
-export type AggregationPeriod = 'daily' | 'weekly' | 'monthly';
+export type AggregationPeriod = "daily" | "weekly" | "monthly";
 
 /**
  * Job sheet audit result for aggregation
@@ -29,7 +29,7 @@ export interface AuditResult {
   templateId: string;
   templateName: string;
   auditedAt: string;
-  outcome: 'VALID' | 'INVALID' | 'REVIEW_QUEUE';
+  outcome: "VALID" | "INVALID" | "REVIEW_QUEUE";
   reasonCodes: string[];
   confidence: number;
   fieldsExtracted: number;
@@ -88,7 +88,7 @@ export interface EngineerFixPack {
     infoIssues: number;
   };
   issues: Array<{
-    category: 'critical' | 'warning' | 'info';
+    category: "critical" | "warning" | "info";
     reasonCode: string;
     description: string;
     occurrences: number;
@@ -151,41 +151,55 @@ export interface TemplateQualityCockpit {
 /**
  * Reason code descriptions
  */
-const REASON_CODE_DESCRIPTIONS: Record<string, { description: string; recommendation: string; category: 'critical' | 'warning' | 'info' }> = {
+const REASON_CODE_DESCRIPTIONS: Record<
+  string,
+  {
+    description: string;
+    recommendation: string;
+    category: "critical" | "warning" | "info";
+  }
+> = {
   MISSING_FIELD: {
-    description: 'Required field was not found in the document',
-    recommendation: 'Ensure all required fields are present and clearly labeled on job sheets',
-    category: 'critical',
+    description: "Required field was not found in the document",
+    recommendation:
+      "Ensure all required fields are present and clearly labeled on job sheets",
+    category: "critical",
   },
   INVALID_FORMAT: {
-    description: 'Field value does not match expected format',
-    recommendation: 'Use standard formats for dates, reference numbers, and other structured data',
-    category: 'warning',
+    description: "Field value does not match expected format",
+    recommendation:
+      "Use standard formats for dates, reference numbers, and other structured data",
+    category: "warning",
   },
   LOW_CONFIDENCE: {
-    description: 'Field extraction had low confidence due to unclear or ambiguous content',
-    recommendation: 'Ensure fields are clearly written or typed, avoid handwriting over printed text',
-    category: 'warning',
+    description:
+      "Field extraction had low confidence due to unclear or ambiguous content",
+    recommendation:
+      "Ensure fields are clearly written or typed, avoid handwriting over printed text",
+    category: "warning",
   },
   CONFLICT: {
-    description: 'Multiple conflicting values detected for the same field',
-    recommendation: 'Ensure only one value is provided for each field, avoid corrections without clear marking',
-    category: 'critical',
+    description: "Multiple conflicting values detected for the same field",
+    recommendation:
+      "Ensure only one value is provided for each field, avoid corrections without clear marking",
+    category: "critical",
   },
   SPEC_GAP: {
-    description: 'Template specification is missing required ROI or field definition',
-    recommendation: 'Contact admin to update template specification',
-    category: 'info',
+    description:
+      "Template specification is missing required ROI or field definition",
+    recommendation: "Contact admin to update template specification",
+    category: "info",
   },
   OCR_FAILURE: {
-    description: 'Document image quality prevented accurate text extraction',
-    recommendation: 'Ensure documents are scanned clearly without shadows, folds, or low resolution',
-    category: 'warning',
+    description: "Document image quality prevented accurate text extraction",
+    recommendation:
+      "Ensure documents are scanned clearly without shadows, folds, or low resolution",
+    category: "warning",
   },
   PIPELINE_ERROR: {
-    description: 'System processing error occurred',
-    recommendation: 'Retry the audit or contact support if issue persists',
-    category: 'info',
+    description: "System processing error occurred",
+    recommendation: "Retry the audit or contact support if issue persists",
+    category: "info",
   },
 };
 
@@ -198,28 +212,28 @@ function calculatePeriodBoundaries(
 ): { start: Date; end: Date } {
   const end = new Date(referenceDate);
   end.setHours(23, 59, 59, 999);
-  
+
   const start = new Date(referenceDate);
   start.setHours(0, 0, 0, 0);
-  
+
   switch (period) {
-    case 'daily':
+    case "daily":
       // Start and end are the same day
       break;
-    case 'weekly':
+    case "weekly":
       // Go back to start of week (Sunday)
       start.setDate(start.getDate() - start.getDay());
       // End is 6 days later (Saturday)
       end.setDate(start.getDate() + 6);
       break;
-    case 'monthly':
+    case "monthly":
       // Start of month
       start.setDate(1);
       // End of month
       end.setMonth(end.getMonth() + 1, 0);
       break;
   }
-  
+
   return { start, end };
 }
 
@@ -232,7 +246,7 @@ function filterAuditsByPeriod(
   referenceDate?: Date
 ): AuditResult[] {
   const { start, end } = calculatePeriodBoundaries(period, referenceDate);
-  
+
   return audits.filter(audit => {
     const auditDate = new Date(audit.auditedAt);
     return auditDate >= start && auditDate <= end;
@@ -247,22 +261,24 @@ function calculateReasonCodeDistribution(
 ): Array<{ reasonCode: string; count: number; percentage: number }> {
   const counts = new Map<string, number>();
   let total = 0;
-  
+
   for (const audit of audits) {
     for (const code of audit.reasonCodes) {
       counts.set(code, (counts.get(code) || 0) + 1);
       total++;
     }
   }
-  
+
   const distribution = Array.from(counts.entries())
     .map(([reasonCode, count]) => ({
       reasonCode,
       count,
       percentage: total > 0 ? (count / total) * 100 : 0,
     }))
-    .sort((a, b) => b.count - a.count || a.reasonCode.localeCompare(b.reasonCode));
-  
+    .sort(
+      (a, b) => b.count - a.count || a.reasonCode.localeCompare(b.reasonCode)
+    );
+
   return distribution;
 }
 
@@ -277,36 +293,58 @@ export function generateEngineerScorecard(
   referenceDate?: Date
 ): EngineerScorecard {
   const { start, end } = calculatePeriodBoundaries(period, referenceDate);
-  const periodAudits = filterAuditsByPeriod(audits, period, referenceDate)
-    .filter(a => a.engineerId === engineerId);
-  
-  const validCount = periodAudits.filter(a => a.outcome === 'VALID').length;
-  const invalidCount = periodAudits.filter(a => a.outcome === 'INVALID').length;
-  const reviewQueueCount = periodAudits.filter(a => a.outcome === 'REVIEW_QUEUE').length;
-  
+  const periodAudits = filterAuditsByPeriod(
+    audits,
+    period,
+    referenceDate
+  ).filter(a => a.engineerId === engineerId);
+
+  const validCount = periodAudits.filter(a => a.outcome === "VALID").length;
+  const invalidCount = periodAudits.filter(a => a.outcome === "INVALID").length;
+  const reviewQueueCount = periodAudits.filter(
+    a => a.outcome === "REVIEW_QUEUE"
+  ).length;
+
   const totalAudits = periodAudits.length;
   const validRate = totalAudits > 0 ? validCount / totalAudits : 0;
-  const averageConfidence = totalAudits > 0
-    ? periodAudits.reduce((sum, a) => sum + a.confidence, 0) / totalAudits
-    : 0;
-  
+  const averageConfidence =
+    totalAudits > 0
+      ? periodAudits.reduce((sum, a) => sum + a.confidence, 0) / totalAudits
+      : 0;
+
   // Aggregate field counts
-  const fieldsExtractedTotal = periodAudits.reduce((sum, a) => sum + a.fieldsExtracted, 0);
-  const fieldsMissingTotal = periodAudits.reduce((sum, a) => sum + a.fieldsMissing, 0);
-  const fieldsLowConfidenceTotal = periodAudits.reduce((sum, a) => sum + a.fieldsLowConfidence, 0);
-  
+  const fieldsExtractedTotal = periodAudits.reduce(
+    (sum, a) => sum + a.fieldsExtracted,
+    0
+  );
+  const fieldsMissingTotal = periodAudits.reduce(
+    (sum, a) => sum + a.fieldsMissing,
+    0
+  );
+  const fieldsLowConfidenceTotal = periodAudits.reduce(
+    (sum, a) => sum + a.fieldsLowConfidence,
+    0
+  );
+
   // Top issues
   const topIssues = calculateReasonCodeDistribution(periodAudits).slice(0, 5);
-  
+
   // Template breakdown
-  const templateMap = new Map<string, { name: string; valid: number; total: number }>();
+  const templateMap = new Map<
+    string,
+    { name: string; valid: number; total: number }
+  >();
   for (const audit of periodAudits) {
-    const existing = templateMap.get(audit.templateId) || { name: audit.templateName, valid: 0, total: 0 };
+    const existing = templateMap.get(audit.templateId) || {
+      name: audit.templateName,
+      valid: 0,
+      total: 0,
+    };
     existing.total++;
-    if (audit.outcome === 'VALID') existing.valid++;
+    if (audit.outcome === "VALID") existing.valid++;
     templateMap.set(audit.templateId, existing);
   }
-  
+
   const templateBreakdown = Array.from(templateMap.entries())
     .map(([templateId, data]) => ({
       templateId,
@@ -314,15 +352,18 @@ export function generateEngineerScorecard(
       auditCount: data.total,
       validRate: data.total > 0 ? data.valid / data.total : 0,
     }))
-    .sort((a, b) => b.auditCount - a.auditCount || a.templateId.localeCompare(b.templateId));
-  
-  logger.info('Engineer scorecard generated', {
+    .sort(
+      (a, b) =>
+        b.auditCount - a.auditCount || a.templateId.localeCompare(b.templateId)
+    );
+
+  logger.info("Engineer scorecard generated", {
     engineerId,
     period,
     totalAudits,
     validRate: validRate.toFixed(3),
   });
-  
+
   return {
     engineerId,
     engineerName,
@@ -359,8 +400,8 @@ export function generateEngineerFixPack(
   const { start, end } = calculatePeriodBoundaries(period, referenceDate);
   const periodAudits = filterAuditsByPeriod(audits, period, referenceDate)
     .filter(a => a.engineerId === engineerId)
-    .filter(a => a.outcome !== 'VALID');
-  
+    .filter(a => a.outcome !== "VALID");
+
   // Aggregate issues by reason code
   const issueMap = new Map<string, { auditIds: string[] }>();
   for (const audit of periodAudits) {
@@ -370,14 +411,14 @@ export function generateEngineerFixPack(
       issueMap.set(code, existing);
     }
   }
-  
+
   // Build issue list
   const issues = Array.from(issueMap.entries())
     .map(([reasonCode, data]) => {
       const info = REASON_CODE_DESCRIPTIONS[reasonCode] || {
-        description: 'Unknown issue',
-        recommendation: 'Contact support for assistance',
-        category: 'info' as const,
+        description: "Unknown issue",
+        recommendation: "Contact support for assistance",
+        category: "info" as const,
       };
       return {
         category: info.category,
@@ -391,25 +432,35 @@ export function generateEngineerFixPack(
     .sort((a, b) => {
       // Sort by category (critical first), then by occurrences
       const categoryOrder = { critical: 0, warning: 1, info: 2 };
-      const categoryDiff = categoryOrder[a.category] - categoryOrder[b.category];
+      const categoryDiff =
+        categoryOrder[a.category] - categoryOrder[b.category];
       if (categoryDiff !== 0) return categoryDiff;
-      return b.occurrences - a.occurrences || a.reasonCode.localeCompare(b.reasonCode);
+      return (
+        b.occurrences - a.occurrences ||
+        a.reasonCode.localeCompare(b.reasonCode)
+      );
     });
-  
+
   const summary = {
     totalIssues: issues.reduce((sum, i) => sum + i.occurrences, 0),
-    criticalIssues: issues.filter(i => i.category === 'critical').reduce((sum, i) => sum + i.occurrences, 0),
-    warningIssues: issues.filter(i => i.category === 'warning').reduce((sum, i) => sum + i.occurrences, 0),
-    infoIssues: issues.filter(i => i.category === 'info').reduce((sum, i) => sum + i.occurrences, 0),
+    criticalIssues: issues
+      .filter(i => i.category === "critical")
+      .reduce((sum, i) => sum + i.occurrences, 0),
+    warningIssues: issues
+      .filter(i => i.category === "warning")
+      .reduce((sum, i) => sum + i.occurrences, 0),
+    infoIssues: issues
+      .filter(i => i.category === "info")
+      .reduce((sum, i) => sum + i.occurrences, 0),
   };
-  
-  logger.info('Fix pack generated', {
+
+  logger.info("Fix pack generated", {
     engineerId,
     period,
     totalIssues: summary.totalIssues,
     criticalIssues: summary.criticalIssues,
   });
-  
+
   return {
     engineerId,
     engineerName,
@@ -439,24 +490,33 @@ export function generateTemplateQualityMetrics(
   referenceDate?: Date
 ): TemplateQualityMetrics {
   const { start, end } = calculatePeriodBoundaries(period, referenceDate);
-  const periodAudits = filterAuditsByPeriod(audits, period, referenceDate)
-    .filter(a => a.templateId === templateId);
-  
+  const periodAudits = filterAuditsByPeriod(
+    audits,
+    period,
+    referenceDate
+  ).filter(a => a.templateId === templateId);
+
   const totalAudits = periodAudits.length;
-  const validCount = periodAudits.filter(a => a.outcome === 'VALID').length;
+  const validCount = periodAudits.filter(a => a.outcome === "VALID").length;
   const validRate = totalAudits > 0 ? validCount / totalAudits : 0;
-  const averageConfidence = totalAudits > 0
-    ? periodAudits.reduce((sum, a) => sum + a.confidence, 0) / totalAudits
-    : 0;
-  
+  const averageConfidence =
+    totalAudits > 0
+      ? periodAudits.reduce((sum, a) => sum + a.confidence, 0) / totalAudits
+      : 0;
+
   // Ambiguity rate (LOW_CONFIDENCE or CONFLICT outcomes)
   const ambiguousCount = periodAudits.filter(
-    a => a.reasonCodes.includes('LOW_CONFIDENCE') || a.reasonCodes.includes('CONFLICT')
+    a =>
+      a.reasonCodes.includes("LOW_CONFIDENCE") ||
+      a.reasonCodes.includes("CONFLICT")
   ).length;
   const ambiguityRate = totalAudits > 0 ? ambiguousCount / totalAudits : 0;
-  
-  const topReasonCodes = calculateReasonCodeDistribution(periodAudits).slice(0, 5);
-  
+
+  const topReasonCodes = calculateReasonCodeDistribution(periodAudits).slice(
+    0,
+    5
+  );
+
   return {
     templateId,
     templateName,
@@ -483,27 +543,38 @@ export function generateTemplateQualityMetrics(
  */
 export function generateTemplateQualityCockpit(
   audits: AuditResult[],
-  templateMetricsMap: Map<string, { name: string; collisionCount?: number; overrideCount?: number; roiCompleteness?: number; fixturePassRate?: number }>,
+  templateMetricsMap: Map<
+    string,
+    {
+      name: string;
+      collisionCount?: number;
+      overrideCount?: number;
+      roiCompleteness?: number;
+      fixturePassRate?: number;
+    }
+  >,
   period: AggregationPeriod,
   referenceDate?: Date
 ): TemplateQualityCockpit {
   const { start, end } = calculatePeriodBoundaries(period, referenceDate);
   const periodAudits = filterAuditsByPeriod(audits, period, referenceDate);
-  
+
   // Generate metrics for each template
   const templateIdsSet = new Set(periodAudits.map(a => a.templateId));
   const templateIds = Array.from(templateIdsSet);
   const templates: TemplateQualityMetrics[] = [];
-  
+
   for (const templateId of templateIds) {
     const templateInfo = templateMetricsMap.get(templateId);
     const templateName = templateInfo?.name || templateId;
-    const additionalMetrics = templateInfo ? {
-      collisionCount: templateInfo.collisionCount,
-      overrideCount: templateInfo.overrideCount,
-      roiCompleteness: templateInfo.roiCompleteness,
-      fixturePassRate: templateInfo.fixturePassRate,
-    } : undefined;
+    const additionalMetrics = templateInfo
+      ? {
+          collisionCount: templateInfo.collisionCount,
+          overrideCount: templateInfo.overrideCount,
+          roiCompleteness: templateInfo.roiCompleteness,
+          fixturePassRate: templateInfo.fixturePassRate,
+        }
+      : undefined;
     const metrics = generateTemplateQualityMetrics(
       templateId,
       templateName,
@@ -514,7 +585,7 @@ export function generateTemplateQualityCockpit(
     );
     templates.push(metrics);
   }
-  
+
   // Sort templates: by attention needed (low valid rate, high ambiguity) first
   templates.sort((a, b) => {
     const aScore = a.metrics.validRate - a.metrics.ambiguityRate;
@@ -522,36 +593,44 @@ export function generateTemplateQualityCockpit(
     if (aScore !== bScore) return aScore - bScore; // Lower score = needs more attention
     return a.templateId.localeCompare(b.templateId);
   });
-  
+
   // Calculate overall metrics
   const totalTemplates = templates.length;
   const totalAudits = periodAudits.length;
-  const averageValidRate = templates.length > 0
-    ? templates.reduce((sum, t) => sum + t.metrics.validRate, 0) / templates.length
-    : 0;
-  const averageConfidence = templates.length > 0
-    ? templates.reduce((sum, t) => sum + t.metrics.averageConfidence, 0) / templates.length
-    : 0;
-  const templatesWithHighAmbiguity = templates.filter(t => t.metrics.ambiguityRate > 0.2).length;
-  const templatesNeedingAttention = templates.filter(t => t.metrics.validRate < 0.8).length;
-  
+  const averageValidRate =
+    templates.length > 0
+      ? templates.reduce((sum, t) => sum + t.metrics.validRate, 0) /
+        templates.length
+      : 0;
+  const averageConfidence =
+    templates.length > 0
+      ? templates.reduce((sum, t) => sum + t.metrics.averageConfidence, 0) /
+        templates.length
+      : 0;
+  const templatesWithHighAmbiguity = templates.filter(
+    t => t.metrics.ambiguityRate > 0.2
+  ).length;
+  const templatesNeedingAttention = templates.filter(
+    t => t.metrics.validRate < 0.8
+  ).length;
+
   // Top issues across all templates
   const allReasonCodes = calculateReasonCodeDistribution(periodAudits);
   const topIssues = allReasonCodes.slice(0, 5).map(rc => ({
     reasonCode: rc.reasonCode,
-    affectedTemplates: templates.filter(t => 
+    affectedTemplates: templates.filter(t =>
       t.topReasonCodes.some(trc => trc.reasonCode === rc.reasonCode)
     ).length,
     totalOccurrences: rc.count,
   }));
-  
-  logger.info('Template quality cockpit generated', {
+
+  logger.info("Template quality cockpit generated", {
     period,
     totalTemplates,
     totalAudits,
     templatesNeedingAttention,
   });
-  
+
   return {
     generatedAt: new Date().toISOString(),
     period,

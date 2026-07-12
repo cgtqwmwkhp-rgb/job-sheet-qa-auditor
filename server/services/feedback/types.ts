@@ -1,13 +1,13 @@
 /**
  * Feedback Cadence Types
- * 
+ *
  * Types for daily/weekly/monthly feedback outputs.
  */
 
 /**
  * Feedback cadence period
  */
-export type CadencePeriod = 'daily' | 'weekly' | 'monthly';
+export type CadencePeriod = "daily" | "weekly" | "monthly";
 
 /**
  * Engineer scorecard
@@ -17,14 +17,14 @@ export interface EngineerScorecard {
   period: CadencePeriod;
   periodStart: string;
   periodEnd: string;
-  
+
   // Engineer info (redacted by default)
   engineer: {
     id: string;
     name?: string; // Only included if not redacted
     redacted: boolean;
   };
-  
+
   // Performance metrics
   metrics: {
     totalDocuments: number;
@@ -34,35 +34,41 @@ export interface EngineerScorecard {
     averageProcessingTimeMs: number;
     overrideRate: number;
   };
-  
+
   // Breakdown by asset type
-  byAssetType: Record<string, {
-    total: number;
-    passed: number;
-    failed: number;
-    passRate: number;
-  }>;
-  
+  byAssetType: Record<
+    string,
+    {
+      total: number;
+      passed: number;
+      failed: number;
+      passRate: number;
+    }
+  >;
+
   // Breakdown by template
-  byTemplateId: Record<string, {
-    total: number;
-    passed: number;
-    failed: number;
-    passRate: number;
-  }>;
-  
+  byTemplateId: Record<
+    string,
+    {
+      total: number;
+      passed: number;
+      failed: number;
+      passRate: number;
+    }
+  >;
+
   // Top issues
   topIssues: Array<{
     reasonCode: string;
     count: number;
     percentage: number;
   }>;
-  
+
   // Trend vs previous period
   trend: {
     passRateDelta: number;
     volumeDelta: number;
-    direction: 'improving' | 'stable' | 'declining';
+    direction: "improving" | "stable" | "declining";
   };
 }
 
@@ -74,18 +80,18 @@ export interface FixPack {
   period: CadencePeriod;
   periodStart: string;
   periodEnd: string;
-  
+
   // Target
   target: {
-    type: 'engineer' | 'customer' | 'assetType' | 'templateId';
+    type: "engineer" | "customer" | "assetType" | "templateId";
     id: string;
     name?: string;
     redacted: boolean;
   };
-  
+
   // Issues to fix
   issues: FixPackIssue[];
-  
+
   // Summary
   summary: {
     totalIssues: number;
@@ -93,9 +99,9 @@ export interface FixPack {
     byReasonCode: Record<string, number>;
     estimatedImpact: number; // Potential improvement in pass rate
   };
-  
+
   // Priority
-  priority: 'critical' | 'high' | 'medium' | 'low';
+  priority: "critical" | "high" | "medium" | "low";
 }
 
 /**
@@ -105,12 +111,12 @@ export interface FixPackIssue {
   issueId: string;
   documentId: string;
   fieldId?: string;
-  
+
   // Issue details
   reasonCode: string;
-  severity: 'S0' | 'S1' | 'S2' | 'S3';
+  severity: "S0" | "S1" | "S2" | "S3";
   message: string;
-  
+
   // Context (redacted by default)
   context: {
     extractedValue?: unknown;
@@ -119,12 +125,12 @@ export interface FixPackIssue {
     pageNumber?: number;
     redacted: boolean;
   };
-  
+
   // Suggested action
   suggestedAction?: string;
-  
+
   // Status
-  status: 'open' | 'acknowledged' | 'fixed' | 'wontfix';
+  status: "open" | "acknowledged" | "fixed" | "wontfix";
 }
 
 /**
@@ -135,14 +141,14 @@ export interface CustomerScorecard {
   period: CadencePeriod;
   periodStart: string;
   periodEnd: string;
-  
+
   // Customer info (redacted by default)
   customer: {
     id: string;
     name?: string;
     redacted: boolean;
   };
-  
+
   // Performance metrics
   metrics: {
     totalDocuments: number;
@@ -150,27 +156,30 @@ export interface CustomerScorecard {
     failRate: number;
     averageProcessingTimeMs: number;
   };
-  
+
   // Breakdown by asset type
-  byAssetType: Record<string, {
-    total: number;
-    passed: number;
-    failed: number;
-    passRate: number;
-  }>;
-  
+  byAssetType: Record<
+    string,
+    {
+      total: number;
+      passed: number;
+      failed: number;
+      passRate: number;
+    }
+  >;
+
   // Top issues
   topIssues: Array<{
     reasonCode: string;
     count: number;
     percentage: number;
   }>;
-  
+
   // Trend
   trend: {
     passRateDelta: number;
     volumeDelta: number;
-    direction: 'improving' | 'stable' | 'declining';
+    direction: "improving" | "stable" | "declining";
   };
 }
 
@@ -182,9 +191,9 @@ export interface AssetTypeScorecard {
   period: CadencePeriod;
   periodStart: string;
   periodEnd: string;
-  
+
   assetType: string;
-  
+
   // Performance metrics
   metrics: {
     totalDocuments: number;
@@ -193,27 +202,30 @@ export interface AssetTypeScorecard {
     averageProcessingTimeMs: number;
     averageConfidence: number;
   };
-  
+
   // Breakdown by template
-  byTemplateId: Record<string, {
-    total: number;
-    passed: number;
-    failed: number;
-    passRate: number;
-  }>;
-  
+  byTemplateId: Record<
+    string,
+    {
+      total: number;
+      passed: number;
+      failed: number;
+      passRate: number;
+    }
+  >;
+
   // Top issues
   topIssues: Array<{
     reasonCode: string;
     count: number;
     percentage: number;
   }>;
-  
+
   // Trend
   trend: {
     passRateDelta: number;
     volumeDelta: number;
-    direction: 'improving' | 'stable' | 'declining';
+    direction: "improving" | "stable" | "declining";
   };
 }
 
@@ -225,10 +237,10 @@ export interface TemplateScorecard {
   period: CadencePeriod;
   periodStart: string;
   periodEnd: string;
-  
+
   templateId: string;
   templateName?: string;
-  
+
   // Performance metrics
   metrics: {
     totalDocuments: number;
@@ -238,15 +250,18 @@ export interface TemplateScorecard {
     averageConfidence: number;
     ambiguityRate: number;
   };
-  
+
   // Field-level breakdown
-  byField: Record<string, {
-    total: number;
-    correct: number;
-    incorrect: number;
-    accuracy: number;
-  }>;
-  
+  byField: Record<
+    string,
+    {
+      total: number;
+      correct: number;
+      incorrect: number;
+      accuracy: number;
+    }
+  >;
+
   // Top issues
   topIssues: Array<{
     reasonCode: string;
@@ -254,12 +269,12 @@ export interface TemplateScorecard {
     count: number;
     percentage: number;
   }>;
-  
+
   // Trend
   trend: {
     passRateDelta: number;
     volumeDelta: number;
-    direction: 'improving' | 'stable' | 'declining';
+    direction: "improving" | "stable" | "declining";
   };
 }
 
@@ -272,7 +287,7 @@ export interface FeedbackReport {
   periodStart: string;
   periodEnd: string;
   generatedAt: string;
-  
+
   // Overall metrics
   overall: {
     totalDocuments: number;
@@ -280,16 +295,16 @@ export interface FeedbackReport {
     failRate: number;
     reviewQueueRate: number;
   };
-  
+
   // Scorecards by type
   engineerScorecards: EngineerScorecard[];
   customerScorecards: CustomerScorecard[];
   assetTypeScorecards: AssetTypeScorecard[];
   templateScorecards: TemplateScorecard[];
-  
+
   // Fix packs
   fixPacks: FixPack[];
-  
+
   // Summary
   summary: {
     totalEngineers: number;
@@ -324,17 +339,17 @@ export interface CockpitData {
     volume: number;
     criticalIssues: number;
   };
-  
+
   // Trend data (last N periods)
   trends: TrendDataPoint[];
-  
+
   // Top issues
   topIssues: Array<{
     reasonCode: string;
     count: number;
-    trend: 'up' | 'down' | 'stable';
+    trend: "up" | "down" | "stable";
   }>;
-  
+
   // Recent fix packs
   recentFixPacks: Array<{
     fixPackId: string;
@@ -350,7 +365,7 @@ export interface CockpitData {
 export interface ExportConfig {
   redactPii: boolean;
   includeDetails: boolean;
-  format: 'json' | 'csv' | 'pdf';
+  format: "json" | "csv" | "pdf";
   period: CadencePeriod;
 }
 
@@ -360,6 +375,6 @@ export interface ExportConfig {
 export const DEFAULT_EXPORT_CONFIG: ExportConfig = {
   redactPii: true,
   includeDetails: true,
-  format: 'json',
-  period: 'weekly',
+  format: "json",
+  period: "weekly",
 };

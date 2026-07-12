@@ -1,38 +1,48 @@
 /**
  * Validation Service Implementation
- * 
+ *
  * Validates extracted fields against specification rules.
  * Produces deterministic validatedFields and findings.
  */
 
-import type { ValidationRule, RuleStatus } from '../specResolver/types';
-import type { ExtractedField } from '../extraction/types';
+import type { ValidationRule, RuleStatus } from "../specResolver/types";
+import type { ExtractedField } from "../extraction/types";
 import type {
   ValidatedField,
   Finding,
   ValidationResult,
   ValidationArtifact,
-} from './types';
-import { getCorrelationId } from '../../utils/context';
+} from "./types";
+import { getCorrelationId } from "../../utils/context";
 
-const VALIDATION_VERSION = '1.0.0';
+const VALIDATION_VERSION = "1.0.0";
 
 /**
  * Custom validator registry
  */
-const customValidators: Map<string, (value: any, param?: string) => boolean> = new Map([
-  ['minLength', (value, param) => {
-    const minLen = parseInt(param || '0', 10);
-    return typeof value === 'string' && value.length >= minLen;
-  }],
-  ['maxLength', (value, param) => {
-    const maxLen = parseInt(param || '0', 10);
-    return typeof value === 'string' && value.length <= maxLen;
-  }],
-  ['notEmpty', (value) => {
-    return value !== null && value !== undefined && value !== '';
-  }],
-]);
+const customValidators: Map<string, (value: any, param?: string) => boolean> =
+  new Map([
+    [
+      "minLength",
+      (value, param) => {
+        const minLen = parseInt(param || "0", 10);
+        return typeof value === "string" && value.length >= minLen;
+      },
+    ],
+    [
+      "maxLength",
+      (value, param) => {
+        const maxLen = parseInt(param || "0", 10);
+        return typeof value === "string" && value.length <= maxLen;
+      },
+    ],
+    [
+      "notEmpty",
+      value => {
+        return value !== null && value !== undefined && value !== "";
+      },
+    ],
+  ]);
 
 /**
  * Validate a single rule against extracted field
@@ -42,112 +52,119 @@ function validateRule(
   extractedField: ExtractedField | undefined
 ): { status: RuleStatus; message?: string } {
   // Handle missing field
-  if (!extractedField || extractedField.value === null || extractedField.value === undefined) {
-    if (rule.type === 'required') {
+  if (
+    !extractedField ||
+    extractedField.value === null ||
+    extractedField.value === undefined
+  ) {
+    if (rule.type === "required") {
       return {
-        status: 'failed',
+        status: "failed",
         message: `Required field '${rule.field}' is missing`,
       };
     }
     // Non-required rules skip if field is missing
-    return { status: 'skipped', message: 'Field not present' };
+    return { status: "skipped", message: "Field not present" };
   }
-  
+
   const value = extractedField.value;
-  
+
   switch (rule.type) {
-    case 'required':
+    case "required":
       // Field exists, so required passes
-      if (value === '' || (typeof value === 'string' && value.trim() === '')) {
+      if (value === "" || (typeof value === "string" && value.trim() === "")) {
         return {
-          status: 'failed',
+          status: "failed",
           message: `Required field '${rule.field}' is empty`,
         };
       }
-      return { status: 'passed' };
-      
-    case 'format':
-    case 'pattern':
+      return { status: "passed" };
+
+    case "format":
+    case "pattern":
       if (rule.pattern) {
         try {
           const regex = new RegExp(rule.pattern);
           const stringValue = String(value);
           if (regex.test(stringValue)) {
-            return { status: 'passed' };
+            return { status: "passed" };
           }
           return {
-            status: 'failed',
+            status: "failed",
             message: `Field '${rule.field}' does not match expected format`,
           };
         } catch {
           return {
-            status: 'error',
+            status: "error",
             message: `Invalid pattern in rule ${rule.ruleId}`,
           };
         }
       }
-      return { status: 'passed' };
-      
-    case 'range':
+      return { status: "passed" };
+
+    case "range":
       if (rule.range) {
-        const numValue = typeof value === 'number' ? value : parseFloat(String(value));
+        const numValue =
+          typeof value === "number" ? value : parseFloat(String(value));
         if (isNaN(numValue)) {
           return {
-            status: 'failed',
+            status: "failed",
             message: `Field '${rule.field}' is not a valid number`,
           };
         }
-        
+
         if (rule.range.min !== undefined) {
-          const min = typeof rule.range.min === 'number' 
-            ? rule.range.min 
-            : parseFloat(rule.range.min);
+          const min =
+            typeof rule.range.min === "number"
+              ? rule.range.min
+              : parseFloat(rule.range.min);
           if (numValue < min) {
             return {
-              status: 'failed',
+              status: "failed",
               message: `Field '${rule.field}' is below minimum value ${min}`,
             };
           }
         }
-        
+
         if (rule.range.max !== undefined) {
-          const max = typeof rule.range.max === 'number'
-            ? rule.range.max
-            : parseFloat(rule.range.max);
+          const max =
+            typeof rule.range.max === "number"
+              ? rule.range.max
+              : parseFloat(rule.range.max);
           if (numValue > max) {
             return {
-              status: 'failed',
+              status: "failed",
               message: `Field '${rule.field}' exceeds maximum value ${max}`,
             };
           }
         }
       }
-      return { status: 'passed' };
-      
-    case 'custom':
+      return { status: "passed" };
+
+    case "custom":
       if (rule.customValidator) {
-        const [validatorName, param] = rule.customValidator.split(':');
+        const [validatorName, param] = rule.customValidator.split(":");
         const validator = customValidators.get(validatorName);
-        
+
         if (!validator) {
           return {
-            status: 'error',
+            status: "error",
             message: `Unknown custom validator: ${validatorName}`,
           };
         }
-        
+
         if (validator(value, param)) {
-          return { status: 'passed' };
+          return { status: "passed" };
         }
         return {
-          status: 'failed',
+          status: "failed",
           message: `Field '${rule.field}' failed custom validation: ${rule.customValidator}`,
         };
       }
-      return { status: 'passed' };
-      
+      return { status: "passed" };
+
     default:
-      return { status: 'passed' };
+      return { status: "passed" };
   }
 }
 
@@ -162,10 +179,10 @@ export function validateFields(
 ): ValidationResult {
   const startTime = Date.now();
   const correlationId = getCorrelationId();
-  
+
   const validatedFields: ValidatedField[] = [];
   const findings: Finding[] = [];
-  
+
   // Summary counters
   let passedRules = 0;
   let failedRules = 0;
@@ -174,7 +191,7 @@ export function validateFields(
   let majorFailures = 0;
   let minorFailures = 0;
   let infoFailures = 0;
-  
+
   // Process rules in deterministic order (already sorted by ruleId)
   for (const rule of rules) {
     if (!rule.enabled) {
@@ -182,16 +199,16 @@ export function validateFields(
       validatedFields.push({
         ruleId: rule.ruleId,
         field: rule.field,
-        status: 'skipped',
+        status: "skipped",
         severity: rule.severity,
-        message: 'Rule disabled',
+        message: "Rule disabled",
       });
       continue;
     }
-    
+
     const extractedField = extractedFields.get(rule.field);
     const { status, message } = validateRule(rule, extractedField);
-    
+
     // Create validated field entry
     const validatedField: ValidatedField = {
       ruleId: rule.ruleId,
@@ -203,21 +220,21 @@ export function validateFields(
       severity: rule.severity,
       message,
     };
-    
+
     validatedFields.push(validatedField);
-    
+
     // Update counters
     switch (status) {
-      case 'passed':
+      case "passed":
         passedRules++;
         break;
-      case 'failed':
+      case "failed":
         failedRules++;
         // Create finding
         findings.push({
           ruleId: rule.ruleId,
           field: rule.field,
-          status: 'failed',
+          status: "failed",
           severity: rule.severity,
           message: message || rule.description,
           actualValue: extractedField?.value ?? null,
@@ -226,26 +243,34 @@ export function validateFields(
         });
         // Count by severity
         switch (rule.severity) {
-          case 'critical': criticalFailures++; break;
-          case 'major': majorFailures++; break;
-          case 'minor': minorFailures++; break;
-          case 'info': infoFailures++; break;
+          case "critical":
+            criticalFailures++;
+            break;
+          case "major":
+            majorFailures++;
+            break;
+          case "minor":
+            minorFailures++;
+            break;
+          case "info":
+            infoFailures++;
+            break;
         }
         break;
-      case 'skipped':
+      case "skipped":
         skippedRules++;
         break;
-      case 'error':
+      case "error":
         failedRules++;
         break;
     }
   }
-  
+
   const processingTimeMs = Date.now() - startTime;
-  
+
   // Overall pass: no critical or major failures
   const passed = criticalFailures === 0 && majorFailures === 0;
-  
+
   return {
     passed,
     validatedFields,
@@ -278,7 +303,7 @@ export function generateValidationArtifact(
   documentId?: string
 ): ValidationArtifact {
   return {
-    version: '1.0.0',
+    version: "1.0.0",
     generatedAt: new Date().toISOString(),
     correlationId: result.correlationId,
     documentId,

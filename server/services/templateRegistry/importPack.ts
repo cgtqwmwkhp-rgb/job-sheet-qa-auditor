@@ -1,19 +1,24 @@
 /**
  * Bulk Template Import Pack
- * 
+ *
  * PR-F: Enables fast onboarding of templates via import packs.
  * Validates and loads template metadata, specs, selection configs, and optional ROI/fixtures.
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 import {
   createTemplate,
   uploadTemplateVersion,
   getTemplate,
   getTemplateBySlug,
-} from './registryService';
-import { createFixturePack, type FixtureCase } from './fixtureRunner';
-import type { SpecJson, SelectionConfig, RoiConfig as TypesRoiConfig, RoiRegion as TypesRoiRegion } from './types';
+} from "./registryService";
+import { createFixturePack, type FixtureCase } from "./fixtureRunner";
+import type {
+  SpecJson,
+  SelectionConfig,
+  RoiConfig as TypesRoiConfig,
+  RoiRegion as TypesRoiRegion,
+} from "./types";
 
 /**
  * Import-specific ROI region (simplified coordinates)
@@ -58,18 +63,22 @@ export const RoiConfigSchema = z.object({
 /**
  * Convert import ROI config to storage format
  */
-function convertImportRoiToStorageFormat(importRoi: ImportRoiConfig): TypesRoiConfig {
+function convertImportRoiToStorageFormat(
+  importRoi: ImportRoiConfig
+): TypesRoiConfig {
   return {
-    regions: importRoi.regions.map((region): TypesRoiRegion => ({
-      name: region.name,
-      page: importRoi.pageIndex + 1, // Convert 0-based to 1-based
-      bounds: {
-        x: region.x,
-        y: region.y,
-        width: region.w,
-        height: region.h,
-      },
-    })),
+    regions: importRoi.regions.map(
+      (region): TypesRoiRegion => ({
+        name: region.name,
+        page: importRoi.pageIndex + 1, // Convert 0-based to 1-based
+        bounds: {
+          x: region.x,
+          y: region.y,
+          width: region.w,
+          height: region.h,
+        },
+      })
+    ),
   };
 }
 
@@ -102,7 +111,7 @@ export interface TemplateImportPack {
  */
 export interface BulkImportPack {
   /** Pack version for schema evolution */
-  packVersion: '1.0.0';
+  packVersion: "1.0.0";
   /** ISO timestamp of export */
   exportedAt: string;
   /** Source system identifier */
@@ -141,35 +150,40 @@ export interface BulkImportResult {
 /**
  * Validate a template import pack
  */
-export function validateImportPack(pack: TemplateImportPack): { valid: boolean; errors: string[] } {
+export function validateImportPack(pack: TemplateImportPack): {
+  valid: boolean;
+  errors: string[];
+} {
   const errors: string[] = [];
 
   // Validate metadata
-  if (!pack.metadata.templateId || pack.metadata.templateId.trim() === '') {
-    errors.push('metadata.templateId is required');
+  if (!pack.metadata.templateId || pack.metadata.templateId.trim() === "") {
+    errors.push("metadata.templateId is required");
   }
-  if (!pack.metadata.name || pack.metadata.name.trim() === '') {
-    errors.push('metadata.name is required');
+  if (!pack.metadata.name || pack.metadata.name.trim() === "") {
+    errors.push("metadata.name is required");
   }
 
   // Validate version
   if (!pack.version || !/^\d+\.\d+\.\d+$/.test(pack.version)) {
-    errors.push('version must be in semver format (e.g., 1.0.0)');
+    errors.push("version must be in semver format (e.g., 1.0.0)");
   }
 
   // Validate specJson
   if (!pack.specJson) {
-    errors.push('specJson is required');
+    errors.push("specJson is required");
   } else {
-    if (!pack.specJson.name) errors.push('specJson.name is required');
-    if (!pack.specJson.version) errors.push('specJson.version is required');
-    if (!Array.isArray(pack.specJson.fields)) errors.push('specJson.fields must be an array');
-    if (!Array.isArray(pack.specJson.rules)) errors.push('specJson.rules must be an array');
+    if (!pack.specJson.name) errors.push("specJson.name is required");
+    if (!pack.specJson.version) errors.push("specJson.version is required");
+    if (!Array.isArray(pack.specJson.fields))
+      errors.push("specJson.fields must be an array");
+    if (!Array.isArray(pack.specJson.rules))
+      errors.push("specJson.rules must be an array");
   }
 
   // Validate selectionConfigJson
   if (!pack.selectionConfigJson) {
-    errors.push('selectionConfigJson is required');
+    errors.push("selectionConfigJson is required");
   }
 
   // Validate roiJson if provided
@@ -177,22 +191,30 @@ export function validateImportPack(pack: TemplateImportPack): { valid: boolean; 
     try {
       RoiConfigSchema.parse(pack.roiJson);
     } catch (e) {
-      errors.push(`roiJson validation failed: ${e instanceof Error ? e.message : 'Invalid format'}`);
+      errors.push(
+        `roiJson validation failed: ${e instanceof Error ? e.message : "Invalid format"}`
+      );
     }
   }
 
   // Validate fixtures if provided
   if (pack.fixtures) {
     if (!Array.isArray(pack.fixtures)) {
-      errors.push('fixtures must be an array');
+      errors.push("fixtures must be an array");
     } else {
       for (let i = 0; i < pack.fixtures.length; i++) {
         const fixture = pack.fixtures[i];
         if (!fixture.caseId) errors.push(`fixtures[${i}].caseId is required`);
-        if (!fixture.description) errors.push(`fixtures[${i}].description is required`);
-        if (!fixture.inputText) errors.push(`fixtures[${i}].inputText is required`);
-        if (!['pass', 'fail', 'review_queue'].includes(fixture.expectedOutcome)) {
-          errors.push(`fixtures[${i}].expectedOutcome must be pass/fail/review_queue`);
+        if (!fixture.description)
+          errors.push(`fixtures[${i}].description is required`);
+        if (!fixture.inputText)
+          errors.push(`fixtures[${i}].inputText is required`);
+        if (
+          !["pass", "fail", "review_queue"].includes(fixture.expectedOutcome)
+        ) {
+          errors.push(
+            `fixtures[${i}].expectedOutcome must be pass/fail/review_queue`
+          );
         }
       }
     }
@@ -232,7 +254,9 @@ export function importTemplate(
 
     if (existingBySlug) {
       // Template exists - use existing
-      result.warnings.push(`Template '${pack.metadata.templateId}' already exists, adding new version`);
+      result.warnings.push(
+        `Template '${pack.metadata.templateId}' already exists, adding new version`
+      );
       templateDbId = existingBySlug.id;
     } else {
       // Create new template
@@ -254,7 +278,9 @@ export function importTemplate(
       version: pack.version,
       specJson: pack.specJson,
       selectionConfigJson: pack.selectionConfigJson,
-      roiJson: pack.roiJson ? convertImportRoiToStorageFormat(pack.roiJson) : undefined,
+      roiJson: pack.roiJson
+        ? convertImportRoiToStorageFormat(pack.roiJson)
+        : undefined,
       createdBy,
     });
     result.created.versionDbId = version.id;
@@ -267,7 +293,9 @@ export function importTemplate(
 
     result.success = true;
   } catch (error) {
-    result.errors.push(error instanceof Error ? error.message : 'Unknown error');
+    result.errors.push(
+      error instanceof Error ? error.message : "Unknown error"
+    );
   }
 
   return result;
@@ -288,7 +316,7 @@ export function importBulkPack(
   for (const templatePack of pack.templates) {
     const result = importTemplate(templatePack, createdBy);
     results.push(result);
-    
+
     if (result.success) {
       successCount++;
     } else {
@@ -309,20 +337,25 @@ export function importBulkPack(
 /**
  * Validate a bulk import pack
  */
-export function validateBulkImportPack(pack: BulkImportPack): { valid: boolean; errors: string[] } {
+export function validateBulkImportPack(pack: BulkImportPack): {
+  valid: boolean;
+  errors: string[];
+} {
   const errors: string[] = [];
 
-  if (pack.packVersion !== '1.0.0') {
-    errors.push(`Unsupported pack version: ${pack.packVersion}. Expected: 1.0.0`);
+  if (pack.packVersion !== "1.0.0") {
+    errors.push(
+      `Unsupported pack version: ${pack.packVersion}. Expected: 1.0.0`
+    );
   }
 
   if (!pack.templates || !Array.isArray(pack.templates)) {
-    errors.push('templates must be an array');
+    errors.push("templates must be an array");
     return { valid: false, errors };
   }
 
   if (pack.templates.length === 0) {
-    errors.push('templates array is empty');
+    errors.push("templates array is empty");
   }
 
   // Validate each template
@@ -343,48 +376,69 @@ export function validateBulkImportPack(pack: BulkImportPack): { valid: boolean; 
  */
 export function createImportPackTemplate(): BulkImportPack {
   return {
-    packVersion: '1.0.0',
+    packVersion: "1.0.0",
     exportedAt: new Date().toISOString(),
     templates: [
       {
         metadata: {
-          templateId: 'example-template',
-          name: 'Example Template',
-          description: 'Description of the template',
-          category: 'maintenance',
-          tags: ['repair', 'service'],
+          templateId: "example-template",
+          name: "Example Template",
+          description: "Description of the template",
+          category: "maintenance",
+          tags: ["repair", "service"],
         },
-        version: '1.0.0',
+        version: "1.0.0",
         specJson: {
-          name: 'Example Spec',
-          version: '1.0.0',
+          name: "Example Spec",
+          version: "1.0.0",
           fields: [
-            { field: 'jobReference', label: 'Job Reference', type: 'string', required: true },
-            { field: 'assetId', label: 'Asset ID', type: 'string', required: true },
-            { field: 'date', label: 'Date', type: 'date', required: true },
-            { field: 'engineerSignOff', label: 'Engineer Sign Off', type: 'boolean', required: true },
+            {
+              field: "jobReference",
+              label: "Job Reference",
+              type: "string",
+              required: true,
+            },
+            {
+              field: "assetId",
+              label: "Asset ID",
+              type: "string",
+              required: true,
+            },
+            { field: "date", label: "Date", type: "date", required: true },
+            {
+              field: "engineerSignOff",
+              label: "Engineer Sign Off",
+              type: "boolean",
+              required: true,
+            },
           ],
           rules: [
-            { ruleId: 'R001', field: 'jobReference', description: 'Job reference required', severity: 'critical', type: 'required', enabled: true },
+            {
+              ruleId: "R001",
+              field: "jobReference",
+              description: "Job reference required",
+              severity: "critical",
+              type: "required",
+              enabled: true,
+            },
           ],
         },
         selectionConfigJson: {
-          requiredTokensAll: ['job', 'sheet'],
-          requiredTokensAny: ['repair', 'maintenance'],
-          optionalTokens: ['customer'],
+          requiredTokensAll: ["job", "sheet"],
+          requiredTokensAny: ["repair", "maintenance"],
+          optionalTokens: ["customer"],
         },
         roiJson: {
           pageIndex: 0,
-          regions: [
-            { name: 'jobReference', x: 0.1, y: 0.1, w: 0.3, h: 0.05 },
-          ],
+          regions: [{ name: "jobReference", x: 0.1, y: 0.1, w: 0.3, h: 0.05 }],
         },
         fixtures: [
           {
-            caseId: 'PASS-001',
-            description: 'Standard job sheet',
-            inputText: 'Job Reference: JOB-123 Asset ID: ASSET-456 Date: 2024-01-01 Engineer Sign Off: Yes',
-            expectedOutcome: 'pass',
+            caseId: "PASS-001",
+            description: "Standard job sheet",
+            inputText:
+              "Job Reference: JOB-123 Asset ID: ASSET-456 Date: 2024-01-01 Engineer Sign Off: Yes",
+            expectedOutcome: "pass",
             required: true,
           },
         ],

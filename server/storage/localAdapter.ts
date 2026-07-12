@@ -1,19 +1,19 @@
 /**
  * Local Filesystem Storage Adapter
- * 
+ *
  * Stores files locally. For development and testing only.
  * NOT recommended for production use.
  */
 
-import { promises as fs } from 'fs';
-import path from 'path';
-import type { StorageAdapter, StorageResult, StorageProvider } from './types';
+import { promises as fs } from "fs";
+import path from "path";
+import type { StorageAdapter, StorageResult, StorageProvider } from "./types";
 
 export class LocalStorageAdapter implements StorageAdapter {
-  readonly provider: StorageProvider = 'local';
+  readonly provider: StorageProvider = "local";
   private basePath: string;
 
-  constructor(basePath: string = './uploads') {
+  constructor(basePath: string = "./uploads") {
     this.basePath = basePath;
   }
 
@@ -30,7 +30,8 @@ export class LocalStorageAdapter implements StorageAdapter {
     await fs.mkdir(dirPath, { recursive: true });
 
     // Write file
-    const buffer = typeof data === 'string' ? Buffer.from(data) : Buffer.from(data);
+    const buffer =
+      typeof data === "string" ? Buffer.from(data) : Buffer.from(data);
     await fs.writeFile(filePath, buffer);
 
     return {
@@ -56,23 +57,22 @@ export class LocalStorageAdapter implements StorageAdapter {
     try {
       // Ensure base directory exists
       await fs.mkdir(this.basePath, { recursive: true });
-      
+
       // Write and read a test file
-      const testFile = path.join(this.basePath, '.health-check');
-      await fs.writeFile(testFile, 'ok');
+      const testFile = path.join(this.basePath, ".health-check");
+      await fs.writeFile(testFile, "ok");
       await fs.unlink(testFile);
-      
+
       return { healthy: true };
     } catch (error) {
       return {
         healthy: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
       };
     }
   }
 
   private normalizeKey(key: string): string {
-    return key.replace(/^\/+/, '').replace(/\.\./g, '');
+    return key.replace(/^\/+/, "").replace(/\.\./g, "");
   }
 }
-

@@ -25,7 +25,7 @@ export async function setupVite(app: Express, server: Server) {
     const url = req.originalUrl;
 
     // Don't intercept Azure Easy Auth routes
-    if (url.startsWith('/.auth')) {
+    if (url.startsWith("/.auth")) {
       return next();
     }
 
@@ -65,52 +65,61 @@ export function serveStatic(app: Express) {
 
   // Serve hashed assets with immutable cache (1 year)
   // Vite generates hashed filenames, so they can be cached forever
-  app.use('/assets', express.static(path.join(distPath, 'assets'), {
-    maxAge: '1y',
-    immutable: true,
-  }));
+  app.use(
+    "/assets",
+    express.static(path.join(distPath, "assets"), {
+      maxAge: "1y",
+      immutable: true,
+    })
+  );
 
   // Serve other static files with appropriate caching
-  app.use(express.static(distPath, {
-    setHeaders: (res, filePath) => {
-      const fileName = path.basename(filePath);
-      
-      // index.html: never cache to ensure fresh deploys
-      if (filePath.endsWith('index.html')) {
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-        return;
-      }
-      
-      // Service workers and manifest: no-cache (revalidate each time)
-      if (fileName.endsWith('.webmanifest') || 
-          fileName === 'sw.js' || 
-          fileName === 'registerSW.js' ||
-          fileName.startsWith('workbox-') ||
-          fileName === 'firebase-messaging-sw.js') {
-        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-        return;
-      }
-      
-      // PWA icons and images: cache for 1 day
-      if (fileName.endsWith('.png') || 
-          fileName.endsWith('.jpg') || 
-          fileName.endsWith('.ico') ||
-          fileName.endsWith('.svg')) {
-        res.setHeader('Cache-Control', 'public, max-age=86400');
-        return;
-      }
-    }
-  }));
+  app.use(
+    express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        const fileName = path.basename(filePath);
+
+        // index.html: never cache to ensure fresh deploys
+        if (filePath.endsWith("index.html")) {
+          res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+          return;
+        }
+
+        // Service workers and manifest: no-cache (revalidate each time)
+        if (
+          fileName.endsWith(".webmanifest") ||
+          fileName === "sw.js" ||
+          fileName === "registerSW.js" ||
+          fileName.startsWith("workbox-") ||
+          fileName === "firebase-messaging-sw.js"
+        ) {
+          res.setHeader("Cache-Control", "no-cache, must-revalidate");
+          return;
+        }
+
+        // PWA icons and images: cache for 1 day
+        if (
+          fileName.endsWith(".png") ||
+          fileName.endsWith(".jpg") ||
+          fileName.endsWith(".ico") ||
+          fileName.endsWith(".svg")
+        ) {
+          res.setHeader("Cache-Control", "public, max-age=86400");
+          return;
+        }
+      },
+    })
+  );
 
   // fall through to index.html if the file doesn't exist
   // Skip .auth routes - these are handled by Azure Easy Auth middleware
   app.use("*", (req, res, next) => {
     // Don't intercept Azure Easy Auth routes
-    if (req.originalUrl.startsWith('/.auth')) {
+    if (req.originalUrl.startsWith("/.auth")) {
       return next();
     }
     // Set cache headers for SPA fallback
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

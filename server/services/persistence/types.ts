@@ -1,11 +1,11 @@
 /**
  * Persistence Service Types
- * 
+ *
  * Defines the persistence layer interface for append-only artifact storage.
  */
 
-import type { ExtractionResult, ExtractionArtifact } from '../extraction/types';
-import type { ValidationResult, ValidationArtifact } from '../validation/types';
+import type { ExtractionResult, ExtractionArtifact } from "../extraction/types";
+import type { ValidationResult, ValidationArtifact } from "../validation/types";
 
 /**
  * Persistence configuration
@@ -24,7 +24,7 @@ export interface PersistenceConfig {
  */
 export const DEFAULT_PERSISTENCE_CONFIG: PersistenceConfig = {
   enableHashing: true,
-  pipelineVersion: '1.0.0',
+  pipelineVersion: "1.0.0",
   enableDeterminismCheck: true,
 };
 
@@ -74,7 +74,7 @@ export interface StoredValidatedField {
   validationArtifactId: number;
   ruleId: string;
   field: string;
-  status: 'passed' | 'failed' | 'skipped';
+  status: "passed" | "failed" | "skipped";
   extractedValue?: string;
   confidence?: number;
   pageNumber?: number;
@@ -87,13 +87,13 @@ export interface StoredValidatedField {
 /**
  * Pipeline run status
  */
-export type PipelineStatus = 
-  | 'pending'
-  | 'extracting'
-  | 'validating'
-  | 'completed'
-  | 'failed'
-  | 'review_queue';
+export type PipelineStatus =
+  | "pending"
+  | "extracting"
+  | "validating"
+  | "completed"
+  | "failed"
+  | "review_queue";
 
 /**
  * Pipeline run record
@@ -149,12 +149,12 @@ export interface LegalHoldRecord {
 /**
  * Retention audit action types
  */
-export type RetentionAction = 
-  | 'ARCHIVE'
-  | 'DELETE'
-  | 'HOLD_PLACED'
-  | 'HOLD_RELEASED'
-  | 'POLICY_APPLIED';
+export type RetentionAction =
+  | "ARCHIVE"
+  | "DELETE"
+  | "HOLD_PLACED"
+  | "HOLD_RELEASED"
+  | "POLICY_APPLIED";
 
 /**
  * Retention audit log entry
@@ -224,7 +224,9 @@ export interface IPersistenceService {
   /**
    * Get validated fields for a validation artifact
    */
-  getValidatedFields(validationArtifactId: number): Promise<StoredValidatedField[]>;
+  getValidatedFields(
+    validationArtifactId: number
+  ): Promise<StoredValidatedField[]>;
 
   /**
    * Create pipeline run
@@ -236,7 +238,18 @@ export interface IPersistenceService {
    */
   updatePipelineRun(
     correlationId: string,
-    updates: Partial<Pick<PipelineRunRecord, 'status' | 'extractionArtifactId' | 'validationArtifactId' | 'errorMessage' | 'errorCode' | 'completedAt' | 'totalTimeMs'>>
+    updates: Partial<
+      Pick<
+        PipelineRunRecord,
+        | "status"
+        | "extractionArtifactId"
+        | "validationArtifactId"
+        | "errorMessage"
+        | "errorCode"
+        | "completedAt"
+        | "totalTimeMs"
+      >
+    >
   ): Promise<void>;
 
   /**
@@ -262,7 +275,9 @@ export interface IRetentionService {
   /**
    * Create retention policy
    */
-  createPolicy(policy: Omit<RetentionPolicyRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<RetentionPolicyRecord>;
+  createPolicy(
+    policy: Omit<RetentionPolicyRecord, "id" | "createdAt" | "updatedAt">
+  ): Promise<RetentionPolicyRecord>;
 
   /**
    * Get active policies for entity type
@@ -272,12 +287,21 @@ export interface IRetentionService {
   /**
    * Place legal hold
    */
-  placeLegalHold(hold: Omit<LegalHoldRecord, 'id' | 'placedAt' | 'releasedAt' | 'releasedBy' | 'releaseReason'>): Promise<LegalHoldRecord>;
+  placeLegalHold(
+    hold: Omit<
+      LegalHoldRecord,
+      "id" | "placedAt" | "releasedAt" | "releasedBy" | "releaseReason"
+    >
+  ): Promise<LegalHoldRecord>;
 
   /**
    * Release legal hold
    */
-  releaseLegalHold(holdId: number, releasedBy: number, releaseReason: string): Promise<void>;
+  releaseLegalHold(
+    holdId: number,
+    releasedBy: number,
+    releaseReason: string
+  ): Promise<void>;
 
   /**
    * Check if entity has active legal hold
@@ -287,15 +311,23 @@ export interface IRetentionService {
   /**
    * Get entities eligible for retention action
    */
-  getEligibleForRetention(entityType: string, policyId: number): Promise<number[]>;
+  getEligibleForRetention(
+    entityType: string,
+    policyId: number
+  ): Promise<number[]>;
 
   /**
    * Log retention action
    */
-  logRetentionAction(entry: Omit<RetentionAuditEntry, 'id' | 'createdAt'>): Promise<void>;
+  logRetentionAction(
+    entry: Omit<RetentionAuditEntry, "id" | "createdAt">
+  ): Promise<void>;
 
   /**
    * Get retention audit log for entity
    */
-  getRetentionAuditLog(entityType: string, entityId: number): Promise<RetentionAuditEntry[]>;
+  getRetentionAuditLog(
+    entityType: string,
+    entityId: number
+  ): Promise<RetentionAuditEntry[]>;
 }

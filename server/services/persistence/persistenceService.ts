@@ -1,14 +1,18 @@
 /**
  * Persistence Service Implementation
- * 
+ *
  * In-memory implementation for testing and development.
  * Production would use Drizzle ORM with MySQL.
  */
 
-import { createHash } from 'crypto';
-import type { ExtractionResult, ExtractionArtifact } from '../extraction/types';
-import type { ValidationResult, ValidationArtifact, ValidatedField } from '../validation/types';
-import type { RuleStatus } from '../specResolver/types';
+import { createHash } from "crypto";
+import type { ExtractionResult, ExtractionArtifact } from "../extraction/types";
+import type {
+  ValidationResult,
+  ValidationArtifact,
+  ValidatedField,
+} from "../validation/types";
+import type { RuleStatus } from "../specResolver/types";
 import type {
   PersistenceConfig,
   StoredExtractionArtifact,
@@ -18,16 +22,16 @@ import type {
   PipelineStatus,
   DeterminismChecksumRecord,
   IPersistenceService,
-} from './types';
-import { DEFAULT_PERSISTENCE_CONFIG } from './types';
-import { getCorrelationId, generateCorrelationId } from '../../utils/context';
+} from "./types";
+import { DEFAULT_PERSISTENCE_CONFIG } from "./types";
+import { getCorrelationId, generateCorrelationId } from "../../utils/context";
 
 /**
  * Generate SHA-256 hash of content
  */
 function hashContent(content: unknown): string {
   const json = JSON.stringify(content, Object.keys(content as object).sort());
-  return createHash('sha256').update(json).digest('hex');
+  return createHash("sha256").update(json).digest("hex");
 }
 
 /**
@@ -93,16 +97,16 @@ export class InMemoryPersistenceService implements IPersistenceService {
     artifact: ExtractionArtifact
   ): Promise<StoredExtractionArtifact> {
     const id = store.nextIds.extraction++;
-    const contentHash = this.config.enableHashing ? hashContent(artifact) : '';
+    const contentHash = this.config.enableHashing ? hashContent(artifact) : "";
 
     const stored: StoredExtractionArtifact = {
       id,
-      correlationId: result.correlationId || artifact.correlationId || '',
+      correlationId: result.correlationId || artifact.correlationId || "",
       jobSheetId,
       schemaVersion: artifact.version,
       extractionJson: artifact,
       contentHash,
-      extractionMethod: result.metadata.ocrModel ? 'OCR' : 'EMBEDDED_TEXT',
+      extractionMethod: result.metadata.ocrModel ? "OCR" : "EMBEDDED_TEXT",
       ocrEngineVersion: result.metadata.ocrModel,
       pageCount: result.metadata.totalPages,
       processingTimeMs: result.metadata.processingTimeMs,
@@ -117,7 +121,12 @@ export class InMemoryPersistenceService implements IPersistenceService {
         jobSheetId,
         pipelineVersion: this.config.pipelineVersion,
       });
-      await this.storeDeterminismChecksum('extraction', id, inputHash, contentHash);
+      await this.storeDeterminismChecksum(
+        "extraction",
+        id,
+        inputHash,
+        contentHash
+      );
     }
 
     return stored;
@@ -131,18 +140,18 @@ export class InMemoryPersistenceService implements IPersistenceService {
     artifact: ValidationArtifact
   ): Promise<StoredValidationArtifact> {
     const id = store.nextIds.validation++;
-    const contentHash = this.config.enableHashing ? hashContent(artifact) : '';
+    const contentHash = this.config.enableHashing ? hashContent(artifact) : "";
 
     const stored: StoredValidationArtifact = {
       id,
-      correlationId: result.correlationId || artifact.correlationId || '',
+      correlationId: result.correlationId || artifact.correlationId || "",
       jobSheetId,
       extractionArtifactId,
       goldSpecId,
       schemaVersion: artifact.version,
       validationJson: artifact,
       contentHash,
-      overallResult: result.passed ? 'pass' : 'fail',
+      overallResult: result.passed ? "pass" : "fail",
       passedCount: result.summary.passedRules,
       failedCount: result.summary.failedRules,
       skippedCount: result.summary.skippedRules,
@@ -154,29 +163,36 @@ export class InMemoryPersistenceService implements IPersistenceService {
     store.validationArtifacts.set(id, stored);
 
     // Store validated fields
-    const fields: StoredValidatedField[] = result.validatedFields.map((vf, index) => {
-      // Map RuleStatus to StoredValidatedField status
-      const mapStatus = (status: RuleStatus): 'passed' | 'failed' | 'skipped' => {
-        if (status === 'passed') return 'passed';
-        if (status === 'failed' || status === 'error') return 'failed';
-        return 'skipped';
-      };
-      
-      return {
-        id: store.nextIds.validatedField++,
-        validationArtifactId: id,
-        ruleId: vf.ruleId,
-        field: vf.field,
-        status: mapStatus(vf.status),
-        extractedValue: vf.value !== null && vf.value !== undefined ? String(vf.value) : undefined,
-        confidence: vf.confidence,
-        pageNumber: vf.pageNumber,
-        severity: vf.severity,
-        message: vf.message,
-        orderIndex: index,
-        createdAt: new Date(),
-      };
-    });
+    const fields: StoredValidatedField[] = result.validatedFields.map(
+      (vf, index) => {
+        // Map RuleStatus to StoredValidatedField status
+        const mapStatus = (
+          status: RuleStatus
+        ): "passed" | "failed" | "skipped" => {
+          if (status === "passed") return "passed";
+          if (status === "failed" || status === "error") return "failed";
+          return "skipped";
+        };
+
+        return {
+          id: store.nextIds.validatedField++,
+          validationArtifactId: id,
+          ruleId: vf.ruleId,
+          field: vf.field,
+          status: mapStatus(vf.status),
+          extractedValue:
+            vf.value !== null && vf.value !== undefined
+              ? String(vf.value)
+              : undefined,
+          confidence: vf.confidence,
+          pageNumber: vf.pageNumber,
+          severity: vf.severity,
+          message: vf.message,
+          orderIndex: index,
+          createdAt: new Date(),
+        };
+      }
+    );
 
     store.validatedFields.set(id, fields);
 
@@ -188,21 +204,32 @@ export class InMemoryPersistenceService implements IPersistenceService {
         goldSpecId,
         pipelineVersion: this.config.pipelineVersion,
       });
-      await this.storeDeterminismChecksum('validation', id, inputHash, contentHash);
+      await this.storeDeterminismChecksum(
+        "validation",
+        id,
+        inputHash,
+        contentHash
+      );
     }
 
     return stored;
   }
 
-  async getExtractionArtifact(id: number): Promise<StoredExtractionArtifact | null> {
+  async getExtractionArtifact(
+    id: number
+  ): Promise<StoredExtractionArtifact | null> {
     return store.extractionArtifacts.get(id) || null;
   }
 
-  async getValidationArtifact(id: number): Promise<StoredValidationArtifact | null> {
+  async getValidationArtifact(
+    id: number
+  ): Promise<StoredValidationArtifact | null> {
     return store.validationArtifacts.get(id) || null;
   }
 
-  async getValidatedFields(validationArtifactId: number): Promise<StoredValidatedField[]> {
+  async getValidatedFields(
+    validationArtifactId: number
+  ): Promise<StoredValidatedField[]> {
     const fields = store.validatedFields.get(validationArtifactId) || [];
     // Return in deterministic order
     return [...fields].sort((a, b) => a.orderIndex - b.orderIndex);
@@ -217,7 +244,7 @@ export class InMemoryPersistenceService implements IPersistenceService {
       correlationId,
       jobSheetId,
       pipelineVersion: this.config.pipelineVersion,
-      status: 'pending',
+      status: "pending",
       startedAt: new Date(),
     };
 
@@ -227,7 +254,18 @@ export class InMemoryPersistenceService implements IPersistenceService {
 
   async updatePipelineRun(
     correlationId: string,
-    updates: Partial<Pick<PipelineRunRecord, 'status' | 'extractionArtifactId' | 'validationArtifactId' | 'errorMessage' | 'errorCode' | 'completedAt' | 'totalTimeMs'>>
+    updates: Partial<
+      Pick<
+        PipelineRunRecord,
+        | "status"
+        | "extractionArtifactId"
+        | "validationArtifactId"
+        | "errorMessage"
+        | "errorCode"
+        | "completedAt"
+        | "totalTimeMs"
+      >
+    >
   ): Promise<void> {
     const run = store.pipelineRuns.get(correlationId);
     if (!run) {
@@ -237,7 +275,9 @@ export class InMemoryPersistenceService implements IPersistenceService {
     Object.assign(run, updates);
   }
 
-  async getPipelineRun(correlationId: string): Promise<PipelineRunRecord | null> {
+  async getPipelineRun(
+    correlationId: string
+  ): Promise<PipelineRunRecord | null> {
     return store.pipelineRuns.get(correlationId) || null;
   }
 
@@ -255,7 +295,10 @@ export class InMemoryPersistenceService implements IPersistenceService {
     }
 
     // Verify that same input produces same output
-    if (existing.inputHash === inputHash && existing.outputHash !== outputHash) {
+    if (
+      existing.inputHash === inputHash &&
+      existing.outputHash !== outputHash
+    ) {
       return false; // Non-deterministic behavior detected
     }
 

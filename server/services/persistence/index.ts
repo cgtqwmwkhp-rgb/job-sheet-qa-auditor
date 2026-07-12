@@ -1,6 +1,6 @@
 /**
  * Persistence Service Module
- * 
+ *
  * Provides append-only artifact storage and retention management.
  */
 
@@ -19,9 +19,9 @@ export type {
   DeterminismChecksumRecord,
   IPersistenceService,
   IRetentionService,
-} from './types';
+} from "./types";
 
-export { DEFAULT_PERSISTENCE_CONFIG } from './types';
+export { DEFAULT_PERSISTENCE_CONFIG } from "./types";
 
 // Persistence service
 export {
@@ -30,7 +30,7 @@ export {
   getPersistenceService,
   resetPersistenceService,
   resetPersistenceStore,
-} from './persistenceService';
+} from "./persistenceService";
 
 // Retention service
 export {
@@ -39,4 +39,4 @@ export {
   getRetentionService,
   resetRetentionService,
   resetRetentionStore,
-} from './retentionService';
+} from "./retentionService";

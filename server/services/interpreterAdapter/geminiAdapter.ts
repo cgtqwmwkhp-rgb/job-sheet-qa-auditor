@@ -1,14 +1,14 @@
 /**
  * Gemini Interpreter Adapter
- * 
+ *
  * Advisory interpretation using Gemini 2.5 Pro.
  * CRITICAL: Output is ADVISORY ONLY - must never affect canonical findings or validatedFields.
- * 
+ *
  * SECURITY: Uses safeLogger to prevent sensitive content from appearing in logs.
  */
 
-import { createSafeLogger } from '../../utils/safeLogger';
-import { getCorrelationId } from '../../utils/context';
+import { createSafeLogger } from "../../utils/safeLogger";
+import { getCorrelationId } from "../../utils/context";
 import type {
   InterpreterAdapter,
   InterpretationResult,
@@ -17,12 +17,13 @@ import type {
   InsightsArtifact,
   Insight,
   InterpreterConfig,
-} from './types';
-import { getInterpreterConfig } from './types';
+} from "./types";
+import { getInterpreterConfig } from "./types";
 
-const logger = createSafeLogger('GeminiInterpreter');
+const logger = createSafeLogger("GeminiInterpreter");
 
-const GEMINI_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
+const GEMINI_API_ENDPOINT =
+  "https://generativelanguage.googleapis.com/v1beta/models";
 
 /**
  * System prompt for Gemini interpretation
@@ -60,17 +61,17 @@ Keep insights actionable and specific. Do not repeat information already in the 
  * Gemini Interpreter Adapter implementation
  */
 export class GeminiInterpreterAdapter implements InterpreterAdapter {
-  readonly providerName = 'gemini';
+  readonly providerName = "gemini";
   private readonly config: InterpreterConfig;
-  
+
   constructor(config?: Partial<InterpreterConfig>) {
     this.config = { ...getInterpreterConfig(), ...config };
   }
-  
+
   get modelId(): string {
     return this.config.model;
   }
-  
+
   /**
    * Generate advisory insights from canonical artifacts
    */
@@ -80,7 +81,7 @@ export class GeminiInterpreterAdapter implements InterpreterAdapter {
   ): Promise<InterpretationResult> {
     const startTime = Date.now();
     const correlationId = getCorrelationId();
-    
+
     // Check if interpreter is enabled
     if (!this.config.enabled) {
       return {
@@ -91,33 +92,33 @@ export class GeminiInterpreterAdapter implements InterpreterAdapter {
         processingTimeMs: 0,
       };
     }
-    
+
     if (!this.config.apiKey) {
       return {
         success: false,
         insights: [],
         model: this.config.model,
         correlationId,
-        error: 'GEMINI_API_KEY not configured',
-        errorCode: 'CONFIG_ERROR',
+        error: "GEMINI_API_KEY not configured",
+        errorCode: "CONFIG_ERROR",
       };
     }
-    
+
     // Build input content (excluding raw OCR unless explicitly enabled)
     const inputContent = this.buildInputContent(input, options);
-    
-    logger.info('Starting interpretation', {
+
+    logger.info("Starting interpretation", {
       correlationId,
       model: this.config.model,
       hasAuditReport: !!input.auditReport,
       hasExtractedFields: !!input.extractedFields,
       includeRawOcr: options.includeRawOcr && !!input.rawOcrText,
     });
-    
+
     try {
       const response = await this.callGeminiAPI(inputContent);
       const processingTimeMs = Date.now() - startTime;
-      
+
       if (!response.success) {
         return {
           success: false,
@@ -129,16 +130,16 @@ export class GeminiInterpreterAdapter implements InterpreterAdapter {
           errorCode: response.errorCode,
         };
       }
-      
+
       // Parse and validate insights
       const insights = this.parseInsights(response.content, options);
-      
-      logger.info('Interpretation complete', {
+
+      logger.info("Interpretation complete", {
         correlationId,
         insightCount: insights.length,
         processingTimeMs,
       });
-      
+
       return {
         success: true,
         insights,
@@ -147,61 +148,67 @@ export class GeminiInterpreterAdapter implements InterpreterAdapter {
         correlationId,
         processingTimeMs,
       };
-      
     } catch (error) {
       const processingTimeMs = Date.now() - startTime;
-      
-      logger.error('Interpretation failed', {
+
+      logger.error("Interpretation failed", {
         correlationId,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
         processingTimeMs,
       });
-      
+
       return {
         success: false,
         insights: [],
         model: this.config.model,
         correlationId,
         processingTimeMs,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        errorCode: 'PROCESSING_ERROR',
+        error: error instanceof Error ? error.message : "Unknown error",
+        errorCode: "PROCESSING_ERROR",
       };
     }
   }
-  
+
   /**
    * Build input content for Gemini
    */
-  private buildInputContent(input: InterpretationInput, options: InterpreterOptions): string {
+  private buildInputContent(
+    input: InterpretationInput,
+    options: InterpreterOptions
+  ): string {
     const parts: string[] = [];
-    
+
     if (input.auditReport) {
-      parts.push('## Audit Report\n');
-      parts.push('### Findings\n');
+      parts.push("## Audit Report\n");
+      parts.push("### Findings\n");
       parts.push(JSON.stringify(input.auditReport.findings, null, 2));
-      parts.push('\n### Validated Fields\n');
+      parts.push("\n### Validated Fields\n");
       parts.push(JSON.stringify(input.auditReport.validatedFields, null, 2));
     }
-    
+
     if (input.extractedFields) {
-      parts.push('\n## Extracted Fields\n');
+      parts.push("\n## Extracted Fields\n");
       parts.push(JSON.stringify(input.extractedFields, null, 2));
     }
-    
+
     // Only include raw OCR if explicitly enabled
-    if (options.includeRawOcr && input.rawOcrText && process.env.ENABLE_RAW_OCR_INSIGHTS === 'true') {
-      parts.push('\n## Raw OCR Text (for context only)\n');
+    if (
+      options.includeRawOcr &&
+      input.rawOcrText &&
+      process.env.ENABLE_RAW_OCR_INSIGHTS === "true"
+    ) {
+      parts.push("\n## Raw OCR Text (for context only)\n");
       // Truncate to prevent token overflow
       const truncated = input.rawOcrText.substring(0, 5000);
       parts.push(truncated);
       if (input.rawOcrText.length > 5000) {
-        parts.push('\n[... truncated ...]');
+        parts.push("\n[... truncated ...]");
       }
     }
-    
-    return parts.join('\n');
+
+    return parts.join("\n");
   }
-  
+
   /**
    * Call Gemini API
    */
@@ -213,33 +220,30 @@ export class GeminiInterpreterAdapter implements InterpreterAdapter {
     errorCode?: string;
   }> {
     const url = `${GEMINI_API_ENDPOINT}/${this.config.model}:generateContent?key=${this.config.apiKey}`;
-    
+
     const payload = {
       contents: [
         {
-          role: 'user',
-          parts: [
-            { text: SYSTEM_PROMPT },
-            { text: inputContent },
-          ],
+          role: "user",
+          parts: [{ text: SYSTEM_PROMPT }, { text: inputContent }],
         },
       ],
       generationConfig: {
         temperature: 0.2,
         topP: 0.8,
         maxOutputTokens: 4096,
-        responseMimeType: 'application/json',
+        responseMimeType: "application/json",
       },
     };
-    
+
     const response = await fetch(url, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       return {
@@ -248,20 +252,20 @@ export class GeminiInterpreterAdapter implements InterpreterAdapter {
         errorCode: `HTTP_${response.status}`,
       };
     }
-    
+
     const result = await response.json();
-    
+
     // Extract content from Gemini response
     const content = result.candidates?.[0]?.content?.parts?.[0]?.text;
-    
+
     if (!content) {
       return {
         success: false,
-        error: 'Empty response from Gemini',
-        errorCode: 'EMPTY_RESPONSE',
+        error: "Empty response from Gemini",
+        errorCode: "EMPTY_RESPONSE",
       };
     }
-    
+
     try {
       const parsed = JSON.parse(content);
       return {
@@ -272,12 +276,12 @@ export class GeminiInterpreterAdapter implements InterpreterAdapter {
     } catch {
       return {
         success: false,
-        error: 'Invalid JSON response from Gemini',
-        errorCode: 'INVALID_JSON',
+        error: "Invalid JSON response from Gemini",
+        errorCode: "INVALID_JSON",
       };
     }
   }
-  
+
   /**
    * Parse and validate insights from Gemini response
    */
@@ -285,64 +289,77 @@ export class GeminiInterpreterAdapter implements InterpreterAdapter {
     if (!content?.insights || !Array.isArray(content.insights)) {
       return [];
     }
-    
+
     let insights: Insight[] = content.insights
-      .filter((i: any) => i && typeof i === 'object')
+      .filter((i: any) => i && typeof i === "object")
       .map((i: any, index: number) => ({
         id: i.id || `insight-${index + 1}`,
-        category: i.category || 'general',
-        severity: ['info', 'suggestion', 'warning'].includes(i.severity) ? i.severity : 'info',
-        title: String(i.title || 'Untitled insight'),
-        description: String(i.description || ''),
-        affectedFields: Array.isArray(i.affectedFields) ? i.affectedFields : undefined,
-        confidence: typeof i.confidence === 'number' ? Math.min(1, Math.max(0, i.confidence)) : 0.5,
+        category: i.category || "general",
+        severity: ["info", "suggestion", "warning"].includes(i.severity)
+          ? i.severity
+          : "info",
+        title: String(i.title || "Untitled insight"),
+        description: String(i.description || ""),
+        affectedFields: Array.isArray(i.affectedFields)
+          ? i.affectedFields
+          : undefined,
+        confidence:
+          typeof i.confidence === "number"
+            ? Math.min(1, Math.max(0, i.confidence))
+            : 0.5,
         reasoning: i.reasoning ? String(i.reasoning) : undefined,
       }));
-    
+
     // Apply confidence filter
     if (options.minConfidence !== undefined) {
       insights = insights.filter(i => i.confidence >= options.minConfidence!);
     }
-    
+
     // Apply max insights limit
     if (options.maxInsights !== undefined) {
       insights = insights.slice(0, options.maxInsights);
     }
-    
+
     return insights;
   }
-  
+
   /**
    * Validate API key is configured
    */
   async validateApiKey(): Promise<{ valid: boolean; error?: string }> {
     if (!this.config.apiKey) {
-      return { valid: false, error: 'GEMINI_API_KEY not configured' };
+      return { valid: false, error: "GEMINI_API_KEY not configured" };
     }
-    
+
     try {
       const url = `${GEMINI_API_ENDPOINT}?key=${this.config.apiKey}`;
-      const response = await fetch(url, { method: 'GET' });
-      
+      const response = await fetch(url, { method: "GET" });
+
       if (response.ok) {
         return { valid: true };
       } else {
-        return { valid: false, error: `API validation failed: ${response.status}` };
+        return {
+          valid: false,
+          error: `API validation failed: ${response.status}`,
+        };
       }
     } catch (error) {
       return {
         valid: false,
-        error: error instanceof Error ? error.message : 'Connection error',
+        error: error instanceof Error ? error.message : "Connection error",
       };
     }
   }
-  
+
   /**
    * Generate insights artifact (strict JSON schema)
    */
-  generateArtifact(result: InterpretationResult, inputArtifacts: string[]): InsightsArtifact {
+  generateArtifact(
+    result: InterpretationResult,
+    inputArtifacts: string[]
+  ): InsightsArtifact {
     return {
-      version: '1.0.0',
+      version: "1.0.0",
       generatedAt: new Date().toISOString(),
       correlationId: result.correlationId,
       model: result.model,
@@ -360,6 +377,8 @@ export class GeminiInterpreterAdapter implements InterpreterAdapter {
 /**
  * Create Gemini interpreter adapter instance
  */
-export function createGeminiAdapter(config?: Partial<InterpreterConfig>): InterpreterAdapter {
+export function createGeminiAdapter(
+  config?: Partial<InterpreterConfig>
+): InterpreterAdapter {
   return new GeminiInterpreterAdapter(config);
 }

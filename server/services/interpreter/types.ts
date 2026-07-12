@@ -1,8 +1,8 @@
 /**
  * Interpreter Router Types
- * 
+ *
  * Types for the Gemini/Claude interpreter routing system.
- * 
+ *
  * CRITICAL: Interpreter results are ADVISORY ONLY.
  * They do NOT change canonical document outcomes.
  */
@@ -10,27 +10,27 @@
 /**
  * Available interpreter providers
  */
-export type InterpreterProvider = 'gemini' | 'claude';
+export type InterpreterProvider = "gemini" | "claude";
 
 /**
  * Interpreter routing mode
  */
-export type RoutingMode = 
-  | 'gemini_default'     // Gemini for all, Claude for escalation
-  | 'claude_default'     // Claude for all (expensive)
-  | 'ab_test'            // A/B mode for evaluation
-  | 'round_robin';       // Alternate between providers
+export type RoutingMode =
+  | "gemini_default" // Gemini for all, Claude for escalation
+  | "claude_default" // Claude for all (expensive)
+  | "ab_test" // A/B mode for evaluation
+  | "round_robin"; // Alternate between providers
 
 /**
  * Escalation trigger reason
  */
-export type EscalationReason = 
-  | 'low_confidence'
-  | 'ambiguous_extraction'
-  | 'complex_document'
-  | 'retry_on_error'
-  | 'manual_escalation'
-  | 'ab_test_assignment';
+export type EscalationReason =
+  | "low_confidence"
+  | "ambiguous_extraction"
+  | "complex_document"
+  | "retry_on_error"
+  | "manual_escalation"
+  | "ab_test_assignment";
 
 /**
  * Interpreter request
@@ -47,9 +47,9 @@ export interface InterpreterRequest {
     imageUrl?: string;
   };
   query: string;
-  priority: 'normal' | 'high' | 'urgent';
+  priority: "normal" | "high" | "urgent";
   metadata: {
-    source: 'extraction' | 'validation' | 'qa' | 'manual';
+    source: "extraction" | "validation" | "qa" | "manual";
     assetType?: string;
     customerId?: string;
     userId?: string;
@@ -63,7 +63,7 @@ export interface InterpreterResponse {
   requestId: string;
   provider: InterpreterProvider;
   modelVersion: string;
-  
+
   // Advisory result (does NOT change canonical)
   advisory: {
     value: unknown;
@@ -74,7 +74,7 @@ export interface InterpreterResponse {
       confidence: number;
     }>;
   };
-  
+
   // Routing metadata
   routing: {
     selectedProvider: InterpreterProvider;
@@ -83,14 +83,14 @@ export interface InterpreterResponse {
     routingMode: RoutingMode;
     latencyMs: number;
   };
-  
+
   // Cost tracking
   cost: {
     inputTokens: number;
     outputTokens: number;
     estimatedCostUsd: number;
   };
-  
+
   // Timestamps
   timestamps: {
     requestedAt: string;
@@ -104,7 +104,7 @@ export interface InterpreterResponse {
 export interface RouterRules {
   // Default provider
   defaultProvider: InterpreterProvider;
-  
+
   // Escalation rules
   escalation: {
     enabled: boolean;
@@ -115,7 +115,7 @@ export interface RouterRules {
       complexDocumentPatterns: string[];
     };
   };
-  
+
   // A/B testing configuration
   abTest: {
     enabled: boolean;
@@ -123,9 +123,9 @@ export interface RouterRules {
       gemini: number;
       claude: number;
     };
-    cohortAssignment: 'random' | 'hash_documentId' | 'hash_userId';
+    cohortAssignment: "random" | "hash_documentId" | "hash_userId";
   };
-  
+
   // Provider-specific settings
   providers: {
     gemini: {
@@ -141,7 +141,7 @@ export interface RouterRules {
       enabled: boolean;
     };
   };
-  
+
   // Rate limiting
   rateLimits: {
     maxRequestsPerMinute: number;
@@ -156,11 +156,11 @@ export interface AdvisoryArtifact {
   artifactId: string;
   documentId: string;
   fieldId?: string;
-  
+
   // Request/Response data
   request: InterpreterRequest;
   response: InterpreterResponse;
-  
+
   // Canonical comparison
   comparison: {
     canonicalValue: unknown;
@@ -168,12 +168,12 @@ export interface AdvisoryArtifact {
     agreesWithCanonical: boolean;
     confidenceDelta: number;
   };
-  
+
   // Audit metadata
   audit: {
     createdAt: string;
     createdBy: string;
-    environment: 'local' | 'staging' | 'production';
+    environment: "local" | "staging" | "production";
     version: string;
   };
 }
@@ -183,22 +183,22 @@ export interface AdvisoryArtifact {
  */
 export interface RouterMetrics {
   timestamp: string;
-  window: 'hourly' | 'daily' | 'weekly';
-  
+  window: "hourly" | "daily" | "weekly";
+
   // Request counts
   requests: {
     total: number;
     byProvider: Record<InterpreterProvider, number>;
     byRoutingMode: Record<RoutingMode, number>;
   };
-  
+
   // Escalation stats
   escalations: {
     total: number;
     byReason: Record<EscalationReason, number>;
     escalationRate: number;
   };
-  
+
   // Performance
   performance: {
     averageLatencyMs: number;
@@ -207,7 +207,7 @@ export interface RouterMetrics {
     p99LatencyMs: number;
     errorRate: number;
   };
-  
+
   // Cost
   cost: {
     totalInputTokens: number;
@@ -215,7 +215,7 @@ export interface RouterMetrics {
     estimatedTotalCostUsd: number;
     byProvider: Record<InterpreterProvider, number>;
   };
-  
+
   // Agreement with canonical
   agreement: {
     total: number;
@@ -229,14 +229,14 @@ export interface RouterMetrics {
  * Default router rules
  */
 export const DEFAULT_ROUTER_RULES: RouterRules = {
-  defaultProvider: 'gemini',
+  defaultProvider: "gemini",
   escalation: {
     enabled: true,
-    provider: 'claude',
+    provider: "claude",
     triggers: {
-      lowConfidenceThreshold: 0.70,
+      lowConfidenceThreshold: 0.7,
       errorRetry: true,
-      complexDocumentPatterns: ['multi_page', 'handwritten', 'damaged'],
+      complexDocumentPatterns: ["multi_page", "handwritten", "damaged"],
     },
   },
   abTest: {
@@ -245,17 +245,17 @@ export const DEFAULT_ROUTER_RULES: RouterRules = {
       gemini: 0.8,
       claude: 0.2,
     },
-    cohortAssignment: 'hash_documentId',
+    cohortAssignment: "hash_documentId",
   },
   providers: {
     gemini: {
-      modelId: 'gemini-1.5-pro',
+      modelId: "gemini-1.5-pro",
       maxTokens: 4096,
       temperature: 0.1,
       enabled: true,
     },
     claude: {
-      modelId: 'claude-3-5-sonnet-20241022',
+      modelId: "claude-3-5-sonnet-20241022",
       maxTokens: 4096,
       temperature: 0.1,
       enabled: true,

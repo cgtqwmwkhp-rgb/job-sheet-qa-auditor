@@ -3,12 +3,17 @@
  * Provides structured logging with correlation IDs and PII redaction
  */
 
-import { createRequestContext, runWithContext, getCorrelationId, getElapsedMs } from './context';
-import { redactObject } from './piiRedaction';
+import {
+  createRequestContext,
+  runWithContext,
+  getCorrelationId,
+  getElapsedMs,
+} from "./context";
+import { redactObject } from "./piiRedaction";
 
 export interface LogEntry {
   timestamp: string;
-  level: 'info' | 'warn' | 'error' | 'debug';
+  level: "info" | "warn" | "error" | "debug";
   correlationId?: string;
   requestId?: string;
   userId?: number;
@@ -22,14 +27,14 @@ export interface LogEntry {
 
 export interface LoggerOptions {
   redactPII?: boolean;
-  logLevel?: 'debug' | 'info' | 'warn' | 'error';
+  logLevel?: "debug" | "info" | "warn" | "error";
   includeBody?: boolean;
   maxBodyLength?: number;
 }
 
 const DEFAULT_OPTIONS: LoggerOptions = {
   redactPII: true,
-  logLevel: 'info',
+  logLevel: "info",
   includeBody: false,
   maxBodyLength: 1000,
 };
@@ -47,7 +52,7 @@ let currentLogLevel = LOG_LEVELS.info;
 /**
  * Set the minimum log level
  */
-export function setLogLevel(level: 'debug' | 'info' | 'warn' | 'error'): void {
+export function setLogLevel(level: "debug" | "info" | "warn" | "error"): void {
   currentLogLevel = LOG_LEVELS[level];
 }
 
@@ -69,13 +74,13 @@ function formatLogEntry(entry: LogEntry): string {
  * Create a structured log entry
  */
 function createLogEntry(
-  level: LogEntry['level'],
+  level: LogEntry["level"],
   message: string,
   data?: Record<string, unknown>,
   options: LoggerOptions = {}
 ): LogEntry {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  
+
   const entry: LogEntry = {
     timestamp: new Date().toISOString(),
     level,
@@ -93,44 +98,64 @@ function createLogEntry(
 /**
  * Log an info message
  */
-export function logInfo(message: string, data?: Record<string, unknown>, options?: LoggerOptions): void {
-  if (!shouldLog('info')) return;
-  const entry = createLogEntry('info', message, data, options);
+export function logInfo(
+  message: string,
+  data?: Record<string, unknown>,
+  options?: LoggerOptions
+): void {
+  if (!shouldLog("info")) return;
+  const entry = createLogEntry("info", message, data, options);
   console.log(formatLogEntry(entry));
 }
 
 /**
  * Log a warning message
  */
-export function logWarn(message: string, data?: Record<string, unknown>, options?: LoggerOptions): void {
-  if (!shouldLog('warn')) return;
-  const entry = createLogEntry('warn', message, data, options);
+export function logWarn(
+  message: string,
+  data?: Record<string, unknown>,
+  options?: LoggerOptions
+): void {
+  if (!shouldLog("warn")) return;
+  const entry = createLogEntry("warn", message, data, options);
   console.warn(formatLogEntry(entry));
 }
 
 /**
  * Log an error message
  */
-export function logError(message: string, data?: Record<string, unknown>, options?: LoggerOptions): void {
-  if (!shouldLog('error')) return;
-  const entry = createLogEntry('error', message, data, options);
+export function logError(
+  message: string,
+  data?: Record<string, unknown>,
+  options?: LoggerOptions
+): void {
+  if (!shouldLog("error")) return;
+  const entry = createLogEntry("error", message, data, options);
   console.error(formatLogEntry(entry));
 }
 
 /**
  * Log a debug message
  */
-export function logDebug(message: string, data?: Record<string, unknown>, options?: LoggerOptions): void {
-  if (!shouldLog('debug')) return;
-  const entry = createLogEntry('debug', message, data, options);
+export function logDebug(
+  message: string,
+  data?: Record<string, unknown>,
+  options?: LoggerOptions
+): void {
+  if (!shouldLog("debug")) return;
+  const entry = createLogEntry("debug", message, data, options);
   console.debug(formatLogEntry(entry));
 }
 
 /**
  * Log request start
  */
-export function logRequestStart(method: string, path: string, userId?: number): void {
-  logInfo('Request started', {
+export function logRequestStart(
+  method: string,
+  path: string,
+  userId?: number
+): void {
+  logInfo("Request started", {
     method,
     path,
     userId,
@@ -147,23 +172,24 @@ export function logRequestComplete(
   userId?: number
 ): void {
   const durationMs = getElapsedMs();
-  
-  const level = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'info';
-  
-  const entry = createLogEntry(level, 'Request completed', {
+
+  const level =
+    statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "info";
+
+  const entry = createLogEntry(level, "Request completed", {
     method,
     path,
     statusCode,
     durationMs,
     userId,
   });
-  
+
   entry.statusCode = statusCode;
   entry.durationMs = durationMs;
-  
-  if (level === 'error') {
+
+  if (level === "error") {
     console.error(formatLogEntry(entry));
-  } else if (level === 'warn') {
+  } else if (level === "warn") {
     console.warn(formatLogEntry(entry));
   } else {
     console.log(formatLogEntry(entry));
@@ -180,7 +206,7 @@ export function logExternalCall(
   success: boolean,
   error?: string
 ): void {
-  const level = success ? 'info' : 'error';
+  const level = success ? "info" : "error";
   const entry = createLogEntry(level, `External call: ${service}`, {
     service,
     operation,
@@ -188,7 +214,7 @@ export function logExternalCall(
     success,
     error,
   });
-  
+
   if (success) {
     console.log(formatLogEntry(entry));
   } else {
@@ -220,13 +246,13 @@ export function logAuditEvent(
  */
 export function createLogger(context: Record<string, unknown>) {
   return {
-    info: (message: string, data?: Record<string, unknown>) => 
+    info: (message: string, data?: Record<string, unknown>) =>
       logInfo(message, { ...context, ...data }),
-    warn: (message: string, data?: Record<string, unknown>) => 
+    warn: (message: string, data?: Record<string, unknown>) =>
       logWarn(message, { ...context, ...data }),
-    error: (message: string, data?: Record<string, unknown>) => 
+    error: (message: string, data?: Record<string, unknown>) =>
       logError(message, { ...context, ...data }),
-    debug: (message: string, data?: Record<string, unknown>) => 
+    debug: (message: string, data?: Record<string, unknown>) =>
       logDebug(message, { ...context, ...data }),
   };
 }
@@ -239,27 +265,27 @@ export function withRequestLogging<T>(
   fn: () => Promise<T>
 ): Promise<T> {
   const context = createRequestContext();
-  
+
   return runWithContext(context, async () => {
     const startTime = Date.now();
-    
+
     logInfo(`Procedure started: ${procedureName}`);
-    
+
     try {
       const result = await fn();
-      
+
       logInfo(`Procedure completed: ${procedureName}`, {
         durationMs: Date.now() - startTime,
         success: true,
       });
-      
+
       return result;
     } catch (error) {
       logError(`Procedure failed: ${procedureName}`, {
         durationMs: Date.now() - startTime,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
       });
-      
+
       throw error;
     }
   });

@@ -1,6 +1,6 @@
 /**
  * Interpreter A/B Harness Types
- * 
+ *
  * Types for running A/B evaluations between different interpreter
  * configurations (prompts, models, parameters).
  */
@@ -12,16 +12,16 @@ export interface InterpreterConfig {
   id: string;
   name: string;
   description?: string;
-  
+
   // Model configuration
   model: string;
   temperature: number;
   maxTokens: number;
-  
+
   // Prompt configuration
   systemPrompt: string;
   userPromptTemplate: string;
-  
+
   // Feature flags
   features: {
     useStructuredOutput: boolean;
@@ -47,7 +47,7 @@ export interface TestCase {
 export interface ExpectedField {
   fieldName: string;
   expectedValue: string | null;
-  tolerance?: 'exact' | 'fuzzy' | 'contains';
+  tolerance?: "exact" | "fuzzy" | "contains";
 }
 
 /**
@@ -56,25 +56,25 @@ export interface ExpectedField {
 export interface TestCaseResult {
   testCaseId: string;
   configId: string;
-  
+
   // Timing
   startedAt: string;
   completedAt: string;
   latencyMs: number;
-  
+
   // Results
   success: boolean;
   extractedFields: ExtractedFieldResult[];
-  
+
   // Metrics
   metrics: {
-    accuracy: number;        // 0-1: % of fields correctly extracted
-    precision: number;       // 0-1: correct / (correct + false positives)
-    recall: number;          // 0-1: correct / (correct + false negatives)
-    f1Score: number;         // 0-1: harmonic mean of precision and recall
-    fieldMatchRate: number;  // 0-1: % of expected fields found
+    accuracy: number; // 0-1: % of fields correctly extracted
+    precision: number; // 0-1: correct / (correct + false positives)
+    recall: number; // 0-1: correct / (correct + false negatives)
+    f1Score: number; // 0-1: harmonic mean of precision and recall
+    fieldMatchRate: number; // 0-1: % of expected fields found
   };
-  
+
   // Errors
   error?: string;
   errorCode?: string;
@@ -87,7 +87,7 @@ export interface ExtractedFieldResult {
   fieldName: string;
   extractedValue: string | null;
   expectedValue: string | null;
-  match: 'exact' | 'fuzzy' | 'partial' | 'missing' | 'extra';
+  match: "exact" | "fuzzy" | "partial" | "missing" | "extra";
   confidence: number;
 }
 
@@ -98,25 +98,25 @@ export interface EvaluationRun {
   id: string;
   name: string;
   description?: string;
-  
+
   // Configs being compared
   configA: InterpreterConfig;
   configB: InterpreterConfig;
-  
+
   // Test cases
   testCases: TestCase[];
-  
+
   // Timing
   startedAt: string;
   completedAt?: string;
-  
+
   // Status
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  
+  status: "pending" | "running" | "completed" | "failed";
+
   // Results
   resultsA: TestCaseResult[];
   resultsB: TestCaseResult[];
-  
+
   // Summary
   summary?: EvaluationSummary;
 }
@@ -128,19 +128,19 @@ export interface EvaluationSummary {
   // Overall metrics
   configAMetrics: AggregateMetrics;
   configBMetrics: AggregateMetrics;
-  
+
   // Winner determination
-  winner: 'A' | 'B' | 'tie';
+  winner: "A" | "B" | "tie";
   winnerReason: string;
-  confidenceLevel: 'high' | 'medium' | 'low';
-  
+  confidenceLevel: "high" | "medium" | "low";
+
   // Detailed comparison
   comparison: {
-    accuracyDelta: number;    // A - B (positive = A better)
-    latencyDelta: number;     // A - B (negative = A faster)
-    f1Delta: number;          // A - B (positive = A better)
+    accuracyDelta: number; // A - B (positive = A better)
+    latencyDelta: number; // A - B (negative = A faster)
+    f1Delta: number; // A - B (positive = A better)
   };
-  
+
   // Recommendations
   recommendations: string[];
 }
@@ -151,24 +151,24 @@ export interface EvaluationSummary {
 export interface AggregateMetrics {
   configId: string;
   configName: string;
-  
+
   // Counts
   totalTests: number;
   passedTests: number;
   failedTests: number;
-  
+
   // Averages
   avgAccuracy: number;
   avgPrecision: number;
   avgRecall: number;
   avgF1Score: number;
   avgLatencyMs: number;
-  
+
   // Percentiles
   p50LatencyMs: number;
   p95LatencyMs: number;
   p99LatencyMs: number;
-  
+
   // Field-level breakdown
   fieldMetrics: FieldMetric[];
 }
@@ -186,17 +186,22 @@ export interface FieldMetric {
 /**
  * Default interpreter configurations for testing
  */
-export function getDefaultConfigs(): { configA: InterpreterConfig; configB: InterpreterConfig } {
+export function getDefaultConfigs(): {
+  configA: InterpreterConfig;
+  configB: InterpreterConfig;
+} {
   return {
     configA: {
-      id: 'baseline-v1',
-      name: 'Baseline (Current)',
-      description: 'Current production configuration',
-      model: 'gemini-2.0-flash',
+      id: "baseline-v1",
+      name: "Baseline (Current)",
+      description: "Current production configuration",
+      model: "gemini-2.0-flash",
       temperature: 0.1,
       maxTokens: 4096,
-      systemPrompt: 'You are a document extraction assistant. Extract structured data from job sheets.',
-      userPromptTemplate: 'Extract the following fields from this document:\n\n{{markdown}}\n\nReturn JSON with the extracted fields.',
+      systemPrompt:
+        "You are a document extraction assistant. Extract structured data from job sheets.",
+      userPromptTemplate:
+        "Extract the following fields from this document:\n\n{{markdown}}\n\nReturn JSON with the extracted fields.",
       features: {
         useStructuredOutput: true,
         useExamples: false,
@@ -204,14 +209,16 @@ export function getDefaultConfigs(): { configA: InterpreterConfig; configB: Inte
       },
     },
     configB: {
-      id: 'candidate-v2',
-      name: 'Candidate (New)',
-      description: 'New configuration with chain-of-thought',
-      model: 'gemini-2.0-flash',
+      id: "candidate-v2",
+      name: "Candidate (New)",
+      description: "New configuration with chain-of-thought",
+      model: "gemini-2.0-flash",
       temperature: 0.0,
       maxTokens: 8192,
-      systemPrompt: 'You are an expert document analyst. Carefully analyze job sheets and extract all relevant information with high precision.',
-      userPromptTemplate: 'Analyze this job sheet document step by step:\n\n{{markdown}}\n\nFirst, identify all sections. Then extract each field. Finally, return JSON.',
+      systemPrompt:
+        "You are an expert document analyst. Carefully analyze job sheets and extract all relevant information with high precision.",
+      userPromptTemplate:
+        "Analyze this job sheet document step by step:\n\n{{markdown}}\n\nFirst, identify all sections. Then extract each field. Finally, return JSON.",
       features: {
         useStructuredOutput: true,
         useExamples: true,

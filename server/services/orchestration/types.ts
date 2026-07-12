@@ -1,36 +1,36 @@
 /**
  * Orchestration Types - Stage 7
- * 
+ *
  * Types for pipeline run lifecycle, idempotency, and replay.
  */
 
 /**
  * Pipeline run states (ordered lifecycle)
  */
-export type RunState = 
-  | 'CREATED'
-  | 'OCR_STARTED'
-  | 'OCR_DONE'
-  | 'EXTRACTION_STARTED'
-  | 'EXTRACTED'
-  | 'VALIDATION_STARTED'
-  | 'VALIDATED'
-  | 'PERSISTENCE_STARTED'
-  | 'PERSISTED'
-  | 'FAILED';
+export type RunState =
+  | "CREATED"
+  | "OCR_STARTED"
+  | "OCR_DONE"
+  | "EXTRACTION_STARTED"
+  | "EXTRACTED"
+  | "VALIDATION_STARTED"
+  | "VALIDATED"
+  | "PERSISTENCE_STARTED"
+  | "PERSISTED"
+  | "FAILED";
 
 /**
  * State transition rules
  */
 export const STATE_TRANSITIONS: Record<RunState, RunState[]> = {
-  CREATED: ['OCR_STARTED', 'FAILED'],
-  OCR_STARTED: ['OCR_DONE', 'FAILED'],
-  OCR_DONE: ['EXTRACTION_STARTED', 'FAILED'],
-  EXTRACTION_STARTED: ['EXTRACTED', 'FAILED'],
-  EXTRACTED: ['VALIDATION_STARTED', 'FAILED'],
-  VALIDATION_STARTED: ['VALIDATED', 'FAILED'],
-  VALIDATED: ['PERSISTENCE_STARTED', 'FAILED'],
-  PERSISTENCE_STARTED: ['PERSISTED', 'FAILED'],
+  CREATED: ["OCR_STARTED", "FAILED"],
+  OCR_STARTED: ["OCR_DONE", "FAILED"],
+  OCR_DONE: ["EXTRACTION_STARTED", "FAILED"],
+  EXTRACTION_STARTED: ["EXTRACTED", "FAILED"],
+  EXTRACTED: ["VALIDATION_STARTED", "FAILED"],
+  VALIDATION_STARTED: ["VALIDATED", "FAILED"],
+  VALIDATED: ["PERSISTENCE_STARTED", "FAILED"],
+  PERSISTENCE_STARTED: ["PERSISTED", "FAILED"],
   PERSISTED: [], // Terminal state
   FAILED: [], // Terminal state
 };
@@ -46,7 +46,7 @@ export function isValidTransition(from: RunState, to: RunState): boolean {
  * Check if a state is terminal
  */
 export function isTerminalState(state: RunState): boolean {
-  return state === 'PERSISTED' || state === 'FAILED';
+  return state === "PERSISTED" || state === "FAILED";
 }
 
 /**

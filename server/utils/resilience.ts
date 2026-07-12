@@ -19,7 +19,7 @@ export interface CircuitBreakerOptions {
   onStateChange?: (from: CircuitState, to: CircuitState) => void;
 }
 
-export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   maxRetries: 3,
@@ -27,16 +27,16 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   maxDelayMs: 30000,
   backoffMultiplier: 2,
   retryableErrors: [
-    'ECONNRESET',
-    'ETIMEDOUT',
-    'ENOTFOUND',
-    'EAI_AGAIN',
-    'RATE_LIMIT',
-    '429',
-    '500',
-    '502',
-    '503',
-    '504',
+    "ECONNRESET",
+    "ETIMEDOUT",
+    "ENOTFOUND",
+    "EAI_AGAIN",
+    "RATE_LIMIT",
+    "429",
+    "500",
+    "502",
+    "503",
+    "504",
   ],
 };
 
@@ -57,7 +57,8 @@ function sleep(ms: number): Promise<void> {
  * Calculate delay with exponential backoff and jitter
  */
 function calculateDelay(attempt: number, options: RetryOptions): number {
-  const exponentialDelay = options.baseDelayMs * Math.pow(options.backoffMultiplier, attempt);
+  const exponentialDelay =
+    options.baseDelayMs * Math.pow(options.backoffMultiplier, attempt);
   const jitter = Math.random() * 0.3 * exponentialDelay; // 30% jitter
   return Math.min(exponentialDelay + jitter, options.maxDelayMs);
 }
@@ -66,8 +67,9 @@ function calculateDelay(attempt: number, options: RetryOptions): number {
  * Check if an error is retryable
  */
 function isRetryableError(error: Error, retryableErrors: string[]): boolean {
-  const errorString = error.message + (error.name || '') + ((error as any).code || '');
-  return retryableErrors.some(pattern => 
+  const errorString =
+    error.message + (error.name || "") + ((error as any).code || "");
+  return retryableErrors.some(pattern =>
     errorString.toLowerCase().includes(pattern.toLowerCase())
   );
 }
@@ -98,7 +100,7 @@ export async function withRetry<T>(
       }
 
       const delayMs = calculateDelay(attempt, opts);
-      
+
       if (opts.onRetry) {
         opts.onRetry(attempt + 1, lastError, delayMs);
       }
@@ -114,7 +116,7 @@ export async function withRetry<T>(
  * Circuit Breaker implementation
  */
 export class CircuitBreaker {
-  private state: CircuitState = 'CLOSED';
+  private state: CircuitState = "CLOSED";
   private failureCount = 0;
   private successCount = 0;
   private lastFailureTime: number | null = null;
@@ -154,12 +156,14 @@ export class CircuitBreaker {
     if (this.state !== newState) {
       const oldState = this.state;
       this.state = newState;
-      
+
       if (this.options.onStateChange) {
         this.options.onStateChange(oldState, newState);
       }
 
-      console.log(`[CircuitBreaker:${this.name}] State transition: ${oldState} → ${newState}`);
+      console.log(
+        `[CircuitBreaker:${this.name}] State transition: ${oldState} → ${newState}`
+      );
     }
   }
 
@@ -168,20 +172,22 @@ export class CircuitBreaker {
    */
   private shouldAllowRequest(): boolean {
     switch (this.state) {
-      case 'CLOSED':
+      case "CLOSED":
         return true;
 
-      case 'OPEN':
+      case "OPEN":
         // Check if reset timeout has elapsed
-        if (this.lastFailureTime && 
-            Date.now() - this.lastFailureTime >= this.options.resetTimeoutMs) {
-          this.transitionTo('HALF_OPEN');
+        if (
+          this.lastFailureTime &&
+          Date.now() - this.lastFailureTime >= this.options.resetTimeoutMs
+        ) {
+          this.transitionTo("HALF_OPEN");
           this.halfOpenSuccesses = 0;
           return true;
         }
         return false;
 
-      case 'HALF_OPEN':
+      case "HALF_OPEN":
         return true;
 
       default:
@@ -196,10 +202,10 @@ export class CircuitBreaker {
     this.failureCount = 0;
     this.successCount++;
 
-    if (this.state === 'HALF_OPEN') {
+    if (this.state === "HALF_OPEN") {
       this.halfOpenSuccesses++;
       if (this.halfOpenSuccesses >= this.options.halfOpenRequests) {
-        this.transitionTo('CLOSED');
+        this.transitionTo("CLOSED");
       }
     }
   }
@@ -211,10 +217,10 @@ export class CircuitBreaker {
     this.failureCount++;
     this.lastFailureTime = Date.now();
 
-    if (this.state === 'HALF_OPEN') {
-      this.transitionTo('OPEN');
+    if (this.state === "HALF_OPEN") {
+      this.transitionTo("OPEN");
     } else if (this.failureCount >= this.options.failureThreshold) {
-      this.transitionTo('OPEN');
+      this.transitionTo("OPEN");
     }
   }
 
@@ -244,7 +250,7 @@ export class CircuitBreaker {
    * Manually reset the circuit breaker
    */
   reset(): void {
-    this.state = 'CLOSED';
+    this.state = "CLOSED";
     this.failureCount = 0;
     this.successCount = 0;
     this.lastFailureTime = null;
@@ -261,7 +267,7 @@ export class CircuitBreakerOpenError extends Error {
 
   constructor(message: string, circuitName: string, retryAfterMs: number) {
     super(message);
-    this.name = 'CircuitBreakerOpenError';
+    this.name = "CircuitBreakerOpenError";
     this.circuitName = circuitName;
     this.retryAfterMs = Math.max(0, retryAfterMs);
   }
@@ -279,7 +285,7 @@ export async function withResiliency<T>(
 }
 
 // Singleton circuit breakers for external services
-export const mistralCircuitBreaker = new CircuitBreaker('mistral-ocr', {
+export const mistralCircuitBreaker = new CircuitBreaker("mistral-ocr", {
   failureThreshold: 3,
   resetTimeoutMs: 30000,
   halfOpenRequests: 2,
@@ -288,7 +294,7 @@ export const mistralCircuitBreaker = new CircuitBreaker('mistral-ocr', {
   },
 });
 
-export const geminiCircuitBreaker = new CircuitBreaker('gemini-analyzer', {
+export const geminiCircuitBreaker = new CircuitBreaker("gemini-analyzer", {
   failureThreshold: 3,
   resetTimeoutMs: 30000,
   halfOpenRequests: 2,

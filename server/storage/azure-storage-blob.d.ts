@@ -1,14 +1,14 @@
 /**
  * Type declaration for @azure/storage-blob
- * 
+ *
  * This allows the azureAdapter to compile without requiring
  * the Azure SDK to be installed during development.
- * 
+ *
  * When STORAGE_PROVIDER=azure is used in production,
  * the actual package must be installed: pnpm add @azure/storage-blob
  */
 
-declare module '@azure/storage-blob' {
+declare module "@azure/storage-blob" {
   export class BlobServiceClient {
     static fromConnectionString(connectionString: string): BlobServiceClient;
     getContainerClient(containerName: string): ContainerClient;
@@ -79,4 +79,3 @@ declare module '@azure/storage-blob' {
     toString(): string;
   };
 }
-

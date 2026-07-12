@@ -1,13 +1,13 @@
 /**
  * Legacy Forge Storage Helpers
- * 
+ *
  * This is the original storage implementation using Manus/Forge proxy.
  * Kept for backwards compatibility with existing code.
- * 
+ *
  * For new code, use the StorageAdapter pattern via getStorageAdapter().
  */
 
-import { ENV } from '../_core/env';
+import { ENV } from "../_core/env";
 
 type ForgeStorageConfig = { baseUrl: string; apiKey: string };
 
@@ -98,7 +98,9 @@ export async function storagePut(
   return { key, url };
 }
 
-export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
+export async function storageGet(
+  relKey: string
+): Promise<{ key: string; url: string }> {
   const { baseUrl, apiKey } = getForgeStorageConfig();
   const key = normalizeKey(relKey);
   return {
@@ -106,4 +108,3 @@ export async function storageGet(relKey: string): Promise<{ key: string; url: st
     url: await buildDownloadUrl(baseUrl, key, apiKey),
   };
 }
-

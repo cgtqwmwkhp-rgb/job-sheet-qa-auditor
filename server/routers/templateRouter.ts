@@ -1,13 +1,13 @@
 /**
  * Template Router
- * 
+ *
  * PR-C: API endpoints for template management.
  * Provides CRUD operations for templates and versions.
  * Admin-only for mutations, protected for reads.
  */
 
-import { z } from 'zod';
-import { protectedProcedure, adminProcedure, router } from '../_core/trpc';
+import { z } from "zod";
+import { protectedProcedure, adminProcedure, router } from "../_core/trpc";
 import {
   createTemplate,
   uploadTemplateVersion,
@@ -35,7 +35,7 @@ import {
   type SpecJson,
   type BulkImportPack,
   type RoiConfig,
-} from '../services/templateRegistry';
+} from "../services/templateRegistry";
 
 // Zod schemas for validation
 const selectionConfigSchema = z.object({
@@ -49,7 +49,7 @@ const selectionConfigSchema = z.object({
 const fieldSpecSchema = z.object({
   field: z.string(),
   label: z.string(),
-  type: z.enum(['string', 'number', 'date', 'boolean', 'currency', 'list']),
+  type: z.enum(["string", "number", "date", "boolean", "currency", "list"]),
   required: z.boolean(),
   extractionHints: z.array(z.string()).optional(),
   aliases: z.array(z.string()).optional(),
@@ -59,13 +59,15 @@ const ruleSpecSchema = z.object({
   ruleId: z.string(),
   field: z.string(),
   description: z.string(),
-  severity: z.enum(['critical', 'major', 'minor', 'info']),
-  type: z.enum(['required', 'format', 'range', 'pattern', 'custom']),
+  severity: z.enum(["critical", "major", "minor", "info"]),
+  type: z.enum(["required", "format", "range", "pattern", "custom"]),
   pattern: z.string().optional(),
-  range: z.object({
-    min: z.union([z.number(), z.string()]).optional(),
-    max: z.union([z.number(), z.string()]).optional(),
-  }).optional(),
+  range: z
+    .object({
+      min: z.union([z.number(), z.string()]).optional(),
+      max: z.union([z.number(), z.string()]).optional(),
+    })
+    .optional(),
   enabled: z.boolean(),
   tags: z.array(z.string()).optional(),
 });
@@ -145,14 +147,16 @@ export const templateRouter = router({
    * Create a new template (admin only)
    */
   create: adminProcedure
-    .input(z.object({
-      templateId: z.string().min(1).max(128),
-      name: z.string().min(1).max(255),
-      client: z.string().max(128).optional(),
-      assetType: z.string().max(128).optional(),
-      workType: z.string().max(128).optional(),
-      description: z.string().optional(),
-    }))
+    .input(
+      z.object({
+        templateId: z.string().min(1).max(128),
+        name: z.string().min(1).max(255),
+        client: z.string().max(128).optional(),
+        assetType: z.string().max(128).optional(),
+        workType: z.string().max(128).optional(),
+        description: z.string().optional(),
+      })
+    )
     .mutation(({ ctx, input }) => {
       return createTemplate({
         templateId: input.templateId,
@@ -169,14 +173,16 @@ export const templateRouter = router({
    * Upload a new template version (admin only)
    */
   uploadVersion: adminProcedure
-    .input(z.object({
-      templateId: z.number(),
-      version: z.string().min(1).max(32),
-      specJson: specJsonSchema,
-      selectionConfigJson: selectionConfigSchema,
-      roiJson: roiConfigSchema.optional(),
-      changeNotes: z.string().optional(),
-    }))
+    .input(
+      z.object({
+        templateId: z.number(),
+        version: z.string().min(1).max(32),
+        specJson: specJsonSchema,
+        selectionConfigJson: selectionConfigSchema,
+        roiJson: roiConfigSchema.optional(),
+        changeNotes: z.string().optional(),
+      })
+    )
     .mutation(({ ctx, input }) => {
       return uploadTemplateVersion({
         templateId: input.templateId,
@@ -194,9 +200,11 @@ export const templateRouter = router({
    * Deactivates any other active version for the same template
    */
   activateVersion: adminProcedure
-    .input(z.object({
-      versionId: z.number(),
-    }))
+    .input(
+      z.object({
+        versionId: z.number(),
+      })
+    )
     .mutation(({ input }) => {
       return activateVersion(input.versionId);
     }),
@@ -205,10 +213,12 @@ export const templateRouter = router({
    * Update template status (admin only)
    */
   updateStatus: adminProcedure
-    .input(z.object({
-      id: z.number(),
-      status: z.enum(['draft', 'active', 'deprecated', 'archived']),
-    }))
+    .input(
+      z.object({
+        id: z.number(),
+        status: z.enum(["draft", "active", "deprecated", "archived"]),
+      })
+    )
     .mutation(({ input }) => {
       return updateTemplateStatus(input.id, input.status);
     }),
@@ -221,9 +231,11 @@ export const templateRouter = router({
    * Validate an import pack without importing (admin only)
    */
   validateImportPack: adminProcedure
-    .input(z.object({
-      pack: z.any(), // Validated internally
-    }))
+    .input(
+      z.object({
+        pack: z.any(), // Validated internally
+      })
+    )
     .mutation(({ input }) => {
       return validateBulkImportPack(input.pack as BulkImportPack);
     }),
@@ -232,9 +244,11 @@ export const templateRouter = router({
    * Import templates from a bulk import pack (admin only)
    */
   importPack: adminProcedure
-    .input(z.object({
-      pack: z.any(), // Validated internally
-    }))
+    .input(
+      z.object({
+        pack: z.any(), // Validated internally
+      })
+    )
     .mutation(({ ctx, input }) => {
       // Validate first
       const validation = validateBulkImportPack(input.pack as BulkImportPack);
@@ -245,7 +259,7 @@ export const templateRouter = router({
           results: [],
         };
       }
-      
+
       // Import
       return importBulkPack(input.pack as BulkImportPack, ctx.user.id);
     }),
@@ -254,10 +268,9 @@ export const templateRouter = router({
    * Get a template for an import pack (admin only)
    * Returns a scaffolded import pack structure
    */
-  getImportPackTemplate: adminProcedure
-    .query(() => {
-      return createImportPackTemplate();
-    }),
+  getImportPackTemplate: adminProcedure.query(() => {
+    return createImportPackTemplate();
+  }),
 
   // ============================================================
   // PR-E: Fixture Runner Endpoints
@@ -291,11 +304,11 @@ export const templateRouter = router({
       if (!version) {
         throw new Error(`Version not found: ${input.versionId}`);
       }
-      
+
       if (!hasFixturePack(input.versionId)) {
         throw new Error(`No fixture pack for version ${input.versionId}`);
       }
-      
+
       return runFixtureMatrix(
         input.versionId,
         version.specJson,
@@ -328,29 +341,35 @@ export const templateRouter = router({
    * Update ROI config for a version (admin only)
    */
   updateRoi: adminProcedure
-    .input(z.object({
-      versionId: z.number(),
-      roiJson: z.object({
-        regions: z.array(z.object({
-          name: z.string(),
-          page: z.number().int().min(1),
-          bounds: z.object({
-            x: z.number().min(0).max(1),
-            y: z.number().min(0).max(1),
-            width: z.number().min(0).max(1),
-            height: z.number().min(0).max(1),
-          }),
-          fields: z.array(z.string()).optional(),
-        })),
-      }),
-    }))
+    .input(
+      z.object({
+        versionId: z.number(),
+        roiJson: z.object({
+          regions: z.array(
+            z.object({
+              name: z.string(),
+              page: z.number().int().min(1),
+              bounds: z.object({
+                x: z.number().min(0).max(1),
+                y: z.number().min(0).max(1),
+                width: z.number().min(0).max(1),
+                height: z.number().min(0).max(1),
+              }),
+              fields: z.array(z.string()).optional(),
+            })
+          ),
+        }),
+      })
+    )
     .mutation(({ input }) => {
       // Validate ROI
       const validation = validateRoiConfig(input.roiJson as RoiConfig);
       if (!validation.valid) {
-        throw new Error(`ROI validation failed: ${validation.errors.join(', ')}`);
+        throw new Error(
+          `ROI validation failed: ${validation.errors.join(", ")}`
+        );
       }
-      
+
       // Normalize and save
       const normalized = normalizeRoiConfig(input.roiJson as RoiConfig);
       return updateVersionRoi(input.versionId, normalized);
@@ -360,9 +379,11 @@ export const templateRouter = router({
    * Validate ROI config (admin only)
    */
   validateRoi: adminProcedure
-    .input(z.object({
-      roiJson: z.any(),
-    }))
+    .input(
+      z.object({
+        roiJson: z.any(),
+      })
+    )
     .mutation(({ input }) => {
       return validateRoiConfig(input.roiJson as RoiConfig);
     }),
@@ -370,13 +391,12 @@ export const templateRouter = router({
   /**
    * Get standard ROI template
    */
-  getStandardRoiTemplate: protectedProcedure
-    .query(() => {
-      return {
-        standardTypes: STANDARD_ROI_TYPES,
-        template: createStandardJobSheetRoi(),
-      };
-    }),
+  getStandardRoiTemplate: protectedProcedure.query(() => {
+    return {
+      standardTypes: STANDARD_ROI_TYPES,
+      template: createStandardJobSheetRoi(),
+    };
+  }),
 });
 
 export type TemplateRouter = typeof templateRouter;

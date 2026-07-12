@@ -1,15 +1,15 @@
 /**
  * Review Queue Implementation
- * 
+ *
  * In-memory review queue for documents requiring manual review.
  * Append-only pattern for audit trail.
  */
 
-import type { ReviewQueueItem } from './types';
-import type { ValidationResult } from './types';
-import type { ExtractionResult } from '../extraction/types';
-import { getCorrelationId } from '../../utils/context';
-import { randomUUID } from 'crypto';
+import type { ReviewQueueItem } from "./types";
+import type { ValidationResult } from "./types";
+import type { ExtractionResult } from "../extraction/types";
+import { getCorrelationId } from "../../utils/context";
+import { randomUUID } from "crypto";
 
 /**
  * Review queue storage (in-memory, append-only)
@@ -19,7 +19,7 @@ const reviewQueue: ReviewQueueItem[] = [];
 /**
  * Priority mapping for review reasons
  */
-const PRIORITY_MAP: Record<ReviewQueueItem['reason'], number> = {
+const PRIORITY_MAP: Record<ReviewQueueItem["reason"], number> = {
   validation_failure: 1,
   low_confidence: 2,
   manual_flag: 3,
@@ -30,27 +30,27 @@ const PRIORITY_MAP: Record<ReviewQueueItem['reason'], number> = {
  */
 export function createReviewItem(
   documentId: string,
-  reason: ReviewQueueItem['reason'],
+  reason: ReviewQueueItem["reason"],
   fields: string[],
   priority?: number
 ): ReviewQueueItem {
   const now = new Date().toISOString();
-  
+
   const item: ReviewQueueItem = {
     id: randomUUID(),
     documentId,
     reason,
     fields,
     priority: priority ?? PRIORITY_MAP[reason],
-    status: 'pending',
+    status: "pending",
     createdAt: now,
     updatedAt: now,
     correlationId: getCorrelationId(),
   };
-  
+
   // Append to queue (immutable)
   reviewQueue.push(item);
-  
+
   return item;
 }
 
@@ -63,24 +63,27 @@ export function queueForReview(
   extractionResult: ExtractionResult
 ): ReviewQueueItem | null {
   const fieldsToReview: string[] = [];
-  let reason: ReviewQueueItem['reason'] | null = null;
-  
+  let reason: ReviewQueueItem["reason"] | null = null;
+
   // Check for critical/major failures
-  if (validationResult.summary.criticalFailures > 0 || validationResult.summary.majorFailures > 0) {
-    reason = 'validation_failure';
+  if (
+    validationResult.summary.criticalFailures > 0 ||
+    validationResult.summary.majorFailures > 0
+  ) {
+    reason = "validation_failure";
     for (const finding of validationResult.findings) {
-      if (finding.severity === 'critical' || finding.severity === 'major') {
+      if (finding.severity === "critical" || finding.severity === "major") {
         if (!fieldsToReview.includes(finding.field)) {
           fieldsToReview.push(finding.field);
         }
       }
     }
   }
-  
+
   // Check for low confidence extractions
   if (extractionResult.lowConfidenceFields.length > 0) {
     if (!reason) {
-      reason = 'low_confidence';
+      reason = "low_confidence";
     }
     for (const field of extractionResult.lowConfidenceFields) {
       if (!fieldsToReview.includes(field)) {
@@ -88,12 +91,12 @@ export function queueForReview(
       }
     }
   }
-  
+
   // Only queue if there's something to review
   if (reason && fieldsToReview.length > 0) {
     return createReviewItem(documentId, reason, fieldsToReview);
   }
-  
+
   return null;
 }
 
@@ -102,7 +105,7 @@ export function queueForReview(
  */
 export function getPendingReviews(limit?: number): ReviewQueueItem[] {
   const pending = reviewQueue
-    .filter(item => item.status === 'pending')
+    .filter(item => item.status === "pending")
     .sort((a, b) => {
       // Sort by priority (ascending), then by createdAt (ascending)
       if (a.priority !== b.priority) {
@@ -110,7 +113,7 @@ export function getPendingReviews(limit?: number): ReviewQueueItem[] {
       }
       return a.createdAt.localeCompare(b.createdAt);
     });
-  
+
   return limit ? pending.slice(0, limit) : pending;
 }
 
@@ -126,15 +129,15 @@ export function getReviewItem(id: string): ReviewQueueItem | undefined {
  */
 export function updateReviewStatus(
   id: string,
-  status: ReviewQueueItem['status'],
+  status: ReviewQueueItem["status"],
   assignedTo?: string
 ): ReviewQueueItem | null {
   const existing = reviewQueue.find(item => item.id === id);
-  
+
   if (!existing) {
     return null;
   }
-  
+
   // Create updated item (append-only pattern)
   const updated: ReviewQueueItem = {
     ...existing,
@@ -142,13 +145,13 @@ export function updateReviewStatus(
     assignedTo: assignedTo ?? existing.assignedTo,
     updatedAt: new Date().toISOString(),
   };
-  
+
   // Find and update in place (for simplicity in in-memory implementation)
   const index = reviewQueue.findIndex(item => item.id === id);
   if (index !== -1) {
     reviewQueue[index] = updated;
   }
-  
+
   return updated;
 }
 
@@ -171,18 +174,26 @@ export function getReviewQueueStats(): {
     dismissed: 0,
     byReason: {} as Record<string, number>,
   };
-  
+
   for (const item of reviewQueue) {
     switch (item.status) {
-      case 'pending': stats.pending++; break;
-      case 'in_progress': stats.inProgress++; break;
-      case 'completed': stats.completed++; break;
-      case 'dismissed': stats.dismissed++; break;
+      case "pending":
+        stats.pending++;
+        break;
+      case "in_progress":
+        stats.inProgress++;
+        break;
+      case "completed":
+        stats.completed++;
+        break;
+      case "dismissed":
+        stats.dismissed++;
+        break;
     }
-    
+
     stats.byReason[item.reason] = (stats.byReason[item.reason] || 0) + 1;
   }
-  
+
   return stats;
 }
 

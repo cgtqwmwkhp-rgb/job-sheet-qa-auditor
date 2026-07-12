@@ -1,11 +1,11 @@
 /**
  * ROI Validator
- * 
+ *
  * PR-H: Validates ROI configurations before persistence.
  * Ensures coordinates are normalized (0-1) and page indices are valid.
  */
 
-import type { RoiConfig, RoiRegion } from './types';
+import type { RoiConfig, RoiRegion } from "./types";
 
 /**
  * ROI validation result
@@ -20,25 +20,28 @@ export interface RoiValidationResult {
  * Predefined ROI region types for job sheets
  */
 export const STANDARD_ROI_TYPES = [
-  'header',
-  'jobReference',
-  'assetId',
-  'date',
-  'expiryDate',
-  'tickboxBlock',
-  'signatureBlock',
-  'customerSignature',
-  'engineerSignature',
-  'workDescription',
-  'partsUsed',
+  "header",
+  "jobReference",
+  "assetId",
+  "date",
+  "expiryDate",
+  "tickboxBlock",
+  "signatureBlock",
+  "customerSignature",
+  "engineerSignature",
+  "workDescription",
+  "partsUsed",
 ] as const;
 
-export type StandardRoiType = typeof STANDARD_ROI_TYPES[number];
+export type StandardRoiType = (typeof STANDARD_ROI_TYPES)[number];
 
 /**
  * Validate a single ROI region
  */
-function validateRegion(region: RoiRegion, index: number): { errors: string[]; warnings: string[] } {
+function validateRegion(
+  region: RoiRegion,
+  index: number
+): { errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -48,7 +51,7 @@ function validateRegion(region: RoiRegion, index: number): { errors: string[]; w
   }
 
   // Check page
-  if (typeof region.page !== 'number' || region.page < 1) {
+  if (typeof region.page !== "number" || region.page < 1) {
     errors.push(`Region ${index}: page must be >= 1 (1-indexed)`);
   }
 
@@ -61,34 +64,45 @@ function validateRegion(region: RoiRegion, index: number): { errors: string[]; w
   // Check normalized coordinates (0-1)
   const { x, y, width, height } = region.bounds;
 
-  if (typeof x !== 'number' || x < 0 || x > 1) {
+  if (typeof x !== "number" || x < 0 || x > 1) {
     errors.push(`Region ${index}: bounds.x must be 0-1 (normalized), got ${x}`);
   }
 
-  if (typeof y !== 'number' || y < 0 || y > 1) {
+  if (typeof y !== "number" || y < 0 || y > 1) {
     errors.push(`Region ${index}: bounds.y must be 0-1 (normalized), got ${y}`);
   }
 
-  if (typeof width !== 'number' || width <= 0 || width > 1) {
-    errors.push(`Region ${index}: bounds.width must be 0-1 (normalized), got ${width}`);
+  if (typeof width !== "number" || width <= 0 || width > 1) {
+    errors.push(
+      `Region ${index}: bounds.width must be 0-1 (normalized), got ${width}`
+    );
   }
 
-  if (typeof height !== 'number' || height <= 0 || height > 1) {
-    errors.push(`Region ${index}: bounds.height must be 0-1 (normalized), got ${height}`);
+  if (typeof height !== "number" || height <= 0 || height > 1) {
+    errors.push(
+      `Region ${index}: bounds.height must be 0-1 (normalized), got ${height}`
+    );
   }
 
   // Check bounds don't exceed page
-  if (x + width > 1.001) { // Allow small floating point error
-    warnings.push(`Region ${index}: x + width = ${x + width}, exceeds page boundary`);
+  if (x + width > 1.001) {
+    // Allow small floating point error
+    warnings.push(
+      `Region ${index}: x + width = ${x + width}, exceeds page boundary`
+    );
   }
 
   if (y + height > 1.001) {
-    warnings.push(`Region ${index}: y + height = ${y + height}, exceeds page boundary`);
+    warnings.push(
+      `Region ${index}: y + height = ${y + height}, exceeds page boundary`
+    );
   }
 
   // Check for standard region types
   if (!STANDARD_ROI_TYPES.includes(region.name as StandardRoiType)) {
-    warnings.push(`Region ${index}: '${region.name}' is not a standard ROI type`);
+    warnings.push(
+      `Region ${index}: '${region.name}' is not a standard ROI type`
+    );
   }
 
   return { errors, warnings };
@@ -105,7 +119,7 @@ export function validateRoiConfig(roiConfig: RoiConfig): RoiValidationResult {
   if (!roiConfig.regions || !Array.isArray(roiConfig.regions)) {
     return {
       valid: false,
-      errors: ['regions must be an array'],
+      errors: ["regions must be an array"],
       warnings: [],
     };
   }
@@ -122,7 +136,7 @@ export function validateRoiConfig(roiConfig: RoiConfig): RoiValidationResult {
   const duplicates = names.filter((name, i) => names.indexOf(name) !== i);
   if (duplicates.length > 0) {
     const uniqueDuplicates = Array.from(new Set(duplicates));
-    warnings.push(`Duplicate region names: ${uniqueDuplicates.join(', ')}`);
+    warnings.push(`Duplicate region names: ${uniqueDuplicates.join(", ")}`);
   }
 
   // Check for overlapping regions (basic check)
@@ -130,7 +144,7 @@ export function validateRoiConfig(roiConfig: RoiConfig): RoiValidationResult {
     for (let j = i + 1; j < roiConfig.regions.length; j++) {
       const r1 = roiConfig.regions[i];
       const r2 = roiConfig.regions[j];
-      
+
       if (r1.page === r2.page && regionsOverlap(r1.bounds, r2.bounds)) {
         warnings.push(`Regions '${r1.name}' and '${r2.name}' overlap`);
       }
@@ -191,12 +205,36 @@ export function createEmptyRoiConfig(): RoiConfig {
 export function createStandardJobSheetRoi(): RoiConfig {
   return {
     regions: [
-      { name: 'header', page: 1, bounds: { x: 0, y: 0, width: 1, height: 0.1 } },
-      { name: 'jobReference', page: 1, bounds: { x: 0.05, y: 0.1, width: 0.4, height: 0.05 } },
-      { name: 'assetId', page: 1, bounds: { x: 0.5, y: 0.1, width: 0.45, height: 0.05 } },
-      { name: 'date', page: 1, bounds: { x: 0.7, y: 0.02, width: 0.25, height: 0.04 } },
-      { name: 'workDescription', page: 1, bounds: { x: 0.05, y: 0.2, width: 0.9, height: 0.4 } },
-      { name: 'signatureBlock', page: 1, bounds: { x: 0, y: 0.85, width: 1, height: 0.15 } },
+      {
+        name: "header",
+        page: 1,
+        bounds: { x: 0, y: 0, width: 1, height: 0.1 },
+      },
+      {
+        name: "jobReference",
+        page: 1,
+        bounds: { x: 0.05, y: 0.1, width: 0.4, height: 0.05 },
+      },
+      {
+        name: "assetId",
+        page: 1,
+        bounds: { x: 0.5, y: 0.1, width: 0.45, height: 0.05 },
+      },
+      {
+        name: "date",
+        page: 1,
+        bounds: { x: 0.7, y: 0.02, width: 0.25, height: 0.04 },
+      },
+      {
+        name: "workDescription",
+        page: 1,
+        bounds: { x: 0.05, y: 0.2, width: 0.9, height: 0.4 },
+      },
+      {
+        name: "signatureBlock",
+        page: 1,
+        bounds: { x: 0, y: 0.85, width: 1, height: 0.15 },
+      },
     ],
   };
 }

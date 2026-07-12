@@ -1,25 +1,25 @@
 /**
  * Deterministic Caching Service - PR-3
- * 
+ *
  * Implements caching by:
  * - fileHash (document content)
  * - templateHash (template version)
  * - engineVersions (OCR + analyzer versions)
- * 
+ *
  * Ensures byte-identical outputs for identical inputs.
  */
 
-import * as crypto from 'crypto';
-import { createSafeLogger } from '../../utils/safeLogger';
+import * as crypto from "crypto";
+import { createSafeLogger } from "../../utils/safeLogger";
 
-const logger = createSafeLogger('deterministicCache');
+const logger = createSafeLogger("deterministicCache");
 
 /**
  * Cache key components
  */
 export interface CacheKeyComponents {
-  fileHash: string;      // SHA-256 of document content
-  templateHash: string;  // SHA-256 of template config
+  fileHash: string; // SHA-256 of document content
+  templateHash: string; // SHA-256 of template config
   engineVersions: {
     ocr: string;
     analyzer: string;
@@ -154,7 +154,7 @@ class CacheStore<T> {
       templateHash: components.templateHash,
       engineVersions: components.engineVersions,
     });
-    return crypto.createHash('sha256').update(keyInput).digest('hex');
+    return crypto.createHash("sha256").update(keyInput).digest("hex");
   }
 
   /**
@@ -162,7 +162,7 @@ class CacheStore<T> {
    */
   get(key: string): CacheEntry<T> | null {
     const entry = this.cache.get(key);
-    
+
     if (!entry) {
       this.stats.misses++;
       this.updateHitRate();
@@ -201,7 +201,7 @@ class CacheStore<T> {
     }
 
     const dataString = JSON.stringify(data);
-    const sizeBytes = Buffer.byteLength(dataString, 'utf8');
+    const sizeBytes = Buffer.byteLength(dataString, "utf8");
 
     const now = new Date();
     const entry: CacheEntry<T> = {
@@ -230,7 +230,7 @@ class CacheStore<T> {
   has(key: string): boolean {
     const entry = this.cache.get(key);
     if (!entry) return false;
-    
+
     // Check expiry
     if (new Date(entry.metadata.expiresAt) < new Date()) {
       this.cache.delete(key);
@@ -238,7 +238,7 @@ class CacheStore<T> {
       this.stats.totalSizeBytes -= entry.metadata.sizeBytes;
       return false;
     }
-    
+
     return true;
   }
 
@@ -333,7 +333,9 @@ let processingCache: CacheStore<ProcessingResult> | null = null;
 /**
  * Get or create the processing cache
  */
-export function getProcessingCache(config?: CacheConfig): CacheStore<ProcessingResult> {
+export function getProcessingCache(
+  config?: CacheConfig
+): CacheStore<ProcessingResult> {
   if (!processingCache) {
     processingCache = new CacheStore<ProcessingResult>(config);
   }
@@ -351,7 +353,7 @@ export function resetCache(): void {
  * Compute file hash
  */
 export function computeFileHash(content: Buffer | string): string {
-  return crypto.createHash('sha256').update(content).digest('hex');
+  return crypto.createHash("sha256").update(content).digest("hex");
 }
 
 /**
@@ -359,17 +361,17 @@ export function computeFileHash(content: Buffer | string): string {
  */
 export function computeTemplateHash(templateConfig: unknown): string {
   const normalized = JSON.stringify(templateConfig);
-  return crypto.createHash('sha256').update(normalized).digest('hex');
+  return crypto.createHash("sha256").update(normalized).digest("hex");
 }
 
 /**
  * Get current engine versions
  */
-export function getCurrentEngineVersions(): CacheKeyComponents['engineVersions'] {
+export function getCurrentEngineVersions(): CacheKeyComponents["engineVersions"] {
   return {
-    ocr: '1.0.0',
-    analyzer: '1.0.0',
-    extraction: '1.0.0',
+    ocr: "1.0.0",
+    analyzer: "1.0.0",
+    extraction: "1.0.0",
   };
 }
 
@@ -476,7 +478,9 @@ class PerformanceTracker {
 /**
  * Create a new performance tracker
  */
-export function createPerformanceTracker(caps?: ParallelismCaps): PerformanceTracker {
+export function createPerformanceTracker(
+  caps?: ParallelismCaps
+): PerformanceTracker {
   return new PerformanceTracker(caps);
 }
 
@@ -486,28 +490,32 @@ export function createPerformanceTracker(caps?: ParallelismCaps): PerformanceTra
 export function getCachedResult(
   fileContent: Buffer | string,
   templateConfig: unknown
-): { result: ProcessingResult | null; fromCache: boolean; cacheCheckTimeMs: number } {
+): {
+  result: ProcessingResult | null;
+  fromCache: boolean;
+  cacheCheckTimeMs: number;
+} {
   const startTime = Date.now();
-  
+
   const components = buildCacheKeyComponents(fileContent, templateConfig);
   const cacheKey = CacheStore.generateKey(components);
-  
+
   const cache = getProcessingCache();
   const entry = cache.get(cacheKey);
-  
+
   const cacheCheckTimeMs = Date.now() - startTime;
-  
+
   if (entry) {
-    logger.info('Cache hit', {
-      cacheKey: cacheKey.substring(0, 16) + '...',
+    logger.info("Cache hit", {
+      cacheKey: cacheKey.substring(0, 16) + "...",
       hitCount: entry.metadata.hitCount,
       cacheCheckTimeMs,
     });
     return { result: entry.data, fromCache: true, cacheCheckTimeMs };
   }
-  
-  logger.info('Cache miss', {
-    cacheKey: cacheKey.substring(0, 16) + '...',
+
+  logger.info("Cache miss", {
+    cacheKey: cacheKey.substring(0, 16) + "...",
     cacheCheckTimeMs,
   });
   return { result: null, fromCache: false, cacheCheckTimeMs };
@@ -523,16 +531,16 @@ export function cacheResult(
 ): CacheEntryMetadata {
   const components = buildCacheKeyComponents(fileContent, templateConfig);
   const cacheKey = CacheStore.generateKey(components);
-  
+
   const cache = getProcessingCache();
   const entry = cache.set(cacheKey, result, components);
-  
-  logger.info('Result cached', {
-    cacheKey: cacheKey.substring(0, 16) + '...',
+
+  logger.info("Result cached", {
+    cacheKey: cacheKey.substring(0, 16) + "...",
     sizeBytes: entry.metadata.sizeBytes,
     expiresAt: entry.metadata.expiresAt,
   });
-  
+
   return entry.metadata;
 }
 

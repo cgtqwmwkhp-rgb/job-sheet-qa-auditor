@@ -1,9 +1,9 @@
 /**
  * Image QA Service
- * 
+ *
  * Main service for document image quality analysis.
  * Orchestrates detectors and produces imageQa.json artifact.
- * 
+ *
  * DESIGN NOTES:
  * - Deterministic output given same input
  * - Does not modify canonical findings
@@ -17,15 +17,15 @@ import type {
   PageQualityMetrics,
   ReviewRoutingDecision,
   ReviewReason,
-} from './types';
-import { getDefaultImageQaConfig } from './types';
+} from "./types";
+import { getDefaultImageQaConfig } from "./types";
 import {
   analyzePageQuality,
   detectCheckboxes,
   detectSignatures,
   detectStamps,
   calculateQualityGrade,
-} from './detectors';
+} from "./detectors";
 
 /**
  * OCR page input for Image QA analysis
@@ -37,7 +37,7 @@ export interface OcrPageInput {
 
 /**
  * Analyze document quality from OCR output
- * 
+ *
  * @param documentId - Unique document identifier
  * @param pages - OCR output pages
  * @param config - Optional configuration overrides
@@ -49,7 +49,7 @@ export function analyzeDocumentQuality(
   config: ImageQaConfig = getDefaultImageQaConfig()
 ): ImageQaResult {
   const startTime = Date.now();
-  
+
   if (pages.length === 0) {
     return {
       success: false,
@@ -61,9 +61,9 @@ export function analyzeDocumentQuality(
         overallScore: 0,
         lowestPageScore: 0,
         averagePageScore: 0,
-        qualityGrade: 'F',
+        qualityGrade: "F",
         requiresReview: true,
-        reviewReasons: ['No pages to analyze'],
+        reviewReasons: ["No pages to analyze"],
       },
       checkboxes: [],
       signatures: [],
@@ -77,22 +77,22 @@ export function analyzeDocumentQuality(
         signaturesPresent: 0,
         stampsFound: 0,
       },
-      error: 'No pages provided',
-      errorCode: 'NO_PAGES',
+      error: "No pages provided",
+      errorCode: "NO_PAGES",
     };
   }
-  
+
   // Analyze each page
   const pageMetrics: PageQualityMetrics[] = [];
-  const allCheckboxes: ImageQaResult['checkboxes'] = [];
-  const allSignatures: ImageQaResult['signatures'] = [];
-  const allStamps: ImageQaResult['stamps'] = [];
-  
+  const allCheckboxes: ImageQaResult["checkboxes"] = [];
+  const allSignatures: ImageQaResult["signatures"] = [];
+  const allStamps: ImageQaResult["stamps"] = [];
+
   for (const page of pages) {
     // Quality metrics
     const metrics = analyzePageQuality(page.pageNumber, page.markdown, config);
     pageMetrics.push(metrics);
-    
+
     // Element detection
     const checkboxes = detectCheckboxes(
       page.pageNumber,
@@ -100,14 +100,14 @@ export function analyzeDocumentQuality(
       config.checkboxSensitivity
     );
     allCheckboxes.push(...checkboxes);
-    
+
     const signatures = detectSignatures(
       page.pageNumber,
       page.markdown,
       config.signatureSensitivity
     );
     allSignatures.push(...signatures);
-    
+
     const stamps = detectStamps(
       page.pageNumber,
       page.markdown,
@@ -115,16 +115,20 @@ export function analyzeDocumentQuality(
     );
     allStamps.push(...stamps);
   }
-  
+
   // Calculate document-level quality
   const scores = pageMetrics.map(p => p.overallScore);
   const lowestPageScore = Math.min(...scores);
-  const averagePageScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-  const overallScore = Math.round(lowestPageScore * 0.4 + averagePageScore * 0.6);
-  
+  const averagePageScore = Math.round(
+    scores.reduce((a, b) => a + b, 0) / scores.length
+  );
+  const overallScore = Math.round(
+    lowestPageScore * 0.4 + averagePageScore * 0.6
+  );
+
   // Determine review reasons
   const reviewReasons: string[] = [];
-  
+
   for (const metrics of pageMetrics) {
     if (metrics.isBlurry) {
       reviewReasons.push(`Page ${metrics.pageNumber}: Blurry image detected`);
@@ -133,23 +137,33 @@ export function analyzeDocumentQuality(
       reviewReasons.push(`Page ${metrics.pageNumber}: Low contrast detected`);
     }
     if (metrics.isSkewed) {
-      reviewReasons.push(`Page ${metrics.pageNumber}: Document skew detected (${metrics.skewAngle}°)`);
+      reviewReasons.push(
+        `Page ${metrics.pageNumber}: Document skew detected (${metrics.skewAngle}°)`
+      );
     }
   }
-  
+
   // Check for missing signatures
   const missingSignatures = allSignatures.filter(s => !s.isPresent);
   if (missingSignatures.length > 0) {
-    reviewReasons.push(`${missingSignatures.length} signature field(s) appear empty`);
+    reviewReasons.push(
+      `${missingSignatures.length} signature field(s) appear empty`
+    );
   }
-  
-  const requiresReview = overallScore < config.reviewQualityThreshold || reviewReasons.length > 0;
-  
+
+  const requiresReview =
+    overallScore < config.reviewQualityThreshold || reviewReasons.length > 0;
+
   // Build summary
   const summary = {
     totalPages: pages.length,
-    pagesWithIssues: pageMetrics.filter(p => 
-      p.isBlurry || p.isLowContrast || p.isSkewed || p.isOverexposed || p.isUnderexposed
+    pagesWithIssues: pageMetrics.filter(
+      p =>
+        p.isBlurry ||
+        p.isLowContrast ||
+        p.isSkewed ||
+        p.isOverexposed ||
+        p.isUnderexposed
     ).length,
     checkboxesFound: allCheckboxes.length,
     checkboxesChecked: allCheckboxes.filter(c => c.isChecked).length,
@@ -157,7 +171,7 @@ export function analyzeDocumentQuality(
     signaturesPresent: allSignatures.filter(s => s.isPresent).length,
     stampsFound: allStamps.length,
   };
-  
+
   return {
     success: true,
     documentId,
@@ -181,7 +195,7 @@ export function analyzeDocumentQuality(
 
 /**
  * Determine review routing based on Image QA results
- * 
+ *
  * @param qaResult - Image QA analysis result
  * @param requiredSignatureFields - Fields that require signatures
  * @param requiredCheckboxFields - Fields that require checked boxes
@@ -193,55 +207,55 @@ export function determineReviewRouting(
   requiredCheckboxFields: string[] = []
 ): ReviewRoutingDecision {
   const reasons: ReviewReason[] = [];
-  
+
   // Check document quality
   if (qaResult.documentQuality.overallScore < 50) {
     reasons.push({
-      code: 'LOW_QUALITY',
-      severity: 'S1',
+      code: "LOW_QUALITY",
+      severity: "S1",
       message: `Document quality score is ${qaResult.documentQuality.overallScore}/100`,
     });
   }
-  
+
   // Check for skewed pages
   const skewedPages = qaResult.pageMetrics.filter(p => p.isSkewed);
   if (skewedPages.length > 0) {
     reasons.push({
-      code: 'SKEWED_DOCUMENT',
-      severity: 'S2',
+      code: "SKEWED_DOCUMENT",
+      severity: "S2",
       message: `${skewedPages.length} page(s) have significant skew`,
       pageNumber: skewedPages[0].pageNumber,
     });
   }
-  
+
   // Check for missing required signatures
   const missingSignatures = qaResult.signatures.filter(s => !s.isPresent);
   for (const sig of missingSignatures) {
     if (sig.label && requiredSignatureFields.includes(sig.label)) {
       reasons.push({
-        code: 'MISSING_SIGNATURE',
-        severity: 'S0',
+        code: "MISSING_SIGNATURE",
+        severity: "S0",
         message: `Required signature "${sig.label}" appears to be missing`,
         pageNumber: sig.pageNumber,
         affectedField: sig.label,
       });
     }
   }
-  
+
   // Check for unchecked required boxes
   const uncheckedBoxes = qaResult.checkboxes.filter(c => !c.isChecked);
   for (const box of uncheckedBoxes) {
     if (box.label && requiredCheckboxFields.includes(box.label)) {
       reasons.push({
-        code: 'UNCHECKED_REQUIRED',
-        severity: 'S1',
+        code: "UNCHECKED_REQUIRED",
+        severity: "S1",
         message: `Required checkbox "${box.label}" is not checked`,
         pageNumber: box.pageNumber,
         affectedField: box.label,
       });
     }
   }
-  
+
   // Check for low confidence detections
   const lowConfidenceItems = [
     ...qaResult.signatures.filter(s => s.confidence < 0.7),
@@ -249,26 +263,26 @@ export function determineReviewRouting(
   ];
   if (lowConfidenceItems.length > 0) {
     reasons.push({
-      code: 'LOW_CONFIDENCE',
-      severity: 'S3',
+      code: "LOW_CONFIDENCE",
+      severity: "S3",
       message: `${lowConfidenceItems.length} detection(s) have low confidence`,
     });
   }
-  
+
   // Sort reasons by severity for stable output
   reasons.sort((a, b) => {
     const severityOrder = { S0: 0, S1: 1, S2: 2, S3: 3 };
     return severityOrder[a.severity] - severityOrder[b.severity];
   });
-  
+
   // Determine priority
-  let priority: 'low' | 'medium' | 'high' = 'low';
-  if (reasons.some(r => r.severity === 'S0')) {
-    priority = 'high';
-  } else if (reasons.some(r => r.severity === 'S1')) {
-    priority = 'medium';
+  let priority: "low" | "medium" | "high" = "low";
+  if (reasons.some(r => r.severity === "S0")) {
+    priority = "high";
+  } else if (reasons.some(r => r.severity === "S1")) {
+    priority = "medium";
   }
-  
+
   return {
     shouldRoute: reasons.length > 0,
     reasons,
@@ -278,14 +292,14 @@ export function determineReviewRouting(
 
 /**
  * Generate imageQa.json artifact content
- * 
+ *
  * @param qaResult - Image QA analysis result
  * @returns JSON string for artifact
  */
 export function generateImageQaArtifact(qaResult: ImageQaResult): string {
   // Create a clean artifact without internal IDs
   const artifact = {
-    schemaVersion: '1.0.0',
+    schemaVersion: "1.0.0",
     documentId: qaResult.documentId,
     processedAt: qaResult.processedAt,
     processingTimeMs: qaResult.processingTimeMs,
@@ -299,11 +313,11 @@ export function generateImageQaArtifact(qaResult: ImageQaResult): string {
       skewAngle: p.skewAngle,
       brightnessScore: p.brightnessScore,
       issues: [
-        p.isBlurry && 'blurry',
-        p.isLowContrast && 'low_contrast',
-        p.isSkewed && 'skewed',
-        p.isOverexposed && 'overexposed',
-        p.isUnderexposed && 'underexposed',
+        p.isBlurry && "blurry",
+        p.isLowContrast && "low_contrast",
+        p.isSkewed && "skewed",
+        p.isOverexposed && "overexposed",
+        p.isUnderexposed && "underexposed",
       ].filter(Boolean),
     })),
     detections: {
@@ -331,6 +345,6 @@ export function generateImageQaArtifact(qaResult: ImageQaResult): string {
     },
     summary: qaResult.summary,
   };
-  
+
   return JSON.stringify(artifact, null, 2);
 }

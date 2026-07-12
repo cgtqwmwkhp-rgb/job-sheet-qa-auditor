@@ -1,11 +1,11 @@
 /**
  * Template Override Service
- * 
+ *
  * PR-G: Allows admins to explicitly set templateId/version for job sheets
  * when selection confidence is LOW or ambiguous.
  */
 
-import type { ConfidenceBand } from '../templateRegistry/types';
+import type { ConfidenceBand } from "../templateRegistry/types";
 
 /**
  * Template override record
@@ -57,7 +57,7 @@ export function setTemplateOverride(
   if (!reason || reason.trim().length < 5) {
     return {
       success: false,
-      error: 'Override reason must be at least 5 characters',
+      error: "Override reason must be at least 5 characters",
     };
   }
 
@@ -83,7 +83,9 @@ export function setTemplateOverride(
 /**
  * Get template override for a job sheet
  */
-export function getTemplateOverride(jobSheetId: number): TemplateOverride | null {
+export function getTemplateOverride(
+  jobSheetId: number
+): TemplateOverride | null {
   return overrideStore.get(jobSheetId) ?? null;
 }
 
@@ -105,8 +107,8 @@ export function clearTemplateOverride(jobSheetId: number): boolean {
  * List all overrides (for analytics)
  */
 export function listOverrides(): TemplateOverride[] {
-  return Array.from(overrideStore.values()).sort((a, b) => 
-    b.createdAt.getTime() - a.createdAt.getTime()
+  return Array.from(overrideStore.values()).sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
   );
 }
 

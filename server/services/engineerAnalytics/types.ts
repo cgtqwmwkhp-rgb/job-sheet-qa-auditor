@@ -1,6 +1,6 @@
 /**
  * Engineer Analytics Types
- * 
+ *
  * Types for tracking engineer performance, feedback, and trends.
  * Supports Fix Pack generation and coaching recommendations.
  */
@@ -26,27 +26,27 @@ export interface IssueOccurrence {
   engineerId: string;
   documentId: string;
   issueType: IssueType;
-  severity: 'S0' | 'S1' | 'S2' | 'S3';
+  severity: "S0" | "S1" | "S2" | "S3";
   fieldName: string;
   reasonCode: string;
   occurredAt: string;
   wasDisputed: boolean;
   wasWaived: boolean;
-  resolutionStatus: 'open' | 'resolved' | 'waived' | 'disputed';
+  resolutionStatus: "open" | "resolved" | "waived" | "disputed";
 }
 
 /**
  * Canonical issue types
  */
-export type IssueType = 
-  | 'MISSING_FIELD'
-  | 'INVALID_FORMAT'
-  | 'OUT_OF_POLICY'
-  | 'SIGNATURE_MISSING'
-  | 'DATE_MISMATCH'
-  | 'PHOTO_QUALITY'
-  | 'INCOMPLETE_CHECKLIST'
-  | 'OTHER';
+export type IssueType =
+  | "MISSING_FIELD"
+  | "INVALID_FORMAT"
+  | "OUT_OF_POLICY"
+  | "SIGNATURE_MISSING"
+  | "DATE_MISMATCH"
+  | "PHOTO_QUALITY"
+  | "INCOMPLETE_CHECKLIST"
+  | "OTHER";
 
 /**
  * Engineer score card
@@ -58,16 +58,16 @@ export interface EngineerScoreCard {
     start: string;
     end: string;
   };
-  
+
   // Overall metrics
-  overallScore: number;           // 0-100
-  trend: 'improving' | 'stable' | 'declining';
-  
+  overallScore: number; // 0-100
+  trend: "improving" | "stable" | "declining";
+
   // Document metrics
   documentsProcessed: number;
   documentsWithIssues: number;
-  issueRate: number;              // 0-1
-  
+  issueRate: number; // 0-1
+
   // Issue breakdown by severity
   issuesBySeverity: {
     S0: number;
@@ -75,20 +75,20 @@ export interface EngineerScoreCard {
     S2: number;
     S3: number;
   };
-  
+
   // Issue breakdown by type
   issuesByType: IssueTypeCount[];
-  
+
   // Top recurring issues
   topRecurringIssues: RecurringIssue[];
-  
+
   // Comparison to peers
   peerComparison: {
-    percentile: number;           // 0-100
+    percentile: number; // 0-100
     teamAvgScore: number;
     regionAvgScore: number;
   };
-  
+
   // Coaching recommendations
   recommendations: CoachingRecommendation[];
 }
@@ -119,8 +119,8 @@ export interface RecurringIssue {
  */
 export interface CoachingRecommendation {
   id: string;
-  priority: 'high' | 'medium' | 'low';
-  category: 'documentation' | 'process' | 'quality' | 'training';
+  priority: "high" | "medium" | "low";
+  category: "documentation" | "process" | "quality" | "training";
   title: string;
   description: string;
   relatedIssueTypes: IssueType[];
@@ -136,20 +136,20 @@ export interface FixPack {
   engineerName: string;
   generatedAt: string;
   validUntil: string;
-  
+
   // Summary
   summary: {
     totalIssues: number;
     criticalIssues: number;
     focusAreas: string[];
   };
-  
+
   // Detailed issues to address
   issues: FixPackIssue[];
-  
+
   // Training modules
   trainingModules: TrainingModule[];
-  
+
   // Acknowledgment tracking
   acknowledgment: {
     required: boolean;
@@ -165,7 +165,7 @@ export interface FixPackIssue {
   issueType: IssueType;
   fieldName: string;
   occurrenceCount: number;
-  severity: 'S0' | 'S1' | 'S2' | 'S3';
+  severity: "S0" | "S1" | "S2" | "S3";
   examples: FixPackExample[];
   correctProcedure: string;
 }
@@ -200,24 +200,24 @@ export interface TrendAnalytics {
   period: {
     start: string;
     end: string;
-    granularity: 'day' | 'week' | 'month';
+    granularity: "day" | "week" | "month";
   };
-  
+
   // Overall trends
   overallTrend: {
-    direction: 'improving' | 'stable' | 'declining';
+    direction: "improving" | "stable" | "declining";
     changePercent: number;
   };
-  
+
   // Time series data
   timeSeries: TrendDataPoint[];
-  
+
   // Issue type trends
   issueTypeTrends: IssueTypeTrend[];
-  
+
   // Top improving engineers
   topImproving: EngineerTrendSummary[];
-  
+
   // Engineers needing attention
   needingAttention: EngineerTrendSummary[];
 }
@@ -241,7 +241,7 @@ export interface IssueTypeTrend {
   currentCount: number;
   previousCount: number;
   changePercent: number;
-  trend: 'increasing' | 'stable' | 'decreasing';
+  trend: "increasing" | "stable" | "decreasing";
 }
 
 /**
@@ -253,7 +253,7 @@ export interface EngineerTrendSummary {
   currentScore: number;
   previousScore: number;
   changePercent: number;
-  trend: 'improving' | 'stable' | 'declining';
+  trend: "improving" | "stable" | "declining";
 }
 
 /**
@@ -262,39 +262,39 @@ export interface EngineerTrendSummary {
 export function getDefaultTrainingModules(): TrainingModule[] {
   return [
     {
-      id: 'tm-001',
-      title: 'Job Sheet Documentation Best Practices',
-      description: 'Comprehensive guide to completing job sheets accurately',
+      id: "tm-001",
+      title: "Job Sheet Documentation Best Practices",
+      description: "Comprehensive guide to completing job sheets accurately",
       estimatedMinutes: 30,
-      relatedIssueTypes: ['MISSING_FIELD', 'INCOMPLETE_CHECKLIST'],
+      relatedIssueTypes: ["MISSING_FIELD", "INCOMPLETE_CHECKLIST"],
     },
     {
-      id: 'tm-002',
-      title: 'Customer Signature Requirements',
-      description: 'Understanding when and how to obtain customer signatures',
+      id: "tm-002",
+      title: "Customer Signature Requirements",
+      description: "Understanding when and how to obtain customer signatures",
       estimatedMinutes: 15,
-      relatedIssueTypes: ['SIGNATURE_MISSING'],
+      relatedIssueTypes: ["SIGNATURE_MISSING"],
     },
     {
-      id: 'tm-003',
-      title: 'Date and Time Recording Standards',
-      description: 'Proper date/time formats and recording procedures',
+      id: "tm-003",
+      title: "Date and Time Recording Standards",
+      description: "Proper date/time formats and recording procedures",
       estimatedMinutes: 10,
-      relatedIssueTypes: ['INVALID_FORMAT', 'DATE_MISMATCH'],
+      relatedIssueTypes: ["INVALID_FORMAT", "DATE_MISMATCH"],
     },
     {
-      id: 'tm-004',
-      title: 'Photo Documentation Guidelines',
-      description: 'Taking clear, compliant photos for job documentation',
+      id: "tm-004",
+      title: "Photo Documentation Guidelines",
+      description: "Taking clear, compliant photos for job documentation",
       estimatedMinutes: 20,
-      relatedIssueTypes: ['PHOTO_QUALITY'],
+      relatedIssueTypes: ["PHOTO_QUALITY"],
     },
     {
-      id: 'tm-005',
-      title: 'Policy Compliance Overview',
-      description: 'Understanding company policies and compliance requirements',
+      id: "tm-005",
+      title: "Policy Compliance Overview",
+      description: "Understanding company policies and compliance requirements",
       estimatedMinutes: 45,
-      relatedIssueTypes: ['OUT_OF_POLICY'],
+      relatedIssueTypes: ["OUT_OF_POLICY"],
     },
   ];
 }
