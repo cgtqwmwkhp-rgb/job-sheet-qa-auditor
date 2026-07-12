@@ -3,6 +3,7 @@ import { notifyOwner } from "./notification";
 import { adminProcedure, publicProcedure, router } from "./trpc";
 import { ENV } from "./env";
 import { getModelRegistry } from "../services/modelRegistry";
+import { summarizeApiCosts } from "../services/finOps";
 
 // Runtime environment variables for version info (injected at build/deploy time)
 const GIT_SHA = process.env.GIT_SHA || "unknown";
@@ -55,6 +56,41 @@ export const systemRouter = router({
         success: delivered,
       } as const;
     }),
+
+  /**
+   * Admin API cost dashboard — estimated spend from recorded LLM usage.
+   */
+  apiCostSummary: adminProcedure
+    .input(
+      z
+        .object({
+          windowHours: z
+            .union([
+              z.literal(1),
+              z.literal(24),
+              z.literal(48),
+              z.literal(168),
+              z.literal(720),
+            ])
+            .nullable()
+            .optional()
+            .default(24),
+          recentLimit: z.number().int().min(1).max(100).optional().default(25),
+          jobSheetLimit: z.number().int().min(1).max(100).optional().default(40),
+          dayLimit: z.number().int().min(1).max(366).optional().default(62),
+          monthLimit: z.number().int().min(1).max(60).optional().default(24),
+        })
+        .optional()
+    )
+    .query(({ input }) =>
+      summarizeApiCosts({
+        windowHours: input?.windowHours === undefined ? 24 : input.windowHours,
+        recentLimit: input?.recentLimit ?? 25,
+        jobSheetLimit: input?.jobSheetLimit ?? 40,
+        dayLimit: input?.dayLimit ?? 62,
+        monthLimit: input?.monthLimit ?? 24,
+      })
+    ),
 
   /**
    * PR-3: Platform config drift endpoint (admin-only)

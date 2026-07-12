@@ -207,12 +207,25 @@ async function callAnthropic(input: {
 
   const json = (await response.json()) as {
     content?: Array<{ type: string; text?: string }>;
+    usage?: { input_tokens?: number; output_tokens?: number };
   };
   const text =
     json.content
       ?.filter(c => c.type === "text")
       .map(c => c.text || "")
       .join("") || "";
+  void import("../finOps")
+    .then(({ recordApiCost }) => {
+      recordApiCost({
+        provider: "anthropic",
+        model,
+        stage: "coaching",
+        tool: "anthropic_coaching",
+        inputTokens: json.usage?.input_tokens ?? 0,
+        outputTokens: json.usage?.output_tokens ?? 0,
+      });
+    })
+    .catch(() => undefined);
   return { ok: true, provider: "anthropic", model, text };
 }
 
@@ -264,8 +277,21 @@ async function callOpenAi(input: {
 
   const json = (await response.json()) as {
     choices?: Array<{ message?: { content?: unknown } }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
   const text = extractTextFromUnknown(json.choices?.[0]?.message?.content);
+  void import("../finOps")
+    .then(({ recordApiCost }) => {
+      recordApiCost({
+        provider: "openai",
+        model,
+        stage: "coaching",
+        tool: "openai_coaching",
+        inputTokens: json.usage?.prompt_tokens ?? 0,
+        outputTokens: json.usage?.completion_tokens ?? 0,
+      });
+    })
+    .catch(() => undefined);
   return { ok: true, provider: "openai", model, text };
 }
 
@@ -285,6 +311,11 @@ async function callGemini(input: {
       ],
       maxTokens: input.maxTokens,
       responseFormat: { type: "json_object" },
+      costMeta: {
+        stage: "coaching",
+        provider: "gemini",
+        tool: "gemini_coaching",
+      },
     });
     const content = response.choices[0]?.message?.content;
     const text = extractTextFromUnknown(content);
