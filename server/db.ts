@@ -229,6 +229,45 @@ export async function getUserById(id: number) {
 }
 
 /**
+ * Create a new user (admin function).
+ * For manual user creation by administrators.
+ */
+export async function createUser(data: InsertUser) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(users).values(data);
+  return { id: Number(result[0].insertId) };
+}
+
+/**
+ * Update user profile information (admin function).
+ * Allows updating name, email, and role.
+ */
+export async function updateUserProfile(
+  id: number,
+  data: {
+    name?: string;
+    email?: string;
+    role?: string;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: Record<string, any> = {};
+  if (data.name !== undefined) updateData.name = data.name;
+  if (data.email !== undefined) updateData.email = data.email;
+  if (data.role !== undefined) updateData.role = data.role;
+
+  if (Object.keys(updateData).length === 0) {
+    throw new Error("No fields to update");
+  }
+
+  await db.update(users).set(updateData).where(eq(users.id, id));
+}
+
+/**
  * Create (or return existing) analytics technician user from an OCR name.
  * Uses a synthetic openId so Azure AD login is not required for attribution.
  */

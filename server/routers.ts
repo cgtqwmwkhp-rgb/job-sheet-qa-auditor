@@ -1089,6 +1089,86 @@ export const appRouter = router({
         return db.getUserById(input.id);
       }),
 
+    create: adminProcedure
+      .input(
+        z.object({
+          openId: z.string().min(1).max(64),
+          name: z.string().optional(),
+          email: z.string().email().optional(),
+          role: z.enum(["user", "admin", "qa_lead", "technician"]).default("user"),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        // Check if user already exists
+        const existingUser = await db.getUserByOpenId(input.openId);
+        if (existingUser) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "User with this openId already exists",
+          });
+        }
+
+        const result = await db.createUser({
+          openId: input.openId,
+          name: input.name ?? null,
+          email: input.email ?? null,
+          role: input.role,
+          lastSignedIn: new Date(),
+        });
+
+        await db.logAction({
+          userId: ctx.user.id,
+          action: "CREATE_USER",
+          entityType: "user",
+          entityId: result.id,
+          details: {
+            openId: input.openId,
+            role: input.role,
+            createdBy: ctx.user.name,
+          },
+        });
+
+        return result;
+      }),
+
+    update: adminProcedure
+      .input(
+        z.object({
+          id: z.number().int().positive(),
+          name: z.string().optional(),
+          email: z.string().email().optional(),
+          role: z.enum(["user", "admin", "qa_lead", "technician"]).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const user = await db.getUserById(input.id);
+        if (!user) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "User not found",
+          });
+        }
+
+        await db.updateUserProfile(input.id, {
+          name: input.name,
+          email: input.email,
+          role: input.role,
+        });
+
+        await db.logAction({
+          userId: ctx.user.id,
+          action: "UPDATE_USER",
+          entityType: "user",
+          entityId: input.id,
+          details: {
+            updatedFields: input,
+            updatedBy: ctx.user.name,
+          },
+        });
+
+        return { success: true };
+      }),
+
     updateRole: adminProcedure
       .input(
         z.object({
@@ -1110,6 +1190,43 @@ export const appRouter = router({
         });
 
         return result;
+      }),
+
+    getActivity: adminProcedure
+      .input(
+        z.object({
+          userId: z.number().int().positive(),
+          startDate: z.date().optional(),
+          endDate: z.date().optional(),
+          limit: z.number().int().positive().max(1000).optional().default(100),
+        })
+      )
+      .query(async ({ input }) => {
+        const user = await db.getUserById(input.userId);
+        if (!user) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "User not found",
+          });
+        }
+
+        const auditLogs = await db.getAuditLog({
+          userId: input.userId,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          limit: input.limit,
+        });
+
+        return {
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          },
+          totalActions: auditLogs.length,
+          recentActivity: auditLogs,
+        };
       }),
   }),
 
