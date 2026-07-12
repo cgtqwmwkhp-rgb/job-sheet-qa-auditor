@@ -1,4 +1,5 @@
 # Production Deployment Plan
+
 **Target Release**: Security Hardening & Operational Infrastructure (PR #275)  
 **Status**: Ready for Production (Pending Staging Validation)  
 **Date Prepared**: 2026-07-12
@@ -8,6 +9,7 @@
 ## 📋 Pre-Deployment Checklist
 
 ### Staging Validation Requirements
+
 - [ ] New code version live in staging (SHA: `0b4fe31`)
 - [ ] Database migrations applied successfully
 - [ ] No foreign key violation errors
@@ -17,6 +19,7 @@
 - [ ] No critical errors in staging logs (24h observation)
 
 ### Production Readiness
+
 - [ ] Database backup completed (< 1 hour old)
 - [ ] Rollback plan reviewed and approved
 - [ ] On-call engineer available
@@ -31,6 +34,7 @@
 ### Phase 1: Pre-Deployment (T-60 minutes)
 
 #### 1.1 Database Backup
+
 ```bash
 # Connect to production database
 mysql -h ai-scheduler-mysql-prod.mysql.database.azure.com \
@@ -53,6 +57,7 @@ gzip backup_*.sql
 **Success Criteria**: Backup file exists and size is reasonable (> 1MB)
 
 #### 1.2 Enable Maintenance Mode (Optional)
+
 ```bash
 # If maintenance window is needed, update environment variable
 az containerapp update \
@@ -62,6 +67,7 @@ az containerapp update \
 ```
 
 #### 1.3 Capture Baseline Metrics
+
 ```bash
 # Current version
 curl -s https://jobsheet-qa-production.happydesert-4448b4c0.uksouth.azurecontainerapps.io/readyz \
@@ -81,6 +87,7 @@ az containerapp logs show \
 ### Phase 2: Deployment (T-0)
 
 #### 2.1 Trigger Production Deploy
+
 Production deployment is **MANUAL** via GitHub Actions:
 
 ```bash
@@ -93,6 +100,7 @@ gh workflow run "Azure Deploy" \
 **Monitor**: https://github.com/cgtqwmwkhp-rgb/job-sheet-qa-auditor/actions
 
 #### 2.2 Watch Deployment Progress
+
 ```bash
 # Get latest workflow run
 RUN_ID=$(gh run list --workflow="Azure Deploy" --limit 1 --json databaseId --jq '.[0].databaseId')
@@ -104,6 +112,7 @@ gh run watch $RUN_ID
 **Expected Duration**: 8-12 minutes
 
 **Success Indicators**:
+
 - ✅ Build & Push to ACR: success
 - ✅ Deploy to Production: success
 - ✅ Verify Production: success
@@ -113,6 +122,7 @@ gh run watch $RUN_ID
 ### Phase 3: Database Migrations (T+15 minutes)
 
 #### 3.1 Apply Migrations
+
 ```bash
 # Connect to production database
 export DB_HOST="ai-scheduler-mysql-prod.mysql.database.azure.com"
@@ -128,15 +138,16 @@ mysql -h $DB_HOST -u $DB_USER -p $DB_NAME --ssl-mode=REQUIRED \
 
 # Verify
 mysql -h $DB_HOST -u $DB_USER -p $DB_NAME --ssl-mode=REQUIRED -e \
-  "SELECT COUNT(*) as foreign_keys 
-   FROM information_schema.KEY_COLUMN_USAGE 
-   WHERE TABLE_SCHEMA = 'jobsheet_qa_production' 
+  "SELECT COUNT(*) as foreign_keys
+   FROM information_schema.KEY_COLUMN_USAGE
+   WHERE TABLE_SCHEMA = 'jobsheet_qa_production'
      AND REFERENCED_TABLE_NAME IS NOT NULL;"
 
 # Expected: ~21 foreign keys
 ```
 
 #### 3.2 Apply Performance Indexes
+
 ```bash
 # Run Migration 2: Indexes
 mysql -h $DB_HOST -u $DB_USER -p $DB_NAME --ssl-mode=REQUIRED \
@@ -144,9 +155,9 @@ mysql -h $DB_HOST -u $DB_USER -p $DB_NAME --ssl-mode=REQUIRED \
 
 # Verify
 mysql -h $DB_HOST -u $DB_USER -p $DB_NAME --ssl-mode=REQUIRED -e \
-  "SELECT COUNT(*) as indexes 
-   FROM information_schema.STATISTICS 
-   WHERE TABLE_SCHEMA = 'jobsheet_qa_production' 
+  "SELECT COUNT(*) as indexes
+   FROM information_schema.STATISTICS
+   WHERE TABLE_SCHEMA = 'jobsheet_qa_production'
      AND INDEX_NAME != 'PRIMARY';"
 
 # Expected: ~30+ indexes
@@ -160,6 +171,7 @@ mysql -h $DB_HOST -u $DB_USER -p $DB_NAME --ssl-mode=REQUIRED -e \
 ### Phase 4: Verification (T+20 minutes)
 
 #### 4.1 Health Checks
+
 ```bash
 # Check all health endpoints
 curl -s https://jobsheet-qa-production.happydesert-4448b4c0.uksouth.azurecontainerapps.io/healthz | jq .
@@ -171,13 +183,16 @@ curl -s https://jobsheet-qa-production.happydesert-4448b4c0.uksouth.azurecontain
 ```
 
 **Success Criteria**:
+
 - `status: "ok"`
 - `database.status: "ok"`
 - `storage.status: "ok"`
 - `version.sha: "0b4fe31a9033cdf46083971f6d0124005a87f71f"`
 
 #### 4.2 Smoke Tests
+
 Run critical user flows (see TESTING_CHECKLIST.md):
+
 - [ ] User login
 - [ ] Document upload
 - [ ] Document processing
@@ -185,6 +200,7 @@ Run critical user flows (see TESTING_CHECKLIST.md):
 - [ ] Data export
 
 #### 4.3 Monitor for Errors
+
 ```bash
 # Watch logs for 10 minutes
 az containerapp logs show \
@@ -195,6 +211,7 @@ az containerapp logs show \
 ```
 
 **Red Flags**:
+
 - Foreign key constraint violations
 - 500 errors
 - Database connection errors
@@ -205,6 +222,7 @@ az containerapp logs show \
 ### Phase 5: Post-Deployment (T+30 minutes)
 
 #### 5.1 Disable Maintenance Mode
+
 ```bash
 az containerapp update \
   --name jobsheet-qa-production \
@@ -213,6 +231,7 @@ az containerapp update \
 ```
 
 #### 5.2 Capture Post-Deployment Metrics
+
 ```bash
 curl -s https://jobsheet-qa-production.happydesert-4448b4c0.uksouth.azurecontainerapps.io/readyz \
   | jq '{sha, dbLatency: .checks.database.latencyMs, timestamp: .timestamp}' \
@@ -225,6 +244,7 @@ echo -n "After:  " && jq -r '.dbLatency' post_deployment_metrics.json
 ```
 
 #### 5.3 Update Documentation
+
 - [ ] Update deployment log
 - [ ] Document any issues encountered
 - [ ] Update runbook with lessons learned
@@ -235,6 +255,7 @@ echo -n "After:  " && jq -r '.dbLatency' post_deployment_metrics.json
 ## 🚨 Rollback Procedure
 
 ### When to Rollback
+
 - Critical errors in production logs
 - Database integrity issues
 - Application unavailability > 5 minutes
@@ -243,6 +264,7 @@ echo -n "After:  " && jq -r '.dbLatency' post_deployment_metrics.json
 ### Rollback Steps
 
 #### Option A: Revert to Previous Container Image
+
 ```bash
 # Get previous revision
 az containerapp revision list \
@@ -262,6 +284,7 @@ az containerapp ingress traffic set \
 **Impact**: Immediate revert to old code
 
 #### Option B: Revert Database Migrations
+
 ```bash
 # Restore from backup
 mysql -h ai-scheduler-mysql-prod.mysql.database.azure.com \
@@ -280,6 +303,7 @@ mysql -h ai-scheduler-mysql-prod.mysql.database.azure.com \
 ## 📊 Success Metrics
 
 ### Deployment Success
+
 - ✅ Zero downtime achieved
 - ✅ All health checks green within 5 minutes
 - ✅ No critical errors in first 30 minutes
@@ -287,6 +311,7 @@ mysql -h ai-scheduler-mysql-prod.mysql.database.azure.com \
 - ✅ All smoke tests passing
 
 ### Feature Validation
+
 - ✅ Object-level authorization working
 - ✅ File upload validation active
 - ✅ No foreign key violations
@@ -298,18 +323,21 @@ mysql -h ai-scheduler-mysql-prod.mysql.database.azure.com \
 ## 🔍 Monitoring Plan
 
 ### First 1 Hour (Active Monitoring)
+
 - Watch application logs continuously
 - Monitor error rates every 5 minutes
 - Check database performance metrics
 - Run smoke tests every 15 minutes
 
 ### First 24 Hours (Passive Monitoring)
+
 - Check error rates every hour
 - Review slow query log
 - Monitor foreign key violation attempts
 - Track authorization denials (should see activity)
 
 ### First Week
+
 - Daily health check review
 - Performance comparison reports
 - User feedback collection
@@ -329,29 +357,34 @@ mysql -h ai-scheduler-mysql-prod.mysql.database.azure.com \
 ## 📝 Deployment Checklist Summary
 
 **Pre-Deployment** (60 min before):
+
 - [ ] Database backup completed
 - [ ] Staging fully validated
 - [ ] Team notified
 - [ ] Monitoring ready
 
 **Deployment** (15 min):
+
 - [ ] GitHub Actions triggered
 - [ ] Build successful
 - [ ] Container deployed
 - [ ] Health checks passing
 
 **Migrations** (5 min):
+
 - [ ] Foreign keys applied
 - [ ] Indexes created
 - [ ] Verification complete
 
 **Verification** (30 min):
+
 - [ ] Smoke tests passed
 - [ ] No errors in logs
 - [ ] Performance acceptable
 - [ ] Metrics captured
 
 **Post-Deployment**:
+
 - [ ] Maintenance mode disabled
 - [ ] Documentation updated
 - [ ] Stakeholders notified
