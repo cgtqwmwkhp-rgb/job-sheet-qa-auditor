@@ -9,6 +9,7 @@ import {
   lte,
   isNotNull,
   isNull,
+  inArray,
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
@@ -1117,6 +1118,11 @@ export interface EngineerAnalyticsFindingRow {
   fieldName: string;
   ruleId: string | null;
   resolutionStatus: "open" | "waived" | "overridden" | "flagged" | "approved";
+  normalisedSnippet: string | null;
+  rawSnippet: string | null;
+  suggestedFix: string | null;
+  whyItMatters: string | null;
+  pageNumber: number | null;
   occurredAt: Date;
 }
 
@@ -1242,6 +1248,11 @@ export async function getEngineerAnalyticsFindings(options?: {
       fieldName: auditFindings.fieldName,
       ruleId: auditFindings.ruleId,
       resolutionStatus: auditFindings.resolutionStatus,
+      normalisedSnippet: auditFindings.normalisedSnippet,
+      rawSnippet: auditFindings.rawSnippet,
+      suggestedFix: auditFindings.suggestedFix,
+      whyItMatters: auditFindings.whyItMatters,
+      pageNumber: auditFindings.pageNumber,
       occurredAt: auditFindings.createdAt,
     })
     .from(auditFindings)
@@ -1262,6 +1273,11 @@ export async function getEngineerAnalyticsFindings(options?: {
         fieldName: string;
         ruleId: string | null;
         resolutionStatus: EngineerAnalyticsFindingRow["resolutionStatus"];
+        normalisedSnippet: string | null;
+        rawSnippet: string | null;
+        suggestedFix: string | null;
+        whyItMatters: string | null;
+        pageNumber: number | null;
         occurredAt: Date;
       } => r.technicianId != null
     )
@@ -1274,8 +1290,41 @@ export async function getEngineerAnalyticsFindings(options?: {
       fieldName: r.fieldName,
       ruleId: r.ruleId,
       resolutionStatus: r.resolutionStatus,
+      normalisedSnippet: r.normalisedSnippet,
+      rawSnippet: r.rawSnippet,
+      suggestedFix: r.suggestedFix,
+      whyItMatters: r.whyItMatters,
+      pageNumber: r.pageNumber,
       occurredAt: r.occurredAt,
     }));
+}
+
+/**
+ * Latest audit reportJson per job sheet (for coaching evidence dossiers).
+ */
+export async function getLatestAuditReportJsonsForJobSheets(
+  jobSheetIds: number[]
+): Promise<Record<number, unknown>> {
+  const db = await getDb();
+  if (!db || jobSheetIds.length === 0) return {};
+
+  const rows = await db
+    .select({
+      jobSheetId: auditResults.jobSheetId,
+      reportJson: auditResults.reportJson,
+      createdAt: auditResults.createdAt,
+    })
+    .from(auditResults)
+    .where(inArray(auditResults.jobSheetId, jobSheetIds))
+    .orderBy(desc(auditResults.createdAt));
+
+  const latest: Record<number, unknown> = {};
+  for (const row of rows) {
+    if (latest[row.jobSheetId] === undefined) {
+      latest[row.jobSheetId] = row.reportJson;
+    }
+  }
+  return latest;
 }
 
 // ============ PR-16: COHORT ANALYTICS ============

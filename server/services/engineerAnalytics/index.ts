@@ -11,5 +11,7 @@ export * from "./mapFindings";
 export * from "./aggregateFromDb";
 export * from "./coachingThemes";
 export * from "./coachingNarrative";
+export * from "./coachingNarrativeLlm";
+export * from "./evidenceDossier";
 export * from "./coachingPack";
 export * from "./coachingSessions";
