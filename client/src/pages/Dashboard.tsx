@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertTriangle,
@@ -26,6 +27,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Link, useLocation } from "wouter";
 import { perfMark, perfClear, PERF_MARKS } from "@/lib/perf";
 import { cn } from "@/lib/utils";
+import { useMemo } from "react";
+import type { Activity } from "@/lib/api";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 function KpiSkeleton() {
   return (
@@ -36,8 +48,45 @@ function KpiSkeleton() {
   );
 }
 
+function ChartSkeleton() {
+  return (
+    <div className="flex h-full w-full items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-[#8A8787]" />
+    </div>
+  );
+}
+
+function relativeTime(date: Date | string): string {
+  const ms = Date.now() - new Date(date).getTime();
+  const mins = Math.floor(ms / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function dashboardPeriod() {
+  const end = new Date();
+  const start = new Date(end.getTime() - 14 * 24 * 60 * 60 * 1000);
+  return {
+    startDate: start.toISOString(),
+    endDate: end.toISOString(),
+    site: "",
+  };
+}
+
+const CHART_TOOLTIP = {
+  backgroundColor: "#ffffff",
+  border: "1px solid #ebe8e8",
+  borderRadius: "8px",
+  color: "#333030",
+};
+
 export default function Dashboard() {
   const [, setLocation] = useLocation();
+  const period = useMemo(() => dashboardPeriod(), []);
 
   const navigateToAudit = (id: number) => {
     perfClear();
@@ -49,7 +98,63 @@ export default function Dashboard() {
     trpc.stats.dashboard.useQuery();
   const { data: recentJobSheets, isLoading: jobSheetsLoading } =
     trpc.jobSheets.list.useQuery({ limit: 5 });
+  const { data: holdQueueSheets, isLoading: holdLoading } =
+    trpc.jobSheets.list.useQuery({ status: "review_queue", limit: 5 });
+  const { data: driftSummary, isLoading: driftLoading } =
+    trpc.analytics.getDriftSummary.useQuery(period);
+  const { data: exceptionSummary, isLoading: exceptionLoading } =
+    trpc.analytics.getExceptionSummary.useQuery(period);
+  const { data: driftAlertsData, isLoading: alertsLoading } =
+    trpc.analytics.getDriftAlerts.useQuery(period);
   const { user } = useAuth();
+
+  const activityChart = useMemo(() => {
+    const series = driftSummary?.series ?? [];
+    if (series.length === 0) return [];
+    const byDay = new Map<string, { audits: number; defects: number }>();
+    for (const s of series) {
+      for (const p of s.series) {
+        const key = p.t.slice(0, 10);
+        const prev = byDay.get(key) ?? { audits: 0, defects: 0 };
+        byDay.set(key, {
+          audits: Math.max(prev.audits, p.documentCount),
+          defects: Math.max(prev.defects, p.defectCount),
+        });
+      }
+    }
+    return Array.from(byDay.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([day, v]) => ({
+        day: day.slice(5),
+        audits: v.audits,
+        defects: v.defects,
+      }));
+  }, [driftSummary]);
+
+  const defectReasons = useMemo(() => {
+    const rules = exceptionSummary?.overturns.worstRules ?? [];
+    return rules.slice(0, 6).map(rule => ({
+      name: rule.reasonCode || rule.ruleId || "Unknown",
+      count: rule.totalFindings,
+      overturned: rule.overturnedCount,
+    }));
+  }, [exceptionSummary]);
+
+  const recentActivity: Activity[] = useMemo(() => {
+    return (recentJobSheets ?? []).slice(0, 8).map(sheet => ({
+      id: sheet.id,
+      type:
+        sheet.status === "review_queue"
+          ? ("review" as const)
+          : sheet.status === "failed"
+            ? ("system" as const)
+            : ("audit" as const),
+      message: `${sheet.referenceNumber || `JS-${sheet.id}`} · ${sheet.status.replace(/_/g, " ")}`,
+      time: relativeTime(sheet.createdAt),
+    }));
+  }, [recentJobSheets]);
+
+  const alerts = driftAlertsData?.alerts ?? [];
 
   const getGreeting = () => {
     if (!user) return "Welcome back";
@@ -116,14 +221,8 @@ export default function Dashboard() {
     },
   ];
 
-  const recentActivity: {
-    id: number;
-    type: "audit" | "review" | "system";
-    message: string;
-    time: string;
-  }[] = [];
-
   const hasNoAudits = !statsLoading && (statsData?.totalAudits ?? 0) === 0;
+  const chartsLoading = driftLoading || exceptionLoading;
 
   return (
     <DashboardLayout>
@@ -211,19 +310,43 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle>Audit Activity</CardTitle>
               <CardDescription>
-                Daily audit volume and pass/fail breakdown.
+                Daily audit volume and defect counts (last 14 days).
               </CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
-              <div className="flex h-[280px] items-center justify-center">
-                {statsLoading ? (
-                  <Loader2 className="h-8 w-8 animate-spin text-[#8A8787]" />
+              <div className="h-[280px]">
+                {chartsLoading ? (
+                  <ChartSkeleton />
+                ) : activityChart.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={activityChart}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        className="stroke-border"
+                      />
+                      <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip contentStyle={CHART_TOOLTIP} />
+                      <Bar
+                        dataKey="audits"
+                        fill="#beda41"
+                        name="Audits"
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="defects"
+                        fill="#ba3737"
+                        name="Defects"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
                 ) : (
                   <EmptyState
                     compact
                     icon={TrendingUp}
                     title="No audit activity yet"
-                    description="Process job sheets to see daily volume and pass/fail trends."
+                    description="Process job sheets to see daily volume and defect trends."
                     action={
                       hasNoAudits
                         ? { label: "Upload first job sheet", href: "/upload" }
@@ -239,13 +362,40 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle>Top Defect Reasons</CardTitle>
               <CardDescription>
-                Breakdown of reasons for audit failure.
+                Highest-volume rules by findings (last 14 days).
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex h-[280px] items-center justify-center">
-                {statsLoading ? (
-                  <Loader2 className="h-8 w-8 animate-spin text-[#8A8787]" />
+              <div className="h-[280px]">
+                {chartsLoading ? (
+                  <ChartSkeleton />
+                ) : defectReasons.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={defectReasons}
+                      layout="vertical"
+                      margin={{ left: 8, right: 8 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        className="stroke-border"
+                      />
+                      <XAxis type="number" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={96}
+                        tick={{ fontSize: 10 }}
+                      />
+                      <Tooltip contentStyle={CHART_TOOLTIP} />
+                      <Bar
+                        dataKey="count"
+                        fill="#2868CE"
+                        name="Findings"
+                        radius={[0, 4, 4, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
                 ) : (
                   <EmptyState
                     compact
@@ -269,8 +419,22 @@ export default function Dashboard() {
             <Tabs defaultValue="recent" className="space-y-4">
               <TabsList>
                 <TabsTrigger value="recent">Recent Audits</TabsTrigger>
-                <TabsTrigger value="hold">Hold Queue</TabsTrigger>
-                <TabsTrigger value="alerts">System Alerts</TabsTrigger>
+                <TabsTrigger value="hold">
+                  Hold Queue
+                  {(holdQueueSheets?.length ?? 0) > 0 ? (
+                    <Badge variant="secondary" className="ml-1.5 h-5 px-1.5">
+                      {holdQueueSheets!.length}
+                    </Badge>
+                  ) : null}
+                </TabsTrigger>
+                <TabsTrigger value="alerts">
+                  System Alerts
+                  {alerts.length > 0 ? (
+                    <Badge variant="destructive" className="ml-1.5 h-5 px-1.5">
+                      {alerts.length}
+                    </Badge>
+                  ) : null}
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="recent" className="space-y-4">
                 <Card>
@@ -385,20 +549,59 @@ export default function Dashboard() {
               </TabsContent>
               <TabsContent value="hold" className="space-y-4">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Hold Queue</CardTitle>
-                    <CardDescription>
-                      Items requiring manual review.
-                    </CardDescription>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                    <div>
+                      <CardTitle>Hold Queue</CardTitle>
+                      <CardDescription>
+                        Items requiring manual review.
+                      </CardDescription>
+                    </div>
+                    <Button asChild variant="ghost" size="sm">
+                      <Link href="/hold-queue">Open queue</Link>
+                    </Button>
                   </CardHeader>
                   <CardContent>
-                    <EmptyState
-                      compact
-                      icon={Clock}
-                      title="Hold queue is clear"
-                      description="No items are waiting for manual review right now."
-                      action={{ label: "Open hold queue", href: "/hold-queue" }}
-                    />
+                    {holdLoading ? (
+                      <ChartSkeleton />
+                    ) : holdQueueSheets && holdQueueSheets.length > 0 ? (
+                      <div className="space-y-3">
+                        {holdQueueSheets.map(sheet => (
+                          <div
+                            key={sheet.id}
+                            className="flex cursor-pointer items-center justify-between rounded-lg border border-l-4 border-l-[#E8A317] p-4 transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4]"
+                            onClick={() => setLocation(`/hold-queue`)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={e =>
+                              e.key === "Enter" && setLocation("/hold-queue")
+                            }
+                          >
+                            <div>
+                              <p className="font-mono font-medium">
+                                {sheet.referenceNumber || `JS-${sheet.id}`}
+                              </p>
+                              <p className="text-sm text-[#706D6D]">
+                                {sheet.fileName} · {sheet.siteInfo || "No site"}
+                              </p>
+                            </div>
+                            <p className="text-xs text-[#8A8787]">
+                              {relativeTime(sheet.createdAt)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyState
+                        compact
+                        icon={Clock}
+                        title="Hold queue is clear"
+                        description="No items are waiting for manual review right now."
+                        action={{
+                          label: "Open hold queue",
+                          href: "/hold-queue",
+                        }}
+                      />
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -407,16 +610,52 @@ export default function Dashboard() {
                   <CardHeader>
                     <CardTitle>System Alerts</CardTitle>
                     <CardDescription>
-                      Important notifications and warnings.
+                      Drift and operational warnings (last 14 days).
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <EmptyState
-                      compact
-                      icon={AlertTriangle}
-                      title="No active alerts"
-                      description="System notifications will appear here when action is needed."
-                    />
+                    {alertsLoading ? (
+                      <ChartSkeleton />
+                    ) : alerts.length > 0 ? (
+                      <div className="space-y-3">
+                        {alerts.slice(0, 8).map(alert => (
+                          <div
+                            key={alert.id}
+                            className="flex items-start justify-between gap-3 rounded-lg border p-3"
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant={
+                                    alert.severity === "critical"
+                                      ? "destructive"
+                                      : "secondary"
+                                  }
+                                >
+                                  {alert.severity}
+                                </Badge>
+                                <p className="truncate text-sm font-medium">
+                                  {alert.label}
+                                </p>
+                              </div>
+                              <p className="mt-1 text-sm text-[#706D6D]">
+                                {alert.message}
+                              </p>
+                            </div>
+                            <Button asChild variant="ghost" size="sm">
+                              <Link href="/analytics/drift">Review</Link>
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyState
+                        compact
+                        icon={AlertTriangle}
+                        title="No active alerts"
+                        description="System notifications will appear here when action is needed."
+                      />
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -424,7 +663,25 @@ export default function Dashboard() {
           </div>
 
           <div className="col-span-1">
-            <AuditTimeline activities={recentActivity} />
+            {recentActivity.length > 0 ? (
+              <AuditTimeline activities={recentActivity} />
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-medium">
+                    Audit History
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <EmptyState
+                    compact
+                    icon={FileText}
+                    title="No recent activity"
+                    description="Processed job sheets will appear in this timeline."
+                  />
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>

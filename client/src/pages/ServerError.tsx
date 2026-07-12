@@ -46,14 +46,14 @@ export default function ServerError() {
             <Button
               onClick={handleRefresh}
               variant="outline"
-              className="px-6 py-2.5 rounded-lg transition-all duration-200"
+              className="px-6 py-2.5 rounded-lg transition-all duration-[var(--duration-normal)]"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
               Try Again
             </Button>
             <Button
               onClick={handleGoHome}
-              className="bg-primary text-primary-foreground hover:bg-[#A8C038] px-6 py-2.5 rounded-lg transition-all duration-150"
+              className="bg-primary text-primary-foreground hover:bg-[#A8C038] px-6 py-2.5 rounded-lg transition-all duration-[var(--duration-normal)]"
             >
               <Home className="w-4 h-4 mr-2" />
               Go Home

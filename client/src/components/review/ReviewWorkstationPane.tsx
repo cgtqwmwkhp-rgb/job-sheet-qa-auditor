@@ -519,10 +519,6 @@ function ReviewWorkstationContent({
   const [focusPage, setFocusPage] = useState<number | null>(null);
   const [focusNonce, setFocusNonce] = useState(0);
   const [focusLabel, setFocusLabel] = useState<string | null>(null);
-  const [annotationOpen, setAnnotationOpen] = useState(false);
-  const [newBox, setNewBox] = useState<ViewerBoundingBox | null>(null);
-  const [annotationLabel, setAnnotationLabel] = useState("");
-  const [annotationComment, setAnnotationComment] = useState("");
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
   const [feedbackType, setFeedbackType] = useState("incorrect");
@@ -985,20 +981,6 @@ function ReviewWorkstationContent({
     auditData.findings.length > 0
   );
 
-  const handleBoxCreate = (box: ViewerBoundingBox) => {
-    setNewBox(box);
-    setAnnotationOpen(true);
-  };
-
-  const submitAnnotation = () => {
-    if (!newBox) return;
-    toast.success("Annotation saved successfully");
-    setAnnotationOpen(false);
-    setNewBox(null);
-    setAnnotationLabel("");
-    setAnnotationComment("");
-  };
-
   const handleReportIssue = (finding: Finding, e: MouseEvent) => {
     e.stopPropagation();
     setSelectedFinding(finding);
@@ -1235,7 +1217,6 @@ function ReviewWorkstationContent({
               focusNonce={focusNonce}
               focusLabel={focusLabel}
               onBoxClick={handleBoxClick}
-              onBoxCreate={handleBoxCreate}
             />
           )}
         </div>
@@ -1334,47 +1315,6 @@ function ReviewWorkstationContent({
           </Tabs>
         </Card>
       </div>
-
-      <Dialog open={annotationOpen} onOpenChange={setAnnotationOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Annotation</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Label</Label>
-              <Select
-                value={annotationLabel}
-                onValueChange={setAnnotationLabel}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a label" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="missing">Missing Field</SelectItem>
-                  <SelectItem value="incorrect">Incorrect Value</SelectItem>
-                  <SelectItem value="unclear">Unclear/Illegible</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Comment</Label>
-              <Textarea
-                placeholder="Add a comment..."
-                value={annotationComment}
-                onChange={e => setAnnotationComment(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAnnotationOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={submitAnnotation}>Save Annotation</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
         <DialogContent>

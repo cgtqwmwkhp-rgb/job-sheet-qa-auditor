@@ -1,12 +1,13 @@
 /**
  * Monitoring Dashboard
  *
- * Displays real-time system health metrics, error tracking,
- * performance monitoring, and operational insights
+ * Live system health, AI providers, DLQ, drift alerts, and FinOps throughput.
+ * No hardcoded performance sample data — unavailable metrics are labeled honestly.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
+import { EmptyState } from "@/components/EmptyState";
 import {
   Card,
   CardContent,
@@ -18,23 +19,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Activity,
   AlertCircle,
   Clock,
   Database,
   TrendingUp,
-  Users,
   CheckCircle2,
   XCircle,
-  Zap,
   Loader2,
   RefreshCw,
   Server,
+  Zap,
 } from "lucide-react";
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
   XAxis,
@@ -46,6 +45,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { Link } from "wouter";
 
 const CHART_TOOLTIP_STYLE = {
   backgroundColor: "#ffffff",
@@ -54,14 +54,23 @@ const CHART_TOOLTIP_STYLE = {
   color: "#333030",
 };
 
+function monitoringPeriod() {
+  const end = new Date();
+  const start = new Date(end.getTime() - 14 * 24 * 60 * 60 * 1000);
+  return {
+    startDate: start.toISOString(),
+    endDate: end.toISOString(),
+    site: "",
+  };
+}
+
 export default function Monitoring() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [healthTs, setHealthTs] = useState(() => Date.now());
-  const avgResponseMs = 245;
-  const errorRatePct = 0.12;
-  const slowQueries = 3;
-  const avgQueryMs = 45;
-  const cacheHitPct = 94;
+  const { hasRole } = useAuth();
+  const period = useMemo(() => monitoringPeriod(), []);
+  const isAdmin = hasRole(["admin"]);
+  const canFinOps = hasRole(["admin", "qa_lead"]);
 
   const {
     data: health,
@@ -81,35 +90,110 @@ export default function Monitoring() {
     isFetching: versionFetching,
   } = trpc.system.version.useQuery();
 
+  const { data: statsData, refetch: refetchStats } =
+    trpc.stats.dashboard.useQuery();
+
+  const { data: aiHealth, refetch: refetchAi } = trpc.ai.healthCheck.useQuery(
+    undefined,
+    { retry: false }
+  );
+
+  const { data: driftAlertsData, refetch: refetchAlerts } =
+    trpc.analytics.getDriftAlerts.useQuery(period, { retry: false });
+
+  const { data: dlqStatus, refetch: refetchDlq } =
+    trpc.analytics.getDlqStatus.useQuery(undefined, {
+      enabled: isAdmin,
+      retry: false,
+    });
+
+  const { data: costSummary, refetch: refetchCosts } =
+    trpc.system.apiCostSummary.useQuery(
+      { windowHours: 48, dayLimit: 14 },
+      { enabled: canFinOps, retry: false }
+    );
+
+  const { data: allSheets, refetch: refetchSheets } =
+    trpc.jobSheets.list.useQuery({
+      limit: 100,
+    });
+
   const isInitialLoading = healthLoading || versionLoading;
   const isRefreshing = healthFetching || versionFetching;
   const hasQueryError = healthError || versionError;
 
-  const [recentErrors] = useState([
-    { id: 1, message: "Database timeout", count: 3, lastSeen: "2 min ago" },
-    {
-      id: 2,
-      message: "OCR service unavailable",
-      count: 1,
-      lastSeen: "15 min ago",
-    },
-  ]);
+  const statusData = useMemo(() => {
+    const counts = {
+      completed: 0,
+      processing: 0,
+      failed: 0,
+      review_queue: 0,
+      pending: 0,
+    };
+    for (const sheet of allSheets ?? []) {
+      if (sheet.status === "completed") counts.completed += 1;
+      else if (sheet.status === "processing") counts.processing += 1;
+      else if (sheet.status === "failed") counts.failed += 1;
+      else if (sheet.status === "review_queue") counts.review_queue += 1;
+      else counts.pending += 1;
+    }
+    return [
+      { name: "Completed", value: counts.completed, color: "#5a7a1a" },
+      { name: "Processing", value: counts.processing, color: "#2563eb" },
+      { name: "Failed", value: counts.failed, color: "#ba3737" },
+      { name: "Hold", value: counts.review_queue, color: "#ca8a04" },
+      { name: "Pending", value: counts.pending, color: "#8A8787" },
+    ].filter(d => d.value > 0);
+  }, [allSheets]);
 
-  const [performanceData] = useState([
-    { name: "00:00", avgResponse: 245, requests: 120 },
-    { name: "04:00", avgResponse: 189, requests: 85 },
-    { name: "08:00", avgResponse: 312, requests: 340 },
-    { name: "12:00", avgResponse: 278, requests: 450 },
-    { name: "16:00", avgResponse: 298, requests: 380 },
-    { name: "20:00", avgResponse: 201, requests: 220 },
-  ]);
+  const throughputData = useMemo(() => {
+    return (costSummary?.byDay ?? [])
+      .slice()
+      .reverse()
+      .map(row => ({
+        day: row.period.slice(5),
+        calls: row.callCount,
+        jobSheets: row.jobSheetsReviewed,
+      }));
+  }, [costSummary]);
 
-  const [statusData] = useState([
-    { name: "Completed", value: 850, color: "#5a7a1a" },
-    { name: "Processing", value: 45, color: "#2563eb" },
-    { name: "Failed", value: 12, color: "#ba3737" },
-    { name: "Pending", value: 93, color: "#ca8a04" },
-  ]);
+  const operationalIssues = useMemo(() => {
+    const items: {
+      id: string;
+      message: string;
+      detail: string;
+      severity: "critical" | "warning" | "info";
+    }[] = [];
+
+    for (const job of dlqStatus?.recoverableJobs?.slice(0, 8) ?? []) {
+      items.push({
+        id: `dlq-${job.id}`,
+        message: `DLQ: ${job.stage} failed for JS-${job.jobSheetId}`,
+        detail: job.errorMessage,
+        severity: "critical",
+      });
+    }
+
+    for (const alert of (driftAlertsData?.alerts ?? []).slice(0, 8)) {
+      items.push({
+        id: alert.id,
+        message: alert.message,
+        detail: alert.suggestedAction,
+        severity: alert.severity,
+      });
+    }
+
+    if (aiHealth?.mistralOcr && !aiHealth.mistralOcr.valid) {
+      items.push({
+        id: "ai-mistral",
+        message: "Mistral OCR unhealthy",
+        detail: aiHealth.mistralOcr.error || "Validation failed",
+        severity: "warning",
+      });
+    }
+
+    return items;
+  }, [dlqStatus, driftAlertsData, aiHealth]);
 
   useEffect(() => {
     if (!autoRefresh) return;
@@ -118,20 +202,48 @@ export default function Monitoring() {
       setHealthTs(Date.now());
       void refetchHealth();
       void refetchVersion();
+      void refetchStats();
+      void refetchAi();
+      void refetchAlerts();
+      void refetchSheets();
+      if (isAdmin) void refetchDlq();
+      if (canFinOps) void refetchCosts();
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [autoRefresh, refetchHealth, refetchVersion]);
+  }, [
+    autoRefresh,
+    refetchHealth,
+    refetchVersion,
+    refetchStats,
+    refetchAi,
+    refetchAlerts,
+    refetchSheets,
+    refetchDlq,
+    refetchCosts,
+    isAdmin,
+    canFinOps,
+  ]);
 
   const handleManualRefresh = () => {
     setHealthTs(Date.now());
     void refetchHealth();
     void refetchVersion();
+    void refetchStats();
+    void refetchAi();
+    void refetchAlerts();
+    void refetchSheets();
+    if (isAdmin) void refetchDlq();
+    if (canFinOps) void refetchCosts();
   };
 
   const systemHealthy = health?.ok === true;
   const dbConfigured = health?.config?.databaseConfigured ?? false;
   const oauthConfigured = health?.config?.oauthConfigured ?? false;
+  const holdCount = statsData?.reviewQueue ?? 0;
+  const totalAudits = statsData?.totalAudits ?? 0;
+  const dlqCount = dlqStatus?.totalFailed ?? dlqStatus?.recoverable ?? 0;
+  const llmCalls = costSummary?.totalCalls ?? null;
 
   return (
     <DashboardLayout>
@@ -142,7 +254,7 @@ export default function Monitoring() {
               System Monitoring
             </h1>
             <p className="text-muted-foreground mt-1">
-              Operational health, performance, and infrastructure status
+              Live health, AI providers, queues, and FinOps throughput
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -208,7 +320,7 @@ export default function Monitoring() {
                   System health
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Live status from health and version endpoints
+                  Live status from health, version, and AI provider checks
                 </p>
               </div>
 
@@ -245,11 +357,11 @@ export default function Monitoring() {
                   subtitle="Identity provider"
                 />
                 <StatusCard
-                  title="Error rate"
-                  value={`${errorRatePct}%`}
+                  title="Hold queue"
+                  value={String(holdCount)}
                   icon={<AlertCircle className="h-5 w-5" />}
-                  variant={errorRatePct < 0.5 ? "success" : "error"}
-                  subtitle="Last hour (sample)"
+                  variant={holdCount === 0 ? "success" : "warning"}
+                  subtitle={`${totalAudits} total audits`}
                 />
               </div>
 
@@ -299,38 +411,72 @@ export default function Monitoring() {
                   id="performance-heading"
                   className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
                 >
-                  Performance & throughput
+                  Providers & throughput
                 </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Live AI health and FinOps call volume — APM latency is not
+                  instrumented yet
+                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <StatusCard
-                  title="Active users"
-                  value="24"
-                  icon={<Users className="h-5 w-5" />}
-                  variant="info"
-                  subtitle="Last 15 minutes"
-                />
-                <StatusCard
-                  title="Avg response"
-                  value={`${avgResponseMs}ms`}
+                  title="Mistral OCR"
+                  value={
+                    aiHealth?.mistralOcr?.configured
+                      ? aiHealth.mistralOcr.valid
+                        ? "Ready"
+                        : "Unhealthy"
+                      : "Not configured"
+                  }
                   icon={<Zap className="h-5 w-5" />}
-                  variant={avgResponseMs < 300 ? "success" : "warning"}
-                  subtitle="Last hour"
+                  variant={
+                    aiHealth?.mistralOcr?.valid
+                      ? "success"
+                      : aiHealth?.mistralOcr?.configured
+                        ? "error"
+                        : "warning"
+                  }
+                  subtitle="OCR provider"
                 />
                 <StatusCard
-                  title="Slow queries"
-                  value={String(slowQueries)}
-                  icon={<Database className="h-5 w-5" />}
-                  variant={slowQueries < 10 ? "success" : "warning"}
-                  subtitle="Database layer"
-                />
-                <StatusCard
-                  title="Cache hit rate"
-                  value={`${cacheHitPct}%`}
+                  title="Gemini"
+                  value={
+                    aiHealth?.geminiAnalyzer?.configured ? "Configured" : "Off"
+                  }
                   icon={<Activity className="h-5 w-5" />}
-                  variant={cacheHitPct > 80 ? "success" : "warning"}
-                  subtitle="Query cache"
+                  variant={
+                    aiHealth?.geminiAnalyzer?.configured ? "success" : "info"
+                  }
+                  subtitle="Analyzer provider"
+                />
+                <StatusCard
+                  title="DLQ depth"
+                  value={isAdmin ? String(dlqCount) : "Admin only"}
+                  icon={<Database className="h-5 w-5" />}
+                  variant={
+                    !isAdmin ? "info" : dlqCount === 0 ? "success" : "warning"
+                  }
+                  subtitle={
+                    isAdmin ? "Failed pipeline jobs" : "Requires admin role"
+                  }
+                />
+                <StatusCard
+                  title="LLM calls (48h)"
+                  value={
+                    canFinOps
+                      ? llmCalls != null
+                        ? String(llmCalls)
+                        : "—"
+                      : "QA lead+"
+                  }
+                  icon={<TrendingUp className="h-5 w-5" />}
+                  variant="info"
+                  subtitle={
+                    canFinOps
+                      ? "Estimated FinOps ledger"
+                      : "Requires qa_lead or admin"
+                  }
                 />
               </div>
 
@@ -339,38 +485,49 @@ export default function Monitoring() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Activity className="h-5 w-5" />
-                      Response time (24h)
+                      LLM throughput (by day)
                     </CardTitle>
                     <CardDescription>
-                      Average API latency by hour
+                      Estimated API call volume from FinOps ledger
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <LineChart data={performanceData}>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          className="stroke-border"
-                        />
-                        <XAxis
-                          dataKey="name"
-                          className="text-muted-foreground"
-                          tick={{ fontSize: 12 }}
-                        />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip
-                          contentStyle={CHART_TOOLTIP_STYLE}
-                          labelStyle={{ color: "#333030" }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="avgResponse"
-                          stroke="#5a7a1a"
-                          strokeWidth={2}
-                          name="Avg response (ms)"
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    {throughputData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={throughputData}>
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            className="stroke-border"
+                          />
+                          <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+                          <YAxis
+                            tick={{ fontSize: 12 }}
+                            allowDecimals={false}
+                          />
+                          <Tooltip
+                            contentStyle={CHART_TOOLTIP_STYLE}
+                            labelStyle={{ color: "#333030" }}
+                          />
+                          <Bar
+                            dataKey="calls"
+                            fill="#beda41"
+                            name="API calls"
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <EmptyState
+                        compact
+                        icon={Activity}
+                        title="No LLM traffic yet"
+                        description={
+                          canFinOps
+                            ? "Call volume appears after AI audits run on this revision."
+                            : "FinOps throughput requires qa_lead or admin."
+                        }
+                      />
+                    )}
                   </CardContent>
                 </Card>
 
@@ -378,31 +535,43 @@ export default function Monitoring() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <TrendingUp className="h-5 w-5" />
-                      Request volume (24h)
+                      Job status distribution
                     </CardTitle>
-                    <CardDescription>Throughput by hour</CardDescription>
+                    <CardDescription>
+                      Live counts from accessible job sheets
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={performanceData}>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          className="stroke-border"
-                        />
-                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                        <YAxis tick={{ fontSize: 12 }} />
-                        <Tooltip
-                          contentStyle={CHART_TOOLTIP_STYLE}
-                          labelStyle={{ color: "#333030" }}
-                        />
-                        <Bar
-                          dataKey="requests"
-                          fill="#beda41"
-                          name="Requests"
-                          radius={[4, 4, 0, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    {statusData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                          <Pie
+                            data={statusData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={2}
+                            dataKey="value"
+                            label={({ name, percent }) =>
+                              `${name}: ${(percent * 100).toFixed(0)}%`
+                            }
+                          >
+                            {statusData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <EmptyState
+                        compact
+                        icon={Database}
+                        title="No job sheets yet"
+                        description="Status mix appears after uploads are processed."
+                      />
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -419,113 +588,97 @@ export default function Monitoring() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Database className="h-5 w-5" />
-                      Job status distribution
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <PieChart>
-                        <Pie
-                          data={statusData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={2}
-                          dataKey="value"
-                          label={({ name, percent }) =>
-                            `${name}: ${(percent * 100).toFixed(0)}%`
-                          }
-                        >
-                          {statusData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-
                 <Card className="lg:col-span-2">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                       <AlertCircle className="h-5 w-5" />
-                      Recent errors
+                      Operational issues
                     </CardTitle>
                     <CardDescription>
-                      Sample operational error feed
+                      DLQ recoverables, drift alerts, and AI provider faults
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {recentErrors.length === 0 ? (
+                      {operationalIssues.length === 0 ? (
                         <div className="text-center text-muted-foreground py-8">
-                          <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-success" />
-                          No recent errors
+                          <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-[#5a7a1a]" />
+                          No active operational issues
                         </div>
                       ) : (
-                        recentErrors.map(error => (
+                        operationalIssues.map(issue => (
                           <div
-                            key={error.id}
-                            className="flex items-center justify-between p-3 border rounded-lg bg-white"
+                            key={issue.id}
+                            className="flex items-center justify-between p-3 border rounded-lg bg-white gap-3"
                           >
-                            <div className="flex items-center gap-3">
-                              <XCircle className="h-5 w-5 text-destructive shrink-0" />
-                              <div>
-                                <p className="font-medium">{error.message}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {error.lastSeen}
+                            <div className="flex items-center gap-3 min-w-0">
+                              <XCircle
+                                className={cn(
+                                  "h-5 w-5 shrink-0",
+                                  issue.severity === "critical"
+                                    ? "text-destructive"
+                                    : "text-warning"
+                                )}
+                              />
+                              <div className="min-w-0">
+                                <p className="font-medium truncate">
+                                  {issue.message}
+                                </p>
+                                <p className="text-sm text-muted-foreground truncate">
+                                  {issue.detail}
                                 </p>
                               </div>
                             </div>
-                            <Badge variant="destructive">{error.count}×</Badge>
+                            <Badge
+                              variant={
+                                issue.severity === "critical"
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                            >
+                              {issue.severity}
+                            </Badge>
                           </div>
                         ))
                       )}
                     </div>
                   </CardContent>
                 </Card>
-              </div>
 
-              <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Database className="h-5 w-5" />
-                    Database performance
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <MetricBox
-                      label="Active connections"
-                      value="12"
-                      max="50"
-                      status="healthy"
-                    />
-                    <MetricBox
-                      label="Slow queries"
-                      value={String(slowQueries)}
-                      suffix="queries"
-                      status={slowQueries < 10 ? "healthy" : "warning"}
-                    />
-                    <MetricBox
-                      label="Avg query time"
-                      value={`${avgQueryMs}ms`}
-                      status={avgQueryMs < 100 ? "healthy" : "warning"}
-                    />
-                    <MetricBox
-                      label="Cache hit rate"
-                      value={`${cacheHitPct}%`}
-                      status={cacheHitPct > 80 ? "healthy" : "warning"}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Database className="h-5 w-5" />
+                      Quick links
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full justify-start"
+                    >
+                      <Link href="/hold-queue">Hold queue</Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full justify-start"
+                    >
+                      <Link href="/analytics/drift">Drift detection</Link>
+                    </Button>
+                    {canFinOps ? (
+                      <Button
+                        asChild
+                        variant="outline"
+                        className="w-full justify-start"
+                      >
+                        <Link href="/settings?tab=api-costs">API costs</Link>
+                      </Button>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              </div>
             </section>
           </>
         )}
@@ -575,35 +728,6 @@ function StatusCard({
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-interface MetricBoxProps {
-  label: string;
-  value: string;
-  max?: string;
-  suffix?: string;
-  status: "healthy" | "warning" | "error";
-}
-
-function MetricBox({ label, value, max, suffix, status }: MetricBoxProps) {
-  const statusColors = {
-    healthy: "text-[#5a7a1a]",
-    warning: "text-warning",
-    error: "text-destructive",
-  };
-
-  return (
-    <div className="border rounded-lg p-4 bg-white">
-      <p className="text-sm text-muted-foreground mb-1">{label}</p>
-      <p className={cn("text-xl font-bold", statusColors[status])}>
-        {value}
-        {max && <span className="text-sm text-muted-foreground"> / {max}</span>}
-        {suffix && (
-          <span className="text-sm text-muted-foreground ml-1">{suffix}</span>
-        )}
-      </p>
-    </div>
   );
 }
 
