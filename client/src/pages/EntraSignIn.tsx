@@ -46,35 +46,32 @@ export default function EntraSignIn({
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4"
+      className="min-h-screen flex items-center justify-center p-4 bg-muted"
       style={{
-        backgroundColor: "#ececec",
         fontFamily: "Segoe UI, system-ui, sans-serif",
       }}
     >
       <div
-        className="w-full bg-white"
+        className="w-full bg-card border"
         style={{
           maxWidth: 368,
           padding: "40px 32px 32px",
           borderRadius: 4,
-          border: "1px solid #e0e0e0",
         }}
       >
         <div className="text-center mb-8">
           <p
-            className="text-xs font-semibold tracking-wide uppercase mb-3"
-            style={{ color: "#706D6D", letterSpacing: "0.06em" }}
+            className="text-xs font-semibold tracking-wide uppercase mb-3 text-muted-foreground"
+            style={{ letterSpacing: "0.06em" }}
           >
             PlantExpand
           </p>
           <h1
-            className="text-xl font-semibold leading-tight"
-            style={{ color: "#333030" }}
+            className="text-xl font-semibold leading-tight text-foreground"
           >
             {subtitle}
           </h1>
-          <p className="mt-2 text-sm" style={{ color: "#706D6D" }}>
+          <p className="mt-2 text-sm text-muted-foreground">
             Sign in with your work account to continue.
           </p>
         </div>
@@ -96,7 +93,7 @@ export default function EntraSignIn({
           Sign in with Microsoft Entra ID
         </button>
 
-        <p className="mt-6 text-center text-xs" style={{ color: "#8a8686" }}>
+        <p className="mt-6 text-center text-xs text-muted-foreground">
           Secured by Microsoft Entra ID
         </p>
       </div>
