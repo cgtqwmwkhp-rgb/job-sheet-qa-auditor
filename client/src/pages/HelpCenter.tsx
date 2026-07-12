@@ -45,7 +45,7 @@ export default function HelpCenter() {
     <div className="space-y-8 p-8 max-w-7xl mx-auto animate-in fade-in duration-500">
       {/* Header Section */}
       <div className="text-center space-y-4 py-8">
-        <h1 className="text-4xl font-bold tracking-tight text-[#333030]">
+        <h1 className="text-4xl font-bold tracking-tight text-foreground">
           How can we help you today?
         </h1>
         <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
@@ -105,7 +105,7 @@ export default function HelpCenter() {
             <Card className="hover:shadow-md transition-shadow border-primary/10">
               <CardHeader>
                 <div className="h-10 w-10 rounded-lg bg-[rgba(190,218,65,0.15)] flex items-center justify-center mb-2">
-                  <ShieldCheck className="h-6 w-6 text-[#333030]" />
+                  <ShieldCheck className="h-6 w-6 text-foreground" />
                 </div>
                 <CardTitle>The "Why" & "How"</CardTitle>
                 <CardDescription>
@@ -333,11 +333,11 @@ export default function HelpCenter() {
         {/* Best Practices Tab */}
         <TabsContent value="best-practices" className="mt-8">
           <div className="grid gap-6 md:grid-cols-2">
-            <Card className="bg-[#F9F9F9] border-[#EBE8E8]">
+            <Card className="bg-muted border">
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-[#333030]">
+                  <CardTitle className="text-foreground">
                     For Engineers
                   </CardTitle>
                 </div>
@@ -375,11 +375,13 @@ export default function HelpCenter() {
               </CardContent>
             </Card>
 
-            <Card className="bg-[#F9F9F9] border-[#EBE8E8]">
+            <Card className="bg-muted border">
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Lightbulb className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-[#333030]">For QA Leads</CardTitle>
+                  <CardTitle className="text-foreground">
+                    For QA Leads
+                  </CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">

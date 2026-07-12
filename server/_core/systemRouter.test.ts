@@ -39,6 +39,8 @@ describe("systemRouter.health", () => {
   it("should include environment in config using APP_ENV", async () => {
     process.env.NODE_ENV = "production";
     process.env.APP_ENV = "staging";
+    process.env.JWT_SECRET =
+      "test-secret-key-for-testing-purposes-only-32-chars-minimum";
 
     const { systemRouter } = await import("./systemRouter");
     const caller = systemRouter.createCaller({});
@@ -51,6 +53,8 @@ describe("systemRouter.health", () => {
   it("should fallback to production when NODE_ENV=production and APP_ENV not set", async () => {
     process.env.NODE_ENV = "production";
     delete process.env.APP_ENV;
+    process.env.JWT_SECRET =
+      "test-secret-key-for-testing-purposes-only-32-chars-minimum";
 
     const { systemRouter } = await import("./systemRouter");
     const caller = systemRouter.createCaller({});
@@ -149,6 +153,8 @@ describe("systemRouter.version", () => {
     process.env.NODE_ENV = "production";
     process.env.APP_ENV = "staging";
     process.env.GIT_SHA = "abc123";
+    process.env.JWT_SECRET =
+      "test-secret-key-for-testing-purposes-only-32-chars-minimum";
 
     const { systemRouter } = await import("./systemRouter");
     const caller = systemRouter.createCaller({});
@@ -162,6 +168,8 @@ describe("systemRouter.version", () => {
     process.env.NODE_ENV = "production";
     delete process.env.APP_ENV;
     process.env.GIT_SHA = "abc123";
+    process.env.JWT_SECRET =
+      "test-secret-key-for-testing-purposes-only-32-chars-minimum";
 
     const { systemRouter } = await import("./systemRouter");
     const caller = systemRouter.createCaller({});

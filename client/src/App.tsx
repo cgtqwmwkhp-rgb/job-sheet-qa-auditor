@@ -1,6 +1,6 @@
 import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/sonner";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+// QueryClient is now only in main.tsx - removed duplicate provider
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, Redirect } from "wouter";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -221,21 +221,17 @@ function Router() {
 
 // Theme: switchable ThemeProvider + header ThemeToggle; tokens in index.css (brand-lime).
 
-const queryClient = new QueryClient();
-
 function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light" switchable={true}>
         <AuthProvider>
-          <QueryClientProvider client={queryClient}>
-            <TooltipProvider>
-              <Toaster />
-              <ProcessingWatchdog />
-              <Router />
-              <OnboardingTour />
-            </TooltipProvider>
-          </QueryClientProvider>
+          <TooltipProvider>
+            <Toaster />
+            <ProcessingWatchdog />
+            <Router />
+            <OnboardingTour />
+          </TooltipProvider>
         </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>

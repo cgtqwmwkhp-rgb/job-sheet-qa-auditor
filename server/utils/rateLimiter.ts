@@ -152,6 +152,10 @@ export function getRateLimitStatus(
 }
 
 // Predefined rate limit configurations
+/**
+ * Rate limit configurations for different operation types.
+ * Override via environment variables for different deployment environments.
+ */
 export const RATE_LIMITS = {
   // Standard API endpoints
   standard: {
