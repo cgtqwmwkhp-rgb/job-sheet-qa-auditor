@@ -40,7 +40,6 @@ import {
   createStudioStarterSelection,
   createStudioStarterRoi,
   attachStudioSample,
-  getStudioSample,
   buildActivationReport,
   proposeFromSample,
   scaffoldFixturesFromSample,
@@ -50,9 +49,13 @@ import {
   markPromoteApplied,
   listPromoteRequests,
   getPromoteRequest,
+  resolvePromoteRequest,
   packIntegrityHash,
+  assertPackIntegrity,
   diffVersions,
 } from "../services/templateStudio";
+import { assertStagingActivationAllowed } from "../services/templateStudio/envGuards";
+import { resolveStudioSample } from "../services/templateStudio/sampleStore";
 import {
   setTemplateOverride,
   getTemplateOverride,
@@ -242,6 +245,14 @@ export const templateRouter = router({
   activateVersion: qaLeadProcedure
     .input(z.object({ versionId: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      try {
+        assertStagingActivationAllowed("templates.activateVersion");
+      } catch (err) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: err instanceof Error ? err.message : "Activation blocked",
+        });
+      }
       const version = activateVersion(input.versionId);
       logAuditEvent(
         "TEMPLATE_ACTIVATE",
@@ -468,10 +479,10 @@ export const templateRouter = router({
         return { meta, sampleUrl };
       }),
 
-    getSample: protectedProcedure
+    getSample: qaLeadProcedure
       .input(z.object({ versionId: z.number() }))
       .query(async ({ input }) => {
-        const meta = getStudioSample(input.versionId);
+        const meta = await resolveStudioSample(input.versionId);
         if (!meta) return null;
         return {
           meta,
@@ -535,6 +546,14 @@ export const templateRouter = router({
     activateStaging: qaLeadProcedure
       .input(z.object({ versionId: z.number() }))
       .mutation(async ({ ctx, input }) => {
+        try {
+          assertStagingActivationAllowed("templates.studio.activateStaging");
+        } catch (err) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: err instanceof Error ? err.message : "Activation blocked",
+          });
+        }
         const report = buildActivationReport(input.versionId);
         if (!report.allowed) {
           throw new TRPCError({
@@ -544,6 +563,13 @@ export const templateRouter = router({
               .join(", ")}${
               report.fixtures.blocking ? "; FIXTURES_FAILED" : ""
             }${!report.collision.allowed ? "; COLLISION" : ""}`,
+          });
+        }
+        if (!report.fixtures.hasFixtures) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Fixtures required before staging activate — run Propose apply or Scaffold fixtures first",
           });
         }
         const version = activateVersion(input.versionId);
@@ -576,6 +602,7 @@ export const templateRouter = router({
           versionId: z.number(),
           templateName: z.string().optional(),
           applyAccepted: z.boolean().optional(),
+          rejectedFieldIds: z.array(z.string()).optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -593,19 +620,54 @@ export const templateRouter = router({
 
         let appliedVersion = null as ReturnType<typeof getTemplateVersion>;
         if (input.applyAccepted) {
+          const rejected = new Set(input.rejectedFieldIds ?? []);
+          const fields = proposal.proposedSpec.fields.filter(
+            f => !rejected.has(f.field)
+          );
+          const rules = proposal.proposedSpec.rules.filter(
+            r => !rejected.has(r.field)
+          );
+          const acceptedFields = proposal.fields.map(f => ({
+            ...f,
+            accepted: !rejected.has(f.field.field),
+          }));
+          const filteredSpec = {
+            ...proposal.proposedSpec,
+            fields,
+            rules,
+            metadata: {
+              ...proposal.proposedSpec.metadata,
+              rejectedFieldIds: Array.from(rejected),
+            },
+          };
+          // Keep critical fields even if user rejected — activation gates require them
+          const critical = [
+            "jobReference",
+            "assetId",
+            "date",
+            "engineerSignOff",
+          ];
+          for (const c of critical) {
+            if (!filteredSpec.fields.some(f => f.field === c)) {
+              const fromProposal = proposal.fields.find(
+                f => f.field.field === c
+              );
+              if (fromProposal) filteredSpec.fields.push(fromProposal.field);
+            }
+          }
           appliedVersion = updateDraftVersion(input.versionId, {
-            specJson: proposal.proposedSpec,
+            specJson: filteredSpec,
             selectionConfigJson: proposal.proposedSelection,
             roiJson: proposal.proposedRoi,
-            changeNotes: "Applied AI/OCR proposal",
+            changeNotes: "Applied AI/OCR proposal (with rejects filtered)",
           });
-          // Scaffold fixtures from layout text
           scaffoldFixturesFromSample({
             versionId: input.versionId,
             sampleText: proposal.layoutTextPreview,
-            specJson: proposal.proposedSpec,
+            specJson: filteredSpec,
             createdBy: ctx.user.id,
           });
+          proposal.fields = acceptedFields;
         }
 
         logAuditEvent(
@@ -617,6 +679,7 @@ export const templateRouter = router({
             layoutAvailable: proposal.layoutAvailable,
             geminiUsed: proposal.geminiUsed,
             applied: Boolean(input.applyAccepted),
+            rejectedCount: input.rejectedFieldIds?.length ?? 0,
           }
         );
 
@@ -653,7 +716,7 @@ export const templateRouter = router({
         return report.collision;
       }),
 
-    diffVersions: protectedProcedure
+    diffVersions: qaLeadProcedure
       .input(
         z.object({
           fromVersionId: z.number(),
@@ -681,7 +744,7 @@ export const templateRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const req = requestPromote({
+        const req = await requestPromote({
           versionId: input.versionId,
           requestedBy: ctx.user.id,
           smokeJobSheetIds: input.smokeJobSheetIds,
@@ -711,7 +774,7 @@ export const templateRouter = router({
     approvePromote: qaLeadProcedure
       .input(z.object({ promoteId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
-        const req = approvePromote({
+        const req = await approvePromote({
           promoteId: input.promoteId,
           approvedBy: ctx.user.id,
         });
@@ -733,25 +796,8 @@ export const templateRouter = router({
             integrity: packIntegrityHash(req.pack),
           },
         });
-
-        // On production env, apply immediately after second approve
-        const env = (process.env.APP_ENV || "").toLowerCase();
-        let applied = null as Awaited<
-          ReturnType<typeof applyPromotePack>
-        > | null;
-        if (env === "production" || env === "prod") {
-          applied = await applyPromotePack(req.pack, ctx.user.id);
-          markPromoteApplied(req.id, ctx.user.id);
-          await db.logAction({
-            userId: ctx.user.id,
-            action: "TEMPLATE_PROMOTE_APPLY",
-            entityType: "template_promote",
-            entityId: applied.version.id,
-            details: { promoteId: req.id, environment: env },
-          });
-        }
-
-        return { request: getPromoteRequest(req.id), applied };
+        // Dual control: approve never auto-applies — applier must call applyPromote
+        return { request: await resolvePromoteRequest(req.id), applied: null };
       }),
 
     rejectPromote: qaLeadProcedure
@@ -762,7 +808,7 @@ export const templateRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const req = rejectPromote({
+        const req = await rejectPromote({
           promoteId: input.promoteId,
           rejectedBy: ctx.user.id,
           reason: input.reason,
@@ -780,7 +826,7 @@ export const templateRouter = router({
     applyPromote: qaLeadProcedure
       .input(z.object({ promoteId: z.string().uuid() }))
       .mutation(async ({ ctx, input }) => {
-        const req = getPromoteRequest(input.promoteId);
+        const req = await resolvePromoteRequest(input.promoteId);
         if (!req) {
           throw new TRPCError({
             code: "NOT_FOUND",
@@ -793,6 +839,14 @@ export const templateRouter = router({
             message: "Promote must be approved before apply",
           });
         }
+        try {
+          assertPackIntegrity(req.pack);
+        } catch (err) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: err instanceof Error ? err.message : "Integrity failure",
+          });
+        }
         if (req.requestedBy === ctx.user.id) {
           throw new TRPCError({
             code: "FORBIDDEN",
@@ -800,7 +854,7 @@ export const templateRouter = router({
           });
         }
         const applied = await applyPromotePack(req.pack, ctx.user.id);
-        markPromoteApplied(req.id, ctx.user.id);
+        await markPromoteApplied(req.id, ctx.user.id);
         await db.logAction({
           userId: ctx.user.id,
           action: "TEMPLATE_PROMOTE_APPLY",
@@ -809,9 +863,13 @@ export const templateRouter = router({
           details: {
             promoteId: req.id,
             environment: process.env.APP_ENV || "unknown",
+            integrity: req.pack.integrityHash,
           },
         });
-        return { request: getPromoteRequest(req.id), ...applied };
+        return {
+          request: await resolvePromoteRequest(req.id),
+          ...applied,
+        };
       }),
 
     listPromotes: qaLeadProcedure
@@ -828,13 +886,13 @@ export const templateRouter = router({
 
     getPromote: qaLeadProcedure
       .input(z.object({ promoteId: z.string().uuid() }))
-      .query(({ input }) => getPromoteRequest(input.promoteId)),
+      .query(async ({ input }) => resolvePromoteRequest(input.promoteId)),
   }),
 
   // Template override (review workstation)
   overrides: router({
     list: qaLeadProcedure.query(() => listOverrides()),
-    get: protectedProcedure
+    get: qaLeadProcedure
       .input(z.object({ jobSheetId: z.number() }))
       .query(({ input }) => getTemplateOverride(input.jobSheetId)),
     set: qaLeadProcedure

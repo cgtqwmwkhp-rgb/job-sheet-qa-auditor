@@ -155,6 +155,18 @@ export default function TemplateStudio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when version id/hash changes
   }, [version?.id, version?.hashSha256]);
 
+  useEffect(() => {
+    if (versionId == null) return;
+    void utils.templates.studio.getSample
+      .fetch({ versionId })
+      .then(sample => {
+        if (sample?.sampleUrl) setSampleUrl(sample.sampleUrl);
+      })
+      .catch(() => {
+        /* no sample yet */
+      });
+  }, [versionId, utils.templates.studio.getSample]);
+
   const openTemplate = (id: number, activeVersionId: number | null) => {
     setTemplateId(id);
     if (activeVersionId) {
@@ -228,8 +240,10 @@ export default function TemplateStudio() {
         versionId,
         templateName: name || undefined,
         applyAccepted,
+        rejectedFieldIds: applyAccepted
+          ? Array.from(rejectedFields)
+          : undefined,
       });
-      setRejectedFields(new Set());
       if (result.appliedVersion) {
         loadVersionIntoEditors(result.appliedVersion);
         await utils.templates.getVersion.invalidate({ versionId });
@@ -240,7 +254,7 @@ export default function TemplateStudio() {
           ? "Gemini + OCR"
           : result.proposal.layoutAvailable
             ? "OCR heuristics"
-            : "Starter scaffold"
+            : "Starter scaffold (no sample OCR)"
       );
       return result.proposal;
     } catch (err) {
@@ -296,7 +310,15 @@ export default function TemplateStudio() {
   const handleActivate = async () => {
     if (!versionId) return;
     try {
-      await scaffoldFixtures.mutateAsync({ versionId });
+      // Ensure fixtures exist before activate (do not silently invent on activate)
+      const has = await utils.templates.hasFixtures.fetch({ versionId });
+      if (!has.hasFixtures) {
+        await scaffoldFixtures.mutateAsync({ versionId });
+        showSuccessToast(
+          "Fixtures scaffolded",
+          "Review gates, then activate again if needed"
+        );
+      }
       const result = await activateStaging.mutateAsync({ versionId });
       await refetchReport();
       await utils.templates.list.invalidate();

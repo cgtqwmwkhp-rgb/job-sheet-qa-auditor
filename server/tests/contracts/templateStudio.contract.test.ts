@@ -2,7 +2,7 @@
  * Template Studio contract tests — R1/R2/R3 foundation.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { templateRouter } from "../../routers/templateRouter";
 import {
   resetRegistry,
@@ -105,6 +105,11 @@ describe("Template Studio contracts", () => {
       name: "Activate Me",
       selectionTokens: ["plantexpand-unique-activate"],
     });
+    await caller.templates.studio.scaffoldFixtures({
+      versionId: version.id,
+      sampleText:
+        "Job Reference JOB-1 Asset ID A-1 Date 01/01/2026 Engineer Sign-Off Jane",
+    });
     const report = await caller.templates.studio.activationReport({
       versionId: version.id,
     });
@@ -116,6 +121,20 @@ describe("Template Studio contracts", () => {
     });
     expect(activated.version.isActive).toBe(true);
     expect(getTemplateVersion(version.id)?.isActive).toBe(true);
+  });
+
+  it("blocks direct activation on production APP_ENV", async () => {
+    vi.stubEnv("APP_ENV", "production");
+    const caller = createCaller("admin");
+    const { version } = await caller.templates.studio.createDraft({
+      name: "Prod Block",
+      selectionTokens: ["prod-block-token"],
+    });
+    await caller.templates.studio.scaffoldFixtures({ versionId: version.id });
+    await expect(
+      caller.templates.studio.activateStaging({ versionId: version.id })
+    ).rejects.toThrow(/blocked on production/i);
+    vi.unstubAllEnvs();
   });
 
   it("proposeFromSample returns artifact without sample (starter path)", async () => {
@@ -140,12 +159,14 @@ describe("Template Studio contracts", () => {
       name: "Promote Me",
       selectionTokens: ["promote-unique-token"],
     });
+    await author.templates.studio.scaffoldFixtures({ versionId: version.id });
     await author.templates.studio.activateStaging({ versionId: version.id });
     const req = await author.templates.studio.requestPromote({
       versionId: version.id,
       smokeJobSheetIds: [42],
     });
     expect(req.status).toBe("pending");
+    expect(req.pack.integrityHash).toBeTruthy();
 
     await expect(
       author.templates.studio.approvePromote({ promoteId: req.id })
@@ -156,6 +177,7 @@ describe("Template Studio contracts", () => {
       promoteId: req.id,
     });
     expect(approved.request?.status).toBe("approved");
+    expect(approved.applied).toBeNull();
   });
 
   it("diffVersions reports field changes", async () => {

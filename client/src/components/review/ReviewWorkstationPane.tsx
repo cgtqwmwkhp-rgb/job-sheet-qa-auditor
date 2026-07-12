@@ -70,6 +70,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   findingsToViewerBoxes,
   syncSelectionFromBox,
@@ -562,6 +563,8 @@ function ReviewWorkstationContent({
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [overrideVersionId, setOverrideVersionId] = useState("");
   const [overrideReason, setOverrideReason] = useState("");
+  const { hasRole } = useAuth();
+  const canOverrideTemplate = hasRole(["admin", "qa_lead"]);
   const utils = trpc.useUtils();
 
   const invalidateFindings = () => {
@@ -1157,10 +1160,12 @@ function ReviewWorkstationContent({
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Reprocess
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setOverrideOpen(true)}>
-                <FileText className="w-4 h-4 mr-2" />
-                Override template + reprocess
-              </DropdownMenuItem>
+              {canOverrideTemplate && (
+                <DropdownMenuItem onClick={() => setOverrideOpen(true)}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Override template + reprocess
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => setShowLegend(v => !v)}>
                 <Keyboard className="w-4 h-4 mr-2" />
                 Shortcuts
@@ -1420,14 +1425,35 @@ function ReviewWorkstationContent({
                     jobSheetId,
                     templateId: tpl.id,
                     versionId,
-                    originalConfidence: "LOW",
-                    originalTopScore: 0,
+                    originalConfidence:
+                      auditData.selectionTrace?.confidenceBand === "HIGH" ||
+                      auditData.selectionTrace?.confidenceBand === "MEDIUM" ||
+                      auditData.selectionTrace?.confidenceBand === "LOW"
+                        ? auditData.selectionTrace.confidenceBand
+                        : "LOW",
+                    originalTopScore:
+                      auditData.selectionTrace?.candidates?.[0]?.score ?? 0,
                     reason: overrideReason.trim(),
                     reprocess: true,
                   },
                   {
-                    onSuccess: () => {
-                      toast.success("Template override applied — reprocessing");
+                    onSuccess: result => {
+                      const ok =
+                        result.reprocessResult == null ||
+                        (typeof result.reprocessResult === "object" &&
+                          result.reprocessResult !== null &&
+                          "success" in result.reprocessResult &&
+                          (result.reprocessResult as { success?: boolean })
+                            .success !== false);
+                      if (ok) {
+                        toast.success(
+                          "Template override applied — reprocessing"
+                        );
+                      } else {
+                        toast.error(
+                          "Override saved but reprocess reported failure — check job status"
+                        );
+                      }
                       setOverrideOpen(false);
                       setOverrideReason("");
                       utils.jobSheets.get.invalidate({ id: jobSheetId });

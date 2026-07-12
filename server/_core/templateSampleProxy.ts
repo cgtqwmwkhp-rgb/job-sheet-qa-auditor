@@ -7,7 +7,10 @@ import { Router, Request, Response, NextFunction } from "express";
 import { readFile } from "fs/promises";
 import { sdk } from "./sdk";
 import { getStorageAdapter } from "../storage";
-import { getStudioSample } from "../services/templateStudio/sampleStore";
+import {
+  getStudioSample,
+  resolveStudioSample,
+} from "../services/templateStudio/sampleStore";
 import { createSafeLogger } from "../utils/safeLogger";
 
 const router = Router();
@@ -40,7 +43,7 @@ router.get("/:versionId", requireQaLead, async (req, res) => {
       res.status(400).json({ error: "Invalid versionId" });
       return;
     }
-    const meta = getStudioSample(versionId);
+    const meta = await resolveStudioSample(versionId);
     if (!meta) {
       res.status(404).json({ error: "Sample not found" });
       return;

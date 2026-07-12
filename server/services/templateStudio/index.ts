@@ -10,3 +10,5 @@ export * from "./scaffoldFixtures";
 export * from "./versionDiff";
 export * from "./proposeFromSample";
 export * from "./stagingVerify";
+export * from "./envGuards";
+export * from "./durableStore";

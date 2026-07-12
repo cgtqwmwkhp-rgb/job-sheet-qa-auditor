@@ -823,12 +823,12 @@ async function processJobSheetWithOptions(
 
   // Manual template override from review workstation (Template Studio R3)
   let forcedTemplateVersionId = options.templateVersionId;
-  if (!forcedTemplateVersionId) {
+  if (!options.templateVersionId) {
     try {
-      const { getTemplateOverride } = await import(
+      const { resolveTemplateOverride } = await import(
         "./templateOverride/overrideService"
       );
-      const override = getTemplateOverride(jobSheetId);
+      const override = await resolveTemplateOverride(jobSheetId);
       if (override?.versionId) {
         forcedTemplateVersionId = override.versionId;
         console.info(

@@ -1,5 +1,6 @@
 /**
  * Template Studio — dual-control promote queue (staging → production).
+ * Durable JSON sidecars survive restarts; integrity hash verified on approve/apply.
  */
 
 import { createHash, randomUUID } from "crypto";
@@ -11,6 +12,7 @@ import {
   type RoiConfig,
 } from "../templateRegistry";
 import { buildActivationReport } from "./activationReport";
+import { loadStudioJson, persistStudioJson, promoteKey } from "./durableStore";
 
 export type PromoteStatus =
   | "pending"
@@ -29,6 +31,7 @@ export interface PromotePack {
   selectionConfigJson: SelectionConfig;
   roiJson: RoiConfig | null;
   changeNotes: string | null;
+  integrityHash: string;
   stagingEvidence: {
     versionId: number;
     templateId: number;
@@ -76,12 +79,53 @@ export function getPromoteRequest(id: string): PromoteRequest | null {
   return promoteStore.get(id) ?? null;
 }
 
-export function requestPromote(input: {
+export async function resolvePromoteRequest(
+  id: string
+): Promise<PromoteRequest | null> {
+  const cached = promoteStore.get(id);
+  if (cached) return cached;
+  const loaded = await loadStudioJson<PromoteRequest>(promoteKey(id));
+  if (loaded) {
+    promoteStore.set(id, loaded);
+    return loaded;
+  }
+  return null;
+}
+
+async function persistPromote(req: PromoteRequest): Promise<void> {
+  promoteStore.set(req.id, req);
+  await persistStudioJson(promoteKey(req.id), req);
+}
+
+export function packIntegrityHash(
+  pack: Omit<PromotePack, "integrityHash"> | PromotePack
+): string {
+  const payload = JSON.stringify({
+    templateSlug: pack.templateSlug,
+    version: pack.version,
+    hashSha256: pack.hashSha256,
+    specJson: pack.specJson,
+    selectionConfigJson: pack.selectionConfigJson,
+    roiJson: pack.roiJson,
+  });
+  return createHash("sha256").update(payload).digest("hex");
+}
+
+export function assertPackIntegrity(pack: PromotePack): void {
+  const expected = packIntegrityHash(pack);
+  if (!pack.integrityHash || pack.integrityHash !== expected) {
+    throw new Error(
+      "Promote pack integrity hash mismatch — pack may have been tampered with"
+    );
+  }
+}
+
+export async function requestPromote(input: {
   versionId: number;
   requestedBy: number;
   smokeJobSheetIds?: number[];
   notes?: string;
-}): PromoteRequest {
+}): Promise<PromoteRequest> {
   const version = getTemplateVersion(input.versionId);
   if (!version) {
     throw new Error(`Version not found: ${input.versionId}`);
@@ -103,7 +147,6 @@ export function requestPromote(input: {
     );
   }
 
-  // Deduplicate pending for same hash
   for (const existing of Array.from(promoteStore.values())) {
     if (
       existing.status === "pending" &&
@@ -115,8 +158,8 @@ export function requestPromote(input: {
     }
   }
 
-  const pack: PromotePack = {
-    schemaVersion: "1.0.0",
+  const packBase = {
+    schemaVersion: "1.0.0" as const,
     templateSlug: template.templateId,
     templateName: template.name,
     version: version.version,
@@ -128,7 +171,7 @@ export function requestPromote(input: {
     stagingEvidence: {
       versionId: version.id,
       templateId: template.id,
-      activatedAt: new Date().toISOString(),
+      activatedAt: version.createdAt.toISOString(),
       environment: process.env.APP_ENV || "staging",
       activationReportSummary: {
         allowed: report.allowed,
@@ -138,6 +181,11 @@ export function requestPromote(input: {
       },
       smokeJobSheetIds: input.smokeJobSheetIds ?? [],
     },
+  };
+
+  const pack: PromotePack = {
+    ...packBase,
+    integrityHash: packIntegrityHash(packBase),
   };
 
   const request: PromoteRequest = {
@@ -156,15 +204,15 @@ export function requestPromote(input: {
     notes: input.notes ?? null,
   };
 
-  promoteStore.set(request.id, request);
+  await persistPromote(request);
   return request;
 }
 
-export function approvePromote(input: {
+export async function approvePromote(input: {
   promoteId: string;
   approvedBy: number;
-}): PromoteRequest {
-  const req = promoteStore.get(input.promoteId);
+}): Promise<PromoteRequest> {
+  const req = await resolvePromoteRequest(input.promoteId);
   if (!req) {
     throw new Error(`Promote request not found: ${input.promoteId}`);
   }
@@ -177,36 +225,39 @@ export function approvePromote(input: {
     );
   }
 
+  assertPackIntegrity(req.pack);
   req.status = "approved";
   req.approvedBy = input.approvedBy;
   req.approvedAt = new Date().toISOString();
+  await persistPromote(req);
   return req;
 }
 
-export function rejectPromote(input: {
+export async function rejectPromote(input: {
   promoteId: string;
   rejectedBy: number;
   reason: string;
-}): PromoteRequest {
-  const req = promoteStore.get(input.promoteId);
+}): Promise<PromoteRequest> {
+  const req = await resolvePromoteRequest(input.promoteId);
   if (!req) {
     throw new Error(`Promote request not found: ${input.promoteId}`);
   }
-  if (req.status !== "pending" && req.status !== "approved") {
+  if (req.status !== "pending") {
     throw new Error(`Cannot reject promote in status ${req.status}`);
   }
   req.status = "rejected";
   req.rejectedBy = input.rejectedBy;
   req.rejectedAt = new Date().toISOString();
   req.rejectReason = input.reason;
+  await persistPromote(req);
   return req;
 }
 
-export function markPromoteApplied(
+export async function markPromoteApplied(
   promoteId: string,
   appliedBy: number
-): PromoteRequest {
-  const req = promoteStore.get(promoteId);
+): Promise<PromoteRequest> {
+  const req = await resolvePromoteRequest(promoteId);
   if (!req) {
     throw new Error(`Promote request not found: ${promoteId}`);
   }
@@ -215,20 +266,13 @@ export function markPromoteApplied(
       `Promote must be approved before apply (status=${req.status})`
     );
   }
+  assertPackIntegrity(req.pack);
+  if (req.requestedBy === appliedBy) {
+    throw new Error("Requester cannot apply their own promote (dual control)");
+  }
   req.status = "applied";
   req.appliedBy = appliedBy;
   req.appliedAt = new Date().toISOString();
+  await persistPromote(req);
   return req;
-}
-
-export function packIntegrityHash(pack: PromotePack): string {
-  const payload = JSON.stringify({
-    templateSlug: pack.templateSlug,
-    version: pack.version,
-    hashSha256: pack.hashSha256,
-    specJson: pack.specJson,
-    selectionConfigJson: pack.selectionConfigJson,
-    roiJson: pack.roiJson,
-  });
-  return createHash("sha256").update(payload).digest("hex");
 }
