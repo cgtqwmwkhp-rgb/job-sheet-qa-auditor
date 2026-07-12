@@ -18,6 +18,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import {
   AlertCircle,
@@ -1188,134 +1193,157 @@ function ReviewWorkstationContent({
         />
       )}
 
-      <div
-        className={`flex-1 min-h-0 grid grid-cols-1 gap-0 ${
-          compact
-            ? "lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] lg:grid-rows-[minmax(40vh,1fr)]"
-            : "lg:grid-cols-[minmax(0,1fr)_minmax(300px,26rem)]"
-        }`}
+      <ResizablePanelGroup
+        direction="horizontal"
+        autoSaveId={
+          compact ? "review-workstation-compact" : "review-workstation"
+        }
+        className={`flex-1 min-h-0 ${compact ? "lg:min-h-[40vh]" : ""}`}
       >
-        <div className="flex flex-col min-h-0 min-w-0 h-full overflow-hidden bg-white border-r border-border">
-          {!showPdfViewer ? (
-            <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/20 p-6">
-              <Eye className="w-12 h-12 mb-4 opacity-40" />
-              <p className="text-sm font-medium mb-2">Document Preview</p>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowPdfViewer(true)}
+        <ResizablePanel
+          defaultSize={compact ? 62 : 68}
+          minSize={40}
+          className="min-w-0"
+        >
+          <div className="flex flex-col min-h-0 min-w-0 h-full overflow-hidden bg-white border-r border-border">
+            {!showPdfViewer ? (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/20 p-6">
+                <Eye className="w-12 h-12 mb-4 opacity-40" />
+                <p className="text-sm font-medium mb-2">Document Preview</p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowPdfViewer(true)}
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  Load Preview
+                </Button>
+              </div>
+            ) : (
+              <DocumentViewer
+                url={documentUrl || ""}
+                boxes={boxes}
+                activeBoxId={activeBoxId}
+                focusPage={focusPage}
+                focusNonce={focusNonce}
+                focusLabel={focusLabel}
+                onBoxClick={handleBoxClick}
+              />
+            )}
+          </div>
+        </ResizablePanel>
+
+        <ResizableHandle
+          withHandle
+          className="hidden lg:flex w-1.5 bg-[#EBE8E8] hover:bg-primary/40 transition-colors"
+        />
+
+        <ResizablePanel
+          defaultSize={compact ? 38 : 32}
+          minSize={22}
+          maxSize={55}
+          className="min-w-0"
+        >
+          <Card className="flex flex-col h-full min-h-0 overflow-hidden min-w-0 rounded-none border-0 shadow-none">
+            <Tabs
+              defaultValue="issues"
+              className="flex-1 flex flex-col min-h-0"
+            >
+              <div className="px-2 pt-2 shrink-0 border-b border-border pb-2">
+                <TabsList className="w-full grid grid-cols-4 h-8">
+                  <TabsTrigger value="issues" className="text-[11px] px-1">
+                    Issues ({failedFindings.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="all" className="text-[11px] px-1">
+                    All ({auditData.findings.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="passed" className="text-[11px] px-1">
+                    Passed
+                  </TabsTrigger>
+                  <TabsTrigger value="context" className="text-[11px] px-1">
+                    Context
+                    {hasActionableClinicalContext({
+                      commentSignals: commentQualityDerived.signals,
+                      photoPairCompare,
+                    }) ? (
+                      <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-destructive" />
+                    ) : null}
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+              <TabsContent
+                value="issues"
+                className="flex-1 min-h-0 m-0 overflow-hidden data-[state=inactive]:hidden"
               >
-                <Eye className="w-4 h-4 mr-2" />
-                Load Preview
-              </Button>
-            </div>
-          ) : (
-            <DocumentViewer
-              url={documentUrl || ""}
-              boxes={boxes}
-              activeBoxId={activeBoxId}
-              focusPage={focusPage}
-              focusNonce={focusNonce}
-              focusLabel={focusLabel}
-              onBoxClick={handleBoxClick}
-            />
-          )}
-        </div>
-
-        <Card className="flex flex-col h-full min-h-0 overflow-hidden min-w-0 rounded-none border-0 shadow-none">
-          <Tabs defaultValue="issues" className="flex-1 flex flex-col min-h-0">
-            <div className="px-2 pt-2 shrink-0 border-b border-border pb-2">
-              <TabsList className="w-full grid grid-cols-4 h-8">
-                <TabsTrigger value="issues" className="text-[11px] px-1">
-                  Issues ({failedFindings.length})
-                </TabsTrigger>
-                <TabsTrigger value="all" className="text-[11px] px-1">
-                  All ({auditData.findings.length})
-                </TabsTrigger>
-                <TabsTrigger value="passed" className="text-[11px] px-1">
-                  Passed
-                </TabsTrigger>
-                <TabsTrigger value="context" className="text-[11px] px-1">
-                  Context
-                  {hasActionableClinicalContext({
-                    commentSignals: commentQualityDerived.signals,
-                    photoPairCompare,
-                  }) ? (
-                    <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-destructive" />
-                  ) : null}
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            <TabsContent
-              value="issues"
-              className="flex-1 min-h-0 m-0 overflow-hidden data-[state=inactive]:hidden"
-            >
-              <IssuesTabContent
-                findings={failedFindings}
-                activeBoxId={activeBoxId}
-                onFindingClick={handleFindingClick}
-                onReportIssue={handleReportIssue}
-                onOverride={handleOverrideClick}
-                onCorrect={handleCorrectClick}
-              />
-            </TabsContent>
-
-            <TabsContent
-              value="all"
-              className="flex-1 min-h-0 m-0 overflow-hidden data-[state=inactive]:hidden"
-            >
-              <FindingsList
-                findings={auditData.findings}
-                activeBoxId={activeBoxId}
-                onFindingClick={handleFindingClick}
-                onReportIssue={handleReportIssue}
-                onOverride={handleOverrideClick}
-                onCorrect={handleCorrectClick}
-              />
-            </TabsContent>
-
-            <TabsContent
-              value="passed"
-              className="flex-1 min-h-0 m-0 overflow-hidden data-[state=inactive]:hidden"
-            >
-              <FindingsList
-                findings={passedFindings}
-                activeBoxId={activeBoxId}
-                onFindingClick={handleFindingClick}
-                onReportIssue={handleReportIssue}
-                onOverride={handleOverrideClick}
-                onCorrect={handleCorrectClick}
-              />
-            </TabsContent>
-
-            <TabsContent
-              value="context"
-              className="flex-1 min-h-0 m-0 overflow-hidden data-[state=inactive]:hidden"
-            >
-              <ScrollArea className="h-full">
-                <ClinicalContextStack
-                  selectionTrace={auditData.selectionTrace ?? null}
-                  selectionMarks={auditData.selectionMarks ?? null}
-                  failurePathSignals={auditData.failurePathSignals ?? null}
-                  failurePathSignalSummary={auditData.failurePathSignalSummary}
-                  commentSignals={commentQualityDerived.signals}
-                  commentSummary={commentQualityDerived.summary}
-                  photoPairCompare={photoPairCompare}
-                  deepNoteAnalysis={deepNoteAnalysis}
-                  documentUrl={documentUrl}
-                  onConfirmPair={handleConfirmPair}
-                  onOverridePair={handleOverridePair}
-                  onMarksRowClick={(_rowIndex, pageNumber) => {
-                    setFocusPage(pageNumber);
-                    if (!showPdfViewer) setShowPdfViewer(true);
-                  }}
+                <IssuesTabContent
+                  findings={failedFindings}
+                  activeBoxId={activeBoxId}
+                  onFindingClick={handleFindingClick}
+                  onReportIssue={handleReportIssue}
+                  onOverride={handleOverrideClick}
+                  onCorrect={handleCorrectClick}
                 />
-              </ScrollArea>
-            </TabsContent>
-          </Tabs>
-        </Card>
-      </div>
+              </TabsContent>
+
+              <TabsContent
+                value="all"
+                className="flex-1 min-h-0 m-0 overflow-hidden data-[state=inactive]:hidden"
+              >
+                <FindingsList
+                  findings={auditData.findings}
+                  activeBoxId={activeBoxId}
+                  onFindingClick={handleFindingClick}
+                  onReportIssue={handleReportIssue}
+                  onOverride={handleOverrideClick}
+                  onCorrect={handleCorrectClick}
+                />
+              </TabsContent>
+
+              <TabsContent
+                value="passed"
+                className="flex-1 min-h-0 m-0 overflow-hidden data-[state=inactive]:hidden"
+              >
+                <FindingsList
+                  findings={passedFindings}
+                  activeBoxId={activeBoxId}
+                  onFindingClick={handleFindingClick}
+                  onReportIssue={handleReportIssue}
+                  onOverride={handleOverrideClick}
+                  onCorrect={handleCorrectClick}
+                />
+              </TabsContent>
+
+              <TabsContent
+                value="context"
+                className="flex-1 min-h-0 m-0 overflow-hidden data-[state=inactive]:hidden"
+              >
+                <ScrollArea className="h-full">
+                  <ClinicalContextStack
+                    selectionTrace={auditData.selectionTrace ?? null}
+                    selectionMarks={auditData.selectionMarks ?? null}
+                    failurePathSignals={auditData.failurePathSignals ?? null}
+                    failurePathSignalSummary={
+                      auditData.failurePathSignalSummary
+                    }
+                    commentSignals={commentQualityDerived.signals}
+                    commentSummary={commentQualityDerived.summary}
+                    photoPairCompare={photoPairCompare}
+                    deepNoteAnalysis={deepNoteAnalysis}
+                    documentUrl={documentUrl}
+                    onConfirmPair={handleConfirmPair}
+                    onOverridePair={handleOverridePair}
+                    onMarksRowClick={(_rowIndex, pageNumber) => {
+                      setFocusPage(pageNumber);
+                      if (!showPdfViewer) setShowPdfViewer(true);
+                    }}
+                  />
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
+          </Card>
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
       <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
         <DialogContent>
