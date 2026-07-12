@@ -389,7 +389,7 @@ export async function updateJobSheetTechnicianId(
  * - All audit findings for those results
  * - All disputes for those findings
  * - All waivers for those findings
- * 
+ *
  * NOTE: This is a destructive operation. Consider soft delete for production use.
  */
 export async function deleteJobSheet(id: number) {

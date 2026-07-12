@@ -1,6 +1,6 @@
 /**
  * Loading Button Component
- * 
+ *
  * Enhanced button with built-in loading state and spinner.
  * Prevents double-clicks and provides visual feedback during async operations.
  */

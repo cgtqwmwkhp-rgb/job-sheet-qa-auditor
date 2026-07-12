@@ -1,6 +1,6 @@
 /**
  * Error Tracking and Logging
- * 
+ *
  * Centralized error tracking for the application.
  * In production, this would integrate with services like Sentry, LogRocket, etc.
  */
@@ -70,7 +70,7 @@ export function logBoundaryError(
  */
 export function logUnhandledRejection(reason: any, context?: ErrorContext) {
   const error = reason instanceof Error ? reason : new Error(String(reason));
-  
+
   console.error("[UnhandledRejection]", {
     reason: String(reason),
     error: error.message,
@@ -88,7 +88,7 @@ export function logUnhandledRejection(reason: any, context?: ErrorContext) {
  */
 export function initializeErrorTracking(context?: Partial<ErrorContext>) {
   // Handle unhandled promise rejections
-  window.addEventListener("unhandledrejection", (event) => {
+  window.addEventListener("unhandledrejection", event => {
     logUnhandledRejection(event.reason, {
       ...context,
       route: window.location.pathname,
@@ -96,7 +96,7 @@ export function initializeErrorTracking(context?: Partial<ErrorContext>) {
   });
 
   // Handle global errors
-  window.addEventListener("error", (event) => {
+  window.addEventListener("error", event => {
     logError(event.error || new Error(event.message), {
       ...context,
       route: window.location.pathname,

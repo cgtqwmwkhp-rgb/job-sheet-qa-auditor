@@ -9,6 +9,7 @@
 ## Executive Summary
 
 This audit identified several optimization opportunities across the application:
+
 - **13 query optimization opportunities** (adding indexes, pagination improvements)
 - **5 N+1 query patterns** requiring batching
 - **8 caching opportunities** for frequently accessed data
@@ -23,11 +24,13 @@ This audit identified several optimization opportunities across the application:
 ### 1. Missing Indexes (HIGH PRIORITY)
 
 #### Current State
+
 The application performs several queries without proper indexes, leading to full table scans.
 
 #### Identified Issues
 
 **`job_sheets` table:**
+
 ```sql
 -- ❌ SLOW: Full table scan
 SELECT * FROM job_sheets WHERE status = 'processing';
@@ -40,6 +43,7 @@ SELECT * FROM job_sheets WHERE status = 'completed' AND uploaded_by = 5;
 ```
 
 **`audit_results` table:**
+
 ```sql
 -- ❌ SLOW: No index on job_sheet_id
 SELECT * FROM audit_results WHERE job_sheet_id = 123;
@@ -49,19 +53,21 @@ SELECT * FROM audit_results ORDER BY created_at DESC LIMIT 50;
 ```
 
 **`audit_findings` table:**
+
 ```sql
 -- ❌ SLOW: No index on audit_result_id
 SELECT * FROM audit_findings WHERE audit_result_id = 456;
 
 -- ❌ SLOW: No compound index for filtering
-SELECT * FROM audit_findings 
+SELECT * FROM audit_findings
 WHERE audit_result_id = 456 AND resolution_status = 'open';
 ```
 
 **`system_audit_log` table:**
+
 ```sql
 -- ❌ SLOW: No compound index
-SELECT * FROM system_audit_log 
+SELECT * FROM system_audit_log
 WHERE user_id = 5 AND entity_type = 'job_sheet'
 ORDER BY created_at DESC;
 ```
@@ -121,6 +127,7 @@ CREATE INDEX idx_users_email ON users(email);
 #### Issue: Job Sheets with User Details
 
 **Current Code** (N+1 pattern):
+
 ```typescript
 // ❌ BAD: Makes N+1 queries (1 for job sheets + N for users)
 const jobSheets = await db.getJobSheets({ limit: 50 });
@@ -131,9 +138,11 @@ for (const sheet of jobSheets) {
 ```
 
 **Optimized Code** (Single query with join):
+
 ```typescript
 // ✅ GOOD: Single query with join
-const jobSheets = await db.getDb()
+const jobSheets = await db
+  .getDb()
   .select({
     ...jobSheets,
     uploaderName: users.name,
@@ -147,6 +156,7 @@ const jobSheets = await db.getDb()
 #### Issue: Audit Results with Findings
 
 **Current Code**:
+
 ```typescript
 // ❌ BAD: N+1 queries
 const audits = await db.getAuditResults({ limit: 20 });
@@ -156,6 +166,7 @@ for (const audit of audits) {
 ```
 
 **Optimized Code**:
+
 ```typescript
 // ✅ GOOD: Batch query with GROUP BY or subquery
 // Option 1: Use Drizzle relations
@@ -168,7 +179,8 @@ const auditsWithFindings = await db.query.auditResults.findMany({
 
 // Option 2: Manual optimization
 const auditIds = audits.map(a => a.id);
-const allFindings = await db.getDb()
+const allFindings = await db
+  .getDb()
   .select()
   .from(auditFindings)
   .where(inArray(auditFindings.auditResultId, auditIds));
@@ -192,13 +204,15 @@ allFindings.forEach(finding => {
 #### Issue: OFFSET-based Pagination at Scale
 
 **Current Implementation**:
+
 ```typescript
 // ❌ SLOW: OFFSET becomes very slow with large datasets
 export async function getJobSheets(options?: {
   limit?: number;
   offset?: number;
 }) {
-  return db.select()
+  return db
+    .select()
     .from(jobSheets)
     .limit(options?.limit || 50)
     .offset(options?.offset || 0); // Gets slower as offset increases
@@ -217,16 +231,14 @@ export async function getJobSheets(options?: {
   beforeId?: number; // For reverse pagination
 }) {
   const query = db.select().from(jobSheets);
-  
+
   if (options?.afterId) {
     query.where(gt(jobSheets.id, options.afterId));
   } else if (options?.beforeId) {
     query.where(lt(jobSheets.id, options.beforeId));
   }
-  
-  return query
-    .orderBy(desc(jobSheets.id))
-    .limit(options?.limit || 50);
+
+  return query.orderBy(desc(jobSheets.id)).limit(options?.limit || 50);
 }
 ```
 
@@ -239,35 +251,38 @@ export async function getJobSheets(options?: {
 #### Frequently Accessed, Rarely Changing Data
 
 **Cache Candidates**:
+
 - Active gold specs (rarely change, accessed frequently)
 - User role mappings (change infrequently)
 - System configuration (static)
 - Template definitions
 
 **Implementation**:
+
 ```typescript
-import NodeCache from 'node-cache';
+import NodeCache from "node-cache";
 
 // TTL: 5 minutes for specs, 15 minutes for users
 const specsCache = new NodeCache({ stdTTL: 300 });
 const usersCache = new NodeCache({ stdTTL: 900 });
 
 export async function getActiveGoldSpecs() {
-  const cached = specsCache.get('active_specs');
+  const cached = specsCache.get("active_specs");
   if (cached) return cached as GoldSpec[];
-  
-  const specs = await db.select()
+
+  const specs = await db
+    .select()
     .from(goldSpecs)
     .where(eq(goldSpecs.isActive, 1));
-  
-  specsCache.set('active_specs', specs);
+
+  specsCache.set("active_specs", specs);
   return specs;
 }
 
 // Invalidate on update
 export async function updateGoldSpec(id: number, data: any) {
   await db.update(goldSpecs).set(data).where(eq(goldSpecs.id, id));
-  specsCache.del('active_specs'); // Invalidate cache
+  specsCache.del("active_specs"); // Invalidate cache
 }
 ```
 
@@ -282,6 +297,7 @@ export async function updateGoldSpec(id: number, data: any) {
 **Current Issue**: Dashboard loads all stats in serial, blocking render.
 
 **Current Code**:
+
 ```typescript
 // ❌ SLOW: Serial loading
 const totalAudits = await db.getAuditResults();
@@ -290,6 +306,7 @@ const recentUploads = await db.getJobSheets({ limit: 10 });
 ```
 
 **Optimized Code**:
+
 ```typescript
 // ✅ BETTER: Parallel loading
 const [totalAudits, totalUsers, recentUploads] = await Promise.all([
@@ -316,6 +333,7 @@ const stats = await db.getDb().execute(sql`
 **Issue**: `reportJson` field in audit_results can be very large (100KB+), slowing down list queries.
 
 **Current Code**:
+
 ```typescript
 // ❌ SLOW: Returns full reportJson for every audit
 const audits = await db.select().from(auditResults).limit(50);
@@ -326,16 +344,20 @@ const audits = await db.select().from(auditResults).limit(50);
 
 ```typescript
 // ✅ BETTER: Exclude heavy fields from list
-const audits = await db.select({
-  id: auditResults.id,
-  jobSheetId: auditResults.jobSheetId,
-  result: auditResults.result,
-  createdAt: auditResults.createdAt,
-  // Exclude reportJson from list
-}).from(auditResults).limit(50);
+const audits = await db
+  .select({
+    id: auditResults.id,
+    jobSheetId: auditResults.jobSheetId,
+    result: auditResults.result,
+    createdAt: auditResults.createdAt,
+    // Exclude reportJson from list
+  })
+  .from(auditResults)
+  .limit(50);
 
 // Load full details only when needed
-const fullAudit = await db.select()
+const fullAudit = await db
+  .select()
   .from(auditResults)
   .where(eq(auditResults.id, auditId))
   .limit(1);
@@ -364,7 +386,7 @@ const JobSheetRow = React.memo(({ sheet }) => {
 
 function JobSheetList({ sheets }) {
   const memoizedSheets = useMemo(() => sheets, [sheets]);
-  return memoizedSheets.map(sheet => 
+  return memoizedSheets.map(sheet =>
     <JobSheetRow key={sheet.id} sheet={sheet} />
   );
 }
@@ -380,7 +402,7 @@ function JobSheetList({ sheets }) {
 
 ```typescript
 // server/utils/queryMonitor.ts
-import { sql } from 'drizzle-orm';
+import { sql } from "drizzle-orm";
 
 const SLOW_QUERY_THRESHOLD_MS = 1000;
 
@@ -389,15 +411,15 @@ export function wrapQuery<T>(
   queryName: string
 ): Promise<T> {
   const startTime = Date.now();
-  
+
   return queryFn().then(result => {
     const duration = Date.now() - startTime;
-    
+
     if (duration > SLOW_QUERY_THRESHOLD_MS) {
       console.warn(`[SLOW QUERY] ${queryName} took ${duration}ms`);
       // Send to monitoring service (DataDog, New Relic, etc.)
     }
-    
+
     return result;
   });
 }
@@ -405,7 +427,7 @@ export function wrapQuery<T>(
 // Usage:
 const audits = await wrapQuery(
   () => db.getAuditResults({ limit: 50 }),
-  'getAuditResults'
+  "getAuditResults"
 );
 ```
 
@@ -414,18 +436,21 @@ const audits = await wrapQuery(
 ## Implementation Priority
 
 ### Phase 1: Critical (Do Immediately)
+
 1. ✅ Add missing database indexes (004_performance_indexes.sql)
 2. Fix N+1 queries in job sheets list
 3. Optimize dashboard stats query
 4. Add query performance monitoring
 
 ### Phase 2: High Priority (This Sprint)
+
 5. Implement cursor-based pagination
 6. Add caching for gold specs and user roles
 7. Exclude heavy JSON fields from list queries
 8. Optimize batch operations
 
 ### Phase 3: Medium Priority (Next Sprint)
+
 9. Frontend memoization optimizations
 10. Implement query result pooling
 11. Add Redis for distributed caching
@@ -435,13 +460,13 @@ const audits = await wrapQuery(
 
 ## Estimated Performance Improvements
 
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| Job Sheets List | 850ms | 180ms | **79%** |
-| Dashboard Load | 2.1s | 650ms | **69%** |
-| Audit Results List | 1.2s | 220ms | **82%** |
-| Batch Operations | 5.4s | 1.8s | **67%** |
-| Database CPU | 65% avg | 25% avg | **62%** |
+| Metric             | Before  | After   | Improvement |
+| ------------------ | ------- | ------- | ----------- |
+| Job Sheets List    | 850ms   | 180ms   | **79%**     |
+| Dashboard Load     | 2.1s    | 650ms   | **69%**     |
+| Audit Results List | 1.2s    | 220ms   | **82%**     |
+| Batch Operations   | 5.4s    | 1.8s    | **67%**     |
+| Database CPU       | 65% avg | 25% avg | **62%**     |
 
 ---
 

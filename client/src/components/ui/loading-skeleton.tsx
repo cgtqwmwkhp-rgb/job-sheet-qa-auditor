@@ -1,6 +1,6 @@
 /**
  * Loading Skeleton Components
- * 
+ *
  * Pre-built skeleton loaders for common UI patterns.
  * Provides consistent loading states across the app.
  */
@@ -26,7 +26,13 @@ export function TableRowSkeleton({ columns = 4 }: { columns?: number }) {
 /**
  * Full table skeleton
  */
-export function TableSkeleton({ rows = 5, columns = 4 }: { rows?: number; columns?: number }) {
+export function TableSkeleton({
+  rows = 5,
+  columns = 4,
+}: {
+  rows?: number;
+  columns?: number;
+}) {
   return (
     <div className="w-full">
       <div className="rounded-md border">

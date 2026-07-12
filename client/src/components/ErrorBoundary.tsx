@@ -175,10 +175,10 @@ export function DataErrorBoundary({ children }: { children: ReactNode }) {
  * Error boundary for route/page-level errors.
  * Provides navigation options to help user recover.
  */
-export function RouteErrorBoundary({ 
+export function RouteErrorBoundary({
   children,
   routeName,
-}: { 
+}: {
   children: ReactNode;
   routeName?: string;
 }) {
@@ -186,11 +186,17 @@ export function RouteErrorBoundary({
     <ErrorBoundary
       onError={(error, errorInfo) => {
         // Log to centralized error tracking
-        import("@/lib/errorTracking").then(({ logBoundaryError, createErrorContext }) => {
-          logBoundaryError(error, errorInfo, createErrorContext(routeName || "Route", {
-            route: window.location.pathname,
-          }));
-        });
+        import("@/lib/errorTracking").then(
+          ({ logBoundaryError, createErrorContext }) => {
+            logBoundaryError(
+              error,
+              errorInfo,
+              createErrorContext(routeName || "Route", {
+                route: window.location.pathname,
+              })
+            );
+          }
+        );
       }}
     >
       {children}

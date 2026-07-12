@@ -59,14 +59,16 @@ const filtered = await trpc.jobSheets.list.query({
 });
 
 // Response:
-[{
-  id: 1,
-  referenceNumber: "JS-001",
-  fileName: "audit-report.pdf",
-  status: "completed",
-  uploadedBy: 5,
-  createdAt: "2026-07-01T10:00:00Z"
-}]
+[
+  {
+    id: 1,
+    referenceNumber: "JS-001",
+    fileName: "audit-report.pdf",
+    status: "completed",
+    uploadedBy: 5,
+    createdAt: "2026-07-01T10:00:00Z",
+  },
+];
 ```
 
 ### Get Job Sheet
@@ -194,8 +196,8 @@ const audits = await trpc.audits.list.query({
 **Auth**: Protected + Object-level authorization
 
 ```typescript
-const audit = await trpc.audits.getByJobSheet.query({ 
-  jobSheetId: 123 
+const audit = await trpc.audits.getByJobSheet.query({
+  jobSheetId: 123
 });
 
 // Response:
@@ -215,19 +217,21 @@ const audit = await trpc.audits.getByJobSheet.query({
 
 ```typescript
 const findings = await trpc.audits.getFindings.query({
-  auditResultId: 456
+  auditResultId: 456,
 });
 
 // Response:
-[{
-  id: 789,
-  severity: "S1", // S0 (critical) | S1 (major) | S2 (minor) | S3 (info)
-  reasonCode: "MISSING_FIELD",
-  fieldName: "customer_signature",
-  expectedValue: "signature",
-  actualValue: null,
-  resolutionStatus: "open"
-}]
+[
+  {
+    id: 789,
+    severity: "S1", // S0 (critical) | S1 (major) | S2 (minor) | S3 (info)
+    reasonCode: "MISSING_FIELD",
+    fieldName: "customer_signature",
+    expectedValue: "signature",
+    actualValue: null,
+    resolutionStatus: "open",
+  },
+];
 ```
 
 ---
@@ -243,14 +247,16 @@ const findings = await trpc.audits.getFindings.query({
 const users = await trpc.users.list.query();
 
 // Response:
-[{
-  id: 5,
-  openId: "user-123",
-  name: "John Doe",
-  email: "john@example.com",
-  role: "qa_lead",
-  createdAt: "2026-01-01T00:00:00Z"
-}]
+[
+  {
+    id: 5,
+    openId: "user-123",
+    name: "John Doe",
+    email: "john@example.com",
+    role: "qa_lead",
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+];
 ```
 
 ### Create User (Admin Only)
@@ -292,7 +298,7 @@ await trpc.users.update.mutate({
 ```typescript
 await trpc.users.updateRole.mutate({
   id: 10,
-  role: "qa_lead"
+  role: "qa_lead",
 });
 ```
 
@@ -309,14 +315,16 @@ await trpc.users.updateRole.mutate({
 const specs = await trpc.specs.list.query();
 
 // Response:
-[{
-  id: 1,
-  name: "Standard Audit Spec",
-  version: "1.0.0",
-  isActive: true,
-  specType: "base", // "base" | "client" | "contract" | "workType"
-  createdAt: "2026-01-01T00:00:00Z"
-}]
+[
+  {
+    id: 1,
+    name: "Standard Audit Spec",
+    version: "1.0.0",
+    isActive: true,
+    specType: "base", // "base" | "client" | "contract" | "workType"
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+];
 ```
 
 ### Create Specification (Admin Only)
@@ -330,7 +338,9 @@ await trpc.specs.create.mutate({
   version: "2.0.0",
   description: "Enhanced audit rules",
   schema: {
-    rules: [/* validation rules */]
+    rules: [
+      /* validation rules */
+    ],
   },
   specType: "client",
   parentSpecId: 1, // optional: inherit from parent
@@ -362,8 +372,8 @@ await trpc.disputes.create.mutate({
   reason: "The signature was present but not detected",
   evidenceUrls: [
     "https://storage.../evidence1.jpg",
-    "https://storage.../evidence2.jpg"
-  ]
+    "https://storage.../evidence2.jpg",
+  ],
 });
 ```
 
@@ -376,7 +386,7 @@ await trpc.disputes.create.mutate({
 await trpc.disputes.updateStatus.mutate({
   id: 100,
   status: "accepted", // "open" | "under_review" | "accepted" | "rejected"
-  reviewNotes: "Reviewed evidence, dispute accepted"
+  reviewNotes: "Reviewed evidence, dispute accepted",
 });
 ```
 
@@ -392,7 +402,7 @@ await trpc.disputes.updateStatus.mutate({
 ```typescript
 await trpc.batchOperations.approveFindingsBatch.mutate({
   findingIds: [789, 790, 791],
-  reason: "All verified correct"
+  reason: "All verified correct",
 });
 ```
 
@@ -404,7 +414,7 @@ await trpc.batchOperations.approveFindingsBatch.mutate({
 ```typescript
 await trpc.batchOperations.assignDisputesBatch.mutate({
   disputeIds: [100, 101, 102],
-  reviewerId: 5
+  reviewerId: 5,
 });
 ```
 
@@ -438,7 +448,7 @@ const stats = await trpc.stats.dashboard.query();
 const performance = await trpc.analytics.technicians.query({
   startDate: "2026-06-01",
   endDate: "2026-07-01",
-  technicianId: 10 // optional: filter by technician
+  technicianId: 10, // optional: filter by technician
 });
 ```
 
@@ -450,39 +460,39 @@ const performance = await trpc.analytics.technicians.query({
 
 All mutations can throw `TRPCError` with these codes:
 
-| Code | HTTP Status | Meaning |
-|------|------------|---------|
-| `UNAUTHORIZED` | 401 | Not authenticated |
-| `FORBIDDEN` | 403 | Insufficient permissions |
-| `NOT_FOUND` | 404 | Resource doesn't exist |
-| `CONFLICT` | 409 | Resource state conflict |
-| `BAD_REQUEST` | 400 | Invalid input |
-| `TOO_MANY_REQUESTS` | 429 | Rate limit exceeded |
-| `INTERNAL_SERVER_ERROR` | 500 | Server error |
+| Code                    | HTTP Status | Meaning                  |
+| ----------------------- | ----------- | ------------------------ |
+| `UNAUTHORIZED`          | 401         | Not authenticated        |
+| `FORBIDDEN`             | 403         | Insufficient permissions |
+| `NOT_FOUND`             | 404         | Resource doesn't exist   |
+| `CONFLICT`              | 409         | Resource state conflict  |
+| `BAD_REQUEST`           | 400         | Invalid input            |
+| `TOO_MANY_REQUESTS`     | 429         | Rate limit exceeded      |
+| `INTERNAL_SERVER_ERROR` | 500         | Server error             |
 
 ### Error Handling Example
 
 ```typescript
-import { TRPCClientError } from '@trpc/client';
+import { TRPCClientError } from "@trpc/client";
 
 try {
   await trpc.jobSheets.process.mutate({ id: 123 });
 } catch (error) {
   if (error instanceof TRPCClientError) {
     switch (error.data?.code) {
-      case 'UNAUTHORIZED':
+      case "UNAUTHORIZED":
         // Redirect to login
         break;
-      case 'FORBIDDEN':
+      case "FORBIDDEN":
         showToast("You don't have permission");
         break;
-      case 'NOT_FOUND':
+      case "NOT_FOUND":
         showToast("Job sheet not found");
         break;
-      case 'CONFLICT':
+      case "CONFLICT":
         showToast("Document is already being processed");
         break;
-      case 'TOO_MANY_REQUESTS':
+      case "TOO_MANY_REQUESTS":
         showToast("Rate limit exceeded, please wait");
         break;
       default:
@@ -496,11 +506,11 @@ try {
 
 ## Rate Limits
 
-| Endpoint | Limit | Window |
-|----------|-------|--------|
-| `jobSheets.upload` | 10 requests | 1 minute |
-| `jobSheets.process` | 5 requests | 1 minute |
-| `jobSheets.reprocess` | 5 requests | 1 minute |
+| Endpoint              | Limit       | Window   |
+| --------------------- | ----------- | -------- |
+| `jobSheets.upload`    | 10 requests | 1 minute |
+| `jobSheets.process`   | 5 requests  | 1 minute |
+| `jobSheets.reprocess` | 5 requests  | 1 minute |
 
 Rate limits are per-user and enforced server-side.
 
@@ -526,7 +536,7 @@ const utils = trpc.useUtils();
 const uploadMutation = trpc.jobSheets.upload.useMutation({
   onSuccess: () => {
     utils.jobSheets.list.invalidate(); // Refetch list
-  }
+  },
 });
 ```
 
@@ -546,7 +556,7 @@ return <JobSheetDisplay data={data} />;
 const utils = trpc.useUtils();
 
 const approveMutation = trpc.audits.approveFinding.useMutation({
-  onMutate: async (variables) => {
+  onMutate: async variables => {
     // Cancel outgoing refetches
     await utils.audits.getFindings.cancel();
 
@@ -554,10 +564,11 @@ const approveMutation = trpc.audits.approveFinding.useMutation({
     const previousFindings = utils.audits.getFindings.getData();
 
     // Optimistically update
-    utils.audits.getFindings.setData({ id: variables.auditId }, (old) =>
-      old?.map(f => f.id === variables.findingId 
-        ? { ...f, resolutionStatus: 'approved' }
-        : f
+    utils.audits.getFindings.setData({ id: variables.auditId }, old =>
+      old?.map(f =>
+        f.id === variables.findingId
+          ? { ...f, resolutionStatus: "approved" }
+          : f
       )
     );
 
@@ -569,7 +580,7 @@ const approveMutation = trpc.audits.approveFinding.useMutation({
       { id: variables.auditId },
       context?.previousFindings
     );
-  }
+  },
 });
 ```
 
@@ -580,15 +591,15 @@ const approveMutation = trpc.audits.approveFinding.useMutation({
 All types are available via import:
 
 ```typescript
-import type { inferRouterOutputs, inferRouterInputs } from '@trpc/server';
-import type { AppRouter } from '@/server/routers';
+import type { inferRouterOutputs, inferRouterInputs } from "@trpc/server";
+import type { AppRouter } from "@/server/routers";
 
 type RouterOutput = inferRouterOutputs<AppRouter>;
 type RouterInput = inferRouterInputs<AppRouter>;
 
 // Use specific endpoint types
-type JobSheet = RouterOutput['jobSheets']['get'];
-type UploadInput = RouterInput['jobSheets']['upload'];
+type JobSheet = RouterOutput["jobSheets"]["get"];
+type UploadInput = RouterInput["jobSheets"]["upload"];
 ```
 
 ---

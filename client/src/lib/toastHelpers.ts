@@ -1,21 +1,21 @@
 /**
  * Toast Notification Helpers
- * 
+ *
  * Standardized toast notifications for common operations.
  * Provides consistent messaging and styling across the app.
- * 
+ *
  * @module toastHelpers
  * @see {@link https://sonner.emilkowal.ski/} Sonner documentation
- * 
+ *
  * @example
  * import { showSuccessToast, showErrorToast } from '@/lib/toastHelpers';
- * 
+ *
  * // Simple success
  * showSuccessToast("Settings saved");
- * 
+ *
  * // Success with description
  * showSuccessToast("User created", "john@example.com has been added");
- * 
+ *
  * // Error with context
  * showMutationErrorToast(error, "save settings");
  */
@@ -118,7 +118,10 @@ export function showSaveSuccessToast(itemType: string = "Changes") {
 /**
  * Save error toast
  */
-export function showSaveErrorToast(itemType: string = "Changes", error?: string) {
+export function showSaveErrorToast(
+  itemType: string = "Changes",
+  error?: string
+) {
   return showErrorToast(
     `Failed to save ${itemType.toLowerCase()}`,
     error || "Please try again"
@@ -168,9 +171,12 @@ export function showNetworkErrorToast() {
 /**
  * Generic mutation error toast from TRPCError
  */
-export function showMutationErrorToast(error: any, actionName: string = "operation") {
+export function showMutationErrorToast(
+  error: any,
+  actionName: string = "operation"
+) {
   const message = error?.message || `Failed to ${actionName}`;
-  const description = error?.data?.zodError 
+  const description = error?.data?.zodError
     ? "Please check your input"
     : undefined;
   return showErrorToast(message, description);
@@ -186,7 +192,11 @@ export function showCopySuccessToast(item: string = "Text") {
 /**
  * Batch operation success toast
  */
-export function showBatchSuccessToast(count: number, action: string, itemType: string) {
+export function showBatchSuccessToast(
+  count: number,
+  action: string,
+  itemType: string
+) {
   return showSuccessToast(
     `Batch ${action} successful`,
     `${count} ${itemType}(s) ${action}ed successfully`
@@ -196,7 +206,11 @@ export function showBatchSuccessToast(count: number, action: string, itemType: s
 /**
  * Batch operation error toast
  */
-export function showBatchErrorToast(count: number, action: string, itemType: string) {
+export function showBatchErrorToast(
+  count: number,
+  action: string,
+  itemType: string
+) {
   return showErrorToast(
     `Batch ${action} failed`,
     `Failed to ${action} ${count} ${itemType}(s)`

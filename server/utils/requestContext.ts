@@ -1,6 +1,6 @@
 /**
  * Request Context and Correlation IDs
- * 
+ *
  * Adds correlation IDs to requests for debugging and tracing.
  * Helps track requests across the system and correlate logs.
  */
@@ -104,15 +104,15 @@ export function formatLogMessage(
   data?: any
 ): string {
   const parts = [`[${context.requestId}]`, message];
-  
+
   if (context.userId) {
     parts.push(`userId=${context.userId}`);
   }
-  
+
   if (data) {
     parts.push(JSON.stringify(data));
   }
-  
+
   return parts.join(" ");
 }
 
@@ -146,9 +146,9 @@ export async function measureOperation<T>(
 ): Promise<T> {
   const startTime = Date.now();
   const logger = createContextLogger(context);
-  
+
   logger.info(`${operationName} started`);
-  
+
   try {
     const result = await operation();
     const duration = Date.now() - startTime;
@@ -171,7 +171,9 @@ export function extractCorrelationId(req: Request): string | undefined {
 /**
  * Propagate correlation ID to external services
  */
-export function getCorrelationHeaders(requestId: string): Record<string, string> {
+export function getCorrelationHeaders(
+  requestId: string
+): Record<string, string> {
   return {
     "X-Correlation-ID": requestId,
     "X-Request-ID": requestId,

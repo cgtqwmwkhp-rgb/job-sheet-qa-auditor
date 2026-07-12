@@ -1,6 +1,6 @@
 /**
  * Accessibility Helpers
- * 
+ *
  * Utilities for improving accessibility across the application.
  * Includes ARIA labels, keyboard navigation, and screen reader support.
  */
@@ -31,7 +31,9 @@ export function getPaginationAriaLabel(
     return page > 1 ? `Go to page ${page - 1}` : "Previous page (disabled)";
   }
   if (type === "next") {
-    return page < totalPages ? `Go to page ${page + 1}` : "Next page (disabled)";
+    return page < totalPages
+      ? `Go to page ${page + 1}`
+      : "Next page (disabled)";
   }
   return `Go to page ${page}`;
 }
@@ -44,7 +46,8 @@ export function getSortAriaLabel(
   currentSort?: { field: string; direction: "asc" | "desc" }
 ): string {
   if (currentSort?.field === field) {
-    const direction = currentSort.direction === "asc" ? "ascending" : "descending";
+    const direction =
+      currentSort.direction === "asc" ? "ascending" : "descending";
     return `Sorted by ${field} in ${direction} order. Click to reverse sort.`;
   }
   return `Sort by ${field}`;
@@ -53,8 +56,13 @@ export function getSortAriaLabel(
 /**
  * Generate ARIA label for filter buttons
  */
-export function getFilterAriaLabel(filterName: string, isActive: boolean): string {
-  return isActive ? `${filterName} filter active. Click to remove.` : `Filter by ${filterName}`;
+export function getFilterAriaLabel(
+  filterName: string,
+  isActive: boolean
+): string {
+  return isActive
+    ? `${filterName} filter active. Click to remove.`
+    : `Filter by ${filterName}`;
 }
 
 /**
@@ -67,7 +75,11 @@ export function getStatusAriaLabel(status: string, itemType: string): string {
 /**
  * Generate ARIA label for progress indicators
  */
-export function getProgressAriaLabel(current: number, total: number, unit: string = "step"): string {
+export function getProgressAriaLabel(
+  current: number,
+  total: number,
+  unit: string = "step"
+): string {
   return `Progress: ${current} of ${total} ${unit}s completed`;
 }
 
@@ -83,7 +95,9 @@ export function getAsyncOperationAnnouncement(
     return `${operation} in progress...`;
   }
   if (status === "success") {
-    return details ? `${operation} successful. ${details}` : `${operation} successful`;
+    return details
+      ? `${operation} successful. ${details}`
+      : `${operation} successful`;
   }
   return details ? `${operation} failed. ${details}` : `${operation} failed`;
 }
@@ -105,16 +119,27 @@ export function getExpandAriaLabel(label: string, isExpanded: boolean): string {
 /**
  * Generate ARIA label for tabs
  */
-export function getTabAriaLabel(tabName: string, isSelected: boolean, index: number, total: number): string {
+export function getTabAriaLabel(
+  tabName: string,
+  isSelected: boolean,
+  index: number,
+  total: number
+): string {
   const position = `${index + 1} of ${total}`;
-  return isSelected ? `${tabName} tab selected (${position})` : `${tabName} tab (${position})`;
+  return isSelected
+    ? `${tabName} tab selected (${position})`
+    : `${tabName} tab (${position})`;
 }
 
 /**
  * Generate ARIA label for modal dialogs
  */
-export function getModalAriaLabel(title: string, type?: "dialog" | "alert" | "confirm"): string {
-  const typeLabel = type === "alert" ? "Alert" : type === "confirm" ? "Confirmation" : "Dialog";
+export function getModalAriaLabel(
+  title: string,
+  type?: "dialog" | "alert" | "confirm"
+): string {
+  const typeLabel =
+    type === "alert" ? "Alert" : type === "confirm" ? "Confirmation" : "Dialog";
   return `${typeLabel}: ${title}`;
 }
 
@@ -126,7 +151,9 @@ export function trapFocus(container: HTMLElement) {
     'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
   );
   const firstElement = focusableElements[0] as HTMLElement;
-  const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+  const lastElement = focusableElements[
+    focusableElements.length - 1
+  ] as HTMLElement;
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key !== "Tab") return;
@@ -157,7 +184,10 @@ export function trapFocus(container: HTMLElement) {
 /**
  * Announce message to screen readers using ARIA live region
  */
-export function announceToScreenReader(message: string, priority: "polite" | "assertive" = "polite") {
+export function announceToScreenReader(
+  message: string,
+  priority: "polite" | "assertive" = "polite"
+) {
   const liveRegion = document.createElement("div");
   liveRegion.setAttribute("role", "status");
   liveRegion.setAttribute("aria-live", priority);
@@ -176,11 +206,15 @@ export function announceToScreenReader(message: string, priority: "polite" | "as
 /**
  * Generate skip link for keyboard navigation
  */
-export function createSkipLink(targetId: string, label: string = "Skip to main content"): HTMLAnchorElement {
+export function createSkipLink(
+  targetId: string,
+  label: string = "Skip to main content"
+): HTMLAnchorElement {
   const link = document.createElement("a");
   link.href = `#${targetId}`;
   link.textContent = label;
-  link.className = "sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:p-4 focus:bg-background focus:text-foreground focus:border focus:rounded";
+  link.className =
+    "sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:p-4 focus:bg-background focus:text-foreground focus:border focus:rounded";
   return link;
 }
 
@@ -190,12 +224,12 @@ export function createSkipLink(targetId: string, label: string = "Skip to main c
 export function isKeyboardAccessible(element: HTMLElement): boolean {
   const tabIndex = element.getAttribute("tabindex");
   const tagName = element.tagName.toLowerCase();
-  
+
   // Naturally focusable elements
   if (["a", "button", "input", "select", "textarea"].includes(tagName)) {
     return !element.hasAttribute("disabled");
   }
-  
+
   // Elements with explicit tabindex >= 0
   return tabIndex !== null && parseInt(tabIndex) >= 0;
 }

@@ -1,26 +1,26 @@
 /**
  * Soft Delete Utilities
- * 
+ *
  * Framework for soft delete pattern across the application.
  * Provides type-safe helpers for implementing recoverable deletions.
- * 
+ *
  * @module softDelete
- * 
+ *
  * NOTE: Full implementation requires database migration to add `deletedAt` columns.
  * This file provides the interface and helper functions for when migrations are applied.
- * 
+ *
  * @example
  * // Check if record is deleted
  * if (isDeleted(record)) {
  *   console.log("Record was deleted");
  * }
- * 
+ *
  * // Filter active records only
  * const activeRecords = filterActive(allRecords);
- * 
+ *
  * // Create deletion metadata
  * const metadata = createSoftDeleteMetadata(userId, "User requested deletion");
- * 
+ *
  * Migration needed:
  * ```sql
  * ALTER TABLE job_sheets ADD COLUMN deletedAt TIMESTAMP NULL;
@@ -145,7 +145,7 @@ export { isNull, isNotNull } from "drizzle-orm";
 
 /**
  * IMPLEMENTATION GUIDE:
- * 
+ *
  * 1. Create migration to add deletedAt columns
  * 2. Update all SELECT queries to filter WHERE deletedAt IS NULL by default
  * 3. Add softDelete* functions that UPDATE deletedAt = NOW()
