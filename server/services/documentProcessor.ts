@@ -142,6 +142,7 @@ import {
   syncStagesFromProcessor,
 } from "./processingProgressStore";
 import type { JobSheetProcessStatus } from "@shared/processingProgress";
+import { mapAnalyzerOverallToJobSheetStatus } from "./processStatus";
 
 export interface ProcessingResult {
   success: boolean;
@@ -2151,13 +2152,10 @@ async function processJobSheetWithOptions(
   let auditResultId: number | undefined;
 
   try {
-    // Determine final status
-    const finalStatus =
-      analysisResult.overallResult === "PASS"
-        ? "completed"
-        : analysisResult.overallResult === "REVIEW_QUEUE"
-          ? "review_queue"
-          : "completed";
+    // Determine final status (FAIL must not look like success)
+    const finalStatus = mapAnalyzerOverallToJobSheetStatus(
+      analysisResult.overallResult
+    );
 
     console.log(`[DocumentProcessor] Setting final status`, {
       jobSheetId,
@@ -2400,9 +2398,7 @@ async function processJobSheetWithOptions(
 
   const terminalStatus: JobSheetProcessStatus = storageFailed
     ? "failed"
-    : analysisResult.overallResult === "REVIEW_QUEUE"
-      ? "review_queue"
-      : "completed";
+    : mapAnalyzerOverallToJobSheetStatus(analysisResult.overallResult);
   finishProgress(terminalStatus);
 
   return {

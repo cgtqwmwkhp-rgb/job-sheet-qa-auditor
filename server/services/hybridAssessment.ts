@@ -16,6 +16,10 @@ import {
   getSuggestedTemplates,
   FALLBACK_SPEC_JSON,
 } from "./templateRegistry/fallbackTemplate";
+import {
+  containsLetterheadNoise,
+  rejectLetterheadExtractedValue,
+} from "./letterheadNoise";
 
 /**
  * Universal assessment result
@@ -206,6 +210,13 @@ export function extractUniversalFields(
       const result = extractFieldValue(pageText, patterns);
 
       if (result.found) {
+        // Pattern captures can be a phone area-code fragment from a letterhead line
+        const line =
+          pageText.split(/\r?\n/).find(l => l.includes(result.value)) ??
+          pageText;
+        if (containsLetterheadNoise(line)) continue;
+        const scrubbed = rejectLetterheadExtractedValue(result.value);
+        if (!scrubbed) continue;
         // Find matching label from spec
         const specField = FALLBACK_SPEC_JSON.fields.find(
           f => f.field === fieldName
@@ -213,7 +224,7 @@ export function extractUniversalFields(
         fields.push({
           field: fieldName,
           label: specField?.label || fieldName,
-          value: result.value,
+          value: scrubbed,
           confidence: result.confidence,
           pageNumber: pageIndex + 1,
         });

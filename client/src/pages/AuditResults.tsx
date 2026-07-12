@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DocOutcomeBadge } from "@/components/DocOutcomeBadge";
 import {
   AlertCircle,
   AlertTriangle,
@@ -331,29 +332,11 @@ export default function AuditResults() {
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
-                          {/* Pass/Fail badge */}
+                          {/* Documentation quality outcome */}
                           {outcome ? (
-                            <Badge
-                              variant={
-                                outcome.result === "pass"
-                                  ? "default"
-                                  : "destructive"
-                              }
-                              className={
-                                outcome.result === "pass"
-                                  ? "bg-emerald-600 hover:bg-emerald-700"
-                                  : undefined
-                              }
-                            >
-                              {outcome.result === "pass" ? "PASS" : "FAIL"}
-                            </Badge>
+                            <DocOutcomeBadge result={outcome.result} />
                           ) : isTerminalJobSheetStatus(sheet.status) ? (
-                            <Badge
-                              variant="outline"
-                              className="text-muted-foreground"
-                            >
-                              —
-                            </Badge>
+                            <DocOutcomeBadge result={null} />
                           ) : null}
 
                           {/* Major Fail chip */}

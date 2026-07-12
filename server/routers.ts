@@ -462,9 +462,9 @@ export const appRouter = router({
 
     /**
      * Backfill technicianId from OCR names on unattributed sheets.
-     * Open to all authenticated staff (was QA-lead-only — blocked viewers).
+     * QA lead / admin only — creates users and rewrites attribution.
      */
-    backfillTechnicianAttribution: protectedProcedure
+    backfillTechnicianAttribution: qaLeadProcedure
       .input(
         z
           .object({
@@ -602,8 +602,9 @@ export const appRouter = router({
 
     /**
      * Assign all unattributed sheets with a given OCR name to one user.
+     * QA lead / admin only.
      */
-    assignByExtractedName: protectedProcedure
+    assignByExtractedName: qaLeadProcedure
       .input(
         z.object({
           extractedName: z.string().min(1),
@@ -658,8 +659,9 @@ export const appRouter = router({
 
     /**
      * Create technician user from OCR name and attribute matching sheets.
+     * QA lead / admin only.
      */
-    ensureTechnicianFromName: protectedProcedure
+    ensureTechnicianFromName: qaLeadProcedure
       .input(
         z.object({
           extractedName: z.string().min(1),
