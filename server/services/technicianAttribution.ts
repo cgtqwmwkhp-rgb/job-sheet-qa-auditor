@@ -36,7 +36,7 @@ export function normalizePersonName(raw: string): string {
  * so "Richard.Newton" ≡ "Richard Newton" ≡ "richard_newton".
  */
 export function canonicalizePersonName(raw: string): string {
-  return normalizePersonName(raw.replace(/[._\-]+/g, " "));
+  return normalizePersonName(raw.replace(/[._-]+/g, " "));
 }
 
 function tokens(canon: string): string[] {
@@ -100,11 +100,11 @@ export function extractTechnicianNameFromFields(
 }
 
 const TEXT_NAME_PATTERNS: RegExp[] = [
-  /technician\s*name\s*[:\-]\s*([A-Za-z][A-Za-z0-9._\- ]{1,80})/i,
-  /engineer\s*name\s*[:\-]\s*([A-Za-z][A-Za-z0-9._\- ]{1,80})/i,
-  /\bengineer\s*[:\-]\s*([A-Za-z][A-Za-z0-9._\- ]{1,80})/i,
-  /\btech(?:nician)?\s*[:\-]\s*([A-Za-z][A-Za-z0-9._\- ]{1,80})/i,
-  /performed\s*by\s*[:\-]\s*([A-Za-z][A-Za-z0-9._\- ]{1,80})/i,
+  /technician\s*name\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
+  /engineer\s*name\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
+  /\bengineer\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
+  /\btech(?:nician)?\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
+  /performed\s*by\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
 ];
 
 /**
@@ -354,7 +354,7 @@ export function buildAttributionClusters(input: {
 /** Pretty display: Richard.Newton → Richard Newton */
 export function prettifyExtractedName(raw: string): string {
   return raw
-    .replace(/[._\-]+/g, " ")
+    .replace(/[._-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, c => c.toUpperCase());
