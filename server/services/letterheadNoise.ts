@@ -120,7 +120,7 @@ function hasNonLetterheadSubstance(value: string): boolean {
   }
   if (/^\d{1,6}$/.test(stripped)) return true;
   if (
-    /^[A-Z0-9][A-Z0-9_\-]{2,}$/i.test(stripped) &&
+    /^[A-Z0-9][A-Z0-9_-]{2,}$/i.test(stripped) &&
     !looksLikeUkContactPhone(value)
   ) {
     return true;
