@@ -1,8 +1,22 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Bell, AlertTriangle, CheckCircle2, FileText, Mail, PenTool } from "lucide-react";
+import {
+  Bell,
+  AlertTriangle,
+  CheckCircle2,
+  FileText,
+  Mail,
+  PenTool,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -18,13 +32,15 @@ interface NotificationSettingsState {
 
 export function NotificationSettings() {
   // Local state for notification settings (would be persisted to backend in real app)
-  const [localSettings, setLocalSettings] = useState<NotificationSettingsState>({
-    criticalDefects: true,
-    majorDefects: true,
-    minorDefects: false,
-    auditCompleted: true,
-    dailySummary: false,
-  });
+  const [localSettings, setLocalSettings] = useState<NotificationSettingsState>(
+    {
+      criticalDefects: true,
+      majorDefects: true,
+      minorDefects: false,
+      auditCompleted: true,
+      dailySummary: false,
+    }
+  );
   const [isSending, setIsSending] = useState(false);
 
   const handleToggle = (key: keyof NotificationSettingsState) => {
@@ -56,18 +72,22 @@ export function NotificationSettings() {
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-4">
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Defect Alerts</h3>
-          
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+            Defect Alerts
+          </h3>
+
           <div className="flex items-center justify-between space-x-2">
             <div className="flex flex-col space-y-1">
               <Label htmlFor="critical" className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-red-500" />
                 Critical Defects
               </Label>
-              <span className="text-xs text-muted-foreground">Immediate alerts for safety and compliance failures.</span>
+              <span className="text-xs text-muted-foreground">
+                Immediate alerts for safety and compliance failures.
+              </span>
             </div>
-            <Switch 
-              id="critical" 
+            <Switch
+              id="critical"
               checked={localSettings.criticalDefects}
               onCheckedChange={() => handleToggle("criticalDefects")}
             />
@@ -79,10 +99,12 @@ export function NotificationSettings() {
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
                 Major Defects
               </Label>
-              <span className="text-xs text-muted-foreground">Alerts for significant quality issues requiring rework.</span>
+              <span className="text-xs text-muted-foreground">
+                Alerts for significant quality issues requiring rework.
+              </span>
             </div>
-            <Switch 
-              id="major" 
+            <Switch
+              id="major"
               checked={localSettings.majorDefects}
               onCheckedChange={() => handleToggle("majorDefects")}
             />
@@ -94,10 +116,12 @@ export function NotificationSettings() {
                 <AlertTriangle className="h-4 w-4 text-blue-500" />
                 Minor Defects
               </Label>
-              <span className="text-xs text-muted-foreground">Notifications for minor cosmetic or documentation issues.</span>
+              <span className="text-xs text-muted-foreground">
+                Notifications for minor cosmetic or documentation issues.
+              </span>
             </div>
-            <Switch 
-              id="minor" 
+            <Switch
+              id="minor"
               checked={localSettings.minorDefects}
               onCheckedChange={() => handleToggle("minorDefects")}
             />
@@ -105,18 +129,25 @@ export function NotificationSettings() {
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">General Updates</h3>
-          
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+            General Updates
+          </h3>
+
           <div className="flex items-center justify-between space-x-2">
             <div className="flex flex-col space-y-1">
-              <Label htmlFor="audit-complete" className="flex items-center gap-2">
+              <Label
+                htmlFor="audit-complete"
+                className="flex items-center gap-2"
+              >
                 <CheckCircle2 className="h-4 w-4 text-green-500" />
                 Audit Completed
               </Label>
-              <span className="text-xs text-muted-foreground">Get notified when a job sheet audit is finalized.</span>
+              <span className="text-xs text-muted-foreground">
+                Get notified when a job sheet audit is finalized.
+              </span>
             </div>
-            <Switch 
-              id="audit-complete" 
+            <Switch
+              id="audit-complete"
               checked={localSettings.auditCompleted}
               onCheckedChange={() => handleToggle("auditCompleted")}
             />
@@ -124,14 +155,19 @@ export function NotificationSettings() {
 
           <div className="flex items-center justify-between space-x-2">
             <div className="flex flex-col space-y-1">
-              <Label htmlFor="daily-summary" className="flex items-center gap-2">
+              <Label
+                htmlFor="daily-summary"
+                className="flex items-center gap-2"
+              >
                 <FileText className="h-4 w-4 text-slate-500" />
                 Daily Summary
               </Label>
-              <span className="text-xs text-muted-foreground">Receive a daily digest of your performance stats.</span>
+              <span className="text-xs text-muted-foreground">
+                Receive a daily digest of your performance stats.
+              </span>
             </div>
-            <Switch 
-              id="daily-summary" 
+            <Switch
+              id="daily-summary"
               checked={localSettings.dailySummary}
               onCheckedChange={() => handleToggle("dailySummary")}
             />
@@ -139,20 +175,24 @@ export function NotificationSettings() {
         </div>
       </CardContent>
       <CardFooter className="bg-muted/20 border-t p-4 flex flex-col gap-2">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="w-full" 
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
           onClick={handleSendTestEmail}
           disabled={!localSettings.dailySummary || isSending}
         >
           <Mail className="h-4 w-4 mr-2" />
           {isSending ? "Sending..." : "Send Test Summary Email"}
         </Button>
-        
+
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs text-muted-foreground"
+            >
               <PenTool className="h-3 w-3 mr-2" />
               Customize Email Templates
             </Button>
