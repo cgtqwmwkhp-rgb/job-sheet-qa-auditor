@@ -87,13 +87,22 @@ export default function SearchPage() {
     setHighlightedIndex(0);
   };
 
-  const { data: jobSheets, isLoading: sheetsLoading } =
-    trpc.jobSheets.list.useQuery({ limit: 100 });
+  const {
+    data: jobSheets,
+    isLoading: sheetsLoading,
+    isError: sheetsError,
+    refetch: refetchSheets,
+  } = trpc.jobSheets.list.useQuery({ limit: 100 });
 
-  const { data: auditResults, isLoading: auditsLoading } =
-    trpc.audits.list.useQuery({ limit: 100 });
+  const {
+    data: auditResults,
+    isLoading: auditsLoading,
+    isError: auditsError,
+    refetch: refetchAudits,
+  } = trpc.audits.list.useQuery({ limit: 100 });
 
   const isLoading = sheetsLoading || auditsLoading;
+  const loadError = sheetsError || auditsError;
 
   const auditByJobSheetId = useMemo(() => {
     const map = new Map<
@@ -234,6 +243,28 @@ export default function SearchPage() {
           <Card className="border-[#EBE8E8] bg-white">
             <CardContent className="p-0">
               <ListSkeleton items={5} />
+            </CardContent>
+          </Card>
+        ) : loadError ? (
+          <Card className="border-destructive/30 bg-white">
+            <CardContent className="py-8 flex flex-col items-center gap-3 text-center">
+              <AlertCircle className="h-10 w-10 text-destructive" />
+              <p className="font-medium text-[#333030]">
+                Unable to load search results
+              </p>
+              <p className="text-sm text-[#706D6D]">
+                Check your connection, then retry.
+              </p>
+              <button
+                type="button"
+                className="text-sm font-medium text-[#333030] underline underline-offset-2"
+                onClick={() => {
+                  void refetchSheets();
+                  void refetchAudits();
+                }}
+              >
+                Retry
+              </button>
             </CardContent>
           </Card>
         ) : allResults.length === 0 ? (

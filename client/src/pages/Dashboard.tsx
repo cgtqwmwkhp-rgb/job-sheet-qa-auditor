@@ -95,7 +95,7 @@ export default function Dashboard() {
     setLocation(`/audits?id=${id}`);
   };
 
-  const { data: statsData, isLoading: statsLoading } =
+  const { data: statsData, isLoading: statsLoading, isError: statsError, refetch: refetchStats } =
     trpc.stats.dashboard.useQuery(undefined, { enabled: !!user });
   const { data: recentJobSheets, isLoading: jobSheetsLoading } =
     trpc.jobSheets.list.useQuery({ limit: 5 }, { enabled: !!user });
@@ -110,6 +110,12 @@ export default function Dashboard() {
     trpc.analytics.getExceptionSummary.useQuery(period, { enabled: !!user });
   const { data: driftAlertsData, isLoading: alertsLoading } =
     trpc.analytics.getDriftAlerts.useQuery(period, { enabled: !!user });
+  const { data: health } = trpc.system.health.useQuery(
+    { timestamp: Date.now() },
+    { enabled: !!user, refetchInterval: 60_000 }
+  );
+
+  const systemHealthy = health?.ok === true;
 
   const activityChart = useMemo(() => {
     const series = driftSummary?.series ?? [];
@@ -230,6 +236,21 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-8">
+        {statsError ? (
+          <Card className="border-destructive/30 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-sm font-medium text-destructive">
+              Unable to load dashboard stats. Refresh and try again.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void refetchStats()}
+            >
+              Retry
+            </Button>
+          </Card>
+        ) : null}
         {/* Hero */}
         <section className="rounded-xl border border-[#EBE8E8] bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -243,12 +264,29 @@ export default function Dashboard() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-2 rounded-full border border-[#D4E86D] bg-[rgba(190,218,65,0.12)] px-3 py-1 text-xs font-medium text-[#4A4646]">
+              <div
+                className={cn(
+                  "flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium",
+                  systemHealthy
+                    ? "border-[#D4E86D] bg-[rgba(190,218,65,0.12)] text-[#4A4646]"
+                    : "border-[#E8A317] bg-[rgba(232,163,23,0.12)] text-[#4A4646]"
+                )}
+              >
                 <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                  {systemHealthy ? (
+                    <>
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                    </>
+                  ) : (
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-[#E8A317]" />
+                  )}
                 </span>
-                System operational
+                {health
+                  ? systemHealthy
+                    ? "System operational"
+                    : "System degraded"
+                  : "Checking health…"}
               </div>
               <Button
                 asChild
@@ -348,8 +386,16 @@ export default function Dashboard() {
                   <EmptyState
                     compact
                     icon={TrendingUp}
-                    title="No audit activity yet"
-                    description="Process job sheets to see daily volume and defect trends."
+                    title={
+                      hasNoAudits
+                        ? "No audit activity yet"
+                        : "Activity series unavailable"
+                    }
+                    description={
+                      hasNoAudits
+                        ? "Process job sheets to see daily volume and defect trends."
+                        : "Audits exist, but drift analytics has no series for this 14-day window."
+                    }
                     action={
                       hasNoAudits
                         ? { label: "Upload first job sheet", href: "/upload" }
@@ -403,8 +449,16 @@ export default function Dashboard() {
                   <EmptyState
                     compact
                     icon={AlertTriangle}
-                    title="No defect data yet"
-                    description="Defect breakdown appears after audits complete."
+                    title={
+                      hasNoAudits
+                        ? "No defect data yet"
+                        : "Defect breakdown unavailable"
+                    }
+                    description={
+                      hasNoAudits
+                        ? "Defect breakdown appears after audits complete."
+                        : "Audits exist, but exception analytics has no overturn rules for this window."
+                    }
                     action={
                       hasNoAudits
                         ? { label: "Upload first job sheet", href: "/upload" }

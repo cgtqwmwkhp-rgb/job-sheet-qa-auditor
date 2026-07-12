@@ -35,8 +35,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
+
+function evidenceUrlList(evidenceUrls: unknown): string[] {
+  if (!Array.isArray(evidenceUrls)) return [];
+  return evidenceUrls.filter(
+    (u): u is string => typeof u === "string" && u.trim().length > 0
+  );
+}
 
 type DisputeStatus =
   | "open"
@@ -57,6 +65,7 @@ type DisputeData = {
   resolvedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  jobSheetId?: number | null;
 };
 
 type StatusFilter = "all" | DisputeStatus;
@@ -291,6 +300,7 @@ export default function DisputeManagement() {
             <button
               key={f.value}
               type="button"
+              aria-pressed={statusFilter === f.value}
               onClick={() => setStatusFilter(f.value)}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium border transition-colors",
@@ -428,18 +438,67 @@ export default function DisputeManagement() {
                               <span className="font-medium text-sm text-[#333030]">
                                 Finding #{dispute.auditFindingId}
                               </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs text-[#706D6D] hover:text-[#333030]"
-                              >
-                                <FileText className="h-3 w-3 mr-1" />
-                                View evidence
-                              </Button>
+                              {(() => {
+                                const urls = evidenceUrlList(
+                                  dispute.evidenceUrls
+                                );
+                                if (urls.length > 0) {
+                                  return (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 text-xs text-[#706D6D] hover:text-[#333030]"
+                                      onClick={() =>
+                                        window.open(
+                                          urls[0],
+                                          "_blank",
+                                          "noopener,noreferrer"
+                                        )
+                                      }
+                                    >
+                                      <FileText className="h-3 w-3 mr-1" />
+                                      View evidence
+                                    </Button>
+                                  );
+                                }
+                                if (dispute.jobSheetId) {
+                                  return (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 text-xs text-[#706D6D] hover:text-[#333030]"
+                                      asChild
+                                    >
+                                      <Link
+                                        href={`/audits?id=${dispute.jobSheetId}`}
+                                      >
+                                        <FileText className="h-3 w-3 mr-1" />
+                                        Open audit
+                                      </Link>
+                                    </Button>
+                                  );
+                                }
+                                return (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs text-[#706D6D]"
+                                    disabled
+                                    title="No evidence URLs or linked job sheet"
+                                  >
+                                    <FileText className="h-3 w-3 mr-1" />
+                                    No evidence
+                                  </Button>
+                                );
+                              })()}
                             </div>
                             <p className="text-sm text-[#706D6D]">
-                              Linked via finding ID — open the audit to compare
-                              technician evidence with the original QA outcome.
+                              Finding #{dispute.auditFindingId}
+                              {dispute.jobSheetId
+                                ? ` · job sheet #${dispute.jobSheetId}`
+                                : ""}
+                              . Compare technician claim with the original QA
+                              outcome.
                             </p>
                           </div>
                         </div>

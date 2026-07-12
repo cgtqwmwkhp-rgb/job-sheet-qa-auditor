@@ -25,7 +25,7 @@ export function AIPersonaSettings() {
   );
 
   const handleSave = () => {
-    toast.success("AI Persona settings saved successfully.");
+    toast.message("Preview only — AI Persona settings are not saved yet");
   };
 
   return (

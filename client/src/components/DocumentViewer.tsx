@@ -91,9 +91,11 @@ export function DocumentViewer({
   const [pageSizes, setPageSizes] = useState<
     Record<number, { width: number; height: number }>
   >({});
+  const [fetchNonce, setFetchNonce] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const objectUrlRef = useRef<string | null>(null);
   const fetchGenRef = useRef(0);
+  const pdfBytesRef = useRef<Uint8Array | null>(null);
 
   useEffect(() => {
     assertNoDirectBlobUrl(url);
@@ -106,6 +108,7 @@ export function DocumentViewer({
     setPdfFile(null);
     setPdfLoadError(null);
     setNumPages(0);
+    pdfBytesRef.current = null;
 
     if (!url) return;
 
@@ -138,6 +141,7 @@ export function DocumentViewer({
         const objectUrl = URL.createObjectURL(blob);
         const previous = objectUrlRef.current;
         objectUrlRef.current = objectUrl;
+        pdfBytesRef.current = bytes;
         setPdfFile(objectUrl);
         if (previous) URL.revokeObjectURL(previous);
 
@@ -183,7 +187,42 @@ export function DocumentViewer({
     return () => {
       cancelled = true;
     };
-  }, [url]);
+  }, [url, fetchNonce]);
+
+  // Probe page size on demand when View-on-Doc targets a page beyond the first 8.
+  useEffect(() => {
+    const bytes = pdfBytesRef.current;
+    const target = focusPage ?? pageNumber;
+    if (!bytes || target < 1 || pageSizes[target]) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+        if (cancelled) {
+          await doc.destroy();
+          return;
+        }
+        if (target <= doc.numPages) {
+          const page = await doc.getPage(target);
+          const vp = page.getViewport({ scale: 1 });
+          if (!cancelled) {
+            setPageSizes(prev => ({
+              ...prev,
+              [target]: { width: vp.width, height: vp.height },
+            }));
+          }
+        }
+        await doc.destroy();
+      } catch (err) {
+        console.warn("[DocumentViewer] on-demand page probe failed:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [focusPage, pageNumber, pageSizes, pdfFile]);
 
   useEffect(() => {
     return () => {
@@ -369,37 +408,47 @@ export function DocumentViewer({
           </div>
 
           <div className="flex items-center gap-1 border-l pl-2 ml-2">
-            <Button
-              variant={isDrawing ? "secondary" : "ghost"}
-              size="icon"
-              aria-label={
-                isDrawing
-                  ? "Done drawing — PDF controls re-enabled"
-                  : "Draw box (temporarily locks PDF controls)"
-              }
-              className="h-8 w-8"
-              onClick={() => setIsDrawing(!isDrawing)}
-              title={
-                isDrawing
-                  ? "Done drawing — PDF controls re-enabled"
-                  : "Draw box (temporarily locks PDF controls)"
-              }
-            >
-              {isDrawing ? (
-                <MousePointer2 className="w-4 h-4" />
-              ) : (
-                <PenTool className="w-4 h-4" />
-              )}
-            </Button>
+            {onBoxCreate ? (
+              <Button
+                variant={isDrawing ? "secondary" : "ghost"}
+                size="icon"
+                aria-label={
+                  isDrawing
+                    ? "Done drawing — PDF controls re-enabled"
+                    : "Draw box (temporarily locks PDF controls)"
+                }
+                className="h-8 w-8"
+                onClick={() => setIsDrawing(!isDrawing)}
+                title={
+                  isDrawing
+                    ? "Done drawing — PDF controls re-enabled"
+                    : "Draw box (temporarily locks PDF controls)"
+                }
+              >
+                {isDrawing ? (
+                  <MousePointer2 className="w-4 h-4" />
+                ) : (
+                  <PenTool className="w-4 h-4" />
+                )}
+              </Button>
+            ) : null}
           </div>
         </div>
       </CardHeader>
 
       <div className="flex-1 bg-muted/30 overflow-hidden relative min-h-0">
         {pdfLoadError && !pdfFile ? (
-          <div className="flex flex-col items-center justify-center h-full w-full min-h-[240px] text-destructive px-4 text-center">
+          <div className="flex flex-col items-center justify-center h-full w-full min-h-[240px] text-destructive px-4 text-center gap-3">
             <p>Failed to load document.</p>
-            <p className="text-xs mt-2 text-muted-foreground">{pdfLoadError}</p>
+            <p className="text-xs text-muted-foreground">{pdfLoadError}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setFetchNonce(n => n + 1)}
+            >
+              Retry
+            </Button>
           </div>
         ) : !iframeSrc ? (
           <div className="flex items-center justify-center h-full w-full min-h-[240px] bg-muted/20">

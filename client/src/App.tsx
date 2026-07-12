@@ -143,7 +143,9 @@ function Router() {
         </Route>
         <Route path="/hold-queue">
           <RequireStaff>
-            <HoldQueue />
+            <RouteErrorBoundary routeName="Hold Queue">
+              <HoldQueue />
+            </RouteErrorBoundary>
           </RequireStaff>
         </Route>
         <Route path="/specs">

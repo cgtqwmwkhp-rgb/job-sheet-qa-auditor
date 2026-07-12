@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ListSkeleton } from "@/components/ui/loading-skeleton";
 import {
   AlertCircle,
   CheckCircle2,
@@ -316,7 +317,9 @@ export default function HoldQueue() {
 
   const handleBulkApprove = async () => {
     const ids =
-      selectedIds.size > 0 ? Array.from(selectedIds) : holdItems.map(i => i.id);
+      selectedIds.size > 0
+        ? Array.from(selectedIds)
+        : sortedFilteredItems.map(i => i.id);
     if (ids.length === 0) {
       toast.error("No items to approve");
       return;
@@ -344,10 +347,9 @@ export default function HoldQueue() {
           action: {
             label: "Undo last",
             onClick: () => {
-              const lastId = ids[ids.length - 1];
               undoApprove.mutate(
                 {
-                  jobSheetId: lastId,
+                  jobSheetId: last.value.jobSheetId,
                   restoreStatus: last.value.previousStatus as
                     | "pending"
                     | "processing"
@@ -529,11 +531,8 @@ export default function HoldQueue() {
         </div>
 
         {isLoading && (
-          <Card className="p-12 border-[#EBE8E8]">
-            <div className="flex flex-col items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-[#706D6D] mb-4" />
-              <p className="text-[#706D6D]">Loading review queue...</p>
-            </div>
+          <Card className="border-[#EBE8E8] bg-white overflow-hidden">
+            <ListSkeleton items={6} />
           </Card>
         )}
 
@@ -579,6 +578,13 @@ export default function HoldQueue() {
                     icon={Filter}
                     title="No items match"
                     description="Try clearing the search or filter."
+                    action={{
+                      label: "Clear filters",
+                      onClick: () => {
+                        setFilterChip("all");
+                        setSearchQuery("");
+                      },
+                    }}
                   />
                 ) : (
                   <ul className="divide-y divide-[#EBE8E8]">

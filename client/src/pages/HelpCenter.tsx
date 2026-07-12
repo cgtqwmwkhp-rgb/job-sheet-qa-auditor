@@ -34,6 +34,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
+import DashboardLayout from "@/components/DashboardLayout";
 
 const HELP_CATEGORIES = [
   {
@@ -155,7 +156,8 @@ export default function HelpCenter() {
   const showTab = (tab: string) => !matchingTabs || matchingTabs.has(tab);
 
   return (
-    <div className="space-y-8 p-6 md:p-8 max-w-7xl mx-auto animate-in fade-in duration-500">
+    <DashboardLayout>
+    <div className="space-y-8 max-w-7xl mx-auto animate-in fade-in duration-500">
       <div className="text-center space-y-4 py-6 md:py-8">
         <p className="text-xs font-semibold uppercase tracking-wider text-primary">
           Help Center
@@ -860,5 +862,6 @@ export default function HelpCenter() {
         )}
       </Tabs>
     </div>
+    </DashboardLayout>
   );
 }

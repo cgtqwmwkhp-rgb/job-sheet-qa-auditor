@@ -30,17 +30,14 @@ export function NotificationSettings() {
   const handleToggle = (key: keyof NotificationSettingsState) => {
     const newSettings = { ...localSettings, [key]: !localSettings[key] };
     setLocalSettings(newSettings);
-    toast.success("Notification preferences updated");
+    toast.message("Preview only — preferences are not saved yet");
   };
 
   const handleSendTestEmail = async () => {
     setIsSending(true);
     try {
-      // Simulate sending test email
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      toast.success("Test email sent! Check your inbox.");
-    } catch {
-      toast.error("Failed to send test email");
+      await new Promise(resolve => setTimeout(resolve, 800));
+      toast.message("Test email is not wired yet — no message was sent");
     } finally {
       setIsSending(false);
     }

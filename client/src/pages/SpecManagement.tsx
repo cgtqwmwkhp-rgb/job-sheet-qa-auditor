@@ -142,11 +142,13 @@ export default function SpecManagement() {
     specs?.find(s => s.isActive) ||
     specs?.[0];
 
-  // Parse rules from spec JSON
+  // Parse rules from spec JSON — empty when none stored (no silent mock fallback)
   const currentRules =
     selectedSpec?.schema && typeof selectedSpec.schema === "object"
-      ? (selectedSpec.schema as any).rules || mockRules
-      : mockRules;
+      ? ((selectedSpec.schema as { rules?: unknown }).rules as
+          | typeof mockRules
+          | undefined) || []
+      : [];
 
   return (
     <DashboardLayout>
@@ -309,6 +311,13 @@ export default function SpecManagement() {
                     </Button>
                   </div>
 
+                  {currentRules.length === 0 ? (
+                    <p className="text-sm text-muted-foreground border border-dashed rounded-lg p-6 text-center">
+                      No rules stored on this specification yet. New specs start
+                      with a starter rule set; edits here are preview-only until
+                      persistence ships.
+                    </p>
+                  ) : (
                   <Accordion type="single" collapsible className="w-full">
                     {currentRules.map((rule: any) => (
                       <AccordionItem key={rule.id} value={rule.id}>
@@ -385,10 +394,15 @@ export default function SpecManagement() {
                                   </Button>
                                   <Button
                                     size="sm"
-                                    onClick={() => setEditingRule(null)}
+                                    onClick={() => {
+                                      setEditingRule(null);
+                                      toast.message(
+                                        "Preview only — rule edits are not persisted yet"
+                                      );
+                                    }}
                                   >
-                                    <Save className="w-3 h-3 mr-2" /> Save
-                                    Changes
+                                    <Save className="w-3 h-3 mr-2" /> Done
+                                    editing
                                   </Button>
                                 </>
                               ) : (
@@ -415,6 +429,7 @@ export default function SpecManagement() {
                       </AccordionItem>
                     ))}
                   </Accordion>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-16 px-6 text-muted-foreground">

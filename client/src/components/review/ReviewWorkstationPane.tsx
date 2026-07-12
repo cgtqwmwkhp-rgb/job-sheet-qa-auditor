@@ -1031,6 +1031,7 @@ function ReviewWorkstationContent({
     <div
       ref={resolvedPaneRef}
       tabIndex={-1}
+      data-review-workstation
       className="flex flex-col outline-none overflow-hidden h-full min-h-0"
     >
       <div
@@ -1190,7 +1191,7 @@ function ReviewWorkstationContent({
       <div
         className={`flex-1 min-h-0 grid grid-cols-1 gap-0 ${
           compact
-            ? "lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]"
+            ? "lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] lg:grid-rows-[minmax(40vh,1fr)]"
             : "lg:grid-cols-[minmax(0,1fr)_minmax(300px,26rem)]"
         }`}
       >

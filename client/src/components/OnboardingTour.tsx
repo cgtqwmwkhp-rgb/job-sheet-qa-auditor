@@ -126,6 +126,7 @@ export function OnboardingTour() {
             size="icon"
             className="absolute top-2 right-2 rounded-full hover:bg-background/50"
             onClick={handleComplete}
+            aria-label="Dismiss onboarding tour"
           >
             <X className="h-4 w-4" />
           </Button>

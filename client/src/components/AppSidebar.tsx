@@ -137,23 +137,25 @@ export function AppSidebar() {
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              tooltip="Settings"
-              isActive={isActive("/settings")}
-              className={cn(
-                "mx-1 rounded-lg border-l-[3px] border-transparent text-[#706D6D] transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4] hover:text-[#333030]",
-                isActive("/settings") &&
-                  "border-l-primary bg-[rgba(190,218,65,0.15)] font-semibold text-[#333030]"
-              )}
-            >
-              <Link href="/settings">
-                <Settings className="size-4 stroke-[1.5]" />
-                <span>Settings</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {hasRole(["admin", "qa_lead"]) ? (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                tooltip="Settings"
+                isActive={isActive("/settings")}
+                className={cn(
+                  "mx-1 rounded-lg border-l-[3px] border-transparent text-[#706D6D] transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4] hover:text-[#333030]",
+                  isActive("/settings") &&
+                    "border-l-primary bg-[rgba(190,218,65,0.15)] font-semibold text-[#333030]"
+                )}
+              >
+                <Link href="/settings">
+                  <Settings className="size-4 stroke-[1.5]" />
+                  <span>Settings</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ) : null}
         </SidebarMenu>
       </SidebarFooter>
       <SidebarRail />

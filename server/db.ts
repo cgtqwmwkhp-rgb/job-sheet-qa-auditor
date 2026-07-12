@@ -741,8 +741,6 @@ export async function getDisputes(options?: {
   const db = await getDb();
   if (!db) return [];
 
-  let query = db.select().from(disputes);
-
   const conditions = [];
   if (options?.status) {
     conditions.push(eq(disputes.status, options.status as any));
@@ -754,14 +752,36 @@ export async function getDisputes(options?: {
     conditions.push(eq(disputes.reviewerId, options.reviewerId));
   }
 
-  if (conditions.length > 0) {
-    query = query.where(and(...conditions)) as any;
-  }
+  const whereClause =
+    conditions.length > 0 ? and(...conditions) : undefined;
 
-  return query
+  const rows = await db
+    .select({
+      id: disputes.id,
+      auditFindingId: disputes.auditFindingId,
+      raisedBy: disputes.raisedBy,
+      status: disputes.status,
+      reason: disputes.reason,
+      evidenceUrls: disputes.evidenceUrls,
+      reviewerId: disputes.reviewerId,
+      reviewNotes: disputes.reviewNotes,
+      resolvedAt: disputes.resolvedAt,
+      createdAt: disputes.createdAt,
+      updatedAt: disputes.updatedAt,
+      jobSheetId: auditResults.jobSheetId,
+    })
+    .from(disputes)
+    .leftJoin(auditFindings, eq(disputes.auditFindingId, auditFindings.id))
+    .leftJoin(
+      auditResults,
+      eq(auditFindings.auditResultId, auditResults.id)
+    )
+    .where(whereClause)
     .orderBy(desc(disputes.createdAt))
     .limit(options?.limit ?? 50)
     .offset(options?.offset ?? 0);
+
+  return rows;
 }
 
 export async function updateDisputeStatus(
