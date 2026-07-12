@@ -9,6 +9,8 @@ import {
   extractCitedJobSheetIds,
   isCoachingLlmNarrativeEnabled,
   enrichCoachingNarrativeWithLlm,
+  applyHardCiteGates,
+  quotesGroundedInDossier,
 } from "../../services/engineerAnalytics/coachingNarrativeLlm";
 import { buildEvidenceDossier } from "../../services/engineerAnalytics/evidenceDossier";
 import {
@@ -214,6 +216,41 @@ describe("coachingNarrativeLlm", () => {
     else process.env.FEATURE_COACHING_LLM_NARRATIVE = prev;
   });
 
+  it("hard cite gate drops invented ids, missing cites, and ungrounded quotes", () => {
+    const allowed = new Set([101, 102]);
+    const corpus = 'snippet: "pump seal failed — parts still required"';
+    expect(
+      quotesGroundedInDossier(
+        'On JS-101 you wrote "pump seal failed — parts still required"',
+        corpus
+      )
+    ).toBe(true);
+    expect(
+      quotesGroundedInDossier(
+        'On JS-101 you wrote "completely fabricated quote here"',
+        corpus
+      )
+    ).toBe(false);
+
+    const gated = applyHardCiteGates(
+      [
+        "JS-101 missing next action on failure path",
+        "JS-999 invented card",
+        "No cite but claims a major documentation failure",
+        'JS-101 quote "completely fabricated quote here"',
+      ],
+      allowed,
+      corpus,
+      { requireCite: true }
+    );
+    expect(gated.kept).toEqual([
+      "JS-101 missing next action on failure path",
+    ]);
+    expect(gated.stats.droppedInventedIds).toBe(1);
+    expect(gated.stats.droppedMissingCite).toBe(1);
+    expect(gated.stats.droppedUngroundedQuote).toBe(1);
+  });
+
   it("mock enrichment adds critic note without inventing cites", async () => {
     const prev = process.env.FEATURE_COACHING_LLM_NARRATIVE;
     process.env.FEATURE_COACHING_LLM_NARRATIVE = "true";
@@ -267,6 +304,7 @@ describe("coachingNarrativeLlm", () => {
       forceMock: true,
     });
     expect(enriched.enrichment.provider).toBe("mock");
+    expect(enriched.enrichment.writerProvider).toBe("mock");
     expect(enriched.criticalAssessment.join(" ")).toMatch(/Mock critic/);
 
     if (prev === undefined) delete process.env.FEATURE_COACHING_LLM_NARRATIVE;

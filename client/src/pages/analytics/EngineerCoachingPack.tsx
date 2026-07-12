@@ -196,7 +196,13 @@ function CoachingPackView({
                 <CardTitle className="text-base">Opening</CardTitle>
                 {pack.draftNarrative.enrichment?.usedLlm ? (
                   <Badge variant="secondary" className="text-xs">
-                    AI-enhanced · {pack.draftNarrative.enrichment.model}
+                    AI critic ·{" "}
+                    {pack.draftNarrative.enrichment.writerProvider ||
+                      pack.draftNarrative.enrichment.provider}
+                    {pack.draftNarrative.enrichment.verifierProvider &&
+                    pack.draftNarrative.enrichment.verifierProvider !== "none"
+                      ? ` · verified by ${pack.draftNarrative.enrichment.verifierProvider}`
+                      : ""}
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-xs">

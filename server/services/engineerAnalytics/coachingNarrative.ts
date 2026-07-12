@@ -9,10 +9,21 @@ import type { ThemeAggregate } from "./coachingThemes";
 import type { EvidenceDossier } from "./evidenceDossier";
 
 export interface NarrativeEnrichmentMeta {
-  provider: "deterministic" | "gemini" | "mock" | "none";
+  provider:
+    | "deterministic"
+    | "anthropic"
+    | "openai"
+    | "gemini"
+    | "mock"
+    | "none";
   model: string | null;
   enrichedAt: string | null;
   usedLlm: boolean;
+  writerProvider?: "anthropic" | "openai" | "gemini" | "mock" | "none" | null;
+  verifierProvider?: "anthropic" | "openai" | "gemini" | "mock" | "none" | null;
+  verifierModel?: string | null;
+  verifierRejectedLines?: number;
+  citeGateDroppedLines?: number;
 }
 
 export interface CoachingNarrativeDraft {
