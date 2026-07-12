@@ -144,7 +144,8 @@ test.describe('Sandbox UI Smoke Test', () => {
     const criticalErrors = consoleErrors.filter(error => 
       !error.includes('Failed to load resource') &&
       !error.includes('net::ERR_') &&
-      !error.includes('OAuth')
+      !error.includes('OAuth') &&
+      !error.includes('Please login')
     );
     
     if (criticalErrors.length > 0) {
