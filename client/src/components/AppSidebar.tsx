@@ -76,7 +76,7 @@ export function AppSidebar() {
       <SidebarHeader className="flex h-14 items-center justify-center border-b border-sidebar-border bg-primary px-2">
         <BrandLogo
           className="w-full px-1 text-primary-foreground"
-          markClassName="h-7 w-7 rounded-md bg-white/90 p-0.5"
+          markClassName="h-8 w-8 rounded-md bg-white p-0.5"
           subtitle="Job Sheet QA"
         />
       </SidebarHeader>

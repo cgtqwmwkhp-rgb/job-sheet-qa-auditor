@@ -1,15 +1,58 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" role="img" aria-label="PlantExpand">
-  <rect width="32" height="32" rx="6" fill="#BEDA41"/>
-  <!-- Simple leaf mark -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="PlantExpand">
+  <!-- Interlocking octagons: brand lime + charcoal (master mark with red→lime) -->
+  <defs>
+    <path id="oct" d="M78 18 L138 18 L178 58 L178 118 L138 158 L78 158 L38 118 L38 58 Z"/>
+  </defs>
+  <!-- Green ring (upper-left) -->
+  <g transform="translate(8 8)">
+    <path
+      d="M78 18 L138 18 L178 58 L178 118 L138 158 L78 158 L38 118 L38 58 Z"
+      fill="none"
+      stroke="#BEDA41"
+      stroke-width="22"
+      stroke-linejoin="round"
+    />
+    <!-- interior ticks -->
+    <g fill="#333030">
+      <rect x="58" y="36" width="22" height="8" transform="rotate(-45 69 40)"/>
+      <rect x="42" y="54" width="22" height="8" transform="rotate(-45 53 58)"/>
+      <rect x="34" y="76" width="22" height="8" transform="rotate(-90 45 80)"/>
+      <rect x="34" y="98" width="22" height="8" transform="rotate(-90 45 102)"/>
+      <rect x="44" y="118" width="22" height="8" transform="rotate(-135 55 122)"/>
+    </g>
+  </g>
+  <!-- Black ring (lower-right), drawn to interlock -->
+  <g transform="translate(52 52)">
+    <path
+      d="M78 18 L138 18 L178 58 L178 118 L138 158 L78 158 L38 118 L38 58 Z"
+      fill="none"
+      stroke="#333030"
+      stroke-width="22"
+      stroke-linejoin="round"
+    />
+    <g fill="#333030">
+      <rect x="118" y="36" width="22" height="8" transform="rotate(45 129 40)"/>
+      <rect x="138" y="54" width="22" height="8" transform="rotate(45 149 58)"/>
+      <rect x="148" y="76" width="22" height="8" transform="rotate(90 159 80)"/>
+      <rect x="148" y="98" width="22" height="8" transform="rotate(90 159 102)"/>
+      <rect x="136" y="118" width="22" height="8" transform="rotate(135 147 122)"/>
+    </g>
+  </g>
+  <!-- Weave overlays so rings interlock like the master mark -->
   <path
-    fill="#333030"
-    d="M16 6c6.5 3.2 9.5 8.2 9.5 13.2 0 4.2-2.8 6.8-6.2 6.8-1.6 0-3-.6-4.1-1.7C14.1 25.4 12.7 26 11.1 26c-3.4 0-6.2-2.6-6.2-6.8C4.9 14.2 7.9 9.2 16 6z"
-  />
-  <path
+    d="M138 78 L168 78 L168 108"
     fill="none"
     stroke="#BEDA41"
-    stroke-width="1.6"
-    stroke-linecap="round"
-    d="M16 10.5v12.5M16 16.5c-2.2.8-3.8 2.4-4.6 4.4M16 14.5c2 .7 3.5 2 4.4 3.8"
+    stroke-width="22"
+    stroke-linecap="butt"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M108 138 L108 168 L138 168"
+    fill="none"
+    stroke="#333030"
+    stroke-width="22"
+    stroke-linecap="butt"
+    stroke-linejoin="round"
   />
 </svg>

@@ -51,8 +51,15 @@ export default function EntraSignIn({
           <div className="h-1 bg-primary" aria-hidden="true" />
           <div className="px-8 pt-10 pb-8">
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center h-10 w-10 rounded-lg bg-primary/15 mb-4">
-                <span className="text-sm font-bold text-primary">PE</span>
+              <div className="inline-flex items-center justify-center mb-4">
+                <img
+                  src="/plantexpand-mark.png"
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 object-contain"
+                  aria-hidden="true"
+                />
               </div>
               <p
                 className="text-xs font-semibold tracking-wide uppercase text-muted-foreground"
