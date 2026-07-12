@@ -35,7 +35,6 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function TechnicianDashboard() {
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState("overview");
   const { fcmToken } = usePushNotifications();
   const [disputeOpen, setDisputeOpen] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
@@ -45,19 +44,18 @@ export default function TechnicianDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9F9F9] pb-20">
-      {/* Mobile Header — Portal chrome */}
-      <header className="bg-white border-b border-[#EBE8E8] sticky top-0 z-10 px-4 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-muted/40 pb-20">
+      <header className="bg-card border-b border-border/60 sticky top-0 z-10 px-4 py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 bg-primary rounded-xl flex items-center justify-center shadow-sm">
-            <CheckCircle2 className="h-5 w-5 text-primary-foreground" />
+          <div className="h-9 w-9 bg-primary rounded-lg flex items-center justify-center shadow-sm">
+            <span className="text-xs font-bold text-primary-foreground">PE</span>
           </div>
           <div>
-            <h1 className="font-bold text-sm leading-tight text-foreground">
+            <h1 className="font-semibold text-sm leading-tight text-foreground">
               Technician Portal
             </h1>
-            <p className="text-[11px] text-muted-foreground font-medium">
-              Logged in as {user?.name || "Technician"}
+            <p className="text-[11px] text-muted-foreground">
+              {user?.name || "Technician"}
             </p>
           </div>
         </div>
@@ -85,26 +83,26 @@ export default function TechnicianDashboard() {
 
       <div className="p-4 space-y-5">
         {/* Scorecard */}
-        <Card className="bg-primary text-primary-foreground border-none shadow-sm relative overflow-hidden">
+        <Card className="bg-primary text-primary-foreground border-none shadow-md relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-10">
-            <TrendingUp className="h-32 w-32 text-white" />
+            <TrendingUp className="h-32 w-32" />
           </div>
           <CardContent className="p-6 relative z-10">
             <div className="flex justify-between items-start mb-6">
               <div>
-                <p className="text-blue-100 text-sm font-medium mb-1">
+                <p className="text-primary-foreground/80 text-sm font-medium mb-1">
                   Current Quality Score
                 </p>
                 <h2 className="text-5xl font-bold tracking-tight">94.2%</h2>
               </div>
-              <Badge className="bg-white/20 hover:bg-white/30 text-white border-none backdrop-blur-sm px-3 py-1">
+              <Badge className="bg-primary-foreground/15 hover:bg-primary-foreground/20 text-primary-foreground border-none px-3 py-1">
                 Top 10%
               </Badge>
             </div>
             <div className="space-y-2">
-              <div className="flex justify-between text-xs font-medium text-blue-100">
+              <div className="flex justify-between text-xs font-medium text-primary-foreground/80">
                 <span>Monthly Target: 95%</span>
-                <span className="text-white">-0.8%</span>
+                <span className="text-primary-foreground">-0.8%</span>
               </div>
               <Progress
                 value={94.2}
@@ -142,10 +140,10 @@ export default function TechnicianDashboard() {
 
         {/* Recent Activity Tabs */}
         <Tabs defaultValue="audits" className="w-full">
-          <TabsList className="w-full grid grid-cols-3 mb-4">
-            <TabsTrigger value="audits">Recent Audits</TabsTrigger>
-            <TabsTrigger value="defects">My Defects</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsList className="w-full grid grid-cols-3 mb-4 h-11 p-1 bg-muted/60">
+            <TabsTrigger value="audits" className="text-xs sm:text-sm">Recent Audits</TabsTrigger>
+            <TabsTrigger value="defects" className="text-xs sm:text-sm">My Defects</TabsTrigger>
+            <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="audits" className="space-y-3">
@@ -336,25 +334,16 @@ export default function TechnicianDashboard() {
       </div>
 
       {/* Mobile Bottom Nav */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around py-2 px-2 z-10 safe-area-pb">
-        <Button
-          variant="ghost"
-          className="flex flex-col items-center gap-1 h-auto py-2 px-4 text-primary"
-        >
+      <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border/60 flex justify-around py-2 px-2 z-10 safe-area-pb shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
+        <Button variant="ghost" className="flex flex-col items-center gap-1 h-auto py-2 px-4 text-primary">
           <TrendingUp className="h-5 w-5" />
-          <span className="text-[10px] font-medium">Dashboard</span>
+          <span className="text-[10px] font-semibold">Dashboard</span>
         </Button>
-        <Button
-          variant="ghost"
-          className="flex flex-col items-center gap-1 h-auto py-2 px-4 text-muted-foreground"
-        >
+        <Button variant="ghost" className="flex flex-col items-center gap-1 h-auto py-2 px-4 text-muted-foreground hover:text-foreground">
           <FileText className="h-5 w-5" />
           <span className="text-[10px] font-medium">My Jobs</span>
         </Button>
-        <Button
-          variant="ghost"
-          className="flex flex-col items-center gap-1 h-auto py-2 px-4 text-muted-foreground"
-        >
+        <Button variant="ghost" className="flex flex-col items-center gap-1 h-auto py-2 px-4 text-muted-foreground hover:text-foreground">
           <Calendar className="h-5 w-5" />
           <span className="text-[10px] font-medium">History</span>
         </Button>

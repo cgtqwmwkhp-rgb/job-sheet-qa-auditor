@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Search,
   Book,
@@ -6,7 +6,6 @@ import {
   HelpCircle,
   Lightbulb,
   ChevronRight,
-  PlayCircle,
   Info,
   CheckCircle2,
   AlertTriangle,
@@ -14,7 +13,6 @@ import {
   Zap,
   BrainCircuit,
   BarChart3,
-  ArrowRight,
   Gauge,
   Scale,
 } from "lucide-react";
@@ -37,69 +35,135 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
 
+const HELP_CATEGORIES = [
+  { id: "overview", label: "System Overview", icon: Info, description: "Purpose, architecture, and workflow" },
+  { id: "guides", label: "Interactive Guides", icon: Book, description: "Step-by-step walkthroughs" },
+  { id: "faqs", label: "FAQs", icon: HelpCircle, description: "Scoring, AI, and workflows" },
+  { id: "best-practices", label: "Best Practices", icon: Lightbulb, description: "Tips for engineers and QA leads" },
+  { id: "policies", label: "Policies & Standards", icon: Scale, description: "Doc quality, tyres, audit policy" },
+] as const;
+
+const SEARCHABLE_CONTENT = [
+  { tab: "overview", text: "Gold Standard Spec OCR AI Validator workflow ingestion scoring" },
+  { tab: "guides", text: "upload disputes AI persona analytics users roles" },
+  { tab: "faqs", text: "first fix rate handwritten OCR dispute gold standard deep note analysis" },
+  { tab: "best-practices", text: "engineers photos notes QA leads hold queue coaching disputes" },
+  { tab: "policies", text: "doc quality extract confidence tyre tread PSI major minor VOR documentation" },
+];
+
+const GUIDES = [
+  { title: "Uploading Job Sheets", desc: "Step-by-step guide to single and batch uploads.", time: "2 min read", action: "/upload", actionLabel: "Go to Upload" },
+  { title: "Handling Disputes", desc: "How to review and resolve engineer disputes effectively.", time: "4 min read", action: "/disputes", actionLabel: "View Disputes" },
+  { title: "Configuring AI Personas", desc: "Adjusting the strictness and tone of the AI auditor.", time: "3 min read", action: "/settings", actionLabel: "Configure AI" },
+  { title: "Understanding Analytics", desc: "Deep dive into First Fix Rates and Defect Analysis.", time: "5 min read", action: "/analytics", actionLabel: "Open Analytics" },
+  { title: "Managing Users & Roles", desc: "Adding technicians and assigning permissions.", time: "3 min read", action: "/users", actionLabel: "Manage Users" },
+];
+
 export default function HelpCenter() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<string>("overview");
   const [, setLocation] = useLocation();
 
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const matchingTabs = useMemo(() => {
+    if (!normalizedQuery) return null;
+    const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+    return new Set(
+      SEARCHABLE_CONTENT.filter(entry =>
+        terms.every(term => entry.text.toLowerCase().includes(term))
+      ).map(entry => entry.tab)
+    );
+  }, [normalizedQuery]);
+
+  const filteredGuides = useMemo(() => {
+    if (!normalizedQuery) return GUIDES;
+    return GUIDES.filter(
+      g =>
+        g.title.toLowerCase().includes(normalizedQuery) ||
+        g.desc.toLowerCase().includes(normalizedQuery)
+    );
+  }, [normalizedQuery]);
+
+  const showTab = (tab: string) => !matchingTabs || matchingTabs.has(tab);
+
   return (
-    <div className="space-y-8 p-8 max-w-7xl mx-auto animate-in fade-in duration-500">
-      {/* Header Section */}
-      <div className="text-center space-y-4 py-8">
-        <h1 className="text-4xl font-bold tracking-tight text-foreground">
+    <div className="space-y-8 p-6 md:p-8 max-w-7xl mx-auto animate-in fade-in duration-500">
+      <div className="text-center space-y-4 py-6 md:py-8">
+        <p className="text-xs font-semibold uppercase tracking-wider text-primary">Help Center</p>
+        <h1 className="text-3xl md:text-4xl font-heading font-bold tracking-tight text-foreground">
           How can we help you today?
         </h1>
-        <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-          Explore our knowledge base for guides, FAQs, and best practices to get
-          the most out of the Job Sheet QA Auditor.
+        <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto">
+          Explore guides, FAQs, and best practices for the Job Sheet QA Auditor.
         </p>
 
         <div className="max-w-xl mx-auto relative mt-6">
-          <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+          <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
           <Input
-            placeholder="Search for articles, guides, or questions..."
-            className="pl-10 h-12 text-lg shadow-sm"
+            placeholder="Search guides, policies, or questions..."
+            className="pl-10 h-12 text-base shadow-sm border-border/80 focus-visible:ring-primary/30"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
+          {normalizedQuery && (
+            <p className="text-left text-xs text-muted-foreground mt-2 pl-1">
+              {matchingTabs && matchingTabs.size === 0 && filteredGuides.length === 0
+                ? `No results for "${searchQuery}"`
+                : `Filtering across ${matchingTabs?.size ?? HELP_CATEGORIES.length} categories`}
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Main Content Tabs */}
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 h-14 p-1 bg-muted/50 backdrop-blur-sm">
-          <TabsTrigger
-            value="overview"
-            className="h-12 text-base data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
-            <Info className="mr-2 h-4 w-4" /> System Overview
-          </TabsTrigger>
-          <TabsTrigger
-            value="guides"
-            className="h-12 text-base data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
-            <Book className="mr-2 h-4 w-4" /> Interactive Guides
-          </TabsTrigger>
-          <TabsTrigger
-            value="faqs"
-            className="h-12 text-base data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
-            <HelpCircle className="mr-2 h-4 w-4" /> FAQs
-          </TabsTrigger>
-          <TabsTrigger
-            value="best-practices"
-            className="h-12 text-base data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
-            <Lightbulb className="mr-2 h-4 w-4" /> Best Practices
-          </TabsTrigger>
-          <TabsTrigger
-            value="policies"
-            className="h-12 text-base data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
-            <Scale className="mr-2 h-4 w-4" /> Policies &amp; Standards
-          </TabsTrigger>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {HELP_CATEGORIES.map(cat => {
+          const Icon = cat.icon;
+          const isMatch = showTab(cat.id);
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => {
+                setActiveTab(cat.id);
+                setSearchQuery("");
+              }}
+              className={`text-left rounded-lg border p-4 transition-all hover:border-primary/40 hover:bg-primary/5 ${
+                activeTab === cat.id
+                  ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
+                  : isMatch
+                    ? "border-border/80 bg-card"
+                    : "border-border/40 bg-muted/30 opacity-50"
+              }`}
+            >
+              <div className="h-9 w-9 rounded-md bg-primary/10 flex items-center justify-center mb-2">
+                <Icon className="h-4 w-4 text-primary" />
+              </div>
+              <p className="text-sm font-semibold text-foreground">{cat.label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{cat.description}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto p-1 bg-muted/50 gap-1">
+          {HELP_CATEGORIES.map(cat => {
+            const Icon = cat.icon;
+            if (!showTab(cat.id)) return null;
+            return (
+              <TabsTrigger
+                key={cat.id}
+                value={cat.id}
+                className="h-11 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <Icon className="mr-2 h-4 w-4 shrink-0" /> {cat.label}
+              </TabsTrigger>
+            );
+          })}
         </TabsList>
 
-        {/* Overview Tab */}
+        {showTab("overview") && (
         <TabsContent value="overview" className="mt-8 space-y-6">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <Card className="hover:shadow-md transition-shadow border-primary/10">
@@ -139,8 +203,8 @@ export default function HelpCenter() {
 
             <Card className="hover:shadow-md transition-shadow border-primary/10">
               <CardHeader>
-                <div className="h-10 w-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-2">
-                  <Zap className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                <div className="h-10 w-10 rounded-lg bg-primary/15 flex items-center justify-center mb-2">
+                  <Zap className="h-6 w-6 text-foreground" />
                 </div>
                 <CardTitle>Workflow Engine</CardTitle>
                 <CardDescription>
@@ -189,47 +253,13 @@ export default function HelpCenter() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
-        {/* Guides Tab */}
+        {showTab("guides") && (
         <TabsContent value="guides" className="mt-8">
           <div className="grid gap-4">
-            {[
-              {
-                title: "Uploading Job Sheets",
-                desc: "Step-by-step guide to single and batch uploads.",
-                time: "2 min read",
-                action: "/upload",
-                actionLabel: "Go to Upload",
-              },
-              {
-                title: "Handling Disputes",
-                desc: "How to review and resolve engineer disputes effectively.",
-                time: "4 min read",
-                action: "/disputes",
-                actionLabel: "View Disputes",
-              },
-              {
-                title: "Configuring AI Personas",
-                desc: "Adjusting the strictness and tone of the AI auditor.",
-                time: "3 min read",
-                action: "/settings",
-                actionLabel: "Configure AI",
-              },
-              {
-                title: "Understanding Analytics",
-                desc: "Deep dive into First Fix Rates and Defect Analysis.",
-                time: "5 min read",
-                action: "/analytics",
-                actionLabel: "Open Analytics",
-              },
-              {
-                title: "Managing Users & Roles",
-                desc: "Adding technicians and assigning permissions.",
-                time: "3 min read",
-                action: "/users",
-                actionLabel: "Manage Users",
-              },
-            ].map((guide, i) => (
+            {filteredGuides.length > 0 ? (
+            filteredGuides.map((guide, i) => (
               <div
                 key={i}
                 className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors group"
@@ -265,11 +295,18 @@ export default function HelpCenter() {
                   </Button>
                 </div>
               </div>
-            ))}
+            ))
+            ) : (
+              <Card className="p-8 text-center text-muted-foreground">
+                <Book className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No guides match your search.</p>
+              </Card>
+            )}
           </div>
         </TabsContent>
+        )}
 
-        {/* FAQs Tab */}
+        {showTab("faqs") && (
         <TabsContent value="faqs" className="mt-8">
           <Card>
             <CardHeader>
@@ -329,8 +366,9 @@ export default function HelpCenter() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
-        {/* Best Practices Tab */}
+        {showTab("best-practices") && (
         <TabsContent value="best-practices" className="mt-8">
           <div className="grid gap-6 md:grid-cols-2">
             <Card className="bg-muted border">
@@ -429,8 +467,9 @@ export default function HelpCenter() {
             </div>
           </div>
         </TabsContent>
+        )}
 
-        {/* Policies & Standards Tab */}
+        {showTab("policies") && (
         <TabsContent value="policies" className="mt-8 space-y-6">
           {/* Doc Quality % vs Extract Confidence */}
           <Card>
@@ -469,7 +508,7 @@ export default function HelpCenter() {
                 </div>
                 <div className="rounded-lg border p-4 space-y-2">
                   <h4 className="font-semibold text-foreground flex items-center gap-2">
-                    <BrainCircuit className="h-4 w-4 text-purple-600" />
+                    <BrainCircuit className="h-4 w-4 text-primary" />
                     Extract Confidence %
                   </h4>
                   <p>
@@ -735,6 +774,7 @@ export default function HelpCenter() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
       </Tabs>
     </div>
   );
