@@ -21,32 +21,9 @@ export interface Notification {
   read: boolean;
 }
 
-const mockNotifications: Notification[] = [
-  {
-    id: "1",
-    title: "Audit Completed",
-    message: "Job Sheet JS-2024-045 has been successfully audited.",
-    type: "success",
-    timestamp: "2 mins ago",
-    read: false,
-  },
-  {
-    id: "2",
-    title: "New Hold Item",
-    message: "JS-2024-044 requires manual review (Missing Signature).",
-    type: "warning",
-    timestamp: "15 mins ago",
-    read: false,
-  },
-  {
-    id: "3",
-    title: "System Update",
-    message: "New validation rules (v2.1) are now active.",
-    type: "info",
-    timestamp: "1 hour ago",
-    read: true,
-  },
-];
+// TODO: Wire to real notification API when backend is ready
+// Empty array prevents misleading fake alerts on first login
+const mockNotifications: Notification[] = [];
 
 export function NotificationsDropdown() {
   const [notifications, setNotifications] =

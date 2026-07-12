@@ -393,9 +393,7 @@ export default function SiteIntelligence() {
                         {drilldown.map(row => (
                           <TableRow key={row.findingId}>
                             <TableCell>
-                              <Link
-                                href={`/audits?jobSheetId=${row.jobSheetId}`}
-                              >
+                              <Link href={`/audits?id=${row.jobSheetId}`}>
                                 <a className="text-[#2868CE] hover:underline inline-flex items-center gap-1">
                                   <FileText className="h-3.5 w-3.5" />#
                                   {row.jobSheetId}

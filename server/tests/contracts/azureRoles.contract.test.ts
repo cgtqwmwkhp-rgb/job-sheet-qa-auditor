@@ -58,23 +58,23 @@ describe("azureRoles", () => {
       ).toBe("technician");
     });
 
-    it("defaults new users without claims to qa_lead", () => {
+    it("defaults new users without claims to user (viewer)", () => {
       expect(
         resolveAzureAuthRole({
           roleClaims: [],
           isNewUser: true,
         })
-      ).toBe("qa_lead");
+      ).toBe("user");
     });
 
-    it("promotes stuck default user role to qa_lead", () => {
+    it("does not auto-promote existing users without claims", () => {
       expect(
         resolveAzureAuthRole({
           roleClaims: [],
           existingRole: "user",
           isNewUser: false,
         })
-      ).toBe("qa_lead");
+      ).toBe(undefined);
     });
 
     it("leaves admin/qa_lead/technician unchanged when no claims", () => {

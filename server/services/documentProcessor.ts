@@ -14,6 +14,7 @@
  */
 
 import { createHash } from "crypto";
+import { withTimeout, TIMEOUT_CONFIG, TimeoutError } from "../utils/timeout";
 import { extractTextFromDocument, OCRResult } from "./ocr";
 import {
   getOCRConfig,
@@ -451,12 +452,28 @@ export async function orchestrateJobSheetProcessing(
     documentUrl = jobSheet.fileUrl;
   }
 
-  return processJobSheetWithOptions(request.jobSheetId, documentUrl, {
-    goldSpecId: request.goldSpecId,
-    templateVersionId: request.templateVersionId,
-    userId: request.userId,
-    useLegacyPath: request.useLegacyPath,
-  });
+  // Wrap processing with timeout to prevent hung jobs
+  try {
+    return await withTimeout(
+      processJobSheetWithOptions(request.jobSheetId, documentUrl, {
+        goldSpecId: request.goldSpecId,
+        templateVersionId: request.templateVersionId,
+        userId: request.userId,
+        useLegacyPath: request.useLegacyPath,
+      }),
+      TIMEOUT_CONFIG.DOCUMENT_PROCESSING,
+      `Job sheet ${request.jobSheetId} processing`
+    );
+  } catch (error) {
+    // If timeout, mark job as failed and log
+    if (error instanceof TimeoutError) {
+      console.error(
+        `[DocumentProcessor] Job ${request.jobSheetId} timed out after ${error.timeoutMs}ms`
+      );
+      await db.updateJobSheetStatus(request.jobSheetId, "failed");
+    }
+    throw error;
+  }
 }
 
 /**

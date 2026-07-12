@@ -27,9 +27,22 @@ function getAppEnvironment(): AppEnvironment {
   return "development";
 }
 
+// Validate critical environment variables at module load (skip in test/CI environments)
+const isTestEnvironment =
+  process.env.NODE_ENV === "test" || process.env.CI === "true";
+if (
+  !isTestEnvironment &&
+  (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)
+) {
+  throw new Error(
+    "JWT_SECRET environment variable is required and must be at least 32 characters for security. " +
+      "Generate a strong secret with: openssl rand -base64 48"
+  );
+}
+
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
-  cookieSecret: process.env.JWT_SECRET ?? "",
+  cookieSecret: process.env.JWT_SECRET,
   databaseUrl: process.env.DATABASE_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",

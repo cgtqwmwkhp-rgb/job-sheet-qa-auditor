@@ -1,14 +1,20 @@
 import React from "react";
 import { useAuth, UserRole } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ShieldCheck, Wrench, ArrowRight, FileCheck } from "lucide-react";
 import { motion } from "framer-motion";
 
 /**
  * Demo Gateway Page - Plantexpand Style Guide
- * 
+ *
  * Clean white background, no gradients
  * Lime green accents for primary actions
  * Border-based cards (no shadows)
@@ -20,34 +26,34 @@ export default function DemoGateway() {
 
   const handleLogin = (role: UserRole) => {
     login(role);
-    if (role === 'technician') {
-      setLocation('/portal/dashboard');
+    if (role === "technician") {
+      setLocation("/portal/dashboard");
     } else {
-      setLocation('/');
+      setLocation("/");
     }
   };
 
   const roles = [
     {
-      id: 'admin',
-      title: 'Admin / QA Lead',
-      description: 'Full access to dashboards, analytics, and configuration.',
+      id: "admin",
+      title: "Admin / QA Lead",
+      description: "Full access to dashboards, analytics, and configuration.",
       icon: ShieldCheck,
-      iconBg: 'bg-[rgba(190,218,65,0.15)]',
-      iconColor: 'text-[#333030]',
-      features: ['Executive Dashboard', 'Spec Management', 'User Control'],
-      primary: true
+      iconBg: "bg-[rgba(190,218,65,0.15)]",
+      iconColor: "text-foreground",
+      features: ["Executive Dashboard", "Spec Management", "User Control"],
+      primary: true,
     },
     {
-      id: 'technician',
-      title: 'Field Technician',
-      description: 'Mobile-optimized view for engineers to check scores.',
+      id: "technician",
+      title: "Field Technician",
+      description: "Mobile-optimized view for engineers to check scores.",
       icon: Wrench,
-      iconBg: 'bg-[rgba(40,104,206,0.1)]',
-      iconColor: 'text-[#2868CE]',
-      features: ['Personal Scorecard', 'Dispute Findings', 'Mobile View'],
-      primary: false
-    }
+      iconBg: "bg-[rgba(40,104,206,0.1)]",
+      iconColor: "text-[oklch(0.55_0.18_250)]" /* brand blue */,
+      features: ["Personal Scorecard", "Dispute Findings", "Mobile View"],
+      primary: false,
+    },
   ];
 
   return (
@@ -56,13 +62,14 @@ export default function DemoGateway() {
         {/* Header Section */}
         <div className="text-center space-y-4">
           <div className="inline-flex items-center justify-center h-16 w-16 rounded-xl bg-[rgba(190,218,65,0.15)] mb-4">
-            <FileCheck className="h-8 w-8 text-[#333030]" />
+            <FileCheck className="h-8 w-8 text-foreground" />
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-[#333030]">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
             Job Sheet QA Auditor
           </h1>
-          <p className="text-base text-[#706D6D] max-w-xl mx-auto leading-relaxed">
-            Experience the future of automated compliance. Select a role to explore the platform.
+          <p className="text-base text-muted-foreground max-w-xl mx-auto leading-relaxed">
+            Experience the future of automated compliance. Select a role to
+            explore the platform.
           </p>
         </div>
 
@@ -75,31 +82,43 @@ export default function DemoGateway() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1, duration: 0.3 }}
             >
-              <Card 
-                className="h-full cursor-pointer transition-all duration-150 border-[#EBE8E8] hover:border-primary group"
+              <Card
+                className="h-full cursor-pointer transition-all duration-150 border hover:border-primary group"
                 onClick={() => handleLogin(role.id as UserRole)}
               >
                 <CardHeader className="pb-2">
-                  <div className={`h-12 w-12 rounded-lg ${role.iconBg} flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-150`}>
+                  <div
+                    className={`h-12 w-12 rounded-lg ${role.iconBg} flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-150`}
+                  >
                     <role.icon className={`h-6 w-6 ${role.iconColor}`} />
                   </div>
-                  <CardTitle className="text-xl font-semibold text-[#333030]">{role.title}</CardTitle>
-                  <CardDescription className="text-sm text-[#706D6D] leading-relaxed">{role.description}</CardDescription>
+                  <CardTitle className="text-xl font-semibold text-foreground">
+                    {role.title}
+                  </CardTitle>
+                  <CardDescription className="text-sm text-muted-foreground leading-relaxed">
+                    {role.description}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-2">
                   <ul className="space-y-2.5 mb-6">
                     {role.features.map((feature, i) => (
-                      <li key={i} className="flex items-center gap-2.5 text-sm text-[#4A4646]">
-                        <div className={`h-1.5 w-1.5 rounded-full ${role.primary ? 'bg-primary' : 'bg-[#2868CE]'}`} />
+                      <li
+                        key={i}
+                        className="flex items-center gap-2.5 text-sm text-foreground/80"
+                      >
+                        <div
+                          className={`h-1.5 w-1.5 rounded-full ${role.primary ? "bg-primary" : "bg-[oklch(0.55_0.18_250)]"}`}
+                        />
                         {feature}
                       </li>
                     ))}
                   </ul>
-                  <Button 
-                    className="w-full" 
+                  <Button
+                    className="w-full"
                     variant={role.primary ? "default" : "outline"}
                   >
-                    Enter Demo <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                    Enter Demo{" "}
+                    <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
                   </Button>
                 </CardContent>
               </Card>
@@ -108,7 +127,7 @@ export default function DemoGateway() {
         </div>
 
         {/* Footer Note */}
-        <div className="text-center text-sm text-[#8A8787] pt-6">
+        <div className="text-center text-sm text-muted-foreground pt-6">
           <p>No password required. This is a live interactive demo.</p>
         </div>
       </div>

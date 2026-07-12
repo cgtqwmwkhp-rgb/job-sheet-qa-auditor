@@ -56,7 +56,7 @@ describe("File URL Endpoint Contract", () => {
         routersContent.indexOf("getFileUrl: protectedProcedure"),
         routersContent.indexOf("getFileUrl: protectedProcedure") + 500
       );
-      expect(getFileUrlSection).toContain("throw new Error");
+      expect(getFileUrlSection).toContain("throw new TRPCError");
       expect(getFileUrlSection).toContain("Job sheet not found");
     });
 
