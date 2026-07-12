@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   Loader2,
   Printer,
+  Users,
 } from "lucide-react";
 import { Link, useRoute, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -594,8 +595,23 @@ function CoachingPackView({
       <style>{`
         @media print {
           nav, aside, header, .print\\:hidden { display: none !important; }
-          body { background: white; }
-          .coaching-pack-print { padding: 0; }
+          body { background: white; color: #333030; }
+          .coaching-pack-print {
+            padding: 0;
+            max-width: 100%;
+          }
+          .coaching-pack-print textarea {
+            border: none;
+            resize: none;
+            overflow: visible;
+            min-height: auto !important;
+            padding: 0;
+            background: transparent;
+            box-shadow: none;
+          }
+          .coaching-pack-print .print\\:shadow-none {
+            box-shadow: none !important;
+          }
         }
       `}</style>
     </AnalyticsLayout>
@@ -644,11 +660,19 @@ export default function EngineerCoachingPackPage() {
         title="Coaching pack"
         description="Select a technician to open their analytical coaching pack."
       >
-        <Card className="p-8 text-center text-muted-foreground">
-          Missing engineer id.{" "}
-          <Link href="/analytics/technicians">
-            <a className="text-primary underline">Back to technicians</a>
-          </Link>
+        <Card className="p-10">
+          <div className="flex flex-col items-center text-center gap-4">
+            <AlertTriangle className="h-12 w-12 text-muted-foreground" />
+            <p className="text-muted-foreground">
+              Missing engineer id in the URL.
+            </p>
+            <Link href="/analytics/technicians">
+              <Button variant="outline" size="sm" className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back to technicians
+              </Button>
+            </Link>
+          </div>
         </Card>
       </AnalyticsLayout>
     );
@@ -660,8 +684,11 @@ export default function EngineerCoachingPackPage() {
         title="Coaching pack"
         description="Building analytical feedback for this period."
       >
-        <div className="flex items-center justify-center h-[40vh]">
+        <div className="flex flex-col items-center justify-center h-[40vh] rounded-xl border border-border bg-white gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">
+            Assembling coaching narrative and evidence…
+          </p>
         </div>
       </AnalyticsLayout>
     );
@@ -673,10 +700,19 @@ export default function EngineerCoachingPackPage() {
         title="Coaching pack"
         description="Building analytical feedback for this period."
       >
-        <div className="flex flex-col items-center justify-center h-[40vh]">
-          <AlertTriangle className="h-12 w-12 text-destructive mb-3" />
-          <p className="text-muted-foreground">{error.message}</p>
-        </div>
+        <Card className="p-10">
+          <div className="flex flex-col items-center text-center gap-4">
+            <AlertTriangle className="h-12 w-12 text-destructive" />
+            <h2 className="text-lg font-semibold">Failed to load coaching pack</h2>
+            <p className="text-muted-foreground max-w-md">{error.message}</p>
+            <Link href="/analytics/technicians">
+              <Button variant="outline" size="sm" className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back to technicians
+              </Button>
+            </Link>
+          </div>
+        </Card>
       </AnalyticsLayout>
     );
   }
@@ -687,15 +723,22 @@ export default function EngineerCoachingPackPage() {
         title="Coaching pack"
         description="Building analytical feedback for this period."
       >
-        <Card className="p-8 space-y-3">
-          <p className="text-muted-foreground">
-            No attributed job cards for this technician in the selected period.
-          </p>
-          <Link href="/analytics/technicians">
-            <a className="text-primary underline text-sm">
-              Back to technicians
-            </a>
-          </Link>
+        <Card className="p-10 border-dashed">
+          <div className="flex flex-col items-center text-center gap-4 max-w-lg mx-auto">
+            <Users className="h-12 w-12 text-muted-foreground" />
+            <h2 className="text-lg font-semibold">No attributed cards in period</h2>
+            <p className="text-muted-foreground">
+              This technician has no attributed job cards in the selected
+              reporting period. Adjust the period filter or resolve attribution
+              on Technician Performance.
+            </p>
+            <Link href="/analytics/technicians">
+              <Button variant="default" size="sm" className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back to technicians
+              </Button>
+            </Link>
+          </div>
         </Card>
       </AnalyticsLayout>
     );

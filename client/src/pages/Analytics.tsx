@@ -89,11 +89,9 @@ function TechnicianAnalyticsPreview() {
           </CardDescription>
         </div>
         <Link href="/analytics/technicians">
-          <a>
-            <Button variant="outline" size="sm">
-              Open full view
-            </Button>
-          </a>
+          <Button variant="outline" size="sm">
+            Open technician performance
+          </Button>
         </Link>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -197,66 +195,84 @@ export default function Analytics() {
         </div>
 
         {/* KPI Cards - Using Real Data */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Overall Pass Rate
-              </CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{passRate}%</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Based on completed audits
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Audits Processed
-              </CardTitle>
-              <FileText className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {totalAudits.toLocaleString()}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                All time total
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Critical Issues
-              </CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{criticalIssues}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Requires attention
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Review Queue
-              </CardTitle>
-              <Users className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{reviewQueue}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Pending review
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <section aria-labelledby="analytics-kpi-heading">
+          <div className="mb-4">
+            <h2
+              id="analytics-kpi-heading"
+              className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
+            >
+              Key metrics
+            </h2>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-12">
+            <Card className="lg:col-span-5 border-primary/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Overall pass rate
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-end justify-between gap-4">
+                  <div>
+                    <div className="text-5xl font-bold tracking-tight">{passRate}%</div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Based on completed audits
+                    </p>
+                  </div>
+                  <CheckCircle2 className="h-10 w-10 text-[#5a7a1a] opacity-80" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="lg:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total audits
+                </CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">
+                  {totalAudits.toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  All time total
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="lg:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Critical issues
+                </CardTitle>
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-3xl font-bold ${criticalIssues > 0 ? "text-destructive" : ""}`}>
+                  {criticalIssues}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Requires attention
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="lg:col-span-3">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Review queue
+                </CardTitle>
+                <Users className="h-4 w-4 text-warning" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-3xl font-bold ${reviewQueue > 0 ? "text-warning" : ""}`}>
+                  {reviewQueue}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Pending review
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
 
         {/* Main Analytics Tabs */}
         <Tabs defaultValue="overview" className="space-y-4">
