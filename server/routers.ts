@@ -201,6 +201,20 @@ export const appRouter = router({
         // Decode base64 before storage (and optional intake gate)
         const buffer = Buffer.from(input.fileBase64, "base64");
 
+        // Validate file type and size
+        const { validateFile, sanitizeFilename } = await import("./utils/fileValidation");
+        const validation = validateFile(buffer, input.fileType, {
+          maxSizeBytes: 10 * 1024 * 1024, // 10MB
+          allowedTypes: ['application/pdf', 'image/jpeg', 'image/png'],
+        });
+
+        if (!validation.valid) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `File validation failed: ${validation.errors.join(", ")}`,
+          });
+        }
+
         // Feature-flagged Image QA intake gate (default off). Fail-open on errors.
         // Runs AFTER rate limit, BEFORE storage — OCRs the real upload buffer when enabled.
         let intake: IntakeGateResult | undefined;
@@ -237,7 +251,9 @@ export const appRouter = router({
           }
         }
 
-        const fileKey = `job-sheets/${ctx.user.id}/${nanoid()}-${input.fileName}`;
+        // Sanitize filename to prevent path traversal and special characters
+        const sanitizedFileName = sanitizeFilename(input.fileName);
+        const fileKey = `job-sheets/${ctx.user.id}/${nanoid()}-${sanitizedFileName}`;
 
         // Use the storage adapter (azure, local, etc.) based on STORAGE_PROVIDER
         const storage = getStorageAdapter();
@@ -282,7 +298,7 @@ export const appRouter = router({
         return intake ? { ...result, intake } : result;
       }),
 
-    updateStatus: protectedProcedure
+    updateStatus: qaLeadProcedure
       .input(
         z.object({
           id: z.number(),
@@ -327,7 +343,17 @@ export const appRouter = router({
 
         const jobSheet = await db.getJobSheetById(input.id);
         if (!jobSheet) {
-          throw new Error("Job sheet not found");
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Job sheet not found",
+          });
+        }
+
+        if (jobSheet.status === "processing") {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Cannot process: document is currently being processed. Please wait for the current processing to complete.",
+          });
         }
 
         if (isAsyncProcessingEnabled()) {
@@ -907,7 +933,7 @@ export const appRouter = router({
         return result;
       }),
 
-    updateStatus: protectedProcedure
+    updateStatus: qaLeadProcedure
       .input(
         z.object({
           id: z.number(),

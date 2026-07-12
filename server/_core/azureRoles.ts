@@ -82,7 +82,9 @@ export function resolveAzureAuthRole(input: {
 }): DbUserRole | undefined {
   const mapped = mapAzureRolesToDbRole(input.roleClaims);
   if (mapped) return mapped;
-  if (input.isNewUser) return "qa_lead";
-  if (input.existingRole === "user") return "qa_lead";
+  // Default new users to 'user' (viewer) role, not 'qa_lead'
+  // Require explicit Azure role claims for elevated access
+  if (input.isNewUser) return "user";
+  // Don't auto-promote existing users
   return undefined;
 }

@@ -185,9 +185,13 @@ export function mapFindingsFromApi(
     suggestedFix?: string | null;
     ruleId?: string | null;
     reasonCode?: string | null;
+    resolutionStatus?: string | null;
   }>
 ): Finding[] {
   return findingsData.map(f => {
+    // Check if finding has been resolved (approved, waived, overridden)
+    const isResolved = f.resolutionStatus && f.resolutionStatus !== "open";
+    
     // Post–Audit Policy: S1 = Major, S2 = Minor, S3 = Passed/informational
     const failClass: Finding["failClass"] =
       f.severity === "S0" || f.severity === "S1"
@@ -201,8 +205,10 @@ export function mapFindingsFromApi(
         : failClass === "minor"
           ? "major"
           : "minor";
-    const status =
-      failClass === "major"
+    // If finding is resolved, show as "passed"; otherwise use severity-based status
+    const status = isResolved
+      ? "passed"
+      : failClass === "major"
         ? "missing"
         : failClass === "minor"
           ? "warning"
