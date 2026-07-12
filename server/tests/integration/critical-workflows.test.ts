@@ -1,6 +1,6 @@
 /**
  * Integration Tests for Critical Workflows
- * 
+ *
  * Tests end-to-end flows through the application:
  * - Document upload → processing → audit
  * - User authentication → authorization
@@ -10,10 +10,12 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { inferProcedureInput } from "@trpc/server";
-import type { AppRouter } from "../routers";
-import * as db from "../db";
+import type { AppRouter } from "../../routers";
+import * as db from "../../db";
 
-describe("Critical Workflows Integration Tests", () => {
+const hasDb = Boolean(process.env.DATABASE_URL);
+
+describe.skipIf(!hasDb)("Critical Workflows Integration Tests", () => {
   let testUserId: number;
   let testJobSheetId: number;
   let testAuditId: number;
@@ -26,7 +28,7 @@ describe("Critical Workflows Integration Tests", () => {
       email: "test@example.com",
       role: "user",
     });
-    
+
     const createdUser = await db.getUserByOpenId("test-integration-user");
     if (createdUser) {
       testUserId = createdUser.id;
@@ -61,7 +63,7 @@ describe("Critical Workflows Integration Tests", () => {
 
     it("should retrieve created job sheet", async () => {
       const jobSheet = await db.getJobSheetById(testJobSheetId);
-      
+
       expect(jobSheet).toBeDefined();
       expect(jobSheet?.fileName).toBe("test.pdf");
       expect(jobSheet?.status).toBe("pending");
@@ -70,7 +72,7 @@ describe("Critical Workflows Integration Tests", () => {
 
     it("should update job sheet status", async () => {
       await db.updateJobSheetStatus(testJobSheetId, "processing");
-      
+
       const jobSheet = await db.getJobSheetById(testJobSheetId);
       expect(jobSheet?.status).toBe("processing");
     });
@@ -88,7 +90,7 @@ describe("Critical Workflows Integration Tests", () => {
 
     it("should retrieve audit by job sheet id", async () => {
       const audit = await db.getAuditResultByJobSheetId(testJobSheetId);
-      
+
       expect(audit).toBeDefined();
       expect(audit?.jobSheetId).toBe(testJobSheetId);
       expect(audit?.result).toBe("pass");
@@ -99,7 +101,7 @@ describe("Critical Workflows Integration Tests", () => {
     it("should enforce role-based access", async () => {
       const user = await db.getUserById(testUserId);
       expect(user?.role).toBe("user");
-      
+
       // Regular users should not have admin privileges
       const isAdmin = user?.role === "admin";
       expect(isAdmin).toBe(false);
@@ -107,10 +109,10 @@ describe("Critical Workflows Integration Tests", () => {
 
     it("should allow role updates by admins", async () => {
       await db.updateUserRole(testUserId, "qa_lead");
-      
+
       const user = await db.getUserById(testUserId);
       expect(user?.role).toBe("qa_lead");
-      
+
       // Revert for other tests
       await db.updateUserRole(testUserId, "user");
     });
@@ -136,7 +138,7 @@ describe("Critical Workflows Integration Tests", () => {
 
     it("should retrieve findings by audit result", async () => {
       const findings = await db.getAuditFindingsByResultId(testAuditId);
-      
+
       expect(findings.length).toBeGreaterThan(0);
       expect(findings[0].fieldName).toBe("customer_signature");
     });
@@ -152,7 +154,7 @@ describe("Critical Workflows Integration Tests", () => {
 
       const updated = await db.getAuditFindingsByResultId(testAuditId);
       const updatedFinding = updated.find(f => f.id === findingId);
-      
+
       expect(updatedFinding?.resolutionStatus).toBe("approved");
     });
   });
@@ -208,11 +210,11 @@ describe("Batch Operations Integration", () => {
     // This tests the transaction utilities
     // Requires actual audit data to be present
     const audits = await db.getAuditResults({ limit: 1 });
-    
+
     if (audits.length > 0) {
       const audit = audits[0];
       const findings = await db.getAuditFindingsByResultId(audit.id);
-      
+
       expect(findings).toBeDefined();
       // Batch operations would be tested here
     }
@@ -223,7 +225,7 @@ describe("Data Integrity", () => {
   it("should maintain referential integrity", async () => {
     // Test that orphaned records don't exist
     const audits = await db.getAuditResults();
-    
+
     for (const audit of audits.slice(0, 10)) {
       const jobSheet = await db.getJobSheetById(audit.jobSheetId);
       expect(jobSheet).toBeDefined();

@@ -38,9 +38,12 @@ import {
 export default function Monitoring() {
   const [autoRefresh, setAutoRefresh] = useState(true);
 
-  // System health
-  const { data: health, refetch: refetchHealth } =
-    trpc.system.health.useQuery();
+  // System health (requires timestamp input per systemRouter contract)
+  const { data: health, refetch: refetchHealth } = trpc.system.health.useQuery({
+    timestamp: Date.now(),
+  });
+  const { data: version, refetch: refetchVersion } =
+    trpc.system.version.useQuery();
 
   // Recent errors (would need endpoint)
   const [recentErrors] = useState([
@@ -77,10 +80,11 @@ export default function Monitoring() {
 
     const interval = setInterval(() => {
       refetchHealth();
+      refetchVersion();
     }, 30000); // Every 30 seconds
 
     return () => clearInterval(interval);
-  }, [autoRefresh, refetchHealth]);
+  }, [autoRefresh, refetchHealth, refetchVersion]);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -109,9 +113,9 @@ export default function Monitoring() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatusCard
           title="System Health"
-          value={health?.status || "checking..."}
+          value={health?.ok ? "healthy" : "checking..."}
           icon={<CheckCircle2 className="h-5 w-5" />}
-          variant={health?.status === "healthy" ? "success" : "warning"}
+          variant={health?.ok ? "success" : "warning"}
         />
         <StatusCard
           title="Active Users"
@@ -327,10 +331,15 @@ export default function Monitoring() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <InfoItem label="Version" value={health?.version || "1.0.0"} />
+            <InfoItem
+              label="Version"
+              value={version?.gitShaShort || version?.gitSha || "unknown"}
+            />
             <InfoItem
               label="Environment"
-              value={health?.environment || "production"}
+              value={
+                version?.environment || health?.config?.environment || "unknown"
+              }
             />
             <InfoItem label="Uptime" value="14d 6h" />
             <InfoItem label="Last Deploy" value="2026-07-12" />
