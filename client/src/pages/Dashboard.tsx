@@ -86,6 +86,7 @@ const CHART_TOOLTIP = {
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
   const period = useMemo(() => dashboardPeriod(), []);
 
   const navigateToAudit = (id: number) => {
@@ -95,18 +96,20 @@ export default function Dashboard() {
   };
 
   const { data: statsData, isLoading: statsLoading } =
-    trpc.stats.dashboard.useQuery();
+    trpc.stats.dashboard.useQuery(undefined, { enabled: !!user });
   const { data: recentJobSheets, isLoading: jobSheetsLoading } =
-    trpc.jobSheets.list.useQuery({ limit: 5 });
+    trpc.jobSheets.list.useQuery({ limit: 5 }, { enabled: !!user });
   const { data: holdQueueSheets, isLoading: holdLoading } =
-    trpc.jobSheets.list.useQuery({ status: "review_queue", limit: 5 });
+    trpc.jobSheets.list.useQuery(
+      { status: "review_queue", limit: 5 },
+      { enabled: !!user }
+    );
   const { data: driftSummary, isLoading: driftLoading } =
-    trpc.analytics.getDriftSummary.useQuery(period);
+    trpc.analytics.getDriftSummary.useQuery(period, { enabled: !!user });
   const { data: exceptionSummary, isLoading: exceptionLoading } =
-    trpc.analytics.getExceptionSummary.useQuery(period);
+    trpc.analytics.getExceptionSummary.useQuery(period, { enabled: !!user });
   const { data: driftAlertsData, isLoading: alertsLoading } =
-    trpc.analytics.getDriftAlerts.useQuery(period);
-  const { user } = useAuth();
+    trpc.analytics.getDriftAlerts.useQuery(period, { enabled: !!user });
 
   const activityChart = useMemo(() => {
     const series = driftSummary?.series ?? [];
