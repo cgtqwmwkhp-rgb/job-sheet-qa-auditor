@@ -63,6 +63,7 @@ const DisputeManagement = lazy(() => import("./pages/DisputeManagement"));
 const AuditLog = lazy(() => import("./pages/AuditLog"));
 const Settings = lazy(() => import("./pages/Settings"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
+const Monitoring = lazy(() => import("./pages/Monitoring"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Loading fallback — no app chrome (Phase 0 portal cleanliness)
@@ -225,6 +226,13 @@ function Router() {
         <Route path="/settings">
           <ProtectedRoute
             component={Settings}
+            allowedRoles={["admin", "qa_lead"]}
+          />
+        </Route>
+        {/* Monitoring dashboard for ops */}
+        <Route path="/monitoring">
+          <ProtectedRoute
+            component={Monitoring}
             allowedRoles={["admin", "qa_lead"]}
           />
         </Route>
