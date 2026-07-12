@@ -66,9 +66,7 @@ export default function EntraSignIn({
           >
             PlantExpand
           </p>
-          <h1
-            className="text-xl font-semibold leading-tight text-foreground"
-          >
+          <h1 className="text-xl font-semibold leading-tight text-foreground">
             {subtitle}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">

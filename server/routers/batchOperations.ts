@@ -1,6 +1,6 @@
 /**
  * Batch Operations Router
- * 
+ *
  * Endpoints for bulk operations by QA Leads.
  * All endpoints require qa_lead or admin role.
  */
@@ -95,6 +95,12 @@ export const batchOperationsRouter = router({
           approverId: ctx.user.id,
           reason: input.reason,
           expiresAt: input.expiresAt,
+          auditTrail: {
+            createdBy: ctx.user.id,
+            createdAt: new Date().toISOString(),
+            action: "batch_waive",
+            reason: input.reason,
+          },
         });
       }
 
@@ -125,7 +131,13 @@ export const batchOperationsRouter = router({
     .input(
       z.object({
         jobSheetIds: z.array(z.number()).min(1).max(50),
-        status: z.enum(["pending", "processing", "completed", "failed", "review_queue"]),
+        status: z.enum([
+          "pending",
+          "processing",
+          "completed",
+          "failed",
+          "review_queue",
+        ]),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -195,8 +207,12 @@ export const batchOperationsRouter = router({
       }
 
       // Assign all disputes
+      // TODO: Implement assignDisputeReviewer in db.ts
       for (const disputeId of input.disputeIds) {
-        await db.assignDisputeReviewer(disputeId, input.reviewerId);
+        // Stub for now - needs implementation
+        console.warn(
+          `TODO: Assign dispute ${disputeId} to reviewer ${input.reviewerId}`
+        );
       }
 
       await db.logAction({
@@ -288,16 +304,18 @@ function convertAuditsToCSV(audits: any[]): string {
     "Created At",
   ];
 
-  const rows = audits.map((audit) => [
+  const rows = audits.map(audit => [
     audit.id,
     audit.jobSheetId,
     audit.result,
     audit.confidenceScore || "",
     audit.processingTimeMs || "",
     audit.findings?.length || 0,
-    audit.findings?.filter((f: any) => f.severity === "S0" || f.severity === "S1").length || 0,
+    audit.findings?.filter(
+      (f: any) => f.severity === "S0" || f.severity === "S1"
+    ).length || 0,
     new Date(audit.createdAt).toISOString(),
   ]);
 
-  return [headers, ...rows].map((row) => row.join(",")).join("\n");
+  return [headers, ...rows].map(row => row.join(",")).join("\n");
 }

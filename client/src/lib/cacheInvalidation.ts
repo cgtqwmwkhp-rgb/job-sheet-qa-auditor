@@ -1,6 +1,6 @@
 /**
  * Central Cache Invalidation Helpers
- * 
+ *
  * Provides consistent cache invalidation patterns across the application.
  * Uses TanStack Query's invalidation API for automatic re-fetching.
  */
@@ -12,7 +12,7 @@ import { trpc } from "./trpc";
 /**
  * Hook that returns cache invalidation helpers.
  * Use this in components/mutations for consistent cache management.
- * 
+ *
  * @example
  * const { invalidateJobSheets, invalidateAudits } = useCacheInvalidation();
  * await processJob(id);
@@ -133,9 +133,9 @@ export const QUERY_KEY_PATTERNS = {
   jobSheets: () => getQueryKey(trpc.jobSheets),
   jobSheet: (id: number) => getQueryKey(trpc.jobSheets.get, { id }),
   audits: () => getQueryKey(trpc.audits),
-  auditsByJobSheet: (jobSheetId: number) => 
+  auditsByJobSheet: (jobSheetId: number) =>
     getQueryKey(trpc.audits.getByJobSheet, { jobSheetId }),
-  findings: (auditResultId: number) => 
+  findings: (auditResultId: number) =>
     getQueryKey(trpc.audits.getFindings, { auditResultId }),
   disputes: () => getQueryKey(trpc.disputes),
   users: () => getQueryKey(trpc.users),
@@ -144,7 +144,7 @@ export const QUERY_KEY_PATTERNS = {
 /**
  * Optimistic update helper for instant UI feedback.
  * Rolls back on error.
- * 
+ *
  * @example
  * const mutation = useMutation({
  *   mutationFn: updateJobSheet,

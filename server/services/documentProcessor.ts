@@ -181,8 +181,7 @@ export interface ProcessingOptions {
   useLegacyPath?: boolean;
 }
 
-export interface OrchestrateJobSheetProcessingRequest
-  extends ProcessingOptions {
+export interface OrchestrateJobSheetProcessingRequest extends ProcessingOptions {
   jobSheetId: number;
   /**
    * Primary HTTP callers already have this from their job sheet lookup. Retry
@@ -466,7 +465,9 @@ export async function orchestrateJobSheetProcessing(
   } catch (error) {
     // If timeout, mark job as failed and log
     if (error instanceof TimeoutError) {
-      console.error(`[DocumentProcessor] Job ${request.jobSheetId} timed out after ${error.timeoutMs}ms`);
+      console.error(
+        `[DocumentProcessor] Job ${request.jobSheetId} timed out after ${error.timeoutMs}ms`
+      );
       await db.updateJobSheetStatus(request.jobSheetId, "failed");
     }
     throw error;
@@ -1753,8 +1754,7 @@ async function processJobSheetWithOptions(
   let failurePathSignals: FailurePathSignals | null = null;
   let failurePathSignalSummary: string | null = null;
   let commentQualitySignals:
-    | ReturnType<typeof evaluateCommentQuality>["signals"]
-    | null = null;
+    ReturnType<typeof evaluateCommentQuality>["signals"] | null = null;
   let commentDeepNote: Awaited<
     ReturnType<typeof buildCommentDeepNoteAdvisory>
   > | null = null;
@@ -2236,9 +2236,7 @@ async function processJobSheetWithOptions(
       goldSpecId: options.goldSpecId || 1, // Default to spec ID 1 if not provided
       runId,
       result: analysisResult.overallResult.toLowerCase() as
-        | "pass"
-        | "fail"
-        | "review_queue",
+        "pass" | "fail" | "review_queue",
       confidenceScore: String(analysisResult.score),
       documentStrategy: usedEmbeddedText ? "embedded_text" : "ocr",
       ocrEngineVersion: getOCREngineVersion(
@@ -2309,8 +2307,8 @@ async function processJobSheetWithOptions(
             isGeminiMultimodalEnabled() &&
             Boolean(
               sharedPdfBuffer &&
-                sharedPdfBuffer.length > 0 &&
-                sharedPdfBuffer.length <= VLM_PDF_MAX_BYTES
+              sharedPdfBuffer.length > 0 &&
+              sharedPdfBuffer.length <= VLM_PDF_MAX_BYTES
             ),
         },
         ...(pipelineIntegrationResult

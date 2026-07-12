@@ -379,7 +379,9 @@ export default function HelpCenter() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Lightbulb className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-foreground">For QA Leads</CardTitle>
+                  <CardTitle className="text-foreground">
+                    For QA Leads
+                  </CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">

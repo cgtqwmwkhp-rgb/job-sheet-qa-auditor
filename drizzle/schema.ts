@@ -33,7 +33,7 @@ export type InsertUser = typeof users.$inferInsert;
 /**
  * Gold Standard Specifications - versioned rule packs for validation
  */
-export const goldSpecs = mysqlTable("gold_specs", {
+export const goldSpecs: any = mysqlTable("gold_specs", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   version: varchar("version", { length: 32 }).notNull(),
@@ -45,9 +45,11 @@ export const goldSpecs = mysqlTable("gold_specs", {
     .default("base")
     .notNull(),
   /** Parent spec ID for layered inheritance */
-  parentSpecId: int("parentSpecId").references(() => goldSpecs.id),
+  parentSpecId: int("parentSpecId").references((): any => goldSpecs.id),
   isActive: boolean("isActive").default(true).notNull(),
-  createdBy: int("createdBy").notNull().references(() => users.id),
+  createdBy: int("createdBy")
+    .notNull()
+    .references(() => users.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -84,7 +86,9 @@ export const jobSheets = mysqlTable("job_sheets", {
   technicianId: int("technicianId").references(() => users.id),
   /** Site/location information */
   siteInfo: text("siteInfo"),
-  uploadedBy: int("uploadedBy").notNull().references(() => users.id),
+  uploadedBy: int("uploadedBy")
+    .notNull()
+    .references(() => users.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -97,9 +101,13 @@ export type InsertJobSheet = typeof jobSheets.$inferInsert;
  */
 export const auditResults = mysqlTable("audit_results", {
   id: int("id").autoincrement().primaryKey(),
-  jobSheetId: int("jobSheetId").notNull().references(() => jobSheets.id),
+  jobSheetId: int("jobSheetId")
+    .notNull()
+    .references(() => jobSheets.id),
   /** Which gold spec version was used */
-  goldSpecId: int("goldSpecId").notNull().references(() => goldSpecs.id),
+  goldSpecId: int("goldSpecId")
+    .notNull()
+    .references(() => goldSpecs.id),
   /** Unique run identifier for traceability */
   runId: varchar("runId", { length: 64 }).notNull(),
   /** Overall result */
@@ -136,7 +144,9 @@ export type InsertAuditResult = typeof auditResults.$inferInsert;
  */
 export const auditFindings = mysqlTable("audit_findings", {
   id: int("id").autoincrement().primaryKey(),
-  auditResultId: int("auditResultId").notNull().references(() => auditResults.id),
+  auditResultId: int("auditResultId")
+    .notNull()
+    .references(() => auditResults.id),
   /** Severity: S0 Blocker, S1 Critical, S2 Major, S3 Minor */
   severity: mysqlEnum("severity", ["S0", "S1", "S2", "S3"]).notNull(),
   /** Reason code from fixed set */
@@ -202,20 +212,20 @@ export const auditFindings = mysqlTable("audit_findings", {
 export type AuditFinding = typeof auditFindings.$inferSelect;
 export type InsertAuditFinding = typeof auditFindings.$inferInsert;
 export type FindingResolutionStatus =
-  | "open"
-  | "waived"
-  | "overridden"
-  | "flagged"
-  | "approved";
+  "open" | "waived" | "overridden" | "flagged" | "approved";
 
 /**
  * Disputes - technician challenges to audit findings
  */
 export const disputes = mysqlTable("disputes", {
   id: int("id").autoincrement().primaryKey(),
-  auditFindingId: int("auditFindingId").notNull().references(() => auditFindings.id),
+  auditFindingId: int("auditFindingId")
+    .notNull()
+    .references(() => auditFindings.id),
   /** Technician who raised the dispute */
-  raisedBy: int("raisedBy").notNull().references(() => users.id),
+  raisedBy: int("raisedBy")
+    .notNull()
+    .references(() => users.id),
   status: mysqlEnum("status", [
     "open",
     "under_review",
@@ -246,9 +256,13 @@ export type InsertDispute = typeof disputes.$inferInsert;
  */
 export const waivers = mysqlTable("waivers", {
   id: int("id").autoincrement().primaryKey(),
-  auditFindingId: int("auditFindingId").notNull().references(() => auditFindings.id),
+  auditFindingId: int("auditFindingId")
+    .notNull()
+    .references(() => auditFindings.id),
   /** Who approved the waiver */
-  approverId: int("approverId").notNull().references(() => users.id),
+  approverId: int("approverId")
+    .notNull()
+    .references(() => users.id),
   reason: text("reason").notNull(),
   /** When the waiver expires */
   expiresAt: timestamp("expiresAt"),
@@ -334,7 +348,9 @@ export const templates = mysqlTable("templates", {
     .notNull(),
   /** Description of the template */
   description: text("description"),
-  createdBy: int("createdBy").notNull().references(() => users.id),
+  createdBy: int("createdBy")
+    .notNull()
+    .references(() => users.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -349,7 +365,9 @@ export type InsertTemplate = typeof templates.$inferInsert;
 export const templateVersions = mysqlTable("template_versions", {
   id: int("id").autoincrement().primaryKey(),
   /** Parent template ID */
-  templateId: int("templateId").notNull().references(() => templates.id),
+  templateId: int("templateId")
+    .notNull()
+    .references(() => templates.id),
   /** Semantic version (e.g., '1.0.0', '1.1.0') */
   version: varchar("version", { length: 32 }).notNull(),
   /** SHA-256 hash of specJson + selectionConfigJson for determinism */
@@ -364,7 +382,9 @@ export const templateVersions = mysqlTable("template_versions", {
   isActive: boolean("isActive").default(false).notNull(),
   /** Change notes for this version */
   changeNotes: text("changeNotes"),
-  createdBy: int("createdBy").notNull().references(() => users.id),
+  createdBy: int("createdBy")
+    .notNull()
+    .references(() => users.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -378,7 +398,9 @@ export type InsertTemplateVersion = typeof templateVersions.$inferInsert;
 export const selectionTraces = mysqlTable("selection_traces", {
   id: int("id").autoincrement().primaryKey(),
   /** Job sheet this selection was for */
-  jobSheetId: int("jobSheetId").notNull().references(() => jobSheets.id),
+  jobSheetId: int("jobSheetId")
+    .notNull()
+    .references(() => jobSheets.id),
   /** Selected template ID (null if no selection made) */
   templateId: int("templateId").references(() => templates.id),
   /** Selected version ID (null if no selection made) */
@@ -417,7 +439,9 @@ export type InsertSelectionTrace = typeof selectionTraces.$inferInsert;
  */
 export const failedJobs = mysqlTable("failed_jobs", {
   id: varchar("id", { length: 36 }).primaryKey(),
-  jobSheetId: int("jobSheetId").notNull().references(() => jobSheets.id),
+  jobSheetId: int("jobSheetId")
+    .notNull()
+    .references(() => jobSheets.id),
   correlationId: varchar("correlationId", { length: 64 }),
   stage: mysqlEnum("stage", ["upload", "ocr", "analysis", "storage"]).notNull(),
   errorMessage: text("errorMessage").notNull(),

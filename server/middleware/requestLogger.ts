@@ -1,6 +1,6 @@
 /**
  * Request Logging Middleware
- * 
+ *
  * Logs all incoming requests with timing, user info, and performance metrics.
  * Useful for debugging, monitoring, and security auditing.
  */
@@ -23,19 +23,21 @@ interface RequestLog {
 /**
  * Request logger middleware.
  * Logs all requests with timing and user context.
- * 
+ *
  * @example
- * app.use(requestLogger({ 
+ * app.use(requestLogger({
  *   logLevel: 'info',
  *   excludePaths: ['/health', '/metrics']
  * }));
  */
-export function requestLogger(options: {
-  logLevel?: "debug" | "info" | "warn" | "error";
-  excludePaths?: string[];
-  logBody?: boolean;
-  logHeaders?: boolean;
-} = {}) {
+export function requestLogger(
+  options: {
+    logLevel?: "debug" | "info" | "warn" | "error";
+    excludePaths?: string[];
+    logBody?: boolean;
+    logHeaders?: boolean;
+  } = {}
+) {
   const {
     logLevel = "info",
     excludePaths = ["/health", "/metrics", "/favicon.ico"],
@@ -45,7 +47,7 @@ export function requestLogger(options: {
 
   return (req: Request, res: Response, next: NextFunction) => {
     // Skip excluded paths
-    if (excludePaths.some((path) => req.path.startsWith(path))) {
+    if (excludePaths.some(path => req.path.startsWith(path))) {
       return next();
     }
 
@@ -54,7 +56,7 @@ export function requestLogger(options: {
       timestamp: new Date().toISOString(),
       method: req.method,
       path: req.path,
-      ip: req.ip || req.headers["x-forwarded-for"] as string,
+      ip: req.ip || (req.headers["x-forwarded-for"] as string),
       userAgent: req.headers["user-agent"],
     };
 
@@ -78,7 +80,7 @@ export function requestLogger(options: {
     const originalSend = res.send;
     res.send = function (data: any) {
       res.send = originalSend; // Restore original
-      
+
       const duration = Date.now() - startTime;
       log.duration = duration;
       log.statusCode = res.statusCode;
@@ -91,7 +93,7 @@ export function requestLogger(options: {
 
       // Log the request
       const message = `${log.method} ${log.path} ${log.statusCode} ${duration}ms${log.userId ? ` user:${log.userId}` : ""}`;
-      
+
       switch (level) {
         case "error":
           console.error(`[RequestLogger] ${message}`, { ...log, ...extraData });
@@ -131,12 +133,12 @@ function sanitizeLogData(data: any): any {
   ];
 
   const sanitized: any = Array.isArray(data) ? [] : {};
-  
+
   for (const [key, value] of Object.entries(data)) {
     const lowerKey = key.toLowerCase();
-    
+
     // Redact sensitive fields
-    if (sensitiveFields.some((field) => lowerKey.includes(field))) {
+    if (sensitiveFields.some(field => lowerKey.includes(field))) {
       sanitized[key] = "[REDACTED]";
     }
     // Recursively sanitize nested objects
@@ -146,8 +148,7 @@ function sanitizeLogData(data: any): any {
     // Truncate long strings
     else if (typeof value === "string" && value.length > 500) {
       sanitized[key] = value.substring(0, 500) + "...[TRUNCATED]";
-    }
-    else {
+    } else {
       sanitized[key] = value;
     }
   }
@@ -206,7 +207,7 @@ export function performanceMonitor(thresholdMs: number = 3000) {
 
     res.on("finish", () => {
       const duration = Date.now() - startTime;
-      
+
       if (duration > thresholdMs) {
         console.warn(
           `[PerformanceMonitor] Slow request detected: ${req.method} ${req.path} took ${duration}ms`,

@@ -11,7 +11,9 @@ export default function SearchPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-heading font-bold tracking-tight">Search & Archive</h1>
+          <h1 className="text-3xl font-heading font-bold tracking-tight">
+            Search & Archive
+          </h1>
           <p className="text-muted-foreground mt-2">
             Advanced search across all audited documents
           </p>
@@ -22,8 +24,9 @@ export default function SearchPage() {
             <AlertCircle className="h-16 w-16 text-muted-foreground" />
             <h2 className="text-2xl font-semibold">Search Coming Soon</h2>
             <p className="text-muted-foreground max-w-md">
-              Advanced search functionality is currently in development. 
-              In the meantime, use the Upload and Audit Results pages to access your documents.
+              Advanced search functionality is currently in development. In the
+              meantime, use the Upload and Audit Results pages to access your
+              documents.
             </p>
             <div className="flex gap-3 mt-4">
               <Link href="/upload">

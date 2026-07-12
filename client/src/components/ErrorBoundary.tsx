@@ -1,6 +1,6 @@
 /**
  * React Error Boundaries
- * 
+ *
  * Catches JavaScript errors anywhere in the component tree and displays
  * a fallback UI instead of crashing the entire app.
  */
@@ -26,12 +26,12 @@ interface State {
 /**
  * Generic error boundary component.
  * Wrap any part of your app to catch and handle errors gracefully.
- * 
+ *
  * @example
  * <ErrorBoundary>
  *   <MyComponent />
  * </ErrorBoundary>
- * 
+ *
  * @example
  * <ErrorBoundary fallback={<CustomErrorUI />} onError={logToSentry}>
  *   <MyComponent />
@@ -97,7 +97,8 @@ export class ErrorBoundary extends Component<Props, State> {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                We encountered an unexpected error. This has been logged and we'll look into it.
+                We encountered an unexpected error. This has been logged and
+                we'll look into it.
               </p>
 
               {this.state.error && (
@@ -152,7 +153,8 @@ export function DataErrorBoundary({ children }: { children: ReactNode }) {
             <AlertTriangle className="h-12 w-12 text-destructive" />
             <h3 className="text-lg font-semibold">Failed to Load Data</h3>
             <p className="text-sm text-muted-foreground text-center max-w-md">
-              We couldn't load the data for this page. Please check your connection and try again.
+              We couldn't load the data for this page. Please check your
+              connection and try again.
             </p>
             <Button onClick={() => window.location.reload()} className="gap-2">
               <RefreshCw className="h-4 w-4" />

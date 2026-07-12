@@ -1,4 +1,5 @@
 # Staging Deployment Checklist
+
 **Branch**: `cursor/fix-concurrent-reprocess-race-condition-a4fd`  
 **Target**: Staging Environment  
 **Date**: 2026-07-12
@@ -8,6 +9,7 @@
 ## Pre-Deployment Verification
 
 ### ✅ Code Quality
+
 - [x] All commits cleanly applied
 - [x] No merge conflicts with `main`
 - [x] TypeScript compilation passes
@@ -17,6 +19,7 @@
 - [ ] Run E2E tests (if available)
 
 ### ✅ Security Checks
+
 - [x] Object-level authorization implemented
 - [x] File validation enabled
 - [x] JWT_SECRET validation in place
@@ -26,6 +29,7 @@
 - [ ] Secrets audit in deployment config
 
 ### ✅ Database Migrations
+
 **CRITICAL**: Must run in order!
 
 1. **0001_add_foreign_keys.sql**
@@ -48,6 +52,7 @@
 ## Environment Variables
 
 ### Required New Variables
+
 ```bash
 # CRITICAL - Must be set
 JWT_SECRET="<min-32-chars-strong-secret>"  # Generate: openssl rand -base64 48
@@ -63,6 +68,7 @@ TIMEOUT_DB_MS="10000"            # 10 seconds
 ```
 
 ### Verify Existing Variables
+
 - [ ] `MISTRAL_API_KEY` present
 - [ ] `GEMINI_API_KEY` present
 - [ ] `AZURE_STORAGE_CONNECTION_STRING` or equivalent
@@ -74,6 +80,7 @@ TIMEOUT_DB_MS="10000"            # 10 seconds
 ## Deployment Steps
 
 ### 1. Pre-Deployment Testing (Local/Dev)
+
 ```bash
 # Pull latest changes
 git checkout cursor/fix-concurrent-reprocess-race-condition-a4fd
@@ -94,6 +101,7 @@ ls -la dist/
 ```
 
 ### 2. Database Migration (Staging)
+
 ```bash
 # Connect to staging database
 mysql -h <staging-host> -u <user> -p <database>
@@ -111,6 +119,7 @@ SHOW INDEXES FROM job_sheets;
 ```
 
 ### 3. Application Deployment
+
 ```bash
 # Stop existing application
 pm2 stop job-sheet-qa-auditor
@@ -133,14 +142,17 @@ pm2 logs job-sheet-qa-auditor
 ```
 
 ### 4. Smoke Tests (Post-Deployment)
+
 Run these immediately after deployment:
 
 #### Authentication
+
 - [ ] Login with Microsoft Entra ID works
 - [ ] Session persists across page reloads
 - [ ] Logout works correctly
 
 #### File Upload
+
 - [ ] PDF upload succeeds
 - [ ] Image upload (JPEG/PNG) succeeds
 - [ ] File size limit enforced (10MB)
@@ -148,6 +160,7 @@ Run these immediately after deployment:
 - [ ] Malicious file rejected (try .exe renamed to .pdf)
 
 #### Processing
+
 - [ ] Job sheet processes within timeout
 - [ ] OCR extraction works
 - [ ] AI analysis completes
@@ -155,18 +168,21 @@ Run these immediately after deployment:
 - [ ] Findings displayed
 
 #### Authorization
+
 - [ ] Regular user cannot access other users' job sheets
 - [ ] QA Lead can access all job sheets
 - [ ] Admin can access all resources
 - [ ] 403 errors clear and helpful
 
 #### Database
+
 - [ ] Foreign keys enforce relationships
 - [ ] Cascade deletes work correctly
 - [ ] Indexes improve query performance
 - [ ] No orphaned records created
 
 #### UI/UX
+
 - [ ] Search page shows "Coming Soon"
 - [ ] Notifications bell empty (no fake alerts)
 - [ ] Analytics deep links work
@@ -178,6 +194,7 @@ Run these immediately after deployment:
 ## Monitoring & Alerts
 
 ### Metrics to Watch (First 24 Hours)
+
 - **Error Rate**: Should not increase
 - **Response Time**: Should decrease (due to indexes)
 - **Processing Timeout**: Monitor for TimeoutError logs
@@ -185,6 +202,7 @@ Run these immediately after deployment:
 - **Database Connections**: Watch for connection pool exhaustion
 
 ### Log Patterns to Monitor
+
 ```bash
 # Timeout errors
 grep "TimeoutError" /var/log/app.log
@@ -200,6 +218,7 @@ grep "processing failed" /var/log/app.log
 ```
 
 ### Alert Thresholds
+
 - Error rate > 5% → Investigate immediately
 - P95 latency > 10s → Check database indexes
 - Timeout rate > 1% → Increase timeout or investigate
@@ -212,6 +231,7 @@ grep "processing failed" /var/log/app.log
 ### If Critical Issues Found
 
 #### Option A: Quick Rollback (< 30 min)
+
 ```bash
 # Revert to previous commit
 git checkout main
@@ -224,6 +244,7 @@ pm2 restart job-sheet-qa-auditor
 ```
 
 #### Option B: Database Rollback (If Migrations Cause Issues)
+
 ```bash
 # Restore from backup
 mysql <database> < backup_<timestamp>.sql
@@ -238,7 +259,9 @@ pm2 restart job-sheet-qa-auditor
 ```
 
 ### Rollback Decision Criteria
+
 Rollback immediately if:
+
 - Error rate > 10%
 - Data corruption detected
 - Critical feature broken (upload, processing, auth)
@@ -250,18 +273,21 @@ Rollback immediately if:
 ## Post-Deployment Tasks
 
 ### Within 1 Hour
+
 - [ ] Verify all smoke tests passing
 - [ ] Check error logs for new issues
 - [ ] Monitor processing queue depth
 - [ ] Verify database performance
 
 ### Within 24 Hours
+
 - [ ] Review performance metrics
 - [ ] Analyze slow query log
 - [ ] Check authorization logs for false denials
 - [ ] Gather user feedback
 
 ### Within 1 Week
+
 - [ ] Full regression test suite
 - [ ] Performance benchmarking
 - [ ] Security audit
@@ -272,6 +298,7 @@ Rollback immediately if:
 ## Success Criteria
 
 Deployment considered successful when:
+
 - ✅ All smoke tests pass
 - ✅ Error rate < 1%
 - ✅ No data corruption
@@ -285,16 +312,19 @@ Deployment considered successful when:
 ## Communication Plan
 
 ### Before Deployment
+
 - [ ] Notify team in Slack #engineering
 - [ ] Email stakeholders (QA leads, admins)
 - [ ] Update status page (if applicable)
 
 ### During Deployment
+
 - [ ] Post deployment start time
 - [ ] Share migration progress
 - [ ] Announce completion
 
 ### After Deployment
+
 - [ ] Share smoke test results
 - [ ] Post metrics comparison
 - [ ] Document any issues encountered
@@ -320,5 +350,5 @@ Deployment considered successful when:
 
 ---
 
-*Last Updated: 2026-07-12*
-*Branch: cursor/fix-concurrent-reprocess-race-condition-a4fd*
+_Last Updated: 2026-07-12_
+_Branch: cursor/fix-concurrent-reprocess-race-condition-a4fd_

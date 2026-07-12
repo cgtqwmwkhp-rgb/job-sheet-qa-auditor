@@ -1,18 +1,21 @@
 /**
  * Transactional Database Operations
- * 
+ *
  * Atomic multi-step operations that ensure data consistency.
  * If any step fails, all changes are rolled back.
  */
 
 import { getDb } from "../db";
 import * as db from "../db";
-import type { InsertAuditResult, InsertAuditFinding } from "../../drizzle/schema";
+import type {
+  InsertAuditResult,
+  InsertAuditFinding,
+} from "../../drizzle/schema";
 
 /**
  * Create audit result with findings atomically.
  * If audit result creation succeeds but findings fail, everything rolls back.
- * 
+ *
  * @param auditData - Audit result data
  * @param findingsData - Array of findings to create
  * @returns Created audit result ID and finding IDs
@@ -29,22 +32,23 @@ export async function createAuditWithFindings(
   const auditId = auditResult.id;
 
   try {
-    // Create all findings
-    const findingIds: number[] = [];
-    for (const findingData of findingsData) {
-      const finding = await db.createAuditFinding({
-        ...findingData,
-        auditResultId: auditId,
-      });
-      findingIds.push(finding.id);
-    }
+    // Create all findings at once
+    const findingsWithAuditId = findingsData.map(f => ({
+      ...f,
+      auditResultId: auditId,
+    }));
+    const findings = await db.createAuditFindings(findingsWithAuditId);
+    const findingIds = findings.map(f => f.id).filter((id): id is number => id !== undefined);
 
     return { auditId, findingIds };
   } catch (error) {
     // If findings fail, we should ideally roll back the audit
     // For now, log the error and re-throw
     // TODO: Implement proper transaction with db.transaction() when Drizzle supports it
-    console.error(`[Transaction] Failed to create findings for audit ${auditId}:`, error);
+    console.error(
+      `[Transaction] Failed to create findings for audit ${auditId}:`,
+      error
+    );
     throw error;
   }
 }
@@ -92,7 +96,7 @@ export async function resolveFindingsBatch(
 
   // Update all findings
   for (const findingId of findingIds) {
-    await db.updateAuditFindingResolution(findingId, {
+    await db.updateFindingResolution(findingId, {
       resolutionStatus: resolution.status,
       resolutionReason: resolution.reason,
       resolvedBy: resolution.resolvedBy,
@@ -109,14 +113,12 @@ export async function resolveFindingsBatch(
  * Create dispute with automatic finding status update.
  * Ensures finding is marked as disputed when dispute is created.
  */
-export async function createDisputeWithFindingUpdate(
-  disputeData: {
-    auditFindingId: number;
-    raisedBy: number;
-    reason: string;
-    evidenceUrls?: any;
-  }
-): Promise<number> {
+export async function createDisputeWithFindingUpdate(disputeData: {
+  auditFindingId: number;
+  raisedBy: number;
+  reason: string;
+  evidenceUrls?: any;
+}): Promise<number> {
   const dbClient = await getDb();
   if (!dbClient) throw new Error("Database not available");
 
@@ -136,7 +138,7 @@ export async function createDisputeWithFindingUpdate(
 /**
  * Delete job sheet and cascade to related records.
  * This is a dangerous operation - use with extreme caution.
- * 
+ *
  * With foreign keys enabled, this should cascade automatically:
  * - Audit results → deleted
  * - Audit findings → deleted
@@ -160,5 +162,8 @@ export async function deleteJobSheetCascade(
   });
 
   // Delete job sheet (cascades via foreign keys)
-  await db.deleteJobSheet(jobSheetId);
+  // TODO: Implement deleteJobSheet in db.ts
+  throw new Error(
+    "deleteJobSheet not yet implemented - requires CASCADE DELETE support"
+  );
 }

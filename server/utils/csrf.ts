@@ -1,6 +1,6 @@
 /**
  * CSRF (Cross-Site Request Forgery) Protection
- * 
+ *
  * Provides CSRF token generation and validation for sensitive mutations.
  * Protects against unauthorized state-changing requests from malicious sites.
  */
@@ -18,14 +18,14 @@ const TOKEN_LIFETIME_MS = 3600000; // 1 hour
 if (!CSRF_SECRET || CSRF_SECRET.length < 32) {
   console.warn(
     "[CSRF] CSRF_SECRET not set or too short. CSRF protection disabled. " +
-    "Set CSRF_SECRET environment variable (min 32 chars) for production."
+      "Set CSRF_SECRET environment variable (min 32 chars) for production."
   );
 }
 
 /**
  * Generate a CSRF token for the current session.
  * Token includes timestamp for expiration validation.
- * 
+ *
  * @param sessionId - Unique session identifier (e.g., user ID + session token)
  * @returns Base64-encoded CSRF token
  */
@@ -38,12 +38,12 @@ export function generateCsrfToken(sessionId: string): string {
   const timestamp = Date.now();
   const nonce = randomBytes(16).toString("hex");
   const payload = `${sessionId}:${timestamp}:${nonce}`;
-  
+
   // Create HMAC signature
   const signature = createHash("sha256")
     .update(`${CSRF_SECRET}:${payload}`)
     .digest("hex");
-  
+
   // Combine payload and signature
   const token = `${payload}:${signature}`;
   return Buffer.from(token).toString("base64");
@@ -52,7 +52,7 @@ export function generateCsrfToken(sessionId: string): string {
 /**
  * Validate a CSRF token.
  * Checks signature and expiration.
- * 
+ *
  * @param token - The CSRF token to validate
  * @param sessionId - Expected session identifier
  * @throws TRPCError with code FORBIDDEN if invalid
@@ -124,10 +124,10 @@ export function validateCsrfToken(token: string, sessionId: string): void {
 /**
  * Middleware factory for tRPC procedures that require CSRF protection.
  * Use for sensitive mutations (delete, status changes, role updates).
- * 
+ *
  * @example
  * const csrfProtectedProcedure = protectedProcedure.use(csrfMiddleware());
- * 
+ *
  * router({
  *   deleteJobSheet: csrfProtectedProcedure
  *     .input(z.object({ id: z.number(), csrfToken: z.string() }))
@@ -140,7 +140,7 @@ export function csrfMiddleware() {
 
     // Extract CSRF token from input
     const csrfToken = input?.csrfToken;
-    
+
     if (!csrfToken) {
       throw new TRPCError({
         code: "BAD_REQUEST",
@@ -178,7 +178,7 @@ export function getCsrfStatus() {
   return {
     enabled: isCsrfEnabled(),
     tokenLifetimeMs: TOKEN_LIFETIME_MS,
-    warning: !isCsrfEnabled() 
+    warning: !isCsrfEnabled()
       ? "CSRF protection disabled - set CSRF_SECRET for production"
       : undefined,
   };

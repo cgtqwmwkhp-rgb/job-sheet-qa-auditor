@@ -1,11 +1,14 @@
 /**
  * Timeout Utilities
- * 
+ *
  * Provides timeout wrappers for long-running operations to prevent hung processes.
  */
 
 export class TimeoutError extends Error {
-  constructor(message: string, public readonly timeoutMs: number) {
+  constructor(
+    message: string,
+    public readonly timeoutMs: number
+  ) {
     super(message);
     this.name = "TimeoutError";
   }
@@ -14,13 +17,13 @@ export class TimeoutError extends Error {
 /**
  * Wraps a promise with a timeout.
  * If the promise doesn't resolve within the timeout period, rejects with TimeoutError.
- * 
+ *
  * @param promise - The promise to wrap
  * @param timeoutMs - Timeout in milliseconds
  * @param operationName - Human-readable name for error messages
  * @returns The promise result if it completes in time
  * @throws TimeoutError if timeout exceeded
- * 
+ *
  * @example
  * const result = await withTimeout(
  *   processDocument(docId),
@@ -59,7 +62,10 @@ export async function withTimeout<T>(
  */
 export const TIMEOUT_CONFIG = {
   /** Document processing (OCR + AI analysis) */
-  DOCUMENT_PROCESSING: parseInt(process.env.TIMEOUT_PROCESSING_MS || "600000", 10), // 10 min
+  DOCUMENT_PROCESSING: parseInt(
+    process.env.TIMEOUT_PROCESSING_MS || "600000",
+    10
+  ), // 10 min
 
   /** OCR extraction only */
   OCR_EXTRACTION: parseInt(process.env.TIMEOUT_OCR_MS || "180000", 10), // 3 min
@@ -80,11 +86,11 @@ export const TIMEOUT_CONFIG = {
 /**
  * Wraps a function with retry logic and timeout.
  * Useful for resilient external API calls.
- * 
+ *
  * @param fn - The function to execute
  * @param options - Retry and timeout configuration
  * @returns The function result if successful
- * 
+ *
  * @example
  * const result = await withRetryAndTimeout(
  *   () => fetch('https://api.example.com/data'),
@@ -114,7 +120,7 @@ export async function withRetryAndTimeout<T>(
       return await withTimeout(fn(), timeoutMs, operationName);
     } catch (error) {
       lastError = error as Error;
-      
+
       // Don't retry on timeout - operation took too long
       if (error instanceof TimeoutError) {
         throw error;
@@ -127,9 +133,12 @@ export async function withRetryAndTimeout<T>(
 
       // Exponential backoff
       const delay = backoffMs * Math.pow(2, attempt - 1);
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 
-  throw lastError || new Error(`${operationName} failed after ${maxAttempts} attempts`);
+  throw (
+    lastError ||
+    new Error(`${operationName} failed after ${maxAttempts} attempts`)
+  );
 }

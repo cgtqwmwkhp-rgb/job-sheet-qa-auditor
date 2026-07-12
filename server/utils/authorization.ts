@@ -1,9 +1,9 @@
 /**
  * Object-Level Authorization Utilities
- * 
+ *
  * These functions enforce access control at the individual resource level,
  * ensuring users can only access resources they own or have permission to view.
- * 
+ *
  * Security Note: Role-based checks (admin, QA lead) are handled in tRPC middleware.
  * These utilities add a second layer: object-level ownership and visibility.
  */
@@ -16,15 +16,16 @@ export interface ResourceOwnership {
   createdById?: number | null;
   uploadedById?: number | null;
   userId?: number | null;
+  [key: string]: unknown; // Allow additional properties from full objects
 }
 
 /**
  * Check if a user can access a job sheet.
- * 
+ *
  * Access rules:
  * - Admins and QA leads can access all job sheets
  * - Regular users can only access their own uploads
- * 
+ *
  * @throws TRPCError with code FORBIDDEN if access denied
  */
 export function enforceJobSheetAccess(
@@ -44,7 +45,8 @@ export function enforceJobSheetAccess(
   }
 
   // Regular users can only access their own uploads
-  const ownerId = resource.createdById ?? resource.uploadedById ?? resource.userId;
+  const ownerId =
+    resource.createdById ?? resource.uploadedById ?? resource.userId;
   if (!ownerId || ownerId !== currentUser.id) {
     throw new TRPCError({
       code: "FORBIDDEN",
@@ -55,11 +57,11 @@ export function enforceJobSheetAccess(
 
 /**
  * Check if a user can access an audit.
- * 
+ *
  * Access rules:
  * - Admins and QA leads can access all audits
  * - Regular users can only access audits for job sheets they uploaded
- * 
+ *
  * @throws TRPCError with code FORBIDDEN if access denied
  */
 export function enforceAuditAccess(
@@ -87,7 +89,10 @@ export function enforceAuditAccess(
     });
   }
 
-  const ownerId = jobSheetResource.createdById ?? jobSheetResource.uploadedById ?? jobSheetResource.userId;
+  const ownerId =
+    jobSheetResource.createdById ??
+    jobSheetResource.uploadedById ??
+    jobSheetResource.userId;
   if (!ownerId || ownerId !== currentUser.id) {
     throw new TRPCError({
       code: "FORBIDDEN",
@@ -98,12 +103,12 @@ export function enforceAuditAccess(
 
 /**
  * Check if a user can access another user's profile.
- * 
+ *
  * Access rules:
  * - Admins can access all profiles
  * - Users can access their own profile
  * - QA leads can access profiles of users they manage (not implemented yet)
- * 
+ *
  * @throws TRPCError with code FORBIDDEN if access denied
  */
 export function enforceUserProfileAccess(
@@ -129,7 +134,7 @@ export function enforceUserProfileAccess(
 
 /**
  * Filter a list of job sheets to only those the user can access.
- * 
+ *
  * This is used for list endpoints where we want to show a subset
  * rather than throwing an error.
  */

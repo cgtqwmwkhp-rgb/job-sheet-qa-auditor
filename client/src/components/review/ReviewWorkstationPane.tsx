@@ -191,7 +191,7 @@ export function mapFindingsFromApi(
   return findingsData.map(f => {
     // Check if finding has been resolved (approved, waived, overridden)
     const isResolved = f.resolutionStatus && f.resolutionStatus !== "open";
-    
+
     // Post–Audit Policy: S1 = Major, S2 = Minor, S3 = Passed/informational
     const failClass: Finding["failClass"] =
       f.severity === "S0" || f.severity === "S1"
@@ -1137,7 +1137,7 @@ function ReviewWorkstationContent({
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 onClick={handleReprocess}
-                disabled={reprocessMutation.isPending || jobSheetData?.status === "processing"}
+                disabled={reprocessMutation.isPending}
               >
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Reprocess

@@ -114,9 +114,10 @@ export const appRouter = router({
       )
       .query(async ({ ctx, input }) => {
         const allJobSheets = await db.getJobSheets(input);
-        
+
         // Object-level filtering: regular users only see their own uploads
-        const { filterJobSheetsByAccess } = await import("./utils/authorization");
+        const { filterJobSheetsByAccess } =
+          await import("./utils/authorization");
         return filterJobSheetsByAccess(allJobSheets, ctx.user);
       }),
 
@@ -142,11 +143,11 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
         const jobSheet = await db.getJobSheetById(input.id);
-        
+
         // Object-level authorization: ensure user can access this job sheet
         const { enforceJobSheetAccess } = await import("./utils/authorization");
         enforceJobSheetAccess(jobSheet, ctx.user);
-        
+
         return jobSheet;
       }),
 
@@ -219,10 +220,11 @@ export const appRouter = router({
         const buffer = Buffer.from(input.fileBase64, "base64");
 
         // Validate file type and size
-        const { validateFile, sanitizeFilename } = await import("./utils/fileValidation");
+        const { validateFile, sanitizeFilename } =
+          await import("./utils/fileValidation");
         const validation = validateFile(buffer, input.fileType, {
           maxSizeBytes: 10 * 1024 * 1024, // 10MB
-          allowedTypes: ['application/pdf', 'image/jpeg', 'image/png'],
+          allowedTypes: ["application/pdf", "image/jpeg", "image/png"],
         });
 
         if (!validation.valid) {
@@ -369,7 +371,8 @@ export const appRouter = router({
         if (jobSheet.status === "processing") {
           throw new TRPCError({
             code: "CONFLICT",
-            message: "Cannot process: document is currently being processed. Please wait for the current processing to complete.",
+            message:
+              "Cannot process: document is currently being processed. Please wait for the current processing to complete.",
           });
         }
 
@@ -787,7 +790,8 @@ export const appRouter = router({
         if (jobSheet.status === "processing") {
           throw new TRPCError({
             code: "CONFLICT",
-            message: "Cannot reprocess: document is currently being processed. Please wait for the current processing to complete.",
+            message:
+              "Cannot reprocess: document is currently being processed. Please wait for the current processing to complete.",
           });
         }
 
@@ -833,16 +837,24 @@ export const appRouter = router({
       )
       .query(async ({ ctx, input }) => {
         const allAudits = await db.getAuditResults(input);
-        
+
         // Object-level filtering: regular users only see audits for their own uploads
         // First, get all job sheets they have access to
         const allJobSheets = await db.getJobSheets();
-        const { filterJobSheetsByAccess } = await import("./utils/authorization");
-        const accessibleJobSheets = filterJobSheetsByAccess(allJobSheets, ctx.user);
-        const accessibleJobSheetIds = new Set(accessibleJobSheets.map(js => js.id));
-        
+        const { filterJobSheetsByAccess } =
+          await import("./utils/authorization");
+        const accessibleJobSheets = filterJobSheetsByAccess(
+          allJobSheets,
+          ctx.user
+        );
+        const accessibleJobSheetIds = new Set(
+          accessibleJobSheets.map(js => js.id)
+        );
+
         // Filter audits to only those for accessible job sheets
-        return allAudits.filter(audit => accessibleJobSheetIds.has(audit.jobSheetId));
+        return allAudits.filter(audit =>
+          accessibleJobSheetIds.has(audit.jobSheetId)
+        );
       }),
 
     getByJobSheet: protectedProcedure
@@ -852,7 +864,7 @@ export const appRouter = router({
         const jobSheet = await db.getJobSheetById(input.jobSheetId);
         const { enforceJobSheetAccess } = await import("./utils/authorization");
         enforceJobSheetAccess(jobSheet, ctx.user);
-        
+
         return db.getAuditResultByJobSheetId(input.jobSheetId);
       }),
 
@@ -867,11 +879,11 @@ export const appRouter = router({
             message: "Audit result not found",
           });
         }
-        
+
         const jobSheet = await db.getJobSheetById(audit.jobSheetId);
         const { enforceAuditAccess } = await import("./utils/authorization");
         enforceAuditAccess(audit, jobSheet, ctx.user);
-        
+
         return db.getAuditFindingsByResultId(input.auditResultId);
       }),
   }),
@@ -1066,9 +1078,10 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
         // Object-level authorization: users can only access their own profile (unless admin)
-        const { enforceUserProfileAccess } = await import("./utils/authorization");
+        const { enforceUserProfileAccess } =
+          await import("./utils/authorization");
         enforceUserProfileAccess(input.id, ctx.user);
-        
+
         return db.getUserById(input.id);
       }),
 

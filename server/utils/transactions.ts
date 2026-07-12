@@ -1,6 +1,6 @@
 /**
  * Database Transaction Utilities
- * 
+ *
  * Provides helpers for wrapping critical multi-step operations in transactions.
  * Ensures atomicity and rollback on errors.
  */
@@ -8,7 +8,10 @@
 import { getDb } from "../db";
 
 export class TransactionError extends Error {
-  constructor(message: string, public readonly cause?: Error) {
+  constructor(
+    message: string,
+    public readonly cause?: Error
+  ) {
     super(message);
     this.name = "TransactionError";
   }
@@ -17,14 +20,14 @@ export class TransactionError extends Error {
 /**
  * Executes a function within a database transaction.
  * Automatically commits on success or rolls back on error.
- * 
+ *
  * Note: Drizzle transactions require the database client to support transactions.
  * MySQL2 and most modern drivers support this.
- * 
+ *
  * @param fn - Function to execute within the transaction (receives db connection)
  * @returns The result of the function
  * @throws TransactionError if transaction fails
- * 
+ *
  * @example
  * await withTransaction(async (tx) => {
  *   await tx.insert(auditResults).values(result);
@@ -44,12 +47,14 @@ export async function withTransaction<T>(
     // Drizzle ORM transaction wrapper
     // Note: The actual implementation depends on the Drizzle version and driver
     // This is a placeholder that should be implemented based on the specific setup
-    
+
     // For MySQL2 with Drizzle, transactions typically use:
     // return await db.transaction(fn);
-    
+
     // For now, execute without transaction wrapper (add proper implementation later)
-    console.warn("[Transactions] Transaction wrapper not fully implemented yet");
+    console.warn(
+      "[Transactions] Transaction wrapper not fully implemented yet"
+    );
     return await fn(db);
   } catch (error) {
     throw new TransactionError(
@@ -72,10 +77,10 @@ export const TransactionPatterns = {
     auditData: any,
     findingsData: any[]
   ): Promise<{ auditId: number; findingIds: number[] }> {
-    return withTransaction(async (tx) => {
+    return withTransaction(async tx => {
       // Implementation would insert audit result and findings
       // in a single transaction
-      
+
       // Placeholder - actual implementation depends on db layer
       throw new Error("Not implemented - use withTransaction directly");
     });
@@ -90,10 +95,10 @@ export const TransactionPatterns = {
     status: string,
     auditData: any
   ): Promise<void> {
-    return withTransaction(async (tx) => {
+    return withTransaction(async tx => {
       // Implementation would update job sheet and insert audit
       // in a single transaction
-      
+
       throw new Error("Not implemented - use withTransaction directly");
     });
   },
@@ -107,10 +112,10 @@ export const TransactionPatterns = {
     resolution: string,
     userId: number
   ): Promise<void> {
-    return withTransaction(async (tx) => {
+    return withTransaction(async tx => {
       // Implementation would update findings and recalculate audit result
       // in a single transaction
-      
+
       throw new Error("Not implemented - use withTransaction directly");
     });
   },
@@ -119,7 +124,7 @@ export const TransactionPatterns = {
 /**
  * Validates that critical operations are idempotent.
  * Prevents duplicate processing by checking state before mutation.
- * 
+ *
  * @example
  * await ensureIdempotent(
  *   () => getJobSheetById(id),
@@ -133,10 +138,10 @@ export async function ensureIdempotent<T>(
   errorMessage: string
 ): Promise<T> {
   const resource = await checkFn();
-  
+
   if (!validationFn(resource)) {
     throw new TransactionError(errorMessage);
   }
-  
+
   return resource;
 }
