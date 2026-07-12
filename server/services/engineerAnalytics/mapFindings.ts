@@ -38,6 +38,12 @@ export interface RawFindingRow {
   ruleId?: string | null;
   resolutionStatus: DbResolutionStatus;
   occurredAt: Date | string;
+  /** Optional evidence fields from audit_findings (coaching dossier). */
+  normalisedSnippet?: string | null;
+  rawSnippet?: string | null;
+  suggestedFix?: string | null;
+  whyItMatters?: string | null;
+  pageNumber?: number | null;
 }
 
 /**

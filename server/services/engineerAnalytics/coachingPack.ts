@@ -1,6 +1,6 @@
 /**
  * Build a period-scoped engineer coaching pack for QA Lead 1:1s.
- * Pure aggregation — no DB / network.
+ * Pure aggregation — no DB / network (LLM enrichment happens in the router).
  */
 
 import {
@@ -19,6 +19,7 @@ import {
   classifyFindingTheme,
   type ThemeAggregate,
 } from "./coachingThemes";
+import { buildEvidenceDossier, type EvidenceDossier } from "./evidenceDossier";
 import type { RawFindingRow } from "./mapFindings";
 import { toIssueOccurrence } from "./mapFindings";
 import { generateFixPack } from "./analyticsService";
@@ -46,6 +47,7 @@ export interface CoachingWorkedExample {
   fieldName: string;
   whatWentWrong: string;
   correctApproach: string;
+  evidenceQuote: string | null;
 }
 
 export interface EngineerCoachingPack {
@@ -72,6 +74,8 @@ export interface EngineerCoachingPack {
   workedExamples: CoachingWorkedExample[];
   coachingAsks: string[];
   draftNarrative: CoachingNarrativeDraft;
+  /** Round-1 evidence dossier (also used to ground LLM pass). */
+  evidenceDossier: EvidenceDossier;
   fixPack: FixPack | null;
   evidenceRoi: {
     commentFailCount: number;
@@ -135,9 +139,10 @@ function buildStrengthHints(input: {
   themes: ThemeAggregate[];
   evidenceRoi: EngineerCoachingPack["evidenceRoi"];
   cardsAssessed: number;
+  dossier: EvidenceDossier;
 }): string[] {
   const hints: string[] = [];
-  const { scoreCard, themes, evidenceRoi, cardsAssessed } = input;
+  const { scoreCard, themes, evidenceRoi, cardsAssessed, dossier } = input;
 
   if (scoreCard.trend === "improving") {
     hints.push(
@@ -172,8 +177,17 @@ function buildStrengthHints(input: {
       `Issue density stayed controlled: ${scoreCard.documentsWithIssues}/${cardsAssessed} cards with findings (${Math.round(scoreCard.issueRate * 100)}%).`
     );
   }
+  if (
+    dossier.signalRollup.failurePathCards > 0 &&
+    dossier.signalRollup.missingWhatCount === 0 &&
+    dossier.cites.some(c => c.commentHasWhat === true)
+  ) {
+    hints.push(
+      "On failure-path cards in the dossier, what-failed language was present — protect that habit."
+    );
+  }
 
-  return hints.slice(0, 3);
+  return hints.slice(0, 4);
 }
 
 /**
@@ -186,6 +200,8 @@ export function buildEngineerCoachingPack(input: {
   engineerId: string;
   startDate?: string;
   endDate?: string;
+  /** Latest audit reportJson keyed by jobSheetId (optional Round-1 depth). */
+  reportsByJobSheetId?: Record<number, unknown>;
 }): EngineerCoachingPack | null {
   const period = resolvePeriod(input.startDate, input.endDate);
   const priorPeriod = previousPeriod(period.start, period.end);
@@ -317,11 +333,20 @@ export function buildEngineerCoachingPack(input: {
     }
   }
 
+  const evidenceDossier = buildEvidenceDossier({
+    engineerName: scoreCard.engineerName,
+    period,
+    documents: periodDocs,
+    findings: periodFindings,
+    reportsByJobSheetId: input.reportsByJobSheetId,
+  });
+
   const strengthHints = buildStrengthHints({
     scoreCard,
     themes,
     evidenceRoi,
     cardsAssessed: periodDocs.length,
+    dossier: evidenceDossier,
   });
 
   const draftNarrative = composeCoachingNarrative({
@@ -332,16 +357,48 @@ export function buildEngineerCoachingPack(input: {
     themes,
     developmentThemes: developmentForPack,
     strengthHints,
+    dossier: evidenceDossier,
   });
 
   const workedExamples: CoachingWorkedExample[] = [];
   for (const theme of developmentForPack) {
-    for (const sheetId of theme.exampleJobSheetIds.slice(0, 1)) {
+    for (const sheetId of theme.exampleJobSheetIds.slice(0, 2)) {
       const finding = (findingsBySheet.get(sheetId) ?? []).find(
         f => classifyFindingTheme(f) === theme.themeId
       );
       if (!finding) continue;
       const doc = periodDocs.find(d => d.jobSheetId === sheetId);
+      const cite = evidenceDossier.cites.find(
+        c => c.findingId === finding.findingId
+      );
+      const quote =
+        cite?.snippet ||
+        cite?.commentSnippet ||
+        finding.normalisedSnippet ||
+        finding.rawSnippet ||
+        null;
+      const gapBits: string[] = [];
+      if (cite?.commentHasWhat === false) gapBits.push("missing what-failed");
+      if (
+        cite?.commentHasNextAction === false &&
+        cite?.commentHasPartsStance === false
+      ) {
+        gapBits.push("missing next-action/parts stance");
+      }
+      if (cite?.photoPairFailed === true) gapBits.push("photo pair failed");
+      if (cite?.coherenceIssue) gapBits.push(cite.coherenceIssue);
+
+      const whatWentWrong = [
+        ruleLabel(finding.ruleId ?? null, finding.reasonCode),
+        quote ? `On-card evidence: “${String(quote).slice(0, 180)}”.` : null,
+        gapBits.length > 0 ? `Gaps: ${gapBits.join("; ")}.` : null,
+        finding.whyItMatters
+          ? `Why it matters: ${finding.whyItMatters.slice(0, 160)}.`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
+
       workedExamples.push({
         jobSheetId: sheetId,
         referenceNumber: doc?.referenceNumber ?? null,
@@ -349,11 +406,11 @@ export function buildEngineerCoachingPack(input: {
         ruleId: finding.ruleId ?? null,
         severity: finding.severity,
         fieldName: finding.fieldName,
-        whatWentWrong: ruleLabel(finding.ruleId ?? null, finding.reasonCode),
-        correctApproach: correctApproachFor(
-          finding.ruleId ?? null,
-          theme.title
-        ),
+        whatWentWrong,
+        correctApproach:
+          finding.suggestedFix?.trim() ||
+          correctApproachFor(finding.ruleId ?? null, theme.title),
+        evidenceQuote: quote ? String(quote).slice(0, 220) : null,
       });
     }
   }
@@ -396,6 +453,7 @@ export function buildEngineerCoachingPack(input: {
     workedExamples,
     coachingAsks: draftNarrative.coachingAsks,
     draftNarrative,
+    evidenceDossier,
     fixPack,
     evidenceRoi,
   };

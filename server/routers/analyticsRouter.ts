@@ -34,6 +34,7 @@ import {
 } from "../services/engineerAnalytics/aggregateFromDb";
 import {
   buildEngineerCoachingPack,
+  enrichCoachingNarrativeWithLlm,
   getCoachingSession,
   markCoachingSessionCompleted,
 } from "../services/engineerAnalytics";
@@ -513,6 +514,8 @@ export const analyticsRouter = router({
 
   /**
    * Period-scoped analytical coaching pack for QA Lead 1:1s.
+   * Round 1: evidence dossier from findings + reportJson.
+   * Round 2: optional LLM critic grounded only in that dossier.
    */
   getEngineerCoachingPack: protectedProcedure
     .input(
@@ -531,17 +534,57 @@ export const analyticsRouter = router({
         technicianId: Number.isFinite(technicianId) ? technicianId : undefined,
         site: input.site,
       });
-      const pack = buildEngineerCoachingPack({
+
+      const periodDocIds = loaded.documents
+        .filter(d => {
+          if (
+            Number.isFinite(technicianId) &&
+            d.technicianId !== technicianId
+          ) {
+            return false;
+          }
+          const iso =
+            d.processedAt instanceof Date
+              ? d.processedAt.toISOString()
+              : new Date(d.processedAt).toISOString();
+          return iso >= loaded.period.start && iso <= loaded.period.end;
+        })
+        .map(d => d.jobSheetId);
+
+      const reportsByJobSheetId =
+        await db.getLatestAuditReportJsonsForJobSheets(periodDocIds);
+
+      let pack = buildEngineerCoachingPack({
         users: loaded.users,
         documents: loaded.documents,
         findings: loaded.findings,
         engineerId: input.engineerId,
         startDate: loaded.period.start,
         endDate: loaded.period.end,
+        reportsByJobSheetId,
       });
       if (!pack) {
         return { pack: null, session: null };
       }
+
+      try {
+        const enrichedNarrative = await enrichCoachingNarrativeWithLlm({
+          draft: pack.draftNarrative,
+          dossier: pack.evidenceDossier,
+        });
+        pack = {
+          ...pack,
+          draftNarrative: enrichedNarrative,
+          strengths: enrichedNarrative.strengths,
+          coachingAsks: enrichedNarrative.coachingAsks,
+        };
+      } catch (error) {
+        console.warn(
+          "[analytics.getEngineerCoachingPack] LLM enrichment failed (non-fatal):",
+          error
+        );
+      }
+
       const session = getCoachingSession({
         engineerId: input.engineerId,
         periodStart: pack.period.start,

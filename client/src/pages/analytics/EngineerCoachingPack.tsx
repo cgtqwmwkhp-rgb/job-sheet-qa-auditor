@@ -77,6 +77,15 @@ function CoachingPackView({
   const [strengthsText, setStrengthsText] = useState(
     pack.draftNarrative.strengths.join("\n\n")
   );
+  const [criticalText, setCriticalText] = useState(
+    (pack.draftNarrative.criticalAssessment ?? []).join("\n\n")
+  );
+  const [anchorsText, setAnchorsText] = useState(
+    (pack.draftNarrative.evidenceAnchors ?? []).join("\n")
+  );
+  const [patternsText, setPatternsText] = useState(
+    (pack.draftNarrative.patternCritique ?? []).join("\n\n")
+  );
   const [themesText, setThemesText] = useState(
     pack.draftNarrative.themesSummary
   );
@@ -85,6 +94,9 @@ function CoachingPackView({
   );
   const [asksText, setAsksText] = useState(
     pack.draftNarrative.coachingAsks.join("\n")
+  );
+  const [criteriaText, setCriteriaText] = useState(
+    (pack.draftNarrative.successCriteria ?? []).join("\n")
   );
   const [qaNote, setQaNote] = useState(session?.qaLeadNote ?? "");
 
@@ -180,9 +192,27 @@ function CoachingPackView({
 
           <Card className="print:shadow-none print:border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Opening</CardTitle>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="text-base">Opening</CardTitle>
+                {pack.draftNarrative.enrichment?.usedLlm ? (
+                  <Badge variant="secondary" className="text-xs">
+                    AI critic ·{" "}
+                    {pack.draftNarrative.enrichment.writerProvider ||
+                      pack.draftNarrative.enrichment.provider}
+                    {pack.draftNarrative.enrichment.verifierProvider &&
+                    pack.draftNarrative.enrichment.verifierProvider !== "none"
+                      ? ` · verified by ${pack.draftNarrative.enrichment.verifierProvider}`
+                      : ""}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-xs">
+                    Evidence-based draft
+                  </Badge>
+                )}
+              </div>
               <CardDescription>
-                Edit before sharing — you own this feedback.
+                Edit before sharing — you own this feedback. Claims should stay
+                tied to the evidence anchors below.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -202,6 +232,67 @@ function CoachingPackView({
               <Textarea
                 value={strengthsText}
                 onChange={e => setStrengthsText(e.target.value)}
+                className="min-h-[90px] leading-relaxed"
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="print:shadow-none print:border border-amber-500/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Critical assessment</CardTitle>
+              <CardDescription>
+                Deep, objective read of documentation quality — not asset
+                pass/fail.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                value={criticalText}
+                onChange={e => setCriticalText(e.target.value)}
+                className="min-h-[140px] leading-relaxed"
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="print:shadow-none print:border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Evidence anchors</CardTitle>
+              <CardDescription>
+                Cite-backed bullets from findings and audit signals. Do not
+                invent cards outside this list.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Textarea
+                value={anchorsText}
+                onChange={e => setAnchorsText(e.target.value)}
+                className="min-h-[120px] leading-relaxed font-mono text-xs sm:text-sm"
+              />
+              {pack.evidenceDossier?.signalRollup && (
+                <p className="text-xs text-muted-foreground">
+                  Dossier rollup:{" "}
+                  {pack.evidenceDossier.signalRollup.majorCiteCount} majors ·{" "}
+                  {pack.evidenceDossier.signalRollup.commentFindingCount}{" "}
+                  comment cites ·{" "}
+                  {pack.evidenceDossier.signalRollup.missingWhatCount} missing
+                  what-failed ·{" "}
+                  {pack.evidenceDossier.signalRollup.photoPairFailCount} photo
+                  pair fails ·{" "}
+                  {pack.evidenceDossier.signalRollup.coherenceIssueCount}{" "}
+                  coherence
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="print:shadow-none print:border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Cross-card patterns</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                value={patternsText}
+                onChange={e => setPatternsText(e.target.value)}
                 className="min-h-[90px] leading-relaxed"
               />
             </CardContent>
@@ -267,6 +358,24 @@ function CoachingPackView({
               <Textarea
                 value={asksText}
                 onChange={e => setAsksText(e.target.value)}
+                className="min-h-[90px] leading-relaxed"
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="print:shadow-none print:border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">
+                Success criteria (next period)
+              </CardTitle>
+              <CardDescription>
+                Measurable bar for the follow-up conversation.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                value={criteriaText}
+                onChange={e => setCriteriaText(e.target.value)}
                 className="min-h-[90px] leading-relaxed"
               />
             </CardContent>
@@ -412,6 +521,11 @@ function CoachingPackView({
                     <span className="font-medium">What went wrong: </span>
                     {ex.whatWentWrong}
                   </p>
+                  {ex.evidenceQuote ? (
+                    <p className="text-sm text-muted-foreground italic border-l-2 border-border pl-3">
+                      “{ex.evidenceQuote}”
+                    </p>
+                  ) : null}
                   <p className="text-sm">
                     <span className="font-medium">Correct approach: </span>
                     {ex.correctApproach}

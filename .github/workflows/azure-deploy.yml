@@ -317,6 +317,34 @@ jobs:
                 "JUDGMENT_MODEL=gemini-2.5-pro"
           fi
 
+          # Coaching critic stack: Claude writer + optional OpenAI verifier
+          if [ -n "${{ secrets.ANTHROPIC_API_KEY }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "anthropic-api-key=${{ secrets.ANTHROPIC_API_KEY }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "ANTHROPIC_API_KEY=secretref:anthropic-api-key" \
+                "FEATURE_COACHING_LLM_NARRATIVE=true" \
+                "COACHING_CRITIC_PROVIDER=auto"
+          fi
+
+          if [ -n "${{ secrets.OPENAI_API_KEY }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "openai-api-key=${{ secrets.OPENAI_API_KEY }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "OPENAI_API_KEY=secretref:openai-api-key" \
+                "FEATURE_COACHING_VERIFIER=true"
+          fi
+
           # Azure Document Intelligence (selectionMarks / layout pass)
           if [ -n "${{ secrets.AZURE_DI_KEY }}" ] && [ -n "${{ vars.AZURE_DI_ENDPOINT }}" ]; then
             az containerapp secret set \
@@ -720,6 +748,34 @@ jobs:
               --set-env-vars "GEMINI_API_KEY=secretref:gemini-api-key" \
                 "ENABLE_GEMINI_INSIGHTS=true" \
                 "JUDGMENT_MODEL=gemini-2.5-pro"
+          fi
+
+          # Coaching critic stack (same secret wiring as staging; only if secrets present)
+          if [ -n "${{ secrets.ANTHROPIC_API_KEY }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "anthropic-api-key=${{ secrets.ANTHROPIC_API_KEY }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "ANTHROPIC_API_KEY=secretref:anthropic-api-key" \
+                "FEATURE_COACHING_LLM_NARRATIVE=true" \
+                "COACHING_CRITIC_PROVIDER=auto"
+          fi
+
+          if [ -n "${{ secrets.OPENAI_API_KEY }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "openai-api-key=${{ secrets.OPENAI_API_KEY }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "OPENAI_API_KEY=secretref:openai-api-key" \
+                "FEATURE_COACHING_VERIFIER=true"
           fi
 
       - name: Get production URL
