@@ -104,6 +104,11 @@ describe("API Authentication Contract", () => {
       expect(pdfProxyContent).toContain("function requireAuth");
     });
 
+    it("should authenticate via shared SDK Easy Auth path", () => {
+      expect(pdfProxyContent).toContain("sdk.authenticateRequest");
+      expect(pdfProxyContent).toContain("enforceJobSheetAccess");
+    });
+
     it("should return 401 for unauthenticated requests", () => {
       expect(pdfProxyContent.replace(/\s+/g, " ")).toMatch(
         /res\s*\.\s*status\s*\(\s*401\s*\)/

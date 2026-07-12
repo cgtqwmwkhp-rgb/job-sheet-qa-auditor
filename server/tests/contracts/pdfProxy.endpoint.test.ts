@@ -32,11 +32,12 @@ describe("PDF Proxy Endpoint Contract", () => {
       expect(pdfProxyContent).toContain("function requireAuth");
     });
 
-    it("should check for x-ms-client-principal header", () => {
-      expect(pdfProxyContent).toContain("x-ms-client-principal");
+    it("should authenticate via shared SDK (same identity as tRPC)", () => {
+      expect(pdfProxyContent).toContain("sdk.authenticateRequest");
+      expect(pdfProxyContent).toContain("enforceJobSheetAccess");
     });
 
-    it("should return 401 when no principal header", () => {
+    it("should return 401 when authentication fails", () => {
       expect(compactContent).toMatch(/res\s*\.\s*status\s*\(\s*401\s*\)/);
       expect(pdfProxyContent).toMatch(/['"]Unauthorized['"]/);
     });
