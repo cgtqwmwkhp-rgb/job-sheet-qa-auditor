@@ -187,7 +187,7 @@ export async function invalidateMatchingQueries(
   predicate: (queryKey: unknown[]) => boolean
 ) {
   await queryClient.invalidateQueries({
-    predicate: (query) => predicate(query.queryKey as unknown[]),
+    predicate: query => predicate(query.queryKey as unknown[]),
   });
 }
 
@@ -268,20 +268,26 @@ export async function batchInvalidate(
   const promises = invalidations.map(({ type, id }) => {
     switch (type) {
       case "jobSheet":
-        return id ? utils.jobSheets.get.invalidate({ id }) : utils.jobSheets.invalidate();
+        return id
+          ? utils.jobSheets.get.invalidate({ id })
+          : utils.jobSheets.invalidate();
       case "audit":
-        return id ? utils.audits.getByJobSheet.invalidate({ jobSheetId: id }) : utils.audits.invalidate();
+        return id
+          ? utils.audits.getByJobSheet.invalidate({ jobSheetId: id })
+          : utils.audits.invalidate();
       case "dispute":
         return utils.disputes.invalidate();
       case "user":
-        return id ? utils.users.get.invalidate({ id }) : utils.users.invalidate();
+        return id
+          ? utils.users.get.invalidate({ id })
+          : utils.users.invalidate();
       case "all":
         return queryClient.invalidateQueries();
       default:
         return Promise.resolve();
     }
   });
-  
+
   await Promise.all(promises);
 }
 
@@ -311,11 +317,14 @@ export function cleanupCache(
   olderThan: number = 30 * 60 * 1000 // 30 minutes
 ) {
   const now = Date.now();
-  
-  queryClient.getQueryCache().getAll().forEach(query => {
-    const state = query.state;
-    if (state.dataUpdatedAt && now - state.dataUpdatedAt > olderThan) {
-      queryClient.removeQueries({ queryKey: query.queryKey });
-    }
-  });
+
+  queryClient
+    .getQueryCache()
+    .getAll()
+    .forEach(query => {
+      const state = query.state;
+      if (state.dataUpdatedAt && now - state.dataUpdatedAt > olderThan) {
+        queryClient.removeQueries({ queryKey: query.queryKey });
+      }
+    });
 }
