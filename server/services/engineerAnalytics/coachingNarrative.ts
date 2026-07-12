@@ -105,10 +105,7 @@ function buildEvidenceAnchors(dossier: EvidenceDossier | null): string[] {
     else if (c.commentSnippet)
       parts.push(`comment quote “${c.commentSnippet}”`);
     if (c.commentHasWhat === false) parts.push("missing clear what-failed");
-    if (
-      c.commentHasNextAction === false &&
-      c.commentHasPartsStance === false
-    ) {
+    if (c.commentHasNextAction === false && c.commentHasPartsStance === false) {
       parts.push("missing next-action / parts stance");
     }
     if (c.photoPairFailed === true) {

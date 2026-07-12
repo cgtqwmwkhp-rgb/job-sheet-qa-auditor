@@ -243,9 +243,7 @@ describe("coachingNarrativeLlm", () => {
       corpus,
       { requireCite: true }
     );
-    expect(gated.kept).toEqual([
-      "JS-101 missing next action on failure path",
-    ]);
+    expect(gated.kept).toEqual(["JS-101 missing next action on failure path"]);
     expect(gated.stats.droppedInventedIds).toBe(1);
     expect(gated.stats.droppedMissingCite).toBe(1);
     expect(gated.stats.droppedUngroundedQuote).toBe(1);

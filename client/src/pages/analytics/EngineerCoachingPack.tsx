@@ -239,9 +239,7 @@ function CoachingPackView({
 
           <Card className="print:shadow-none print:border border-amber-500/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">
-                Critical assessment
-              </CardTitle>
+              <CardTitle className="text-base">Critical assessment</CardTitle>
               <CardDescription>
                 Deep, objective read of documentation quality — not asset
                 pass/fail.
@@ -272,10 +270,10 @@ function CoachingPackView({
               />
               {pack.evidenceDossier?.signalRollup && (
                 <p className="text-xs text-muted-foreground">
-                  Dossier rollup: {pack.evidenceDossier.signalRollup.majorCiteCount}{" "}
-                  majors ·{" "}
-                  {pack.evidenceDossier.signalRollup.commentFindingCount} comment
-                  cites ·{" "}
+                  Dossier rollup:{" "}
+                  {pack.evidenceDossier.signalRollup.majorCiteCount} majors ·{" "}
+                  {pack.evidenceDossier.signalRollup.commentFindingCount}{" "}
+                  comment cites ·{" "}
                   {pack.evidenceDossier.signalRollup.missingWhatCount} missing
                   what-failed ·{" "}
                   {pack.evidenceDossier.signalRollup.photoPairFailCount} photo

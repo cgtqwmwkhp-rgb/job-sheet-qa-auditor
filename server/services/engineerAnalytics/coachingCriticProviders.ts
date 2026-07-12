@@ -37,9 +37,7 @@ export function isGeminiConfigured(): boolean {
 /** Any critic-capable key present. */
 export function isAnyCoachingLlmConfigured(): boolean {
   return (
-    isAnthropicConfigured() ||
-    isOpenAiConfigured() ||
-    isGeminiConfigured()
+    isAnthropicConfigured() || isOpenAiConfigured() || isGeminiConfigured()
   );
 }
 
@@ -49,9 +47,9 @@ export function isAnyCoachingLlmConfigured(): boolean {
  * Auto preference: Claude (faithful critique) → OpenAI → Gemini.
  */
 export function resolveCoachingWriterProvider(): CoachingLlmProvider {
-  const raw = (
-    process.env.COACHING_CRITIC_PROVIDER || "auto"
-  ).toLowerCase().trim();
+  const raw = (process.env.COACHING_CRITIC_PROVIDER || "auto")
+    .toLowerCase()
+    .trim();
   if (raw === "mock") return "mock";
   if (raw === "anthropic") {
     return isAnthropicConfigured() ? "anthropic" : "none";
@@ -80,9 +78,9 @@ export function resolveCoachingVerifierProvider(
   const flag = process.env.FEATURE_COACHING_VERIFIER;
   if (flag === "false" || flag === "0") return "none";
 
-  const raw = (
-    process.env.COACHING_VERIFIER_PROVIDER || "auto"
-  ).toLowerCase().trim();
+  const raw = (process.env.COACHING_VERIFIER_PROVIDER || "auto")
+    .toLowerCase()
+    .trim();
   if (raw === "none" || raw === "off") return "none";
 
   const pick = (p: CoachingLlmProvider): CoachingLlmProvider => {
@@ -211,8 +209,10 @@ async function callAnthropic(input: {
     content?: Array<{ type: string; text?: string }>;
   };
   const text =
-    json.content?.filter(c => c.type === "text").map(c => c.text || "").join("") ||
-    "";
+    json.content
+      ?.filter(c => c.type === "text")
+      .map(c => c.text || "")
+      .join("") || "";
   return { ok: true, provider: "anthropic", model, text };
 }
 

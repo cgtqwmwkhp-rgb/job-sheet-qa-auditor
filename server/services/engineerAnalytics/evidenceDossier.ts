@@ -5,10 +5,7 @@
  */
 
 import type { EngineerDocumentRow } from "./aggregateFromDb";
-import {
-  classifyFindingTheme,
-  type CoachingThemeId,
-} from "./coachingThemes";
+import { classifyFindingTheme, type CoachingThemeId } from "./coachingThemes";
 import type { RawFindingRow } from "./mapFindings";
 
 export interface EvidenceCite {
@@ -104,9 +101,10 @@ function extractDeepNoteGaps(report: Record<string, unknown> | null): string[] {
     .slice(0, 5);
 }
 
-function extractPhotoPair(
-  report: Record<string, unknown> | null
-): { failed: boolean | null; summary: string | null } {
+function extractPhotoPair(report: Record<string, unknown> | null): {
+  failed: boolean | null;
+  summary: string | null;
+} {
   const pair = asRecord(report?.photoPairCompare);
   if (!pair) return { failed: null, summary: null };
   const passed = asBool(pair.passed ?? pair.ok ?? pair.pairOk);
@@ -197,10 +195,7 @@ function extractCommentSignals(report: Record<string, unknown> | null): {
 }
 
 function findingSnippet(f: RawFindingRow): string | null {
-  return truncate(
-    asString(f.normalisedSnippet) ?? asString(f.rawSnippet),
-    220
-  );
+  return truncate(asString(f.normalisedSnippet) ?? asString(f.rawSnippet), 220);
 }
 
 /**
@@ -276,8 +271,7 @@ export function buildEvidenceDossier(input: {
       .length,
     missingWhatCount: cites.filter(c => c.commentHasWhat === false).length,
     missingNextOrPartsCount: cites.filter(
-      c =>
-        c.commentHasNextAction === false && c.commentHasPartsStance === false
+      c => c.commentHasNextAction === false && c.commentHasPartsStance === false
     ).length,
     vagueCommentCount: cites.filter(c => c.commentVague === true).length,
     photoPairFailCount: cites.filter(c => c.photoPairFailed === true).length,
@@ -335,10 +329,7 @@ function renderCompactMarkdown(input: {
       lines.push(`  comment: "${c.commentSnippet}"`);
     }
     if (c.commentHasWhat === false) lines.push("  gap: missing what-failed");
-    if (
-      c.commentHasNextAction === false &&
-      c.commentHasPartsStance === false
-    ) {
+    if (c.commentHasNextAction === false && c.commentHasPartsStance === false) {
       lines.push("  gap: missing next-action / parts stance");
     }
     if (c.commentVague === true) lines.push("  gap: vague/thin comment");
@@ -359,6 +350,8 @@ function renderCompactMarkdown(input: {
 }
 
 /** Allowed JS ids for LLM cite validation. */
-export function dossierAllowedJobSheetIds(dossier: EvidenceDossier): Set<number> {
+export function dossierAllowedJobSheetIds(
+  dossier: EvidenceDossier
+): Set<number> {
   return new Set(dossier.cites.map(c => c.jobSheetId));
 }

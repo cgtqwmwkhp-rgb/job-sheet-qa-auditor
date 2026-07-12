@@ -429,9 +429,7 @@ function applyVerifierRemovals(
   unsupported: string[]
 ): { draft: CoachingNarrativeDraft; rejected: number } {
   if (unsupported.length === 0) return { draft, rejected: 0 };
-  const normalized = new Set(
-    unsupported.map(s => s.trim()).filter(Boolean)
-  );
+  const normalized = new Set(unsupported.map(s => s.trim()).filter(Boolean));
   const strip = (lines: string[]) =>
     lines.filter(line => !normalized.has(line.trim()));
 
@@ -478,9 +476,7 @@ function restoreIfEmptied(
         ? enriched.evidenceAnchors
         : base.evidenceAnchors,
     development:
-      enriched.development.length > 0
-        ? enriched.development
-        : base.development,
+      enriched.development.length > 0 ? enriched.development : base.development,
     strengths:
       enriched.strengths.length > 0 ? enriched.strengths : base.strengths,
     coachingAsks:
@@ -641,8 +637,7 @@ export async function enrichCoachingNarrativeWithLlm(input: {
       enrichedAt: new Date().toISOString(),
       usedLlm: true,
       writerProvider: writer,
-      verifierProvider:
-        verifierProvider === "none" ? "none" : verifierProvider,
+      verifierProvider: verifierProvider === "none" ? "none" : verifierProvider,
       verifierModel,
       verifierRejectedLines: verifierRejected,
       citeGateDroppedLines: gateDropped,

@@ -19,10 +19,7 @@ import {
   classifyFindingTheme,
   type ThemeAggregate,
 } from "./coachingThemes";
-import {
-  buildEvidenceDossier,
-  type EvidenceDossier,
-} from "./evidenceDossier";
+import { buildEvidenceDossier, type EvidenceDossier } from "./evidenceDossier";
 import type { RawFindingRow } from "./mapFindings";
 import { toIssueOccurrence } from "./mapFindings";
 import { generateFixPack } from "./analyticsService";
