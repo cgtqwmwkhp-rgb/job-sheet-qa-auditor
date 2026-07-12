@@ -103,11 +103,11 @@ export default function SpecManagement() {
   const handleActivateSpec = (id: number) => {
     activateSpec.mutate({ id }, {
       onSuccess: () => {
-        toast.success("Specification activated");
+        showSuccessToast("Specification activated", "This specification is now active for all audits");
         utils.specs.list.invalidate();
       },
-      onError: () => {
-        toast.error("Failed to activate specification");
+      onError: (error) => {
+        showMutationErrorToast(error, "activate specification");
       }
     });
   };

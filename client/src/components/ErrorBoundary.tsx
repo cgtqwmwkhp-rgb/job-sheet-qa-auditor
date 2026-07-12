@@ -48,8 +48,10 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Log error to console
-    console.error("[ErrorBoundary] Caught error:", error, errorInfo);
+    // Log error to centralized tracking
+    import("@/lib/errorTracking").then(({ logBoundaryError }) => {
+      logBoundaryError(error, errorInfo);
+    });
 
     // Call custom error handler if provided
     if (this.props.onError) {

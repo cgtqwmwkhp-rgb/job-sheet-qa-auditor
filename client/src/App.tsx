@@ -1,9 +1,9 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 // QueryClient is now only in main.tsx - removed duplicate provider
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, Redirect } from "wouter";
-import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ErrorBoundary, RouteErrorBoundary } from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import {
   AuthProvider,
@@ -15,6 +15,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Loader2 } from "lucide-react";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { useProcessingWatchdog } from "@/hooks/useProcessingWatch";
+import { initializeErrorTracking } from "@/lib/errorTracking";
 
 const STAFF_ROLES: UserRole[] = ["admin", "qa_lead", "viewer"];
 const TECH_ROLES: UserRole[] = ["technician"];
