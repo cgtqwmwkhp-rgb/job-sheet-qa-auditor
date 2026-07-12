@@ -1,18 +1,25 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  BrainCircuit, 
-  Scale, 
-  MessageSquareWarning, 
-  FileSearch, 
+import {
+  BrainCircuit,
+  Scale,
+  MessageSquareWarning,
+  FileSearch,
   Save,
-  RefreshCw
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,7 +32,7 @@ export function AIPersonaSettings() {
   );
 
   const handleSave = () => {
-    toast.success("AI Persona settings saved successfully.");
+    toast.message("Preview only — AI Persona settings are not saved yet");
   };
 
   return (
@@ -37,7 +44,8 @@ export function AIPersonaSettings() {
             <CardTitle>Auditor Persona</CardTitle>
           </div>
           <CardDescription>
-            Define the "lens" through which the AI evaluates engineer notes and job sheets.
+            Define the "lens" through which the AI evaluates engineer notes and
+            job sheets.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -49,15 +57,16 @@ export function AIPersonaSettings() {
               </Label>
               <span className="font-mono text-sm">{strictness}%</span>
             </div>
-            <Slider 
-              value={strictness} 
-              onValueChange={setStrictness} 
-              max={100} 
-              step={5} 
+            <Slider
+              value={strictness}
+              onValueChange={setStrictness}
+              max={100}
+              step={5}
               className="py-2"
             />
             <p className="text-xs text-muted-foreground">
-              Higher strictness will flag minor omissions and require more detailed evidence.
+              Higher strictness will flag minor omissions and require more
+              detailed evidence.
             </p>
           </div>
 
@@ -70,7 +79,8 @@ export function AIPersonaSettings() {
               <Switch checked={toneCheck} onCheckedChange={setToneCheck} />
             </div>
             <p className="text-xs text-muted-foreground">
-              Detect unprofessional language, frustration, or inappropriate remarks in job notes.
+              Detect unprofessional language, frustration, or inappropriate
+              remarks in job notes.
             </p>
           </div>
 
@@ -80,10 +90,14 @@ export function AIPersonaSettings() {
                 <FileSearch className="h-4 w-4" />
                 Completeness & Loose Ends
               </Label>
-              <Switch checked={completenessCheck} onCheckedChange={setCompletenessCheck} />
+              <Switch
+                checked={completenessCheck}
+                onCheckedChange={setCompletenessCheck}
+              />
             </div>
             <p className="text-xs text-muted-foreground">
-              Identify missing technical details, unanswered questions, or vague descriptions (e.g., "parts ordered" without part numbers).
+              Identify missing technical details, unanswered questions, or vague
+              descriptions (e.g., "parts ordered" without part numbers).
             </p>
           </div>
         </CardContent>
@@ -99,17 +113,23 @@ export function AIPersonaSettings() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>System Prompt Override</Label>
-            <Textarea 
+            <Textarea
               className="min-h-[200px] font-mono text-sm"
               value={customInstructions}
-              onChange={(e) => setCustomInstructions(e.target.value)}
+              onChange={e => setCustomInstructions(e.target.value)}
               placeholder="Enter specific instructions for the AI..."
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline" className="cursor-pointer hover:bg-muted">Focus: Safety Compliance</Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-muted">Focus: Customer Interaction</Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-muted">Focus: Parts Usage</Badge>
+            <Badge variant="outline" className="cursor-pointer hover:bg-muted">
+              Focus: Safety Compliance
+            </Badge>
+            <Badge variant="outline" className="cursor-pointer hover:bg-muted">
+              Focus: Customer Interaction
+            </Badge>
+            <Badge variant="outline" className="cursor-pointer hover:bg-muted">
+              Focus: Parts Usage
+            </Badge>
           </div>
         </CardContent>
         <CardFooter className="flex justify-between">

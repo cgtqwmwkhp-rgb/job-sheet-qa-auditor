@@ -22,10 +22,16 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return false;
 }
 
+function isInsideReviewWorkstation(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(target.closest("[data-review-workstation]"));
+}
+
 /**
  * Finding-level shortcuts for the review workstation (Phase 1.7):
  * n/p navigate findings, o override, c correct, v view on document.
- * Skips when focus is in an input, textarea, or dialog.
+ * Only active when focus is inside the workstation pane (avoids colliding
+ * with Hold Queue j/k/a/r shortcuts).
  */
 export function useReviewFindingKeyboard(
   handlers: ReviewFindingKeyboardHandlers,
@@ -37,6 +43,7 @@ export function useReviewFindingKeyboard(
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (isEditableTarget(e.target)) return;
+      if (!isInsideReviewWorkstation(e.target)) return;
 
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
 

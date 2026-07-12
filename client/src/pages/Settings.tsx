@@ -51,7 +51,7 @@ const SETTINGS_TABS = [
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 const settingsNavTriggerClass =
-  "w-full shrink-0 justify-start gap-3 whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:font-semibold hover:bg-muted/50";
+  "w-auto shrink-0 md:w-full justify-start gap-3 whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:font-semibold hover:bg-muted/50";
 
 function SettingsNavSection({ label }: { label: string }) {
   return (

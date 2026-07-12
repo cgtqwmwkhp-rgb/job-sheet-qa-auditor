@@ -538,7 +538,8 @@ export default function Monitoring() {
                       Job status distribution
                     </CardTitle>
                     <CardDescription>
-                      Live counts from accessible job sheets
+                      Mix across the latest 100 accessible job sheets (sample,
+                      not full population)
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

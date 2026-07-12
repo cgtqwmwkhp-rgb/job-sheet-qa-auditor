@@ -466,6 +466,8 @@ export default function AuditResults() {
                 <button
                   key={chip.key}
                   type="button"
+                  aria-pressed={statusFilter === chip.key}
+                  aria-label={`Filter ${chip.label}, ${statusCounts[chip.key]} audits`}
                   onClick={() => {
                     setStatusFilter(chip.key);
                     setHighlightIndex(0);
