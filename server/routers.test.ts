@@ -630,17 +630,17 @@ describe("specs", () => {
     expect(result).toHaveProperty("isActive", true);
   });
 
-  it("creates gold spec (admin only)", async () => {
+  it("rejects gold-spec create (deprecated → Template Studio)", async () => {
     const { ctx } = createAuthContext("admin");
     const caller = appRouter.createCaller(ctx);
 
-    const result = await caller.specs.create({
-      name: "New Spec",
-      version: "2.0.0",
-      schema: { fields: [] },
-    });
-
-    expect(result).toHaveProperty("id");
+    await expect(
+      caller.specs.create({
+        name: "New Spec",
+        version: "2.0.0",
+        schema: { fields: [] },
+      })
+    ).rejects.toThrow(/deprecated/i);
   });
 
   it("rejects non-admin from creating specs", async () => {

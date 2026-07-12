@@ -38,7 +38,7 @@ const items = [
   { title: "Hold Queue", url: "/hold-queue", icon: ShieldAlert },
   { title: "Disputes", url: "/disputes", icon: MessageSquareWarning },
   { title: "Search", url: "/search", icon: Search },
-  { title: "Spec Management", url: "/specs", icon: FileText },
+  { title: "Template Studio", url: "/specs", icon: FileText },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Monitoring", url: "/monitoring", icon: Activity },
   { title: "User Management", url: "/users", icon: Users },
@@ -51,6 +51,9 @@ export function AppSidebar() {
   const { hasRole } = useAuth();
 
   const filteredItems = items.filter(item => {
+    if (item.title === "Template Studio") {
+      return hasRole(["admin", "qa_lead"]);
+    }
     if (item.title === "Disputes") {
       return hasRole(["admin", "qa_lead"]);
     }

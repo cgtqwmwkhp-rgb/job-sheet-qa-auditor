@@ -19,6 +19,7 @@ import {
 } from "../services/templateRegistry";
 import { hydrateDeadLetterQueueFromDb } from "../utils/deadLetterQueue";
 import { pdfProxyRouter } from "./pdfProxy";
+import { templateSampleProxyRouter } from "./templateSampleProxy";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -125,6 +126,7 @@ async function startServer() {
   // PDF proxy endpoint (before tRPC, requires auth)
   // Provides same-origin PDF streaming to avoid CORS issues with Azure Blob
   app.use("/api/documents", pdfProxyRouter);
+  app.use("/api/template-samples", templateSampleProxyRouter);
 
   // tRPC API
   app.use(

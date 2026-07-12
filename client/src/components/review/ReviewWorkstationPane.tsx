@@ -37,6 +37,7 @@ import {
   MoreHorizontal,
   Pencil,
   RotateCcw,
+  FileText,
 } from "lucide-react";
 import {
   useState,
@@ -554,6 +555,13 @@ function ReviewWorkstationContent({
     trpc.auditActions.captureFieldCorrection.useMutation();
   const undoCorrection = trpc.auditActions.undoFieldCorrection.useMutation();
   const reprocessMutation = trpc.jobSheets.reprocess.useMutation();
+  const templateOverrideMutation = trpc.templates.overrides.set.useMutation();
+  const { data: templateCatalog } = trpc.templates.list.useQuery(undefined, {
+    staleTime: 60_000,
+  });
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [overrideVersionId, setOverrideVersionId] = useState("");
+  const [overrideReason, setOverrideReason] = useState("");
   const utils = trpc.useUtils();
 
   const invalidateFindings = () => {
@@ -1149,6 +1157,10 @@ function ReviewWorkstationContent({
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Reprocess
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setOverrideOpen(true)}>
+                <FileText className="w-4 h-4 mr-2" />
+                Override template + reprocess
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setShowLegend(v => !v)}>
                 <Keyboard className="w-4 h-4 mr-2" />
                 Shortcuts
@@ -1344,6 +1356,97 @@ function ReviewWorkstationContent({
           </Card>
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      <Dialog open={overrideOpen} onOpenChange={setOverrideOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Override template + reprocess</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Force a registry template version for this job sheet, then
+              reprocess. Use when Selection Trace confidence is LOW or wrong.
+            </p>
+            <div className="space-y-2">
+              <Label>Active template version</Label>
+              <Select
+                value={overrideVersionId}
+                onValueChange={setOverrideVersionId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select active version" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(templateCatalog ?? [])
+                    .filter(t => t.activeVersionId != null)
+                    .map(t => (
+                      <SelectItem
+                        key={t.activeVersionId!}
+                        value={String(t.activeVersionId)}
+                      >
+                        {t.name} (v{t.activeVersion})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Reason (min 5 chars)</Label>
+              <Textarea
+                value={overrideReason}
+                onChange={e => setOverrideReason(e.target.value)}
+                placeholder="Wrong template auto-selected — force Generator Service"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOverrideOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                templateOverrideMutation.isPending ||
+                !overrideVersionId ||
+                overrideReason.trim().length < 5
+              }
+              onClick={() => {
+                const versionId = Number(overrideVersionId);
+                const tpl = (templateCatalog ?? []).find(
+                  t => t.activeVersionId === versionId
+                );
+                if (!tpl?.activeVersionId || !jobSheetId) return;
+                templateOverrideMutation.mutate(
+                  {
+                    jobSheetId,
+                    templateId: tpl.id,
+                    versionId,
+                    originalConfidence: "LOW",
+                    originalTopScore: 0,
+                    reason: overrideReason.trim(),
+                    reprocess: true,
+                  },
+                  {
+                    onSuccess: () => {
+                      toast.success("Template override applied — reprocessing");
+                      setOverrideOpen(false);
+                      setOverrideReason("");
+                      utils.jobSheets.get.invalidate({ id: jobSheetId });
+                      invalidateFindings();
+                    },
+                    onError: err =>
+                      toast.error(err.message || "Override failed"),
+                  }
+                );
+              }}
+            >
+              {templateOverrideMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Override & reprocess
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
         <DialogContent>

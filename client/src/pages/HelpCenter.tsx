@@ -427,10 +427,12 @@ export default function HelpCenter() {
                         Can I customize the "Gold Standard" rules?
                       </AccordionTrigger>
                       <AccordionContent className="text-muted-foreground">
-                        Yes. Navigate to the "Spec Management" page to adjust
-                        validation rules. You can define mandatory fields,
-                        allowed value ranges, and specific evidence requirements
-                        for different job types.
+                        Yes. Use Template Studio (/specs) to upload a
+                        sample form, refine ROIs and selection tokens, run
+                        activation gates on staging, then dual-control promote
+                        to production. Spec Management gold-spec authoring is
+                        deprecated — the live audit pipeline uses the template
+                        registry.
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-4">

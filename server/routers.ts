@@ -918,37 +918,22 @@ export const appRouter = router({
           parentSpecId: z.number().optional(),
         })
       )
-      .mutation(async ({ ctx, input }) => {
-        const result = await db.createGoldSpec({
-          ...input,
-          createdBy: ctx.user.id,
+      .mutation(async () => {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Gold-spec authoring is deprecated. Use Template Studio (templates.studio.*) to create and activate live templates.",
         });
-
-        await db.logAction({
-          userId: ctx.user.id,
-          action: "CREATE_GOLD_SPEC",
-          entityType: "gold_spec",
-          entityId: result.id,
-          details: { name: input.name, version: input.version },
-        });
-
-        return result;
       }),
 
     activate: adminProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ ctx, input }) => {
-        const result = await db.activateGoldSpec(input.id);
-
-        await db.logAction({
-          userId: ctx.user.id,
-          action: "ACTIVATE_GOLD_SPEC",
-          entityType: "gold_spec",
-          entityId: input.id,
-          details: { activated: true },
+      .mutation(async () => {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Gold-spec activation is deprecated. Use Template Studio → Activate staging / Promote.",
         });
-
-        return result;
       }),
   }),
 
