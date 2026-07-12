@@ -741,6 +741,13 @@ export const appRouter = router({
           });
         }
 
+        if (jobSheet.status === "processing") {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Cannot reprocess: document is currently being processed. Please wait for the current processing to complete.",
+          });
+        }
+
         await db.logAction({
           userId: ctx.user.id,
           action: "REPROCESS_JOB_SHEET",

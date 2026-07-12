@@ -1131,7 +1131,7 @@ function ReviewWorkstationContent({
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 onClick={handleReprocess}
-                disabled={reprocessMutation.isPending}
+                disabled={reprocessMutation.isPending || jobSheetData?.status === "processing"}
               >
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Reprocess
