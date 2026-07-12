@@ -103,6 +103,40 @@ describe("mapSelectionMarksToRows", () => {
     expect(rows[0].choice).toBe("UNREADABLE");
   });
 
+  it("collapses duplicate X marks so filled Ok is not dropped", () => {
+    // Azure DI often emits outline+fill pairs per radio (8 marks / row).
+    // Taking raw rightmost-4 used to miss Ok and mark everything UNREADABLE.
+    const mk = (x: number, state: "selected" | "unselected", conf = 99) => ({
+      state,
+      confidence: conf,
+      pageNumber: 1,
+      bbox: {
+        x,
+        y: 40,
+        width: 1.2,
+        height: 1.2,
+        coordinateSpace: "percent" as const,
+      },
+    });
+
+    const marks = [
+      mk(57.8, "selected"),
+      mk(57.9, "selected"), // duplicate Ok fill
+      mk(66.0, "unselected"),
+      mk(66.2, "unselected"),
+      mk(74.5, "unselected"),
+      mk(74.6, "unselected"),
+      mk(83.0, "unselected"),
+      mk(83.1, "unselected"),
+    ];
+    const rows = mapSelectionMarksToRows(marks, {
+      headerText: "Ok Adv. Fail N/A",
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].choice).toBe("Ok");
+    expect(rows[0].markCount).toBe(4);
+  });
+
   it("inferColumnOrder reads Ok Adv Fail N/A headers", () => {
     expect(inferColumnOrder("Ok Adv. Fail N/A")).toEqual([
       "Ok",

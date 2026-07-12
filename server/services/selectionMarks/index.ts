@@ -132,18 +132,25 @@ export function inferColumnOrder(
 
 /**
  * Cluster marks by Y into rows, then map X-order to Ok/Adv/Fail/N/A.
+ *
+ * Azure DI often emits *two* marks per radio (outline + fill) at nearly the
+ * same X. We collapse those into one column before choosing Ok/Adv/Fail/N/A —
+ * otherwise taking the raw rightmost-4 frequently drops the filled Ok circle
+ * and every row becomes UNREADABLE.
  */
 export function mapSelectionMarksToRows(
   marks: AzureSelectionMark[],
   options: {
     headerText?: string;
     yTolerancePercent?: number;
+    xTolerancePercent?: number;
     lines?: AzureTextLine[];
   } = {}
 ): SelectionMarkRow[] {
   if (marks.length === 0) return [];
 
   const yTol = options.yTolerancePercent ?? 1.5;
+  const xTol = options.xTolerancePercent ?? 1.5;
   const columns = inferColumnOrder(options.headerText);
   const lines = options.lines ?? [];
 
@@ -175,23 +182,26 @@ export function mapSelectionMarksToRows(
     // Skip sparse clusters that aren't checklist radio rows (need ≥2 marks)
     if (cluster.length < 2) continue;
 
-    const byX = [...cluster].sort((a, b) => a.bbox.x - b.bbox.x);
-    // If more than 4, take the rightmost 4 (status columns usually on the right)
-    const marksForCols = byX.length > 4 ? byX.slice(byX.length - 4) : byX;
+    const marksForCols = collapseMarksToColumns(cluster, xTol);
+    // Need at least 2 columns to be a radio row
+    if (marksForCols.length < 2) continue;
+    // Prefer the rightmost 4 columns when extras exist (status cols on right)
+    const colMarks =
+      marksForCols.length > 4
+        ? marksForCols.slice(marksForCols.length - 4)
+        : marksForCols;
 
-    const selected = marksForCols.filter(m => m.state === "selected");
-    const pageNumber = marksForCols[0].pageNumber;
+    const selected = colMarks.filter(m => m.state === "selected");
+    const pageNumber = colMarks[0].pageNumber;
     const avgConf =
-      marksForCols.reduce((s, m) => s + m.confidence, 0) / marksForCols.length;
+      colMarks.reduce((s, m) => s + m.confidence, 0) / colMarks.length;
 
     let choice: ChecklistChoice = "UNREADABLE";
-    let bbox = unionBBox(marksForCols);
+    let bbox = unionBBox(colMarks);
 
-    if (selected.length === 1 && marksForCols.length >= 2) {
-      const selIdx = marksForCols.indexOf(selected[0]);
-      if (marksForCols.length === 4) {
-        choice = columns[selIdx] ?? "UNREADABLE";
-      } else if (marksForCols.length === 3) {
+    if (selected.length === 1 && colMarks.length >= 2) {
+      const selIdx = colMarks.indexOf(selected[0]);
+      if (colMarks.length === 4 || colMarks.length === 3) {
         choice = columns[selIdx] ?? "UNREADABLE";
       } else {
         choice =
@@ -200,14 +210,27 @@ export function mapSelectionMarksToRows(
             : (columns[columns.length - 1] ?? "UNREADABLE");
       }
       bbox = selected[0].bbox;
-    } else if (selected.length === 0 || selected.length > 1) {
+    } else if (selected.length > 1) {
+      // Prefer a clearly dominant selected mark (ink bleed / duplicate)
+      const byConf = [...selected].sort((a, b) => b.confidence - a.confidence);
+      if (
+        byConf.length >= 2 &&
+        byConf[0].confidence >= byConf[1].confidence + 15
+      ) {
+        const selIdx = colMarks.indexOf(byConf[0]);
+        choice = columns[selIdx] ?? "UNREADABLE";
+        bbox = byConf[0].bbox;
+      } else {
+        choice = "UNREADABLE";
+      }
+    } else {
       choice = "UNREADABLE";
     }
 
     const rowY =
-      marksForCols.reduce((s, m) => s + m.bbox.y + m.bbox.height / 2, 0) /
-      marksForCols.length;
-    const minMarkX = Math.min(...marksForCols.map(m => m.bbox.x));
+      colMarks.reduce((s, m) => s + m.bbox.y + m.bbox.height / 2, 0) /
+      colMarks.length;
+    const minMarkX = Math.min(...colMarks.map(m => m.bbox.x));
     const label = findRowLabel(lines, pageNumber, rowY, minMarkX, yTol);
 
     rows.push({
@@ -218,11 +241,39 @@ export function mapSelectionMarksToRows(
       confidence: Math.round(avgConf),
       bbox,
       selectedCount: selected.length,
-      markCount: marksForCols.length,
+      markCount: colMarks.length,
     });
   }
 
   return rows;
+}
+
+/**
+ * Collapse near-duplicate X positions into one mark per radio column.
+ * Prefer a `selected` mark within the column; else highest confidence.
+ */
+export function collapseMarksToColumns(
+  marks: AzureSelectionMark[],
+  xTolPercent = 1.5
+): AzureSelectionMark[] {
+  const byX = [...marks].sort((a, b) => a.bbox.x - b.bbox.x);
+  const groups: AzureSelectionMark[][] = [];
+  for (const mark of byX) {
+    const last = groups[groups.length - 1];
+    if (last && Math.abs(last[0].bbox.x - mark.bbox.x) <= xTolPercent) {
+      last.push(mark);
+    } else {
+      groups.push([mark]);
+    }
+  }
+
+  return groups.map(group => {
+    const selected = group.filter(m => m.state === "selected");
+    if (selected.length > 0) {
+      return [...selected].sort((a, b) => b.confidence - a.confidence)[0];
+    }
+    return [...group].sort((a, b) => b.confidence - a.confidence)[0];
+  });
 }
 
 /** Nearest text line left of the radio columns, same vertical band. */
