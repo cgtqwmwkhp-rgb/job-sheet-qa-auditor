@@ -1,9 +1,9 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 // QueryClient is now only in main.tsx - removed duplicate provider
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, Redirect } from "wouter";
-import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ErrorBoundary, RouteErrorBoundary } from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import {
   AuthProvider,
@@ -15,6 +15,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Loader2 } from "lucide-react";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { useProcessingWatchdog } from "@/hooks/useProcessingWatch";
+import { initializeErrorTracking } from "@/lib/errorTracking";
 
 const STAFF_ROLES: UserRole[] = ["admin", "qa_lead", "viewer"];
 const TECH_ROLES: UserRole[] = ["technician"];
@@ -62,6 +63,7 @@ const DisputeManagement = lazy(() => import("./pages/DisputeManagement"));
 const AuditLog = lazy(() => import("./pages/AuditLog"));
 const Settings = lazy(() => import("./pages/Settings"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
+const Monitoring = lazy(() => import("./pages/Monitoring"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Loading fallback — no app chrome (Phase 0 portal cleanliness)
@@ -87,6 +89,19 @@ function RequireStaff({ children }: { children: React.ReactNode }) {
 function Router() {
   const { isLoading, user } = useAuth();
 
+  // Initialize error tracking on mount
+  useEffect(() => {
+    initializeErrorTracking({
+      user: user
+        ? {
+            id: Number(user.id),
+            email: user.email,
+            role: user.role,
+          }
+        : undefined,
+    });
+  }, [user]);
+
   if (isLoading) return <PageLoader />;
 
   const homeRedirect = user?.role === "technician" ? "/portal/dashboard" : "/";
@@ -107,17 +122,23 @@ function Router() {
 
         <Route path="/">
           <RequireStaff>
-            <Dashboard />
+            <RouteErrorBoundary routeName="Dashboard">
+              <Dashboard />
+            </RouteErrorBoundary>
           </RequireStaff>
         </Route>
         <Route path="/upload">
           <RequireStaff>
-            <UploadPage />
+            <RouteErrorBoundary routeName="Upload">
+              <UploadPage />
+            </RouteErrorBoundary>
           </RequireStaff>
         </Route>
         <Route path="/audits">
           <RequireStaff>
-            <AuditResults />
+            <RouteErrorBoundary routeName="AuditResults">
+              <AuditResults />
+            </RouteErrorBoundary>
           </RequireStaff>
         </Route>
         <Route path="/hold-queue">
@@ -207,6 +228,13 @@ function Router() {
         <Route path="/settings">
           <ProtectedRoute
             component={Settings}
+            allowedRoles={["admin", "qa_lead"]}
+          />
+        </Route>
+        {/* Monitoring dashboard for ops */}
+        <Route path="/monitoring">
+          <ProtectedRoute
+            component={Monitoring}
             allowedRoles={["admin", "qa_lead"]}
           />
         </Route>

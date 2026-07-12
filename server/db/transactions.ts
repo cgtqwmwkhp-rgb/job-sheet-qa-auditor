@@ -164,8 +164,5 @@ export async function deleteJobSheetCascade(
   });
 
   // Delete job sheet (cascades via foreign keys)
-  // TODO: Implement deleteJobSheet in db.ts
-  throw new Error(
-    "deleteJobSheet not yet implemented - requires CASCADE DELETE support"
-  );
+  await db.deleteJobSheet(jobSheetId);
 }

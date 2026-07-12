@@ -2,7 +2,13 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -37,57 +43,78 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, MoreHorizontal, Search, Shield, User, UserPlus } from "lucide-react";
+import {
+  Loader2,
+  MoreHorizontal,
+  Search,
+  Shield,
+  User,
+  UserPlus,
+} from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import {
+  showSaveSuccessToast,
+  showSaveErrorToast,
+  showMutationErrorToast,
+} from "@/lib/toastHelpers";
 
 export default function UserManagement() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   // Fetch users from API
   const { data: users, isLoading } = trpc.users.list.useQuery();
   const updateRole = trpc.users.updateRole.useMutation();
   const utils = trpc.useUtils();
 
   const handleRoleChange = (userId: number, newRole: string) => {
-    updateRole.mutate({ id: userId, role: newRole as any }, {
-      onSuccess: () => {
-        toast.success("User role updated successfully");
-        utils.users.list.invalidate();
-      },
-      onError: () => {
-        toast.error("Failed to update user role");
+    updateRole.mutate(
+      { id: userId, role: newRole as any },
+      {
+        onSuccess: () => {
+          showSaveSuccessToast("User role");
+          utils.users.list.invalidate();
+        },
+        onError: error => {
+          showMutationErrorToast(error, "update user role");
+        },
       }
-    });
+    );
   };
 
   // Filter users by search term
-  const filteredUsers = users?.filter(user => 
-    user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filteredUsers =
+    users?.filter(
+      user =>
+        user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    ) || [];
 
   // Calculate stats. Store timestamp in state (initialized once on mount).
   const [mountTime] = useState(() => Date.now());
   const totalUsers = users?.length || 0;
   const activeUsers = useMemo(() => {
-    return users?.filter(u => {
-      if (!u.lastSignedIn) return false;
-      const lastActive = new Date(u.lastSignedIn);
-      const hourAgo = new Date(mountTime - 60 * 60 * 1000);
-      return lastActive > hourAgo;
-    }).length || 0;
+    return (
+      users?.filter(u => {
+        if (!u.lastSignedIn) return false;
+        const lastActive = new Date(u.lastSignedIn);
+        const hourAgo = new Date(mountTime - 60 * 60 * 1000);
+        return lastActive > hourAgo;
+      }).length || 0
+    );
   }, [users, mountTime]);
-  const adminCount = users?.filter(u => u.role === 'admin').length || 0;
+  const adminCount = users?.filter(u => u.role === "admin").length || 0;
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-heading font-bold tracking-tight">User Management</h1>
+            <h1 className="text-3xl font-heading font-bold tracking-tight">
+              User Management
+            </h1>
             <p className="text-muted-foreground mt-1">
               Manage user access, roles, and permissions.
             </p>
@@ -103,7 +130,8 @@ export default function UserManagement() {
               <DialogHeader>
                 <DialogTitle>Invite New User</DialogTitle>
                 <DialogDescription>
-                  Send an invitation to a new team member. They will receive an email to set up their account.
+                  Send an invitation to a new team member. They will receive an
+                  email to set up their account.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
@@ -127,11 +155,20 @@ export default function UserManagement() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsInviteOpen(false)}>Cancel</Button>
-                <Button onClick={() => {
-                  toast.info("User invitation feature coming soon");
-                  setIsInviteOpen(false);
-                }}>Send Invitation</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsInviteOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    toast.info("User invitation feature coming soon");
+                    setIsInviteOpen(false);
+                  }}
+                >
+                  Send Invitation
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -145,7 +182,9 @@ export default function UserManagement() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalUsers}</div>
-              <p className="text-xs text-muted-foreground">Registered accounts</p>
+              <p className="text-xs text-muted-foreground">
+                Registered accounts
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -155,17 +194,23 @@ export default function UserManagement() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{activeUsers}</div>
-              <p className="text-xs text-muted-foreground">Active in last hour</p>
+              <p className="text-xs text-muted-foreground">
+                Active in last hour
+              </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Invites</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Pending Invites
+              </CardTitle>
               <UserPlus className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">0</div>
-              <p className="text-xs text-muted-foreground">Awaiting acceptance</p>
+              <p className="text-xs text-muted-foreground">
+                Awaiting acceptance
+              </p>
             </CardContent>
           </Card>
           <Card>
@@ -175,7 +220,9 @@ export default function UserManagement() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{adminCount}</div>
-              <p className="text-xs text-muted-foreground">Full system access</p>
+              <p className="text-xs text-muted-foreground">
+                Full system access
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -188,11 +235,11 @@ export default function UserManagement() {
             </div>
             <div className="relative w-64">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search users..." 
-                className="pl-8 h-9" 
+              <Input
+                placeholder="Search users..."
+                className="pl-8 h-9"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
           </CardHeader>
@@ -213,30 +260,41 @@ export default function UserManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUsers.map((user) => (
+                  {filteredUsers.map(user => (
                     <TableRow key={user.id}>
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="font-medium">{user.name || 'Unknown User'}</span>
-                          <span className="text-xs text-muted-foreground">{user.email || 'No email'}</span>
+                          <span className="font-medium">
+                            {user.name || "Unknown User"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {user.email || "No email"}
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {user.role === 'admin' && <Shield className="w-3 h-3 text-primary" />}
-                          <span className="capitalize">{user.role?.replace('_', ' ') || 'User'}</span>
+                          {user.role === "admin" && (
+                            <Shield className="w-3 h-3 text-primary" />
+                          )}
+                          <span className="capitalize">
+                            {user.role?.replace("_", " ") || "User"}
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={user.lastSignedIn ? 'default' : 'secondary'}>
-                          {user.lastSignedIn ? 'active' : 'inactive'}
+                        <Badge
+                          variant={user.lastSignedIn ? "default" : "secondary"}
+                        >
+                          {user.lastSignedIn ? "active" : "inactive"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {user.lastSignedIn 
-                          ? formatDistanceToNow(new Date(user.lastSignedIn), { addSuffix: true })
-                          : 'Never'
-                        }
+                        {user.lastSignedIn
+                          ? formatDistanceToNow(new Date(user.lastSignedIn), {
+                              addSuffix: true,
+                            })
+                          : "Never"}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -247,13 +305,23 @@ export default function UserManagement() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleRoleChange(user.id, 'admin')}>
+                            <DropdownMenuItem
+                              onClick={() => handleRoleChange(user.id, "admin")}
+                            >
                               Make Admin
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleRoleChange(user.id, 'qa_lead')}>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleRoleChange(user.id, "qa_lead")
+                              }
+                            >
                               Make QA Lead
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleRoleChange(user.id, 'technician')}>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleRoleChange(user.id, "technician")
+                              }
+                            >
                               Make Technician
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />

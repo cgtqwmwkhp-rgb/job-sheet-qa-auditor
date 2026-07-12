@@ -229,6 +229,45 @@ export async function getUserById(id: number) {
 }
 
 /**
+ * Create a new user (admin function).
+ * For manual user creation by administrators.
+ */
+export async function createUser(data: InsertUser) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(users).values(data);
+  return { id: Number(result[0].insertId) };
+}
+
+/**
+ * Update user profile information (admin function).
+ * Allows updating name, email, and role.
+ */
+export async function updateUserProfile(
+  id: number,
+  data: {
+    name?: string;
+    email?: string;
+    role?: string;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: Record<string, any> = {};
+  if (data.name !== undefined) updateData.name = data.name;
+  if (data.email !== undefined) updateData.email = data.email;
+  if (data.role !== undefined) updateData.role = data.role;
+
+  if (Object.keys(updateData).length === 0) {
+    throw new Error("No fields to update");
+  }
+
+  await db.update(users).set(updateData).where(eq(users.id, id));
+}
+
+/**
  * Create (or return existing) analytics technician user from an OCR name.
  * Uses a synthetic openId so Azure AD login is not required for attribution.
  */
@@ -341,6 +380,23 @@ export async function updateJobSheetTechnicianId(
 
   await db.update(jobSheets).set({ technicianId }).where(eq(jobSheets.id, id));
   return { success: true };
+}
+
+/**
+ * Delete a job sheet and all associated data (cascades via foreign keys).
+ * This will automatically delete:
+ * - All audit results for this job sheet
+ * - All audit findings for those results
+ * - All disputes for those findings
+ * - All waivers for those findings
+ *
+ * NOTE: This is a destructive operation. Consider soft delete for production use.
+ */
+export async function deleteJobSheet(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(jobSheets).where(eq(jobSheets.id, id));
 }
 
 /**
@@ -725,6 +781,27 @@ export async function updateDisputeStatus(
   }
 
   await db.update(disputes).set(updateData).where(eq(disputes.id, id));
+}
+
+/**
+ * Assign a reviewer to a dispute (typically a QA lead).
+ * Updates the dispute's reviewerId and optionally changes status to "under_review".
+ */
+export async function assignDisputeReviewer(
+  disputeId: number,
+  reviewerId: number,
+  updateStatus: boolean = true
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: Record<string, any> = { reviewerId };
+  if (updateStatus) {
+    updateData.status = "under_review";
+    updateData.updatedAt = new Date();
+  }
+
+  await db.update(disputes).set(updateData).where(eq(disputes.id, disputeId));
 }
 
 // ============ WAIVER QUERIES ============

@@ -1,18 +1,23 @@
 /**
  * Exports Router - Stage 5
- * 
+ *
  * Provides API endpoints for generating exports (CSV, bundle).
  * All exports are redacted by default for PII safety.
  */
 
-import { z } from 'zod';
-import { protectedProcedure, router } from '../_core/trpc';
-import type { AuditResultResponse, ValidatedFieldResponse, FindingResponse } from './auditRouter';
+import { z } from "zod";
+import { TRPCError } from "@trpc/server";
+import { protectedProcedure, router } from "../_core/trpc";
+import type {
+  AuditResultResponse,
+  ValidatedFieldResponse,
+  FindingResponse,
+} from "./auditRouter";
 
 /**
  * Export format options
  */
-export type ExportFormat = 'csv' | 'json' | 'bundle';
+export type ExportFormat = "csv" | "json" | "bundle";
 
 /**
  * Redaction patterns for PII
@@ -34,11 +39,11 @@ const PII_PATTERNS = [
  * Redact PII from a string value
  */
 function redactPII(value: string | null | undefined): string {
-  if (!value) return '';
-  
+  if (!value) return "";
+
   let redacted = value;
   for (const pattern of PII_PATTERNS) {
-    redacted = redacted.replace(pattern, '[REDACTED]');
+    redacted = redacted.replace(pattern, "[REDACTED]");
   }
   return redacted;
 }
@@ -46,12 +51,16 @@ function redactPII(value: string | null | undefined): string {
 /**
  * Redact PII from a validated field
  */
-function redactValidatedField(field: ValidatedFieldResponse, redact: boolean): ValidatedFieldResponse {
+function redactValidatedField(
+  field: ValidatedFieldResponse,
+  redact: boolean
+): ValidatedFieldResponse {
   if (!redact) return field;
-  
+
   return {
     ...field,
-    value: typeof field.value === 'string' ? redactPII(field.value) : field.value,
+    value:
+      typeof field.value === "string" ? redactPII(field.value) : field.value,
     message: field.message ? redactPII(field.message) : undefined,
   };
 }
@@ -59,13 +68,18 @@ function redactValidatedField(field: ValidatedFieldResponse, redact: boolean): V
 /**
  * Redact PII from a finding
  */
-function redactFinding(finding: FindingResponse, redact: boolean): FindingResponse {
+function redactFinding(
+  finding: FindingResponse,
+  redact: boolean
+): FindingResponse {
   if (!redact) return finding;
-  
+
   return {
     ...finding,
     message: redactPII(finding.message),
-    extractedValue: finding.extractedValue ? redactPII(finding.extractedValue) : undefined,
+    extractedValue: finding.extractedValue
+      ? redactPII(finding.extractedValue)
+      : undefined,
   };
 }
 
@@ -76,22 +90,33 @@ function generateValidatedFieldsCSV(
   fields: ValidatedFieldResponse[],
   redact: boolean
 ): string {
-  const headers = ['Rule ID', 'Field', 'Status', 'Value', 'Confidence', 'Page', 'Severity', 'Message'];
+  const headers = [
+    "Rule ID",
+    "Field",
+    "Status",
+    "Value",
+    "Confidence",
+    "Page",
+    "Severity",
+    "Message",
+  ];
   const rows = fields.map(f => {
     const redacted = redactValidatedField(f, redact);
     return [
       redacted.ruleId,
       redacted.field,
       redacted.status,
-      String(redacted.value ?? ''),
+      String(redacted.value ?? ""),
       String(redacted.confidence),
-      String(redacted.pageNumber ?? ''),
+      String(redacted.pageNumber ?? ""),
       redacted.severity,
-      redacted.message ?? '',
-    ].map(v => `"${v.replace(/"/g, '""')}"`).join(',');
+      redacted.message ?? "",
+    ]
+      .map(v => `"${v.replace(/"/g, '""')}"`)
+      .join(",");
   });
-  
-  return [headers.join(','), ...rows].join('\n');
+
+  return [headers.join(","), ...rows].join("\n");
 }
 
 /**
@@ -101,7 +126,16 @@ function generateFindingsCSV(
   findings: FindingResponse[],
   redact: boolean
 ): string {
-  const headers = ['ID', 'Rule ID', 'Field', 'Severity', 'Message', 'Extracted Value', 'Expected Pattern', 'Page'];
+  const headers = [
+    "ID",
+    "Rule ID",
+    "Field",
+    "Severity",
+    "Message",
+    "Extracted Value",
+    "Expected Pattern",
+    "Page",
+  ];
   const rows = findings.map(f => {
     const redacted = redactFinding(f, redact);
     return [
@@ -110,24 +144,23 @@ function generateFindingsCSV(
       redacted.field,
       redacted.severity,
       redacted.message,
-      redacted.extractedValue ?? '',
-      redacted.expectedPattern ?? '',
-      String(redacted.pageNumber ?? ''),
-    ].map(v => `"${v.replace(/"/g, '""')}"`).join(',');
+      redacted.extractedValue ?? "",
+      redacted.expectedPattern ?? "",
+      String(redacted.pageNumber ?? ""),
+    ]
+      .map(v => `"${v.replace(/"/g, '""')}"`)
+      .join(",");
   });
-  
-  return [headers.join(','), ...rows].join('\n');
+
+  return [headers.join(","), ...rows].join("\n");
 }
 
 /**
  * Generate bundle content (JSON with all audit data)
  */
-function generateBundle(
-  audit: AuditResultResponse,
-  redact: boolean
-): object {
+function generateBundle(audit: AuditResultResponse, redact: boolean): object {
   return {
-    version: '1.0.0',
+    version: "1.0.0",
     generatedAt: new Date().toISOString(),
     redacted: redact,
     audit: {
@@ -141,7 +174,9 @@ function generateBundle(
       createdAt: audit.createdAt,
       metadata: audit.metadata,
     },
-    validatedFields: audit.validatedFields.map(f => redactValidatedField(f, redact)),
+    validatedFields: audit.validatedFields.map(f =>
+      redactValidatedField(f, redact)
+    ),
     findings: audit.findings.map(f => redactFinding(f, redact)),
     reviewQueueReasons: audit.reviewQueueReasons,
     isRedacted: redact,
@@ -176,28 +211,35 @@ export const exportsRouter = router({
    * Generate CSV export of validated fields
    */
   validatedFieldsCSV: protectedProcedure
-    .input(z.object({
-      auditId: z.number(),
-      redacted: z.boolean().default(true), // Redacted by default
-      tab: z.enum(['all', 'passed', 'failed']).default('all'),
-    }))
+    .input(
+      z.object({
+        auditId: z.number(),
+        redacted: z.boolean().default(true), // Redacted by default
+        tab: z.enum(["all", "passed", "failed"]).default("all"),
+      })
+    )
     .query(async ({ input }) => {
       const audit = mockAuditStore.get(input.auditId);
       if (!audit) {
-        return { success: false, error: 'Audit not found', content: '' };
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Audit result not found",
+        });
       }
-      
+
       let fields = audit.validatedFields;
-      
+
       // Filter by tab
-      if (input.tab === 'passed') {
-        fields = fields.filter(f => f.status === 'passed');
-      } else if (input.tab === 'failed') {
-        fields = fields.filter(f => f.status === 'failed' || f.status === 'error');
+      if (input.tab === "passed") {
+        fields = fields.filter(f => f.status === "passed");
+      } else if (input.tab === "failed") {
+        fields = fields.filter(
+          f => f.status === "failed" || f.status === "error"
+        );
       }
-      
+
       const csv = generateValidatedFieldsCSV(fields, input.redacted);
-      
+
       return {
         success: true,
         content: csv,
@@ -210,18 +252,23 @@ export const exportsRouter = router({
    * Generate CSV export of findings
    */
   findingsCSV: protectedProcedure
-    .input(z.object({
-      auditId: z.number(),
-      redacted: z.boolean().default(true), // Redacted by default
-    }))
+    .input(
+      z.object({
+        auditId: z.number(),
+        redacted: z.boolean().default(true), // Redacted by default
+      })
+    )
     .query(async ({ input }) => {
       const audit = mockAuditStore.get(input.auditId);
       if (!audit) {
-        return { success: false, error: 'Audit not found', content: '' };
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Audit result not found",
+        });
       }
-      
+
       const csv = generateFindingsCSV(audit.findings, input.redacted);
-      
+
       return {
         success: true,
         content: csv,
@@ -234,18 +281,23 @@ export const exportsRouter = router({
    * Generate full audit bundle (JSON)
    */
   bundle: protectedProcedure
-    .input(z.object({
-      auditId: z.number(),
-      redacted: z.boolean().default(true), // Redacted by default
-    }))
+    .input(
+      z.object({
+        auditId: z.number(),
+        redacted: z.boolean().default(true), // Redacted by default
+      })
+    )
     .query(async ({ input }) => {
       const audit = mockAuditStore.get(input.auditId);
       if (!audit) {
-        return { success: false, error: 'Audit not found', content: null };
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Audit result not found",
+        });
       }
-      
+
       const bundle = generateBundle(audit, input.redacted);
-      
+
       return {
         success: true,
         content: bundle,
@@ -264,11 +316,11 @@ export const exportsRouter = router({
       if (!audit) {
         return null;
       }
-      
+
       return {
         auditId: input.auditId,
-        availableFormats: ['csv', 'json', 'bundle'] as ExportFormat[],
-        tabs: ['all', 'passed', 'failed'] as const,
+        availableFormats: ["csv", "json", "bundle"] as ExportFormat[],
+        tabs: ["all", "passed", "failed"] as const,
         defaultRedacted: true,
         fieldCount: audit.validatedFields.length,
         findingCount: audit.findings.length,
