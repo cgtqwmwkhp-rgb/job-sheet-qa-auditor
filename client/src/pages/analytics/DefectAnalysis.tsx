@@ -314,7 +314,7 @@ export default function DefectAnalysis() {
                       <TableRow key={item.jobSheetId}>
                         <TableCell>
                           <Link
-                            href={`/audits/${item.jobSheetId}`}
+                            href={`/audits?id=${item.jobSheetId}`}
                             className="text-primary hover:underline"
                           >
                             {item.referenceNumber || `JS-${item.jobSheetId}`}

@@ -394,7 +394,7 @@ export default function SiteIntelligence() {
                           <TableRow key={row.findingId}>
                             <TableCell>
                               <Link
-                                href={`/audits?jobSheetId=${row.jobSheetId}`}
+                                href={`/audits?id=${row.jobSheetId}`}
                               >
                                 <a className="text-[#2868CE] hover:underline inline-flex items-center gap-1">
                                   <FileText className="h-3.5 w-3.5" />#
