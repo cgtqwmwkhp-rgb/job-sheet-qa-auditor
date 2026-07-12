@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { protectedProcedure, router } from '../_core/trpc';
 
 /**
@@ -229,11 +230,17 @@ export const pipelineRouter = router({
     .mutation(async ({ input }) => {
       const run = pipelineStore.runs.get(input.runId);
       if (!run) {
-        return { success: false, error: 'Run not found' };
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Pipeline run not found",
+        });
       }
       
       if (run.state === 'PERSISTED' || run.state === 'FAILED') {
-        return { success: false, error: 'Run already completed' };
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot cancel: run already completed",
+        });
       }
       
       run.state = 'FAILED';

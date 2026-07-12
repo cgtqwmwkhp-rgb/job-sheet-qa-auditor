@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { protectedProcedure, router } from '../_core/trpc';
 import type { AuditResultResponse, ValidatedFieldResponse, FindingResponse } from './auditRouter';
 
@@ -184,7 +185,10 @@ export const exportsRouter = router({
     .query(async ({ input }) => {
       const audit = mockAuditStore.get(input.auditId);
       if (!audit) {
-        return { success: false, error: 'Audit not found', content: '' };
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Audit result not found",
+        });
       }
       
       let fields = audit.validatedFields;
@@ -217,7 +221,10 @@ export const exportsRouter = router({
     .query(async ({ input }) => {
       const audit = mockAuditStore.get(input.auditId);
       if (!audit) {
-        return { success: false, error: 'Audit not found', content: '' };
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Audit result not found",
+        });
       }
       
       const csv = generateFindingsCSV(audit.findings, input.redacted);
@@ -241,7 +248,10 @@ export const exportsRouter = router({
     .query(async ({ input }) => {
       const audit = mockAuditStore.get(input.auditId);
       if (!audit) {
-        return { success: false, error: 'Audit not found', content: null };
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Audit result not found",
+        });
       }
       
       const bundle = generateBundle(audit, input.redacted);

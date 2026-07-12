@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { protectedProcedure, router } from '../_core/trpc';
 import { REVIEW_QUEUE_REASON_CODES, type ReviewQueueReasonCode } from './auditRouter';
 
@@ -192,7 +193,10 @@ export const reviewQueueRouter = router({
     .mutation(async ({ input }) => {
       const item = reviewQueueStore.items.get(input.id);
       if (!item) {
-        return { success: false, error: 'Item not found' };
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Review queue item not found",
+        });
       }
       
       item.assignedTo = input.assignedTo;
@@ -213,7 +217,10 @@ export const reviewQueueRouter = router({
     .mutation(async ({ ctx, input }) => {
       const item = reviewQueueStore.items.get(input.id);
       if (!item) {
-        return { success: false, error: 'Item not found' };
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Review queue item not found",
+        });
       }
       
       item.status = 'resolved';
@@ -239,7 +246,10 @@ export const reviewQueueRouter = router({
     .mutation(async ({ input }) => {
       const item = reviewQueueStore.items.get(input.id);
       if (!item) {
-        return { success: false, error: 'Item not found' };
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Review queue item not found",
+        });
       }
       
       item.status = 'escalated';
