@@ -558,8 +558,8 @@ export default function HoldQueue() {
         )}
 
         {!isLoading && !error && holdItems.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-[calc(100vh-14rem)]">
-            <Card className="flex flex-col min-h-0 overflow-hidden border-[#EBE8E8] bg-white">
+          <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-[calc(100vh-14rem)] h-[calc(100vh-14rem)]">
+            <Card className="flex flex-col min-h-0 h-full overflow-hidden border-[#EBE8E8] bg-white">
               <CardHeader className="px-4 py-3 border-b border-[#EBE8E8] shrink-0">
                 <CardTitle className="text-base text-[#333030]">
                   Pending Reviews ({sortedFilteredItems.length}
@@ -729,20 +729,22 @@ export default function HoldQueue() {
               </CardContent>
             </Card>
 
-            <Card className="flex flex-col min-h-0 overflow-hidden p-3 border-[#EBE8E8] bg-white">
+            <Card className="flex flex-col min-h-0 h-full overflow-hidden p-0 gap-0 border-[#EBE8E8] bg-white">
               {activeId != null ? (
-                <ReviewWorkstationPane
-                  jobSheetId={activeId}
-                  compact
-                  showJobSheetActions
-                  paneRef={paneRef}
-                  onApproveJobSheet={() => handleApprove(activeId)}
-                  onRejectJobSheet={() => handleReject(activeId)}
-                  approvePending={approveJobSheet.isPending}
-                  rejectPending={updateStatus.isPending}
-                />
+                <div className="flex-1 min-h-0 h-full p-3">
+                  <ReviewWorkstationPane
+                    jobSheetId={activeId}
+                    compact
+                    showJobSheetActions
+                    paneRef={paneRef}
+                    onApproveJobSheet={() => handleApprove(activeId)}
+                    onRejectJobSheet={() => handleReject(activeId)}
+                    approvePending={approveJobSheet.isPending}
+                    rejectPending={updateStatus.isPending}
+                  />
+                </div>
               ) : (
-                <div className="flex h-full items-center justify-center">
+                <div className="flex h-full items-center justify-center p-3">
                   <EmptyState
                     icon={Inbox}
                     title="Select a job sheet"
