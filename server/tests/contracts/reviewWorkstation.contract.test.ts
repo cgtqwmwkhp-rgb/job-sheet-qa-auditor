@@ -16,6 +16,10 @@ describe("Review Workstation Contract (PR-13)", () => {
     root,
     "client/src/components/review/ReviewWorkstationPane.tsx"
   );
+  const documentViewerPath = path.join(
+    root,
+    "client/src/components/DocumentViewer.tsx"
+  );
   const keyboardPath = path.join(
     root,
     "client/src/hooks/useReviewQueueKeyboard.ts"
@@ -26,6 +30,7 @@ describe("Review Workstation Contract (PR-13)", () => {
 
   let holdQueue: string;
   let pane: string;
+  let documentViewer: string;
   let keyboard: string;
   let router: string;
   let service: string;
@@ -34,6 +39,7 @@ describe("Review Workstation Contract (PR-13)", () => {
   beforeAll(() => {
     holdQueue = fs.readFileSync(holdQueuePath, "utf-8");
     pane = fs.readFileSync(panePath, "utf-8");
+    documentViewer = fs.readFileSync(documentViewerPath, "utf-8");
     keyboard = fs.readFileSync(keyboardPath, "utf-8");
     router = fs.readFileSync(routerPath, "utf-8");
     service = fs.readFileSync(servicePath, "utf-8");
@@ -147,6 +153,14 @@ describe("Review Workstation Contract (PR-13)", () => {
         const content = fs.readFileSync(path.join(drizzleDir, f), "utf-8");
         expect(content.toLowerCase()).not.toContain("field_correction");
       }
+    });
+  });
+  describe("DocumentViewer PDF iframe open params", () => {
+    it("does not use Chromium-invalid zoom=page-width or focus= hash params", () => {
+      expect(documentViewer).not.toMatch(/zoom=\$\{[^}]*page-width/);
+      expect(documentViewer).not.toContain("zoom=page-width");
+      expect(documentViewer).not.toMatch(/&focus=\$\{focusNonce\}/);
+      expect(documentViewer).toContain("hashParts");
     });
   });
 });

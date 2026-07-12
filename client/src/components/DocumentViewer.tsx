@@ -258,9 +258,16 @@ export function DocumentViewer({
       : null;
   const headerFocusLabel = focusLabel || activeBox?.label || null;
   const pageSize = pageSizes[pageNumber];
-  // When we know a region, ask the native PDF viewer to open at that point.
-  // zoom=scale,left,top uses PDF user-space units (origin top-left in Chromium).
-  let zoomParam: string;
+  // Chromium's built-in PDF viewer only accepts numeric zoom (or zoom,left,top).
+  // Named values like "page-width" and non-standard "focus=" blank the iframe.
+  // Remounting is handled by the iframe `key` (includes focusNonce) — keep the
+  // fragment limited to documented open parameters.
+  const hashParts = [
+    "toolbar=1",
+    "navpanes=0",
+    "scrollbar=1",
+    `page=${pageNumber}`,
+  ];
   if (
     activeBox &&
     activeBox.page === pageNumber &&
@@ -270,16 +277,11 @@ export function DocumentViewer({
     const left = Math.round((activeBox.x / 100) * pageSize.width);
     const top = Math.round((activeBox.y / 100) * pageSize.height);
     const scalePct = scale === "page-width" ? 100 : Math.round(scale * 100);
-    zoomParam = `${scalePct},${left},${top}`;
-  } else {
-    zoomParam =
-      scale === "page-width" ? "page-width" : String(Math.round(scale * 100));
+    hashParts.push(`zoom=${scalePct},${left},${top}`);
+  } else if (scale !== "page-width") {
+    hashParts.push(`zoom=${Math.round(scale * 100)}`);
   }
-  // Include focusNonce so re-clicking the same finding remounts the iframe
-  // and the browser PDF viewer re-applies #page= / #zoom=.
-  const iframeSrc = pdfFile
-    ? `${pdfFile}#toolbar=1&navpanes=0&scrollbar=1&page=${pageNumber}&zoom=${zoomParam}&focus=${focusNonce}`
-    : null;
+  const iframeSrc = pdfFile ? `${pdfFile}#${hashParts.join("&")}` : null;
 
   return (
     <Card className="flex flex-col h-full min-h-0 overflow-hidden border-0 shadow-none rounded-none bg-white">
@@ -393,23 +395,27 @@ export function DocumentViewer({
         </div>
       </CardHeader>
 
-      <div className="flex-1 bg-white overflow-hidden relative min-h-0">
+      <div className="flex-1 bg-muted/30 overflow-hidden relative min-h-0">
         {pdfLoadError && !pdfFile ? (
-          <div className="flex flex-col items-center justify-center h-full w-full text-destructive px-4 text-center">
+          <div className="flex flex-col items-center justify-center h-full w-full min-h-[240px] text-destructive px-4 text-center">
             <p>Failed to load document.</p>
-            <p className="text-xs mt-2">{pdfLoadError}</p>
+            <p className="text-xs mt-2 text-muted-foreground">{pdfLoadError}</p>
           </div>
         ) : !iframeSrc ? (
-          <div className="flex items-center justify-center h-full w-full min-h-[240px] bg-white">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <div className="flex items-center justify-center h-full w-full min-h-[240px] bg-muted/20">
+            <div
+              className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"
+              role="status"
+              aria-label="Loading PDF"
+            />
           </div>
         ) : (
           <div
-            className="relative w-full h-full min-h-0 bg-white"
+            className="relative w-full h-full min-h-[240px] bg-muted/20"
             ref={containerRef}
           >
             <iframe
-              key={`${iframeSrc}::${focusNonce}`}
+              key={`pdf-${pageNumber}-${focusNonce}-${scale === "page-width" ? "fit" : scale}`}
               title="PDF document"
               src={iframeSrc}
               className="absolute inset-0 w-full h-full border-0 bg-white"
