@@ -308,6 +308,7 @@ export function DocumentViewer({
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Previous page"
               className="h-8 w-8"
               onClick={() => handlePageChange(Math.max(1, pageNumber - 1))}
               disabled={pageNumber <= 1}
@@ -320,6 +321,7 @@ export function DocumentViewer({
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Next page"
               className="h-8 w-8"
               onClick={() =>
                 handlePageChange(Math.min(numPages || 1, pageNumber + 1))
@@ -334,6 +336,7 @@ export function DocumentViewer({
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Zoom out"
               className="h-8 w-8"
               onClick={() =>
                 setScale(s => {
@@ -350,6 +353,7 @@ export function DocumentViewer({
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Zoom in"
               className="h-8 w-8"
               onClick={() =>
                 setScale(s => {
@@ -366,6 +370,11 @@ export function DocumentViewer({
             <Button
               variant={isDrawing ? "secondary" : "ghost"}
               size="icon"
+              aria-label={
+                isDrawing
+                  ? "Done drawing — PDF controls re-enabled"
+                  : "Draw box (temporarily locks PDF controls)"
+              }
               className="h-8 w-8"
               onClick={() => setIsDrawing(!isDrawing)}
               title={

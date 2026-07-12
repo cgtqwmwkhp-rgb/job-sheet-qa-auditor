@@ -1,4 +1,5 @@
 import { AnalyticsLayout } from "./AnalyticsLayout";
+import { AnalyticsSkeleton } from "@/components/ui/loading-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -99,12 +100,7 @@ export default function SiteIntelligence() {
         title="Site & Cohort Intelligence"
         description="Compare audit quality by site, asset type, and work type."
       >
-        <div className="flex items-center justify-center h-[50vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-muted-foreground">
-            Loading cohort analytics...
-          </span>
-        </div>
+        <AnalyticsSkeleton />
       </AnalyticsLayout>
     );
   }

@@ -1,4 +1,5 @@
 import { AnalyticsLayout } from "./AnalyticsLayout";
+import { AnalyticsSkeleton } from "@/components/ui/loading-skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -15,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AlertTriangle, Activity, Loader2, Target } from "lucide-react";
+import { AlertTriangle, Activity, Target } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAnalyticsFilters } from "@/hooks/useAnalyticsFilters";
 import { useMemo } from "react";
@@ -85,12 +86,7 @@ export default function DriftDetection() {
         title="Drift Detection"
         description="EWMA/CUSUM on defect-rate series with confidence calibration."
       >
-        <div className="flex items-center justify-center h-[50vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-muted-foreground">
-            Loading drift analytics...
-          </span>
-        </div>
+        <AnalyticsSkeleton />
       </AnalyticsLayout>
     );
   }

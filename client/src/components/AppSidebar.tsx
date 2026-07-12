@@ -73,9 +73,9 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-      <SidebarHeader className="h-14 flex items-center justify-center border-b border-sidebar-border bg-primary px-2">
+      <SidebarHeader className="flex h-14 items-center justify-center border-b border-sidebar-border bg-primary px-2">
         <BrandLogo
-          className="px-1 w-full text-primary-foreground"
+          className="w-full px-1 text-primary-foreground"
           markClassName="h-7 w-7 rounded-md bg-white/90 p-0.5"
           subtitle="Job Sheet QA"
         />
@@ -96,19 +96,18 @@ export function AppSidebar() {
                       isActive={active}
                       tooltip={item.title}
                       className={cn(
-                        "relative mx-1 rounded-lg text-sm text-[#706D6D] hover:bg-[#F5F4F4] hover:text-[#333030]",
+                        "relative mx-1 rounded-lg border-l-[3px] border-transparent text-sm text-[#706D6D] transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4] hover:text-[#333030]",
                         active &&
-                          "bg-[rgba(190,218,65,0.15)] font-medium text-[#333030] hover:bg-[rgba(190,218,65,0.22)] hover:text-[#333030]"
+                          "border-l-primary bg-[rgba(190,218,65,0.15)] font-semibold text-[#333030] hover:bg-[rgba(190,218,65,0.22)] hover:text-[#333030]"
                       )}
                     >
                       <Link href={item.url}>
-                        {active ? (
-                          <span
-                            className="absolute left-0 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-primary"
-                            aria-hidden
-                          />
-                        ) : null}
-                        <item.icon className="size-4 stroke-[1.5]" />
+                        <item.icon
+                          className={cn(
+                            "size-4 stroke-[1.5] transition-colors duration-[var(--duration-normal)]",
+                            active ? "text-primary" : "text-[#8A8787]"
+                          )}
+                        />
                         <span>{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -125,7 +124,12 @@ export function AppSidebar() {
             <SidebarMenuButton
               asChild
               tooltip="Help & Resources"
-              className="mx-1 rounded-lg text-[#706D6D] hover:bg-[#F5F4F4] hover:text-[#333030]"
+              isActive={isActive("/help")}
+              className={cn(
+                "mx-1 rounded-lg border-l-[3px] border-transparent text-[#706D6D] transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4] hover:text-[#333030]",
+                isActive("/help") &&
+                  "border-l-primary bg-[rgba(190,218,65,0.15)] font-semibold text-[#333030]"
+              )}
             >
               <Link href="/help">
                 <HelpCircle className="size-4 stroke-[1.5]" />
@@ -139,9 +143,9 @@ export function AppSidebar() {
               tooltip="Settings"
               isActive={isActive("/settings")}
               className={cn(
-                "mx-1 rounded-lg text-[#706D6D] hover:bg-[#F5F4F4] hover:text-[#333030]",
+                "mx-1 rounded-lg border-l-[3px] border-transparent text-[#706D6D] transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4] hover:text-[#333030]",
                 isActive("/settings") &&
-                  "bg-[rgba(190,218,65,0.15)] font-medium text-[#333030]"
+                  "border-l-primary bg-[rgba(190,218,65,0.15)] font-semibold text-[#333030]"
               )}
             >
               <Link href="/settings">

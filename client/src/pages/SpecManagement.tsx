@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ListSkeleton } from "@/components/ui/loading-skeleton";
 import {
   Edit,
   FileJson,
@@ -149,8 +150,8 @@ export default function SpecManagement() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-6 max-w-7xl mx-auto">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-border/50">
           <div>
             <h1 className="text-3xl font-heading font-bold tracking-tight">
               Spec Management
@@ -159,7 +160,10 @@ export default function SpecManagement() {
               Manage Gold Standard specifications and validation rules.
             </p>
           </div>
-          <Button onClick={() => setCreateDialogOpen(true)}>
+          <Button
+            onClick={() => setCreateDialogOpen(true)}
+            className="shrink-0"
+          >
             <Plus className="w-4 h-4 mr-2" />
             Create New Spec
           </Button>
@@ -167,7 +171,7 @@ export default function SpecManagement() {
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left Panel: Spec List */}
-          <Card className="lg:col-span-1 h-fit">
+          <Card className="lg:col-span-1 lg:sticky lg:top-6 lg:self-start">
             <CardHeader>
               <CardTitle>Specifications</CardTitle>
               <CardDescription>
@@ -176,11 +180,9 @@ export default function SpecManagement() {
             </CardHeader>
             <CardContent className="p-0">
               {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
+                <ListSkeleton items={4} />
               ) : specs && specs.length > 0 ? (
-                <div className="divide-y">
+                <div className="max-h-[min(70vh,640px)] overflow-auto divide-y">
                   {specs.map(spec => (
                     <div
                       key={spec.id}
@@ -230,12 +232,24 @@ export default function SpecManagement() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileJson className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No specifications found.</p>
-                  <p className="text-sm">
-                    Create your first spec to get started.
+                <div className="text-center py-12 px-6 text-muted-foreground">
+                  <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-muted/60 flex items-center justify-center">
+                    <FileJson className="h-7 w-7 opacity-60" />
+                  </div>
+                  <p className="font-medium text-foreground">
+                    No specifications yet
                   </p>
+                  <p className="text-sm mt-1">
+                    Create your first Gold Standard spec to define validation
+                    rules for job sheet audits.
+                  </p>
+                  <Button
+                    onClick={() => setCreateDialogOpen(true)}
+                    className="mt-4"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create First Spec
+                  </Button>
                 </div>
               )}
             </CardContent>
@@ -403,11 +417,16 @@ export default function SpecManagement() {
                   </Accordion>
                 </div>
               ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <FileJson className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>No specification selected</p>
-                  <p className="text-sm">
-                    Select a spec from the list or create a new one.
+                <div className="text-center py-16 px-6 text-muted-foreground">
+                  <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-muted/60 flex items-center justify-center">
+                    <FileJson className="h-7 w-7 opacity-60" />
+                  </div>
+                  <p className="font-medium text-foreground">
+                    No specification selected
+                  </p>
+                  <p className="text-sm mt-1">
+                    Select a spec from the list or create a new one to view and
+                    edit validation rules.
                   </p>
                 </div>
               )}

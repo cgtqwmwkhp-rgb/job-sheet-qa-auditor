@@ -1,4 +1,5 @@
 import { AnalyticsLayout } from "./AnalyticsLayout";
+import { AnalyticsSkeleton } from "@/components/ui/loading-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -94,14 +95,7 @@ export default function DefectAnalysis() {
         title="Exception Management"
         description="Review SLAs, hold-queue ageing, and per-rule overturn rates."
       >
-        <Card className="p-12">
-          <div className="flex flex-col items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">
-              Loading exception analytics...
-            </p>
-          </div>
-        </Card>
+        <AnalyticsSkeleton />
       </AnalyticsLayout>
     );
   }

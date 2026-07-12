@@ -1,4 +1,5 @@
 import { AnalyticsLayout } from "./AnalyticsLayout";
+import { AnalyticsSkeleton } from "@/components/ui/loading-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,11 +23,13 @@ import {
   BarChart3,
   CheckCircle2,
   FileText,
+  GraduationCap,
   Loader2,
+  Minus,
   TrendingDown,
   TrendingUp,
+  Upload,
   Users,
-  Minus,
 } from "lucide-react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -158,12 +161,7 @@ export default function TechnicianPerformance() {
         title="Technician Performance"
         description="Track and compare technician quality metrics."
       >
-        <div className="flex items-center justify-center h-[50vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-muted-foreground">
-            Loading engineer analytics...
-          </span>
-        </div>
+        <AnalyticsSkeleton />
       </AnalyticsLayout>
     );
   }
@@ -199,22 +197,27 @@ export default function TechnicianPerformance() {
         title="Technician Performance"
         description="Track and compare technician quality metrics."
       >
-        <Card className="p-8 md:p-12">
-          <div className="flex flex-col items-center text-center gap-4">
-            <Users className="h-16 w-16 text-muted-foreground" />
-            <div>
-              <h2 className="text-xl font-semibold mb-2">
+        <Card className="p-8 md:p-12 border-dashed">
+          <div className="flex flex-col items-center text-center gap-6 max-w-2xl mx-auto">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+              <Users className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold">
                 No Technician Attribution Yet
               </h2>
-              <p className="text-muted-foreground max-w-xl mx-auto">
+              <p className="text-muted-foreground">
                 Scorecards need each job card linked to a technician user. OCR
-                often prints names like <code>Richard.Newton</code> — we now
-                match those to users named Richard Newton, emails, or create a
-                technician account from the OCR name.
+                often prints names like{" "}
+                <code className="text-sm bg-muted px-1.5 py-0.5 rounded">
+                  Richard.Newton
+                </code>{" "}
+                — we match those to users named Richard Newton, emails, or
+                create a technician account from the OCR name.
               </p>
               {unattributedCount > 0 && (
-                <p className="text-sm text-amber-800 mt-3">
-                  {unattributedCount} processed card
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200/80 rounded-lg px-3 py-2 mt-3">
+                  <strong>{unattributedCount}</strong> processed card
                   {unattributedCount === 1 ? "" : "s"} in this period have no
                   technician assigned
                   {attributionGap
@@ -225,7 +228,7 @@ export default function TechnicianPerformance() {
               )}
             </div>
 
-            <div className="flex flex-wrap justify-center gap-2">
+            <div className="flex flex-wrap justify-center gap-2 w-full">
               <Button
                 type="button"
                 disabled={busy}
@@ -262,15 +265,19 @@ export default function TechnicianPerformance() {
                 Create missing users + backfill
               </Button>
               <Link href="/upload">
-                <Button type="button" variant="outline">
+                <Button type="button" variant="outline" className="gap-2">
+                  <Upload className="h-4 w-4" />
                   Upload with technician
                 </Button>
               </Link>
             </div>
 
-            <div className="w-full max-w-3xl text-left mt-2">
-              <p className="text-sm font-medium mb-2">
-                OCR names found on unattributed cards
+            <div className="w-full text-left border-t border-border pt-6 mt-2">
+              <p className="text-sm font-semibold mb-1">
+                OCR names on unattributed cards
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Resolve matches below to unlock scorecards and coaching packs.
               </p>
               {gapLoading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
@@ -426,7 +433,10 @@ export default function TechnicianPerformance() {
                 <Link
                   href={`/analytics/technicians/${selectedEngineerId}/coaching`}
                 >
-                  <Button size="sm">Open coaching pack</Button>
+                  <Button size="sm" className="gap-2 print:hidden">
+                    <GraduationCap className="h-4 w-4" />
+                    Open coaching pack
+                  </Button>
                 </Link>
               </div>
 
@@ -783,12 +793,12 @@ export default function TechnicianPerformance() {
           </Card>
         </div>
 
-        <Card>
+        <Card className="print:shadow-none">
           <CardHeader>
             <CardTitle>Leaderboard</CardTitle>
             <CardDescription>
-              Click a technician for scorecard and drill-through, or open
-              coaching directly from the row.
+              Click a row for the scorecard and drill-through, or open a
+              coaching pack directly.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -828,16 +838,19 @@ export default function TechnicianPerformance() {
                     <TableCell className="text-sm text-muted-foreground">
                       {row.topIssueType ?? "—"}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right print:hidden">
                       <Link
                         href={`/analytics/technicians/${row.engineerId}/coaching`}
                       >
-                        <a
-                          className="text-sm font-medium text-primary hover:underline"
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 text-xs"
                           onClick={e => e.stopPropagation()}
                         >
-                          Pack
-                        </a>
+                          <GraduationCap className="h-3.5 w-3.5" />
+                          Open coaching pack
+                        </Button>
                       </Link>
                     </TableCell>
                   </TableRow>

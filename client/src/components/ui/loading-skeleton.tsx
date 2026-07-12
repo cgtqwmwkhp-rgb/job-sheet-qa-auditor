@@ -157,6 +157,33 @@ export function StatCardSkeleton() {
 }
 
 /**
+ * Analytics page skeleton (KPI cards + chart placeholder).
+ * Mirrors the layout most analytics pages settle into once loaded, so the
+ * transition from loading → loaded doesn't cause a layout jump.
+ */
+export function AnalyticsSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCardSkeleton />
+        <StatCardSkeleton />
+        <StatCardSkeleton />
+        <StatCardSkeleton />
+      </div>
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-56" />
+          <Skeleton className="h-4 w-72 mt-2" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-64 w-full rounded-lg" />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/**
  * Dashboard skeleton (stats grid + table)
  */
 export function DashboardSkeleton() {

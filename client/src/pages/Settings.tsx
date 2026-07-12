@@ -34,13 +34,69 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
+import { useMemo, useState } from "react";
+
+const SETTINGS_TABS = [
+  "notifications",
+  "email-templates",
+  "ai-persona",
+  "processing",
+  "audit-policy",
+  "general",
+  "appearance",
+  "security",
+  "api-costs",
+] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+const settingsNavTriggerClass =
+  "w-full shrink-0 justify-start gap-3 whitespace-nowrap px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:font-semibold hover:bg-muted/50";
+
+function SettingsNavSection({ label }: { label: string }) {
+  return (
+    <div className="hidden pt-4 pb-1.5 px-4 first:pt-0 md:block">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+/** Deep-linkable tab: `/settings?tab=api-costs` opens straight on a section —
+ * one click from anywhere in the app instead of landing on Notifications first. */
+function useSettingsTabFromUrl(canViewApiCosts: boolean) {
+  const search = useSearch();
+  const initialTab = useMemo<SettingsTab>(() => {
+    const requested = new URLSearchParams(search).get("tab");
+    if (
+      requested &&
+      (SETTINGS_TABS as readonly string[]).includes(requested) &&
+      (requested !== "api-costs" || canViewApiCosts)
+    ) {
+      return requested as SettingsTab;
+    }
+    return "notifications";
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- read once on mount
+  }, []);
+  const [tab, setTabState] = useState<SettingsTab>(initialTab);
+
+  const setTab = (value: string) => {
+    setTabState(value as SettingsTab);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", value);
+    window.history.replaceState(null, "", url.toString());
+  };
+
+  return [tab, setTab] as const;
+}
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
   // Settings is already admin/qa_lead gated; cost tracking is visible to both.
   const { hasRole } = useAuth();
   const canViewApiCosts = hasRole(["admin", "qa_lead"]);
+  const [activeTab, setActiveTab] = useSettingsTabFromUrl(canViewApiCosts);
 
   return (
     <DashboardLayout>
@@ -65,78 +121,88 @@ export default function Settings() {
           </p>
         </div>
 
-        <Tabs defaultValue="notifications" className="w-full">
-          <div className="flex flex-col md:flex-row gap-8">
-            <aside className="w-full md:w-64 shrink-0">
-              <TabsList className="flex flex-col h-auto w-full bg-transparent p-0 gap-1.5">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="flex flex-col gap-4 md:flex-row md:gap-8">
+            <aside className="w-full shrink-0 md:w-64 md:sticky md:top-6 md:self-start">
+              <TabsList className="flex h-auto w-full flex-row gap-1 overflow-x-auto rounded-lg border border-border/50 bg-muted/30 p-1.5 md:flex-col md:gap-0.5 md:overflow-visible md:p-2">
+                <SettingsNavSection label="Communications" />
                 <TabsTrigger
                   value="notifications"
-                  className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
+                  className={settingsNavTriggerClass}
                 >
-                  <Bell className="w-4 h-4 mr-3" />
+                  <Bell className="w-4 h-4 shrink-0" />
                   Notifications
                 </TabsTrigger>
                 <TabsTrigger
                   value="email-templates"
-                  className="w-full justify-start px-4 py-2 data-[state=active]:bg-muted data-[state=active]:text-foreground"
+                  className={settingsNavTriggerClass}
                 >
-                  <Mail className="w-4 h-4 mr-2" />
+                  <Mail className="w-4 h-4 shrink-0" />
                   Email Templates
                 </TabsTrigger>
+
+                <SettingsNavSection label="AI & Auditing" />
                 <TabsTrigger
                   value="ai-persona"
-                  className="w-full justify-start px-4 py-2 data-[state=active]:bg-muted data-[state=active]:text-foreground"
+                  className={settingsNavTriggerClass}
                 >
-                  <BrainCircuit className="w-4 h-4 mr-2" />
+                  <BrainCircuit className="w-4 h-4 shrink-0" />
                   AI Auditor Persona
                 </TabsTrigger>
                 <TabsTrigger
-                  value="general"
-                  className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
-                >
-                  <Globe className="w-4 h-4 mr-3" />
-                  General
-                </TabsTrigger>
-                <TabsTrigger
-                  value="appearance"
-                  className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
-                >
-                  <Palette className="w-4 h-4 mr-3" />
-                  Appearance
-                </TabsTrigger>
-                <TabsTrigger
                   value="processing"
-                  className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
+                  className={settingsNavTriggerClass}
                 >
-                  <Cpu className="w-4 h-4 mr-3" />
+                  <Cpu className="w-4 h-4 shrink-0" />
                   Processing
                 </TabsTrigger>
                 <TabsTrigger
                   value="audit-policy"
-                  className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
+                  className={settingsNavTriggerClass}
                 >
-                  <ShieldAlert className="w-4 h-4 mr-3" />
+                  <ShieldAlert className="w-4 h-4 shrink-0" />
                   Audit Policy
+                </TabsTrigger>
+
+                <SettingsNavSection label="Platform" />
+                <TabsTrigger
+                  value="general"
+                  className={settingsNavTriggerClass}
+                >
+                  <Globe className="w-4 h-4 shrink-0" />
+                  General
+                </TabsTrigger>
+                <TabsTrigger
+                  value="appearance"
+                  className={settingsNavTriggerClass}
+                >
+                  <Palette className="w-4 h-4 shrink-0" />
+                  Appearance
                 </TabsTrigger>
                 <TabsTrigger
                   value="security"
-                  className="w-full justify-start px-4 py-2 data-[state=active]:bg-muted data-[state=active]:text-foreground"
+                  className={settingsNavTriggerClass}
                 >
-                  <Shield className="w-4 h-4 mr-2" />
+                  <Shield className="w-4 h-4 shrink-0" />
                   Security
                 </TabsTrigger>
+
                 {canViewApiCosts ? (
                   <>
-                    <div className="pt-3 pb-1 px-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <div className="mx-2 my-2 hidden border-t border-border/60 md:block" />
+                    <div className="hidden rounded-md border border-primary/15 bg-primary/5 px-4 py-2 md:block">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
                         FinOps
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        API spend &amp; budgets
                       </p>
                     </div>
                     <TabsTrigger
                       value="api-costs"
-                      className="w-full justify-start px-4 py-2.5 text-sm font-medium rounded-md transition-all data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted/50"
+                      className={`${settingsNavTriggerClass} md:mt-1`}
                     >
-                      <DollarSign className="w-4 h-4 mr-3" />
+                      <DollarSign className="w-4 h-4 shrink-0" />
                       API Costs
                     </TabsTrigger>
                   </>

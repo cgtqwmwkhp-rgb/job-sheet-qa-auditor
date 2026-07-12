@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TableSkeleton } from "@/components/ui/loading-skeleton";
 import {
   Select,
   SelectContent,
@@ -43,14 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Loader2,
-  MoreHorizontal,
-  Search,
-  Shield,
-  User,
-  UserPlus,
-} from "lucide-react";
+import { MoreHorizontal, Search, Shield, User, UserPlus } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -109,8 +103,8 @@ export default function UserManagement() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-6 max-w-7xl mx-auto">
+        <div className="pb-4 border-b border-border/50 space-y-4">
           <div>
             <h1 className="text-3xl font-heading font-bold tracking-tight">
               User Management
@@ -119,59 +113,64 @@ export default function UserManagement() {
               Manage user access, roles, and permissions.
             </p>
           </div>
-          <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="w-4 h-4 mr-2" />
-                Invite User
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Invite New User</DialogTitle>
-                <DialogDescription>
-                  Send an invitation to a new team member. They will receive an
-                  email to set up their account.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input id="email" placeholder="colleague@company.com" />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="role">Role</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Administrator</SelectItem>
-                      <SelectItem value="qa_lead">QA Lead</SelectItem>
-                      <SelectItem value="technician">Technician</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsInviteOpen(false)}
-                >
-                  Cancel
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              {totalUsers} {totalUsers === 1 ? "user" : "users"} registered
+            </p>
+            <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+              <DialogTrigger asChild>
+                <Button className="shrink-0">
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Invite User
                 </Button>
-                <Button
-                  onClick={() => {
-                    toast.info("User invitation feature coming soon");
-                    setIsInviteOpen(false);
-                  }}
-                >
-                  Send Invitation
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Invite New User</DialogTitle>
+                  <DialogDescription>
+                    Send an invitation to a new team member. They will receive
+                    an email to set up their account.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="email">Email Address</Label>
+                    <Input id="email" placeholder="colleague@company.com" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="role">Role</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Administrator</SelectItem>
+                        <SelectItem value="qa_lead">QA Lead</SelectItem>
+                        <SelectItem value="technician">Technician</SelectItem>
+                        <SelectItem value="viewer">Viewer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsInviteOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      toast.info("User invitation feature coming soon");
+                      setIsInviteOpen(false);
+                    }}
+                  >
+                    Send Invitation
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <div className="grid gap-6 md:grid-cols-4">
@@ -190,7 +189,7 @@ export default function UserManagement() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Now</CardTitle>
-              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              <div className="h-2 w-2 rounded-full bg-brand-lime animate-pulse" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{activeUsers}</div>
@@ -231,12 +230,16 @@ export default function UserManagement() {
           <CardHeader className="px-6 py-4 border-b flex flex-row items-center justify-between">
             <div className="flex items-center gap-2">
               <CardTitle className="text-base">Users</CardTitle>
-              <Badge variant="secondary">All Users</Badge>
+              <Badge variant="secondary">
+                {searchTerm
+                  ? `${filteredUsers.length} of ${totalUsers}`
+                  : `${filteredUsers.length} ${filteredUsers.length === 1 ? "user" : "users"}`}
+              </Badge>
             </div>
             <div className="relative w-64">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search users..."
+                placeholder="Search by name or email..."
                 className="pl-8 h-9"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
@@ -245,100 +248,128 @@ export default function UserManagement() {
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <div className="p-4">
+                <TableSkeleton rows={6} columns={5} />
               </div>
             ) : filteredUsers.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last Active</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map(user => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">
-                            {user.name || "Unknown User"}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {user.email || "No email"}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {user.role === "admin" && (
-                            <Shield className="w-3 h-3 text-primary" />
-                          )}
-                          <span className="capitalize">
-                            {user.role?.replace("_", " ") || "User"}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={user.lastSignedIn ? "default" : "secondary"}
-                        >
-                          {user.lastSignedIn ? "active" : "inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {user.lastSignedIn
-                          ? formatDistanceToNow(new Date(user.lastSignedIn), {
-                              addSuffix: true,
-                            })
-                          : "Never"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem
-                              onClick={() => handleRoleChange(user.id, "admin")}
-                            >
-                              Make Admin
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleRoleChange(user.id, "qa_lead")
-                              }
-                            >
-                              Make QA Lead
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleRoleChange(user.id, "technician")
-                              }
-                            >
-                              Make Technician
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
-                              Deactivate User
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+              <div className="max-h-[min(70vh,640px)] overflow-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="pl-6">Name</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last Active</TableHead>
+                      <TableHead className="text-right pr-6">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.map(user => (
+                      <TableRow key={user.id}>
+                        <TableCell className="pl-6">
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {user.name || "Unknown User"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {user.email || "No email"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {user.role === "admin" && (
+                              <Shield className="w-3 h-3 text-primary" />
+                            )}
+                            <span className="capitalize">
+                              {user.role?.replace("_", " ") || "User"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              user.lastSignedIn ? "default" : "secondary"
+                            }
+                          >
+                            {user.lastSignedIn ? "active" : "inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {user.lastSignedIn
+                            ? formatDistanceToNow(new Date(user.lastSignedIn), {
+                                addSuffix: true,
+                              })
+                            : "Never"}
+                        </TableCell>
+                        <TableCell className="text-right pr-6">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Actions for ${user.name || user.email}`}
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleRoleChange(user.id, "admin")
+                                }
+                              >
+                                Make Admin
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleRoleChange(user.id, "qa_lead")
+                                }
+                              >
+                                Make QA Lead
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleRoleChange(user.id, "technician")
+                                }
+                              >
+                                Make Technician
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive">
+                                Deactivate User
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                <User className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No users found.</p>
+              <div className="text-center py-16 px-6 text-muted-foreground">
+                <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-muted/60 flex items-center justify-center">
+                  <User className="h-7 w-7 opacity-60" />
+                </div>
+                <p className="font-medium text-foreground">
+                  {searchTerm ? "No matching users" : "No users yet"}
+                </p>
+                <p className="text-sm mt-1">
+                  {searchTerm
+                    ? `No results for "${searchTerm}". Try a different name or email.`
+                    : "Invite team members to give them access to the platform."}
+                </p>
+                {!searchTerm && (
+                  <Button
+                    onClick={() => setIsInviteOpen(true)}
+                    className="mt-4"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Invite First User
+                  </Button>
+                )}
               </div>
             )}
           </CardContent>

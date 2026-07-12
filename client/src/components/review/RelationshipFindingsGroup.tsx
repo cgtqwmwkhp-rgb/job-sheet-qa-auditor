@@ -47,24 +47,24 @@ export function RelationshipFindingsGroup({
   if (findings.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-indigo-200 bg-indigo-50/30 overflow-hidden">
+    <div className="rounded-lg border border-amber-200 bg-amber-50/30 overflow-hidden">
       <button
         type="button"
-        className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-indigo-50/60 transition-colors"
+        className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-amber-50/60 transition-colors"
         onClick={() => setExpanded(v => !v)}
       >
         {expanded ? (
-          <ChevronDown className="w-4 h-4 text-indigo-600 shrink-0" />
+          <ChevronDown className="w-4 h-4 text-amber-700 shrink-0" />
         ) : (
-          <ChevronRight className="w-4 h-4 text-indigo-600 shrink-0" />
+          <ChevronRight className="w-4 h-4 text-amber-700 shrink-0" />
         )}
-        <Link2 className="w-4 h-4 text-indigo-600 shrink-0" />
-        <span className="text-xs font-semibold text-indigo-700">
+        <Link2 className="w-4 h-4 text-amber-700 shrink-0" />
+        <span className="text-xs font-semibold text-amber-800">
           Outcome consistency
         </span>
         <Badge
           variant="secondary"
-          className="ml-auto text-[10px] px-1.5 bg-indigo-100 text-indigo-700 border-indigo-200"
+          className="ml-auto text-[10px] px-1.5 bg-amber-100 text-amber-800 border-amber-200"
         >
           {findings.length}
         </Badge>

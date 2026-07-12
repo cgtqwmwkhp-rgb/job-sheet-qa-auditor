@@ -1,4 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { EmptyState } from "@/components/EmptyState";
 import { ReviewWorkstationPane } from "@/components/review/ReviewWorkstationPane";
 import { ReviewShortcutsLegend } from "@/components/review/ReviewShortcutsLegend";
 import { Badge } from "@/components/ui/badge";
@@ -10,23 +11,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   AlertCircle,
   CheckCircle2,
   Clock,
+  ExternalLink,
   Filter,
   Keyboard,
   Loader2,
-  MoreHorizontal,
   Search,
   XCircle,
   Inbox,
@@ -39,8 +32,23 @@ import { useReviewQueueKeyboard } from "@/hooks/useReviewQueueKeyboard";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { deriveReasonChips } from "@/components/review/holdQueueReasons";
 import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
+import { cn } from "@/lib/utils";
 
 type FilterChip = "all" | "critical";
+
+type HoldItem = {
+  id: number;
+  referenceNumber: string;
+  technician: string;
+  site: string;
+  date: string;
+  severity: "critical" | "warning" | "info";
+  status: "pending";
+  fileName: string;
+  slaBreached: boolean;
+  ageHours?: number;
+  hoursUntilBreach?: number;
+};
 
 function HoldItemReasonChips({ jobSheetId }: { jobSheetId: number }) {
   const { data: auditResult } = trpc.audits.getByJobSheet.useQuery(
@@ -70,7 +78,7 @@ function HoldItemReasonChips({ jobSheetId }: { jobSheetId: number }) {
   }, [findings, auditResult]);
 
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1 min-w-0">
       {chips.map(chip => (
         <Badge
           key={chip.key}
@@ -82,6 +90,24 @@ function HoldItemReasonChips({ jobSheetId }: { jobSheetId: number }) {
       ))}
     </div>
   );
+}
+
+function priorityBorderClass(item: HoldItem): string {
+  if (item.slaBreached) return "border-l-[#DC2626]";
+  if (item.severity === "critical") return "border-l-[#333030]";
+  return "border-l-[#EBE8E8]";
+}
+
+function sortByPriority(items: HoldItem[]): HoldItem[] {
+  return [...items].sort((a, b) => {
+    if (a.slaBreached !== b.slaBreached) return a.slaBreached ? -1 : 1;
+    const aCritical = a.severity === "critical";
+    const bCritical = b.severity === "critical";
+    if (aCritical !== bCritical) return aCritical ? -1 : 1;
+    const aAge = a.ageHours ?? 0;
+    const bAge = b.ageHours ?? 0;
+    return bAge - aAge;
+  });
 }
 
 export default function HoldQueue() {
@@ -173,18 +199,23 @@ export default function HoldQueue() {
     });
   }, [holdItems, searchQuery, filterChip]);
 
+  const sortedFilteredItems = useMemo(
+    () => sortByPriority(filteredItems),
+    [filteredItems]
+  );
+
   const totalItems = holdItems.length;
 
   const activeId = useMemo(() => {
-    if (filteredItems.length === 0) return null;
+    if (sortedFilteredItems.length === 0) return null;
     if (
       selectedId != null &&
-      filteredItems.some(item => item.id === selectedId)
+      sortedFilteredItems.some(item => item.id === selectedId)
     ) {
       return selectedId;
     }
-    return filteredItems[0].id;
-  }, [filteredItems, selectedId]);
+    return sortedFilteredItems[0].id;
+  }, [sortedFilteredItems, selectedId]);
 
   const showApproveUndo = (jobSheetId: number, previousStatus: string) => {
     toast.success("Job sheet approved", {
@@ -226,9 +257,11 @@ export default function HoldQueue() {
             return next;
           });
           if (selectedId === jobSheetId) {
-            const idx = filteredItems.findIndex(i => i.id === jobSheetId);
+            const idx = sortedFilteredItems.findIndex(i => i.id === jobSheetId);
             const nextItem =
-              filteredItems[idx + 1] ?? filteredItems[idx - 1] ?? null;
+              sortedFilteredItems[idx + 1] ??
+              sortedFilteredItems[idx - 1] ??
+              null;
             setSelectedId(nextItem?.id ?? null);
           }
           showApproveUndo(jobSheetId, result.previousStatus);
@@ -245,9 +278,11 @@ export default function HoldQueue() {
         onSuccess: () => {
           utils.jobSheets.list.invalidate();
           if (selectedId === jobSheetId) {
-            const idx = filteredItems.findIndex(i => i.id === jobSheetId);
+            const idx = sortedFilteredItems.findIndex(i => i.id === jobSheetId);
             const nextItem =
-              filteredItems[idx + 1] ?? filteredItems[idx - 1] ?? null;
+              sortedFilteredItems[idx + 1] ??
+              sortedFilteredItems[idx - 1] ??
+              null;
             setSelectedId(nextItem?.id ?? null);
           }
           toast.success("Job sheet rejected", {
@@ -340,17 +375,20 @@ export default function HoldQueue() {
   };
 
   const selectByOffset = usePersistFn((delta: number) => {
-    if (filteredItems.length === 0) return;
+    if (sortedFilteredItems.length === 0) return;
     const currentIdx = activeId
-      ? filteredItems.findIndex(i => i.id === activeId)
+      ? sortedFilteredItems.findIndex(i => i.id === activeId)
       : -1;
     const nextIdx =
       currentIdx < 0
         ? delta > 0
           ? 0
-          : filteredItems.length - 1
-        : Math.max(0, Math.min(filteredItems.length - 1, currentIdx + delta));
-    setSelectedId(filteredItems[nextIdx].id);
+          : sortedFilteredItems.length - 1
+        : Math.max(
+            0,
+            Math.min(sortedFilteredItems.length - 1, currentIdx + delta)
+          );
+    setSelectedId(sortedFilteredItems[nextIdx].id);
   });
 
   const onApproveSelected = usePersistFn(() => {
@@ -379,17 +417,18 @@ export default function HoldQueue() {
       <div className="space-y-4" tabIndex={0}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-3xl font-heading font-bold tracking-tight">
+            <h1 className="text-3xl font-heading font-bold tracking-tight text-[#333030]">
               Hold Queue
             </h1>
-            <p className="text-muted-foreground mt-1">
-              Review and resolve flagged job sheets requiring manual
-              intervention.
+            <p className="text-[#706D6D] mt-1">
+              Priority-sorted review queue — SLA breaches and critical items
+              first.
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
+              className="border-[#EBE8E8] text-[#333030] hover:bg-[#F5F4F4]"
               onClick={() => setShowLegend(v => !v)}
               aria-label="Toggle keyboard shortcuts"
             >
@@ -398,6 +437,7 @@ export default function HoldQueue() {
             </Button>
             <Button
               variant="outline"
+              className="border-[#EBE8E8] text-[#333030] hover:bg-[#F5F4F4]"
               onClick={() =>
                 setFilterChip(f => (f === "all" ? "critical" : "all"))
               }
@@ -408,6 +448,7 @@ export default function HoldQueue() {
             <Button
               onClick={() => void handleBulkApprove()}
               disabled={approveJobSheet.isPending || totalItems === 0}
+              className="bg-primary text-[#333030] hover:bg-primary/90"
             >
               {approveJobSheet.isPending ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -421,16 +462,19 @@ export default function HoldQueue() {
         </div>
 
         {showLegend && (
-          <ReviewShortcutsLegend variant="queue" className="bg-muted/40" />
+          <ReviewShortcutsLegend
+            variant="queue"
+            className="bg-white border border-[#EBE8E8]"
+          />
         )}
 
         <div className="flex items-center gap-4 flex-wrap">
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[#706D6D]" />
             <Input
               type="search"
               placeholder="Search by ID, technician, or site..."
-              className="pl-9"
+              className="pl-9 bg-white border-[#EBE8E8]"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
@@ -438,14 +482,22 @@ export default function HoldQueue() {
           <div className="flex items-center gap-2">
             <Badge
               variant={filterChip === "all" ? "default" : "secondary"}
-              className="cursor-pointer"
+              className={cn(
+                "cursor-pointer",
+                filterChip === "all" &&
+                  "bg-primary text-[#333030] hover:bg-primary/90"
+              )}
               onClick={() => setFilterChip("all")}
             >
               All ({totalItems})
             </Badge>
             <Badge
               variant={filterChip === "critical" ? "default" : "secondary"}
-              className="cursor-pointer"
+              className={cn(
+                "cursor-pointer",
+                filterChip === "critical" &&
+                  "bg-primary text-[#333030] hover:bg-primary/90"
+              )}
               onClick={() => setFilterChip("critical")}
             >
               Critical
@@ -458,7 +510,7 @@ export default function HoldQueue() {
             )}
             <Link
               href="/analytics/defects"
-              className="text-sm text-primary hover:underline ml-1"
+              className="text-sm text-[#333030] hover:underline ml-1 font-medium"
             >
               Exception analytics
             </Link>
@@ -466,71 +518,73 @@ export default function HoldQueue() {
         </div>
 
         {isLoading && (
-          <Card className="p-12">
+          <Card className="p-12 border-[#EBE8E8]">
             <div className="flex flex-col items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Loading review queue...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-[#706D6D] mb-4" />
+              <p className="text-[#706D6D]">Loading review queue...</p>
             </div>
           </Card>
         )}
 
         {error && (
-          <Card className="p-12">
+          <Card className="p-12 border-[#EBE8E8]">
             <div className="flex flex-col items-center justify-center text-destructive">
               <AlertCircle className="h-16 w-16 mb-4" />
               <p className="font-semibold">Failed to load review queue</p>
-              <p className="text-sm text-muted-foreground">{error.message}</p>
+              <p className="text-sm text-[#706D6D]">{error.message}</p>
             </div>
           </Card>
         )}
 
         {!isLoading && !error && holdItems.length === 0 && (
-          <Card className="p-12">
-            <div className="flex flex-col items-center justify-center text-center">
-              <Inbox className="h-16 w-16 text-muted-foreground mb-4" />
-              <h2 className="text-xl font-semibold mb-2">Review Queue Empty</h2>
-              <p className="text-muted-foreground max-w-md">
-                No job sheets are currently awaiting review. All documents have
-                been processed successfully.
-              </p>
-            </div>
+          <Card className="p-4 border-[#EBE8E8] bg-white">
+            <EmptyState
+              icon={Inbox}
+              title="Review Queue Empty"
+              description="No job sheets are currently awaiting review. All documents have been processed successfully."
+            />
           </Card>
         )}
 
         {!isLoading && !error && holdItems.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-[calc(100vh-14rem)]">
-            <Card className="flex flex-col min-h-0 overflow-hidden">
-              <CardHeader className="px-4 py-3 border-b shrink-0">
-                <CardTitle className="text-base">
-                  Pending Reviews ({filteredItems.length}
-                  {filteredItems.length !== totalItems
+            <Card className="flex flex-col min-h-0 overflow-hidden border-[#EBE8E8] bg-white">
+              <CardHeader className="px-4 py-3 border-b border-[#EBE8E8] shrink-0">
+                <CardTitle className="text-base text-[#333030]">
+                  Pending Reviews ({sortedFilteredItems.length}
+                  {sortedFilteredItems.length !== totalItems
                     ? ` of ${totalItems}`
                     : ""}
                   )
                 </CardTitle>
-                <CardDescription>
-                  Select a row to review in place. j/k to navigate.
+                <CardDescription className="text-[#706D6D]">
+                  Sorted by SLA breach, severity, then age. j/k to navigate.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0 flex-1 overflow-y-auto">
-                {filteredItems.length === 0 ? (
-                  <div className="p-6 text-sm text-muted-foreground text-center">
-                    No items match the current search/filter.
-                  </div>
+                {sortedFilteredItems.length === 0 ? (
+                  <EmptyState
+                    compact
+                    icon={Filter}
+                    title="No items match"
+                    description="Try clearing the search or filter."
+                  />
                 ) : (
-                  <ul className="divide-y">
-                    {filteredItems.map(item => {
+                  <ul className="divide-y divide-[#EBE8E8]">
+                    {sortedFilteredItems.map(item => {
                       const isActive = activeId === item.id;
                       return (
                         <li key={item.id}>
                           <div
                             role="button"
                             tabIndex={0}
-                            className={`w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer ${
+                            className={cn(
+                              "group w-full text-left px-3 py-2 border-l-4 transition-colors cursor-pointer",
+                              priorityBorderClass(item),
                               isActive
-                                ? "bg-primary/5 ring-2 ring-inset ring-primary"
-                                : ""
-                            }`}
+                                ? "bg-[rgba(190,218,65,0.12)] ring-1 ring-inset ring-primary"
+                                : "hover:bg-[#F5F4F4] bg-white"
+                            )}
                             onClick={() => setSelectedId(item.id)}
                             onKeyDown={e => {
                               if (e.key === "Enter" || e.key === " ") {
@@ -539,21 +593,21 @@ export default function HoldQueue() {
                               }
                             }}
                           >
-                            <div className="flex items-start gap-3">
+                            <div className="flex items-start gap-2">
                               <input
                                 type="checkbox"
                                 checked={selectedIds.has(item.id)}
                                 onChange={() => toggleSelect(item.id)}
                                 onClick={e => e.stopPropagation()}
                                 aria-label={`Select ${item.referenceNumber}`}
-                                className="h-4 w-4 mt-1"
+                                className="h-4 w-4 mt-0.5 accent-primary"
                               />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between gap-2">
-                                  <span className="font-mono font-medium text-sm">
+                                  <span className="font-mono font-medium text-sm text-[#333030]">
                                     {item.referenceNumber}
                                   </span>
-                                  <div className="flex items-center gap-1 text-xs">
+                                  <div className="flex items-center gap-1 text-xs shrink-0">
                                     {item.slaBreached ? (
                                       <Badge
                                         variant="destructive"
@@ -562,14 +616,14 @@ export default function HoldQueue() {
                                         SLA
                                       </Badge>
                                     ) : item.ageHours != null ? (
-                                      <span className="text-muted-foreground flex items-center gap-1">
+                                      <span className="text-[#706D6D] flex items-center gap-1">
                                         <Clock className="w-3 h-3" />
                                         {item.ageHours < 24
                                           ? `${Math.round(item.ageHours)}h`
                                           : `${Math.round(item.ageHours / 24)}d`}
                                       </span>
                                     ) : (
-                                      <span className="text-muted-foreground flex items-center gap-1">
+                                      <span className="text-[#706D6D] flex items-center gap-1">
                                         <Clock className="w-3 h-3" />
                                         pending
                                       </span>
@@ -577,51 +631,62 @@ export default function HoldQueue() {
                                   </div>
                                 </div>
                                 <div
-                                  className="text-sm truncate"
+                                  className="text-sm truncate text-[#333030]"
                                   title={item.fileName}
                                 >
                                   {item.fileName}
                                 </div>
-                                <div className="text-xs text-muted-foreground truncate">
+                                <div className="text-xs text-[#706D6D] truncate">
                                   {item.site} • {item.date}
                                 </div>
                                 <div className="mt-1 flex items-center gap-2">
                                   <HoldItemReasonChips jobSheetId={item.id} />
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
+                                  {/* Quick actions: always visible on the active row; revealed
+                                      on hover/focus for others so approve/reject take one click
+                                      without first selecting the row. */}
+                                  <div
+                                    className={cn(
+                                      "flex items-center gap-0.5 ml-auto shrink-0 transition-opacity duration-[var(--duration-fast)]",
+                                      isActive
+                                        ? "opacity-100"
+                                        : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+                                    )}
+                                    onClick={e => e.stopPropagation()}
+                                  >
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0 text-emerald-700 hover:bg-emerald-50"
+                                      onClick={() => handleApprove(item.id)}
+                                      disabled={approveJobSheet.isPending}
+                                      aria-label="Approve"
+                                      title="Approve (a)"
+                                    >
+                                      <CheckCircle2 className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0 text-red-600 hover:bg-red-50"
+                                      onClick={() => handleReject(item.id)}
+                                      disabled={updateStatus.isPending}
+                                      aria-label="Reject"
+                                      title="Reject (r)"
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                    </Button>
+                                    <Link href={`/audits?id=${item.id}`}>
                                       <Button
+                                        size="sm"
                                         variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 ml-auto"
-                                        onClick={e => e.stopPropagation()}
+                                        className="h-7 w-7 p-0 text-[#706D6D] hover:bg-[#F5F4F4]"
+                                        aria-label="Open full audit"
+                                        title="Open full audit"
                                       >
-                                        <MoreHorizontal className="w-4 h-4" />
+                                        <ExternalLink className="w-3.5 h-3.5" />
                                       </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuLabel>
-                                        Actions
-                                      </DropdownMenuLabel>
-                                      <DropdownMenuItem
-                                        onClick={() => handleApprove(item.id)}
-                                      >
-                                        <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" />
-                                        Approve
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        onClick={() => handleReject(item.id)}
-                                      >
-                                        <XCircle className="w-4 h-4 mr-2 text-red-600" />
-                                        Reject
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem asChild>
-                                        <Link href={`/audits?id=${item.id}`}>
-                                          View Details
-                                        </Link>
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                    </Link>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -634,7 +699,7 @@ export default function HoldQueue() {
               </CardContent>
             </Card>
 
-            <Card className="flex flex-col min-h-0 overflow-hidden p-3">
+            <Card className="flex flex-col min-h-0 overflow-hidden p-3 border-[#EBE8E8] bg-white">
               {activeId != null ? (
                 <ReviewWorkstationPane
                   jobSheetId={activeId}
@@ -647,13 +712,12 @@ export default function HoldQueue() {
                   rejectPending={updateStatus.isPending}
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center">
-                  <Inbox className="h-12 w-12 mb-3 opacity-40" />
-                  <p className="font-medium">Select a job sheet</p>
-                  <p className="text-sm mt-1 max-w-sm">
-                    Choose an item from the queue to open the review workstation
-                    (PDF + findings) without leaving this page.
-                  </p>
+                <div className="flex h-full items-center justify-center">
+                  <EmptyState
+                    icon={Inbox}
+                    title="Select a job sheet"
+                    description="Choose an item from the queue to open the review workstation (PDF + findings) without leaving this page."
+                  />
                 </div>
               )}
             </Card>

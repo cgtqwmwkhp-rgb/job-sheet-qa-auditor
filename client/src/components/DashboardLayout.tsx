@@ -16,11 +16,86 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
+}
+
+const PAGE_CONTEXT: Record<string, { title: string; subtitle: string }> = {
+  "/": {
+    title: "Dashboard",
+    subtitle: "Overview & key metrics",
+  },
+  "/upload": {
+    title: "Upload Job Cards",
+    subtitle: "Single-job intake & processing",
+  },
+  "/audits": {
+    title: "Audit Results",
+    subtitle: "Review outcomes & evidence",
+  },
+  "/hold-queue": {
+    title: "Hold Queue",
+    subtitle: "Items awaiting manual review",
+  },
+  "/disputes": {
+    title: "Disputes",
+    subtitle: "Challenge resolution",
+  },
+  "/search": {
+    title: "Search",
+    subtitle: "Find job sheets & audits",
+  },
+  "/specs": {
+    title: "Spec Management",
+    subtitle: "Gold Standard criteria",
+  },
+  "/analytics": {
+    title: "Analytics",
+    subtitle: "Performance insights",
+  },
+  "/monitoring": {
+    title: "Monitoring",
+    subtitle: "System health & pipelines",
+  },
+  "/users": {
+    title: "User Management",
+    subtitle: "Roles & access",
+  },
+  "/audit-log": {
+    title: "Audit Log",
+    subtitle: "Activity history",
+  },
+  "/settings": {
+    title: "Settings",
+    subtitle: "Preferences & configuration",
+  },
+  "/help": {
+    title: "Help & Resources",
+    subtitle: "Guides & support",
+  },
+};
+
+function resolvePageContext(pathname: string) {
+  if (PAGE_CONTEXT[pathname]) {
+    return PAGE_CONTEXT[pathname];
+  }
+
+  const match = Object.keys(PAGE_CONTEXT)
+    .filter(route => route !== "/")
+    .sort((a, b) => b.length - a.length)
+    .find(route => pathname === route || pathname.startsWith(`${route}/`));
+
+  if (match) {
+    return PAGE_CONTEXT[match];
+  }
+
+  return {
+    title: "Job Sheet QA",
+    subtitle: "PlantExpand Portal",
+  };
 }
 
 /**
@@ -29,6 +104,8 @@ interface DashboardLayoutProps {
  */
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, logout } = useAuth();
+  const [location] = useLocation();
+  const page = resolvePageContext(location);
 
   return (
     <SidebarProvider>
@@ -37,10 +114,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </a>
       <AppSidebar />
       <SidebarInset className="bg-[#F9F9F9]">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-[#EBE8E8] bg-white px-3 sticky top-0 z-10">
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-[#EBE8E8] bg-white/95 px-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
           <SidebarTrigger className="-ml-1 text-[#333030] hover:bg-[#F5F4F4]" />
-          <div className="w-px h-4 bg-[#EBE8E8] mx-1.5" aria-hidden="true" />
-          <div className="flex-1" />
+          <div className="h-4 w-px bg-[#EBE8E8]" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold leading-tight text-[#333030]">
+              {page.title}
+            </p>
+            <p className="truncate text-xs text-[#8A8787]">{page.subtitle}</p>
+          </div>
           <div className="flex items-center gap-0.5">
             <ThemeToggle />
             <NotificationsDropdown />
@@ -77,7 +159,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 p-6 overflow-auto outline-none bg-[#F9F9F9] text-[#333030]"
+          className="flex-1 overflow-auto bg-[#F9F9F9] p-6 text-[#333030] outline-none"
         >
           {children}
         </main>

@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -7,15 +14,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { 
-  Mail, 
-  Sparkles, 
-  Eye, 
-  Send, 
-  RefreshCw, 
+import {
+  Mail,
+  Sparkles,
+  Eye,
+  Send,
+  RefreshCw,
   CheckCircle2,
   User,
-  Users
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -35,36 +42,44 @@ const DEFAULT_TEMPLATES: EmailTemplate[] = [
     id: "daily-summary",
     name: "Daily Stakeholder Summary",
     subject: "Job Sheet QA - Daily Performance Digest",
-    description: "High-level overview of daily audit performance, critical defects, and hold queue status.",
-    aiPrompt: "Generate a professional daily summary email for stakeholders. Include: Total audits processed, pass rate trend, top 3 critical defects found today, and current hold queue volume. Tone: Professional, concise, data-driven.",
+    description:
+      "High-level overview of daily audit performance, critical defects, and hold queue status.",
+    aiPrompt:
+      "Generate a professional daily summary email for stakeholders. Include: Total audits processed, pass rate trend, top 3 critical defects found today, and current hold queue volume. Tone: Professional, concise, data-driven.",
     targetAudience: "stakeholders",
     frequency: "daily",
-    isActive: true
+    isActive: true,
   },
   {
     id: "weekly-engineer",
     name: "Weekly Engineer Performance",
     subject: "Your Weekly Quality Scorecard",
-    description: "Personalized performance report for each engineer with scores, trends, and improvement tips.",
-    aiPrompt: "Generate a personalized weekly email for an engineer. Include: Their personal pass rate vs team average, list of their most common defect types this week, and one specific actionable tip for improvement. Tone: Encouraging, constructive, coaching-oriented.",
+    description:
+      "Personalized performance report for each engineer with scores, trends, and improvement tips.",
+    aiPrompt:
+      "Generate a personalized weekly email for an engineer. Include: Their personal pass rate vs team average, list of their most common defect types this week, and one specific actionable tip for improvement. Tone: Encouraging, constructive, coaching-oriented.",
     targetAudience: "engineers",
     frequency: "weekly",
-    isActive: true
-  }
+    isActive: true,
+  },
 ];
 
 export function EmailTemplateManager() {
-  const [templates, setTemplates] = useState<EmailTemplate[]>(DEFAULT_TEMPLATES);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(DEFAULT_TEMPLATES[0].id);
+  const [templates, setTemplates] =
+    useState<EmailTemplate[]>(DEFAULT_TEMPLATES);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
+    DEFAULT_TEMPLATES[0].id
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewContent, setPreviewContent] = useState<string | null>(null);
 
-  const selectedTemplate = templates.find(t => t.id === selectedTemplateId) || templates[0];
+  const selectedTemplate =
+    templates.find(t => t.id === selectedTemplateId) || templates[0];
 
   const handleUpdateTemplate = (key: keyof EmailTemplate, value: any) => {
-    setTemplates(prev => prev.map(t => 
-      t.id === selectedTemplateId ? { ...t, [key]: value } : t
-    ));
+    setTemplates(prev =>
+      prev.map(t => (t.id === selectedTemplateId ? { ...t, [key]: value } : t))
+    );
   };
 
   const generatePreview = () => {
@@ -73,8 +88,9 @@ export function EmailTemplateManager() {
 
     // Simulate AI generation delay
     setTimeout(() => {
-      const mockContent = selectedTemplate.id === "daily-summary" 
-        ? `
+      const mockContent =
+        selectedTemplate.id === "daily-summary"
+          ? `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
             <div style="background-color: #0f172a; padding: 20px; text-align: center;">
               <h2 style="color: #ffffff; margin: 0;">Daily Performance Digest</h2>
@@ -114,7 +130,7 @@ export function EmailTemplateManager() {
             </div>
           </div>
         `
-        : `
+          : `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
             <div style="background-color: #2563eb; padding: 20px; text-align: center;">
               <h2 style="color: #ffffff; margin: 0;">Weekly Scorecard</h2>
@@ -146,7 +162,7 @@ export function EmailTemplateManager() {
             </div>
           </div>
         `;
-      
+
       setPreviewContent(mockContent);
       setIsGenerating(false);
       toast.success("AI Preview Generated");
@@ -164,24 +180,30 @@ export function EmailTemplateManager() {
           <CardContent className="p-2">
             <div className="space-y-2">
               {templates.map(template => (
-                <div 
+                <div
                   key={template.id}
                   onClick={() => {
                     setSelectedTemplateId(template.id);
                     setPreviewContent(null);
                   }}
                   className={`p-3 rounded-md cursor-pointer transition-colors border ${
-                    selectedTemplateId === template.id 
-                      ? "bg-primary/10 border-primary" 
+                    selectedTemplateId === template.id
+                      ? "bg-primary/10 border-primary"
                       : "hover:bg-muted border-transparent"
                   }`}
                 >
                   <div className="flex justify-between items-start mb-1">
                     <span className="font-medium text-sm">{template.name}</span>
-                    {template.isActive && <span className="w-2 h-2 rounded-full bg-green-500 mt-1.5" />}
+                    {template.isActive && (
+                      <span className="w-2 h-2 rounded-full bg-green-500 mt-1.5" />
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    {template.targetAudience === "stakeholders" ? <Users className="w-3 h-3" /> : <User className="w-3 h-3" />}
+                    {template.targetAudience === "stakeholders" ? (
+                      <Users className="w-3 h-3" />
+                    ) : (
+                      <User className="w-3 h-3" />
+                    )}
                     <span className="capitalize">{template.frequency}</span>
                   </div>
                 </div>
@@ -201,40 +223,48 @@ export function EmailTemplateManager() {
             <div className="flex justify-between items-center">
               <CardTitle>Template Editor</CardTitle>
               <div className="flex items-center gap-2">
-                <Label htmlFor="active-mode" className="text-xs">Active</Label>
-                <Switch 
-                  id="active-mode" 
+                <Label htmlFor="active-mode" className="text-xs">
+                  Active
+                </Label>
+                <Switch
+                  id="active-mode"
                   checked={selectedTemplate.isActive}
-                  onCheckedChange={(checked) => handleUpdateTemplate("isActive", checked)}
+                  onCheckedChange={checked =>
+                    handleUpdateTemplate("isActive", checked)
+                  }
                 />
               </div>
             </div>
-            <CardDescription>Configure AI generation rules and schedule.</CardDescription>
+            <CardDescription>
+              Configure AI generation rules and schedule.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 flex-1 overflow-auto">
             <div className="space-y-2">
               <Label>Template Name</Label>
-              <Input 
-                value={selectedTemplate.name} 
-                onChange={(e) => handleUpdateTemplate("name", e.target.value)}
+              <Input
+                value={selectedTemplate.name}
+                onChange={e => handleUpdateTemplate("name", e.target.value)}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label>Email Subject Line</Label>
-              <Input 
-                value={selectedTemplate.subject} 
-                onChange={(e) => handleUpdateTemplate("subject", e.target.value)}
+              <Input
+                value={selectedTemplate.subject}
+                onChange={e => handleUpdateTemplate("subject", e.target.value)}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Target Audience</Label>
-                <select 
+                <select
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={selectedTemplate.targetAudience}
-                  onChange={(e) => handleUpdateTemplate("targetAudience", e.target.value)}
+                  onChange={e =>
+                    handleUpdateTemplate("targetAudience", e.target.value)
+                  }
                 >
                   <option value="stakeholders">Stakeholders</option>
                   <option value="engineers">Engineers</option>
@@ -242,10 +272,12 @@ export function EmailTemplateManager() {
               </div>
               <div className="space-y-2">
                 <Label>Frequency</Label>
-                <select 
+                <select
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={selectedTemplate.frequency}
-                  onChange={(e) => handleUpdateTemplate("frequency", e.target.value)}
+                  onChange={e =>
+                    handleUpdateTemplate("frequency", e.target.value)
+                  }
                 >
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
@@ -257,24 +289,30 @@ export function EmailTemplateManager() {
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <Label className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-purple-500" />
+                  <Sparkles className="w-4 h-4 text-primary" />
                   AI Content Prompt
                 </Label>
-                <Badge variant="outline" className="text-[10px]">GPT-4o</Badge>
+                <Badge variant="outline" className="text-[10px]">
+                  GPT-4o
+                </Badge>
               </div>
-              <Textarea 
+              <Textarea
                 className="min-h-[200px] font-mono text-sm"
                 value={selectedTemplate.aiPrompt}
-                onChange={(e) => handleUpdateTemplate("aiPrompt", e.target.value)}
+                onChange={e => handleUpdateTemplate("aiPrompt", e.target.value)}
                 placeholder="Describe how the AI should generate this email..."
               />
               <p className="text-xs text-muted-foreground">
-                Use natural language to instruct the AI on tone, data points to include, and formatting preferences.
+                Use natural language to instruct the AI on tone, data points to
+                include, and formatting preferences.
               </p>
             </div>
           </CardContent>
           <CardFooter className="border-t p-4 flex justify-between">
-            <Button variant="ghost" onClick={() => setTemplates(DEFAULT_TEMPLATES)}>
+            <Button
+              variant="ghost"
+              onClick={() => setTemplates(DEFAULT_TEMPLATES)}
+            >
               <RefreshCw className="w-4 h-4 mr-2" />
               Reset
             </Button>
@@ -296,7 +334,9 @@ export function EmailTemplateManager() {
       <div className="lg:col-span-4 space-y-4">
         <Card className="h-full flex flex-col bg-muted/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Live Preview</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Live Preview
+            </CardTitle>
           </CardHeader>
           <CardContent className="flex-1 overflow-auto p-4">
             {previewContent ? (
@@ -305,24 +345,29 @@ export function EmailTemplateManager() {
                   <div className="flex gap-2 mb-1">
                     <span className="text-muted-foreground w-12">To:</span>
                     <span className="font-medium">
-                      {selectedTemplate.targetAudience === "stakeholders" ? "stakeholders@company.com" : "alex.murphy@company.com"}
+                      {selectedTemplate.targetAudience === "stakeholders"
+                        ? "stakeholders@company.com"
+                        : "alex.murphy@company.com"}
                     </span>
                   </div>
                   <div className="flex gap-2">
                     <span className="text-muted-foreground w-12">Subject:</span>
-                    <span className="font-medium">{selectedTemplate.subject}</span>
+                    <span className="font-medium">
+                      {selectedTemplate.subject}
+                    </span>
                   </div>
                 </div>
-                <div 
+                <div
                   className="preview-container bg-white shadow-sm rounded-lg"
-                  dangerouslySetInnerHTML={{ __html: previewContent }} 
+                  dangerouslySetInnerHTML={{ __html: previewContent }}
                 />
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground space-y-3 opacity-50">
                 <Mail className="w-12 h-12" />
                 <p className="text-sm text-center max-w-[200px]">
-                  Click "Generate Preview" to see how the AI renders this template with sample data.
+                  Click "Generate Preview" to see how the AI renders this
+                  template with sample data.
                 </p>
               </div>
             )}

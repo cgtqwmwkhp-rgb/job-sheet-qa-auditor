@@ -129,10 +129,10 @@ export function FileUploader({
     <div className="space-y-4">
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-colors ${
+        className={`rounded-lg border-2 border-dashed p-10 text-center cursor-pointer outline-none transition-[border-color,background-color,box-shadow] duration-[var(--duration-normal)] focus-visible:ring-[3px] focus-visible:ring-primary/30 ${
           isDragActive
-            ? "border-brand-lime bg-brand-lime/10"
-            : "border-muted-foreground/25 hover:border-brand-lime/50"
+            ? "border-primary bg-[rgba(190,218,65,0.12)] shadow-[0_0_0_4px_rgba(190,218,65,0.15)]"
+            : "border-[#C5C2C2] hover:border-primary/60 hover:bg-[rgba(190,218,65,0.06)]"
         }`}
       >
         <input {...getInputProps()} />
