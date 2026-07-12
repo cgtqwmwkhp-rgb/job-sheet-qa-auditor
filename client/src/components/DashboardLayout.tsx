@@ -50,8 +50,12 @@ const PAGE_CONTEXT: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Find job sheets & audits",
   },
   "/specs": {
-    title: "Spec Management",
-    subtitle: "Gold Standard criteria",
+    title: "Template Studio",
+    subtitle: "Author & activate form templates",
+  },
+  "/template-studio": {
+    title: "Template Studio",
+    subtitle: "Author & activate form templates",
   },
   "/analytics": {
     title: "Analytics",

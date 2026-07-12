@@ -278,7 +278,8 @@ jobs:
               ENABLE_PURGE_EXECUTION="${{ vars.ENABLE_PURGE_EXECUTION || 'false' }}" \
               ENABLE_SCHEDULER="${{ vars.ENABLE_SCHEDULER || 'false' }}" \
               FEATURE_OVERTURN_METRICS=true \
-              FEATURE_PHOTO_PAIR_COMPARE=true
+              FEATURE_PHOTO_PAIR_COMPARE=true \
+              TEMPLATE_REGISTRY_MYSQL_PERSISTENCE_ENABLED=true
 
       - name: Set secrets as environment variables
         run: |
@@ -745,7 +746,8 @@ jobs:
               STORAGE_PROVIDER="${{ vars.STORAGE_PROVIDER || 'azure' }}" \
               AZURE_STORAGE_CONTAINER_NAME="${{ vars.AZURE_STORAGE_CONTAINER_NAME || 'jobsheets' }}" \
               ENABLE_PURGE_EXECUTION="${{ vars.ENABLE_PURGE_EXECUTION || 'false' }}" \
-              ENABLE_SCHEDULER="${{ vars.ENABLE_SCHEDULER || 'false' }}"
+              ENABLE_SCHEDULER="${{ vars.ENABLE_SCHEDULER || 'false' }}" \
+              TEMPLATE_REGISTRY_MYSQL_PERSISTENCE_ENABLED=true
 
       - name: Set secrets as environment variables
         run: |

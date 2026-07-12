@@ -63,7 +63,7 @@ interface TemplateRecord {
   updatedAt: Date;
 }
 
-interface VersionRecord {
+export interface VersionRecord {
   id: number;
   templateId: number;
   version: string;
@@ -479,6 +479,49 @@ export function updateVersionRoi(
   }
 
   version.roiJson = roiJson;
+
+  return version;
+}
+
+/**
+ * Update draft version content in place (Template Studio saveDraft).
+ * Active versions cannot be mutated — upload a new version instead.
+ */
+export function updateDraftVersion(
+  versionId: number,
+  input: {
+    specJson?: SpecJson;
+    selectionConfigJson?: SelectionConfig;
+    roiJson?: RoiConfig | null;
+    changeNotes?: string;
+  }
+): VersionRecord {
+  const version = versionStore.get(versionId);
+  if (!version) {
+    throw new Error(`Version not found: ${versionId}`);
+  }
+  if (version.isActive) {
+    throw new Error(
+      "Cannot mutate an active version in place — upload a new version"
+    );
+  }
+
+  if (input.specJson) version.specJson = input.specJson;
+  if (input.selectionConfigJson) {
+    version.selectionConfigJson = input.selectionConfigJson;
+  }
+  if (input.roiJson !== undefined) version.roiJson = input.roiJson;
+  if (input.changeNotes !== undefined) version.changeNotes = input.changeNotes;
+
+  version.hashSha256 = computeVersionHash(
+    version.specJson,
+    version.selectionConfigJson
+  );
+
+  const template = templateStore.get(version.templateId);
+  if (template) {
+    persistTemplateVersionToMysqlBestEffort(version, template);
+  }
 
   return version;
 }

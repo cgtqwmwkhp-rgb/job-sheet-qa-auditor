@@ -1,49 +1,63 @@
 /**
  * Template Override Service
- * 
- * PR-G: Allows admins to explicitly set templateId/version for job sheets
+ *
+ * Allows admins/QA leads to explicitly set templateId/version for job sheets
  * when selection confidence is LOW or ambiguous.
  */
 
-import type { ConfidenceBand } from '../templateRegistry/types';
+import type { ConfidenceBand } from "../templateRegistry/types";
+import {
+  getTemplate,
+  getTemplateVersion,
+} from "../templateRegistry/registryService";
+import {
+  loadStudioJson,
+  overrideKey,
+  persistStudioJson,
+} from "../templateStudio/durableStore";
 
-/**
- * Template override record
- */
 export interface TemplateOverride {
-  /** Job sheet ID */
   jobSheetId: number;
-  /** Overridden template ID */
   templateId: number;
-  /** Overridden version ID */
   versionId: number;
-  /** Original selection confidence */
   originalConfidence: ConfidenceBand;
-  /** Original top score */
   originalTopScore: number;
-  /** Reason for override */
   reason: string;
-  /** User who created override */
   createdBy: number;
-  /** When override was created */
   createdAt: Date;
 }
 
-/**
- * Override result
- */
 export interface OverrideResult {
   success: boolean;
   override?: TemplateOverride;
   error?: string;
 }
 
-// In-memory override store
 const overrideStore = new Map<number, TemplateOverride>();
 
-/**
- * Create or update a template override for a job sheet
- */
+function serialize(override: TemplateOverride) {
+  return {
+    ...override,
+    createdAt: override.createdAt.toISOString(),
+  };
+}
+
+function deserialize(raw: {
+  jobSheetId: number;
+  templateId: number;
+  versionId: number;
+  originalConfidence: ConfidenceBand;
+  originalTopScore: number;
+  reason: string;
+  createdBy: number;
+  createdAt: string;
+}): TemplateOverride {
+  return {
+    ...raw,
+    createdAt: new Date(raw.createdAt),
+  };
+}
+
 export function setTemplateOverride(
   jobSheetId: number,
   templateId: number,
@@ -53,11 +67,31 @@ export function setTemplateOverride(
   reason: string,
   createdBy: number
 ): OverrideResult {
-  // Validate reason is provided
   if (!reason || reason.trim().length < 5) {
     return {
       success: false,
-      error: 'Override reason must be at least 5 characters',
+      error: "Override reason must be at least 5 characters",
+    };
+  }
+
+  const template = getTemplate(templateId);
+  if (!template) {
+    return { success: false, error: `Template not found: ${templateId}` };
+  }
+  const version = getTemplateVersion(versionId);
+  if (!version) {
+    return { success: false, error: `Version not found: ${versionId}` };
+  }
+  if (version.templateId !== templateId) {
+    return {
+      success: false,
+      error: "versionId does not belong to templateId",
+    };
+  }
+  if (!version.isActive) {
+    return {
+      success: false,
+      error: "Override requires an active template version",
     };
   }
 
@@ -73,6 +107,7 @@ export function setTemplateOverride(
   };
 
   overrideStore.set(jobSheetId, override);
+  void persistStudioJson(overrideKey(jobSheetId), serialize(override));
 
   return {
     success: true,
@@ -80,46 +115,53 @@ export function setTemplateOverride(
   };
 }
 
-/**
- * Get template override for a job sheet
- */
-export function getTemplateOverride(jobSheetId: number): TemplateOverride | null {
+export function getTemplateOverride(
+  jobSheetId: number
+): TemplateOverride | null {
   return overrideStore.get(jobSheetId) ?? null;
 }
 
-/**
- * Check if job sheet has an override
- */
+export async function resolveTemplateOverride(
+  jobSheetId: number
+): Promise<TemplateOverride | null> {
+  const cached = overrideStore.get(jobSheetId);
+  if (cached) return cached;
+  const loaded = await loadStudioJson<ReturnType<typeof serialize>>(
+    overrideKey(jobSheetId)
+  );
+  if (loaded) {
+    const override = deserialize(loaded);
+    overrideStore.set(jobSheetId, override);
+    return override;
+  }
+  return null;
+}
+
 export function hasTemplateOverride(jobSheetId: number): boolean {
   return overrideStore.has(jobSheetId);
 }
 
-/**
- * Remove template override for a job sheet
- */
 export function clearTemplateOverride(jobSheetId: number): boolean {
-  return overrideStore.delete(jobSheetId);
+  const deleted = overrideStore.delete(jobSheetId);
+  if (deleted) {
+    void persistStudioJson(overrideKey(jobSheetId), {
+      cleared: true,
+      clearedAt: new Date().toISOString(),
+    });
+  }
+  return deleted;
 }
 
-/**
- * List all overrides (for analytics)
- */
 export function listOverrides(): TemplateOverride[] {
-  return Array.from(overrideStore.values()).sort((a, b) => 
-    b.createdAt.getTime() - a.createdAt.getTime()
+  return Array.from(overrideStore.values()).sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
   );
 }
 
-/**
- * Get override count
- */
 export function getOverrideCount(): number {
   return overrideStore.size;
 }
 
-/**
- * Get overrides by confidence band (for analytics)
- */
 export function getOverridesByConfidence(): Record<ConfidenceBand, number> {
   const result: Record<ConfidenceBand, number> = {
     HIGH: 0,
@@ -128,16 +170,12 @@ export function getOverridesByConfidence(): Record<ConfidenceBand, number> {
   };
 
   for (const override of Array.from(overrideStore.values())) {
-    const band = override.originalConfidence as ConfidenceBand;
-    result[band]++;
+    result[override.originalConfidence]++;
   }
 
   return result;
 }
 
-/**
- * Reset override store (for testing)
- */
 export function resetOverrideStore(): void {
   overrideStore.clear();
 }

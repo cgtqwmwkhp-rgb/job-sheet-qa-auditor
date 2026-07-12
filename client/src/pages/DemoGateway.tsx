@@ -41,7 +41,7 @@ export default function DemoGateway() {
       icon: ShieldCheck,
       iconBg: "bg-[rgba(190,218,65,0.15)]",
       iconColor: "text-foreground",
-      features: ["Executive Dashboard", "Spec Management", "User Control"],
+      features: ["Executive Dashboard", "Template Studio", "User Control"],
       primary: true,
     },
     {

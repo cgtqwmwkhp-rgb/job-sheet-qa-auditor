@@ -133,7 +133,7 @@ export function CommandCenter() {
               onSelect={() => runCommand(() => setLocation("/specs"))}
             >
               <FileText className="mr-2 h-4 w-4" />
-              <span>Spec Management</span>
+              <span>Template Studio</span>
             </CommandItem>
             {canSettings ? (
               <CommandItem

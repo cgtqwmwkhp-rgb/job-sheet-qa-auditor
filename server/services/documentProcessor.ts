@@ -821,9 +821,28 @@ async function processJobSheetWithOptions(
     );
   }
 
-  if (options.templateVersionId) {
+  // Manual template override from review workstation (Template Studio R3)
+  let forcedTemplateVersionId = options.templateVersionId;
+  if (!options.templateVersionId) {
+    try {
+      const { resolveTemplateOverride } = await import(
+        "./templateOverride/overrideService"
+      );
+      const override = await resolveTemplateOverride(jobSheetId);
+      if (override?.versionId) {
+        forcedTemplateVersionId = override.versionId;
+        console.info(
+          `[DocumentProcessor] Using template override versionId=${override.versionId} for jobSheet ${jobSheetId}`
+        );
+      }
+    } catch {
+      // override module optional — ignore
+    }
+  }
+
+  if (forcedTemplateVersionId) {
     // Explicit template version provided - use directly
-    const version = getTemplateVersion(options.templateVersionId);
+    const version = getTemplateVersion(forcedTemplateVersionId);
     if (version) {
       spec = convertSpecJsonToGoldSpec(version.specJson);
       usedTemplateVersionId = version.id;
@@ -837,7 +856,7 @@ async function processJobSheetWithOptions(
       );
     } else {
       // Template version not found - fail explicitly (no fallback)
-      const errorMsg = `Template version ${options.templateVersionId} not found`;
+      const errorMsg = `Template version ${forcedTemplateVersionId} not found`;
       console.error(`[DocumentProcessor] ${errorMsg}`);
 
       try {
