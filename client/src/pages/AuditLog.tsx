@@ -48,62 +48,62 @@ export default function AuditLog() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-6 max-w-7xl mx-auto">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-border/50">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">System Audit Log</h1>
+            <h1 className="text-3xl font-heading font-bold tracking-tight">System Audit Log</h1>
             <p className="text-muted-foreground mt-1">Security events and access history.</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
-          </div>
+          <Button variant="outline" className="shrink-0">
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
         </div>
 
         <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle className="flex items-center gap-2">
+          <CardHeader className="border-b space-y-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <ShieldAlert className="h-5 w-5 text-primary" />
                 Security Events
               </CardTitle>
-              <div className="flex gap-2 w-full max-w-sm">
+              <div className="flex gap-2 w-full sm:max-w-sm">
                 <div className="relative flex-1">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input 
-                    placeholder="Search logs..." 
-                    className="pl-8" 
+                    placeholder="Search action, entity, or ID..." 
+                    className="pl-9 h-9" 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-                <Button variant="outline" size="icon">
+                <Button variant="outline" size="icon" className="shrink-0 h-9 w-9">
                   <Filter className="h-4 w-4" />
                 </Button>
               </div>
             </div>
             <CardDescription>
-              Showing {filteredLogs.length} events from the system audit log.
+              {searchTerm
+                ? `${filteredLogs.length} of ${logs?.length ?? 0} events match your search`
+                : `Showing ${filteredLogs.length} recent events`}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {isLoading ? (
-              <div className="flex items-center justify-center py-12">
+              <div className="flex items-center justify-center py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : filteredLogs.length > 0 ? (
-              <div className="rounded-md border">
+              <div className="max-h-[min(70vh,640px)] overflow-auto">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[180px]">Timestamp</TableHead>
+                  <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-[180px] pl-6">Timestamp</TableHead>
                       <TableHead>User</TableHead>
                       <TableHead>Action</TableHead>
                       <TableHead>Entity</TableHead>
                       <TableHead>Details</TableHead>
-                      <TableHead className="text-right">Status</TableHead>
+                      <TableHead className="text-right pr-6">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -111,7 +111,7 @@ export default function AuditLog() {
                       const status = getStatusBadge(log.action);
                       return (
                         <TableRow key={log.id}>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
+                          <TableCell className="font-mono text-xs text-muted-foreground pl-6">
                             <div className="flex items-center gap-2">
                               <Clock className="h-3 w-3" />
                               {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
@@ -143,7 +143,7 @@ export default function AuditLog() {
                           <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
                             {log.details ? JSON.stringify(log.details) : '-'}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right pr-6">
                             <Badge 
                               variant={status.variant}
                               className={status.className || ''}
@@ -158,10 +158,18 @@ export default function AuditLog() {
                 </Table>
               </div>
             ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                <ShieldAlert className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No audit events found.</p>
-                <p className="text-sm">System activity will appear here.</p>
+              <div className="text-center py-16 px-6 text-muted-foreground">
+                <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-muted/60 flex items-center justify-center">
+                  <ShieldAlert className="h-7 w-7 opacity-60" />
+                </div>
+                <p className="font-medium text-foreground">
+                  {searchTerm ? "No matching events" : "No audit events yet"}
+                </p>
+                <p className="text-sm mt-1">
+                  {searchTerm
+                    ? `No results for "${searchTerm}". Try a different term.`
+                    : "System activity will appear here as users interact with the platform."}
+                </p>
               </div>
             )}
           </CardContent>
