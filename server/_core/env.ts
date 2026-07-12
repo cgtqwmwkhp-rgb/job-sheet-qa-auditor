@@ -27,9 +27,11 @@ function getAppEnvironment(): AppEnvironment {
   return "development";
 }
 
-// Validate critical environment variables at module load (skip in test environment)
+// Validate critical environment variables at module load (skip in test/CI environments)
+const isTestEnvironment =
+  process.env.NODE_ENV === "test" || process.env.CI === "true";
 if (
-  process.env.NODE_ENV !== "test" &&
+  !isTestEnvironment &&
   (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)
 ) {
   throw new Error(
