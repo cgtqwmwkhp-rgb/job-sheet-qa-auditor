@@ -88,6 +88,17 @@ function RequireStaff({ children }: { children: React.ReactNode }) {
 function Router() {
   const { isLoading, user } = useAuth();
 
+  // Initialize error tracking on mount
+  useEffect(() => {
+    initializeErrorTracking({
+      user: user ? {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      } : undefined,
+    });
+  }, [user]);
+
   if (isLoading) return <PageLoader />;
 
   const homeRedirect = user?.role === "technician" ? "/portal/dashboard" : "/";
@@ -108,17 +119,23 @@ function Router() {
 
         <Route path="/">
           <RequireStaff>
-            <Dashboard />
+            <RouteErrorBoundary routeName="Dashboard">
+              <Dashboard />
+            </RouteErrorBoundary>
           </RequireStaff>
         </Route>
         <Route path="/upload">
           <RequireStaff>
-            <UploadPage />
+            <RouteErrorBoundary routeName="Upload">
+              <UploadPage />
+            </RouteErrorBoundary>
           </RequireStaff>
         </Route>
         <Route path="/audits">
           <RequireStaff>
-            <AuditResults />
+            <RouteErrorBoundary routeName="AuditResults">
+              <AuditResults />
+            </RouteErrorBoundary>
           </RequireStaff>
         </Route>
         <Route path="/hold-queue">
