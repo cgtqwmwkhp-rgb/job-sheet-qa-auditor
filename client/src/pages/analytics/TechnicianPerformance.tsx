@@ -787,7 +787,8 @@ export default function TechnicianPerformance() {
           <CardHeader>
             <CardTitle>Leaderboard</CardTitle>
             <CardDescription>
-              Click a technician to open scorecard and audit drill-through.
+              Click a technician for scorecard and drill-through, or open
+              coaching directly from the row.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -801,6 +802,7 @@ export default function TechnicianPerformance() {
                   <TableHead>Issue rate</TableHead>
                   <TableHead>Critical</TableHead>
                   <TableHead>Top issue</TableHead>
+                  <TableHead className="text-right">Coaching</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -825,6 +827,18 @@ export default function TechnicianPerformance() {
                     <TableCell>{row.criticalIssues}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {row.topIssueType ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Link
+                        href={`/analytics/technicians/${row.engineerId}/coaching`}
+                      >
+                        <a
+                          className="text-sm font-medium text-primary hover:underline"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          Pack
+                        </a>
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ))}

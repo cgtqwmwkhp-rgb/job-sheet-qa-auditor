@@ -24,6 +24,7 @@ import type { RawFindingRow } from "./mapFindings";
 import { toIssueOccurrence } from "./mapFindings";
 import { generateFixPack } from "./analyticsService";
 import type { EngineerScoreCard, FixPack } from "./types";
+import { stripLetterheadNoise } from "../letterheadNoise";
 
 export interface CoachingJobCard {
   jobSheetId: number;
@@ -371,12 +372,15 @@ export function buildEngineerCoachingPack(input: {
       const cite = evidenceDossier.cites.find(
         c => c.findingId === finding.findingId
       );
-      const quote =
+      const quoteRaw =
         cite?.snippet ||
         cite?.commentSnippet ||
         finding.normalisedSnippet ||
         finding.rawSnippet ||
         null;
+      const quote = quoteRaw
+        ? stripLetterheadNoise(String(quoteRaw)) || null
+        : null;
       const gapBits: string[] = [];
       if (cite?.commentHasWhat === false) gapBits.push("missing what-failed");
       if (
