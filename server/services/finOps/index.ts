@@ -13,6 +13,12 @@ export { rollupStageCosts } from "./rollup";
 export { estimateTokenCostUsd, resolveTokenPricing } from "./pricing";
 export { deriveToolId, toolDisplayLabel } from "./toolLabels";
 export {
+  getUsdToGbpRate,
+  clearUsdGbpRateCache,
+  convertUsdToDisplay,
+  type UsdGbpRate,
+} from "./fx";
+export {
   recordApiCost,
   clearApiCostLedger,
   getApiCostEventCount,

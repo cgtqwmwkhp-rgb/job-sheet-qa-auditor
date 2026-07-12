@@ -8,7 +8,7 @@ import {
 } from "./trpc";
 import { ENV } from "./env";
 import { getModelRegistry } from "../services/modelRegistry";
-import { summarizeApiCosts } from "../services/finOps";
+import { summarizeApiCosts, getUsdToGbpRate } from "../services/finOps";
 
 // Runtime environment variables for version info (injected at build/deploy time)
 const GIT_SHA = process.env.GIT_SHA || "unknown";
@@ -94,15 +94,29 @@ export const systemRouter = router({
         })
         .optional()
     )
-    .query(({ input }) =>
-      summarizeApiCosts({
-        windowHours: input?.windowHours === undefined ? 24 : input.windowHours,
-        recentLimit: input?.recentLimit ?? 25,
-        jobSheetLimit: input?.jobSheetLimit ?? 40,
-        dayLimit: input?.dayLimit ?? 62,
-        monthLimit: input?.monthLimit ?? 24,
-      })
-    ),
+    .query(async ({ input }) => {
+      const [summary, fx] = await Promise.all([
+        Promise.resolve(
+          summarizeApiCosts({
+            windowHours:
+              input?.windowHours === undefined ? 24 : input.windowHours,
+            recentLimit: input?.recentLimit ?? 25,
+            jobSheetLimit: input?.jobSheetLimit ?? 40,
+            dayLimit: input?.dayLimit ?? 62,
+            monthLimit: input?.monthLimit ?? 24,
+          })
+        ),
+        getUsdToGbpRate(),
+      ]);
+      return {
+        ...summary,
+        fx: {
+          usdToGbp: fx.usdToGbp,
+          asOf: fx.asOf,
+          source: fx.source,
+        },
+      };
+    }),
 
   /**
    * PR-3: Platform config drift endpoint (admin-only)
