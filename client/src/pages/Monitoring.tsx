@@ -37,10 +37,16 @@ import {
 
 export default function Monitoring() {
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [healthTs] = useState(() => Date.now());
+  const avgResponseMs = 245;
+  const errorRatePct = 0.12;
+  const slowQueries = 3;
+  const avgQueryMs = 45;
+  const cacheHitPct = 94;
 
   // System health (requires timestamp input per systemRouter contract)
   const { data: health, refetch: refetchHealth } = trpc.system.health.useQuery({
-    timestamp: Date.now(),
+    timestamp: healthTs,
   });
   const { data: version, refetch: refetchVersion } =
     trpc.system.version.useQuery();
@@ -126,16 +132,16 @@ export default function Monitoring() {
         />
         <StatusCard
           title="Avg Response"
-          value="245ms"
+          value={`${avgResponseMs}ms`}
           icon={<Zap className="h-5 w-5" />}
-          variant={245 < 300 ? "success" : "warning"}
+          variant={avgResponseMs < 300 ? "success" : "warning"}
           subtitle="Last hour"
         />
         <StatusCard
           title="Error Rate"
-          value="0.12%"
+          value={`${errorRatePct}%`}
           icon={<AlertCircle className="h-5 w-5" />}
-          variant={0.12 < 0.5 ? "success" : "error"}
+          variant={errorRatePct < 0.5 ? "success" : "error"}
           subtitle="Last hour"
         />
       </div>
@@ -303,19 +309,19 @@ export default function Monitoring() {
             />
             <MetricBox
               label="Slow Queries"
-              value="3"
+              value={String(slowQueries)}
               suffix="queries"
-              status={3 < 10 ? "healthy" : "warning"}
+              status={slowQueries < 10 ? "healthy" : "warning"}
             />
             <MetricBox
               label="Avg Query Time"
-              value="45ms"
-              status={45 < 100 ? "healthy" : "warning"}
+              value={`${avgQueryMs}ms`}
+              status={avgQueryMs < 100 ? "healthy" : "warning"}
             />
             <MetricBox
               label="Cache Hit Rate"
-              value="94%"
-              status={94 > 80 ? "healthy" : "warning"}
+              value={`${cacheHitPct}%`}
+              status={cacheHitPct > 80 ? "healthy" : "warning"}
             />
           </div>
         </CardContent>

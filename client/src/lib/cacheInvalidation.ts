@@ -5,6 +5,7 @@
  * Uses TanStack Query's invalidation API for automatic re-fetching.
  */
 
+import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getQueryKey } from "@trpc/react-query";
 import { trpc } from "./trpc";
@@ -225,25 +226,30 @@ export function useStaleWhileRevalidate<T>(
   staleTime: number = 5000 // 5 seconds
 ) {
   const queryClient = useQueryClient();
-  
+
   // Try to get cached data
   const cachedData = queryClient.getQueryData<T>(queryKey);
-  
-  // Fetch fresh data in background if stale
-  if (cachedData) {
-    const queryState = queryClient.getQueryState(queryKey);
-    const isStale = !queryState?.dataUpdatedAt || 
-      Date.now() - queryState.dataUpdatedAt > staleTime;
-    
-    if (isStale) {
-      fetcher().then(data => {
-        queryClient.setQueryData(queryKey, data);
-      }).catch(err => {
+  const dataUpdatedAt = queryClient.getQueryState(queryKey)?.dataUpdatedAt ?? 0;
+
+  // Fetch fresh data in background if stale (effect keeps render pure)
+  useEffect(() => {
+    if (!cachedData) return;
+    const now = Date.now();
+    const isStale = !dataUpdatedAt || now - dataUpdatedAt > staleTime;
+    if (!isStale) return;
+    let cancelled = false;
+    fetcher()
+      .then(data => {
+        if (!cancelled) queryClient.setQueryData(queryKey, data);
+      })
+      .catch(err => {
         console.error("Background refetch failed:", err);
       });
-    }
-  }
-  
+    return () => {
+      cancelled = true;
+    };
+  }, [cachedData, dataUpdatedAt, fetcher, queryClient, queryKey, staleTime]);
+
   return cachedData;
 }
 
