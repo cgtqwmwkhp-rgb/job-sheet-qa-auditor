@@ -38,7 +38,9 @@ export async function createAuditWithFindings(
       auditResultId: auditId,
     }));
     const findings = await db.createAuditFindings(findingsWithAuditId);
-    const findingIds = findings.map(f => f.id).filter((id): id is number => id !== undefined);
+    const findingIds = findings
+      .map(f => f.id)
+      .filter((id): id is number => id !== undefined);
 
     return { auditId, findingIds };
   } catch (error) {

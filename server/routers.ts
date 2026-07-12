@@ -116,8 +116,9 @@ export const appRouter = router({
         const allJobSheets = await db.getJobSheets(input);
 
         // Object-level filtering: regular users only see their own uploads
-        const { filterJobSheetsByAccess } =
-          await import("./utils/authorization");
+        const { filterJobSheetsByAccess } = await import(
+          "./utils/authorization"
+        );
         return filterJobSheetsByAccess(allJobSheets, ctx.user);
       }),
 
@@ -220,8 +221,9 @@ export const appRouter = router({
         const buffer = Buffer.from(input.fileBase64, "base64");
 
         // Validate file type and size
-        const { validateFile, sanitizeFilename } =
-          await import("./utils/fileValidation");
+        const { validateFile, sanitizeFilename } = await import(
+          "./utils/fileValidation"
+        );
         const validation = validateFile(buffer, input.fileType, {
           maxSizeBytes: 10 * 1024 * 1024, // 10MB
           allowedTypes: ["application/pdf", "image/jpeg", "image/png"],
@@ -841,8 +843,9 @@ export const appRouter = router({
         // Object-level filtering: regular users only see audits for their own uploads
         // First, get all job sheets they have access to
         const allJobSheets = await db.getJobSheets();
-        const { filterJobSheetsByAccess } =
-          await import("./utils/authorization");
+        const { filterJobSheetsByAccess } = await import(
+          "./utils/authorization"
+        );
         const accessibleJobSheets = filterJobSheetsByAccess(
           allJobSheets,
           ctx.user
@@ -1078,8 +1081,9 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
         // Object-level authorization: users can only access their own profile (unless admin)
-        const { enforceUserProfileAccess } =
-          await import("./utils/authorization");
+        const { enforceUserProfileAccess } = await import(
+          "./utils/authorization"
+        );
         enforceUserProfileAccess(input.id, ctx.user);
 
         return db.getUserById(input.id);

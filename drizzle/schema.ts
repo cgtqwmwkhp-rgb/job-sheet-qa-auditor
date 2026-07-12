@@ -212,7 +212,11 @@ export const auditFindings = mysqlTable("audit_findings", {
 export type AuditFinding = typeof auditFindings.$inferSelect;
 export type InsertAuditFinding = typeof auditFindings.$inferInsert;
 export type FindingResolutionStatus =
-  "open" | "waived" | "overridden" | "flagged" | "approved";
+  | "open"
+  | "waived"
+  | "overridden"
+  | "flagged"
+  | "approved";
 
 /**
  * Disputes - technician challenges to audit findings
