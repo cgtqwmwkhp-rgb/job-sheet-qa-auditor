@@ -1,4 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <rect width="32" height="32" fill="#BEDA41" rx="6"/>
-  <text x="16" y="22" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#333030" text-anchor="middle">PE</text>
+  <rect width="32" height="32" rx="6" fill="#FFFFFF"/>
+  <!-- Compact interlocking mark: lime + charcoal -->
+  <g fill="none" stroke-linejoin="round">
+    <path
+      d="M9 5.5 H15.5 L19.5 9.5 V16 L15.5 20 H9 L5 16 V9.5 Z"
+      stroke="#BEDA41"
+      stroke-width="2.6"
+    />
+    <path
+      d="M16.5 12.5 H23 L27 16.5 V23 L23 27 H16.5 L12.5 23 V16.5 Z"
+      stroke="#333030"
+      stroke-width="2.6"
+    />
+  </g>
 </svg>

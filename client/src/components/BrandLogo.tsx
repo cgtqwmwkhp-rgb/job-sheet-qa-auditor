@@ -10,7 +10,7 @@ interface BrandLogoProps {
 }
 
 /**
- * PlantExpand brand mark + optional wordmark for staff chrome.
+ * PlantExpand brand mark (interlocking octagons, lime + charcoal) + optional wordmark.
  */
 export function BrandLogo({
   showWordmark = true,
@@ -21,11 +21,11 @@ export function BrandLogo({
   return (
     <div className={cn("flex items-center gap-2 min-w-0", className)}>
       <img
-        src="/plantexpand-mark.svg"
+        src="/plantexpand-mark.png"
         alt=""
         width={32}
         height={32}
-        className={cn("h-7 w-7 shrink-0 rounded-md", markClassName)}
+        className={cn("h-7 w-7 shrink-0 object-contain", markClassName)}
         aria-hidden="true"
       />
       {showWordmark ? (
