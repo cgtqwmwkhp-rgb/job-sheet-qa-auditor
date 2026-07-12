@@ -176,3 +176,139 @@ export async function optimisticUpdate<T>(
 
   return { previousData };
 }
+
+/**
+ * Selective cache invalidation based on filters.
+ * Only invalidates queries matching specific criteria.
+ */
+export async function invalidateMatchingQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  predicate: (queryKey: unknown[]) => boolean
+) {
+  await queryClient.invalidateQueries({
+    predicate: (query) => predicate(query.queryKey as unknown[]),
+  });
+}
+
+/**
+ * Prefetch data for smoother navigation.
+ * Use before navigating to a new page.
+ */
+export async function prefetchData(
+  utils: ReturnType<typeof trpc.useUtils>,
+  type: "jobSheet" | "audit" | "user",
+  id: number
+) {
+  switch (type) {
+    case "jobSheet":
+      await Promise.all([
+        utils.jobSheets.get.prefetch({ id }),
+        utils.audits.getByJobSheet.prefetch({ jobSheetId: id }),
+      ]);
+      break;
+    case "audit":
+      await utils.audits.getFindings.prefetch({ auditResultId: id });
+      break;
+    case "user":
+      await utils.users.get.prefetch({ id });
+      break;
+  }
+}
+
+/**
+ * Stale-while-revalidate pattern.
+ * Returns stale data immediately while fetching fresh data in background.
+ */
+export function useStaleWhileRevalidate<T>(
+  queryKey: unknown[],
+  fetcher: () => Promise<T>,
+  staleTime: number = 5000 // 5 seconds
+) {
+  const queryClient = useQueryClient();
+  
+  // Try to get cached data
+  const cachedData = queryClient.getQueryData<T>(queryKey);
+  
+  // Fetch fresh data in background if stale
+  if (cachedData) {
+    const queryState = queryClient.getQueryState(queryKey);
+    const isStale = !queryState?.dataUpdatedAt || 
+      Date.now() - queryState.dataUpdatedAt > staleTime;
+    
+    if (isStale) {
+      fetcher().then(data => {
+        queryClient.setQueryData(queryKey, data);
+      }).catch(err => {
+        console.error("Background refetch failed:", err);
+      });
+    }
+  }
+  
+  return cachedData;
+}
+
+/**
+ * Batch invalidation for multiple entities.
+ * More efficient than individual invalidations.
+ */
+export async function batchInvalidate(
+  utils: ReturnType<typeof trpc.useUtils>,
+  invalidations: Array<{
+    type: "jobSheet" | "audit" | "dispute" | "user" | "all";
+    id?: number;
+  }>
+) {
+  const promises = invalidations.map(({ type, id }) => {
+    switch (type) {
+      case "jobSheet":
+        return id ? utils.jobSheets.get.invalidate({ id }) : utils.jobSheets.invalidate();
+      case "audit":
+        return id ? utils.audits.getByJobSheet.invalidate({ jobSheetId: id }) : utils.audits.invalidate();
+      case "dispute":
+        return utils.disputes.invalidate();
+      case "user":
+        return id ? utils.users.get.invalidate({ id }) : utils.users.invalidate();
+      case "all":
+        return utils.client.invalidateQueries();
+      default:
+        return Promise.resolve();
+    }
+  });
+  
+  await Promise.all(promises);
+}
+
+/**
+ * Smart cache warming on app startup.
+ * Prefetches commonly accessed data.
+ */
+export async function warmCache(utils: ReturnType<typeof trpc.useUtils>) {
+  try {
+    // Prefetch dashboard data
+    await Promise.all([
+      utils.stats.dashboard.prefetch(),
+      utils.jobSheets.list.prefetch({ limit: 10 }),
+    ]);
+  } catch (error) {
+    console.error("Cache warming failed:", error);
+    // Non-critical, don't block app startup
+  }
+}
+
+/**
+ * Cache cleanup for memory management.
+ * Removes old/unused queries.
+ */
+export function cleanupCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  olderThan: number = 30 * 60 * 1000 // 30 minutes
+) {
+  const now = Date.now();
+  
+  queryClient.getQueryCache().getAll().forEach(query => {
+    const state = query.state;
+    if (state.dataUpdatedAt && now - state.dataUpdatedAt > olderThan) {
+      queryClient.removeQueries({ queryKey: query.queryKey });
+    }
+  });
+}
