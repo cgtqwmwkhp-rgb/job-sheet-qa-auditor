@@ -1,4 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { EmptyState } from "@/components/EmptyState";
 import { FileUploader } from "@/components/FileUploader";
 import { ProcessingProgressPanel } from "@/components/ProcessingProgressPanel";
 import {
@@ -11,6 +12,13 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Info,
   FileText,
   CheckCircle2,
@@ -18,9 +26,12 @@ import {
   Loader2,
   Play,
   AlertCircle,
+  User,
+  ArrowRight,
+  Upload as UploadIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { GuidedTour } from "@/components/GuidedTour";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -30,12 +41,18 @@ import {
   watchJobSheetsProcessing,
 } from "@/hooks/useProcessingWatch";
 import { isActiveJobSheetStatus } from "@shared/processingProgress";
+import { cn } from "@/lib/utils";
 
 interface IntakeFeedback {
   fileName: string;
   qualityScore: number | null;
   grade: string | null;
   retakeFeedback: string[];
+}
+
+interface UploadSuccess {
+  ids: number[];
+  fileNames: string[];
 }
 
 export default function UploadPage() {
@@ -46,8 +63,10 @@ export default function UploadPage() {
     []
   );
   const [technicianId, setTechnicianId] = useState<string>("");
+  const [uploadSuccess, setUploadSuccess] = useState<UploadSuccess | null>(
+    null
+  );
 
-  // Fetch recent uploads — poll while any are actively processing
   const {
     data: recentUploads,
     isLoading: uploadsLoading,
@@ -70,6 +89,11 @@ export default function UploadPage() {
   const processMutation = trpc.jobSheets.process.useMutation();
   const utils = trpc.useUtils();
 
+  const selectedTechnician = useMemo(
+    () => technicians?.find(t => String(t.id) === technicianId),
+    [technicians, technicianId]
+  );
+
   const primaryProcessingId = useMemo(() => {
     if (processingIds.length > 0) return processingIds[0];
     const fromList = recentUploads?.find(u => isActiveJobSheetStatus(u.status));
@@ -84,6 +108,7 @@ export default function UploadPage() {
     if (files.length === 0) return;
 
     setIsUploading(true);
+    setUploadSuccess(null);
     const uploaded: Array<{ id: number; fileName: string }> = [];
     const rejections: IntakeFeedback[] = [];
 
@@ -140,6 +165,11 @@ export default function UploadPage() {
         return;
       }
 
+      setUploadSuccess({
+        ids: uploaded.map(u => u.id),
+        fileNames: uploaded.map(u => u.fileName),
+      });
+
       toast.success(
         `Uploaded ${uploaded.length} file(s). Processing in the background — you can navigate away.`
       );
@@ -151,7 +181,6 @@ export default function UploadPage() {
       setProcessingIds(ids);
       watchJobSheetsProcessing(uploaded);
 
-      // Fire-and-forget process so SPA navigation does not block on the mutation UI
       void (async () => {
         for (const item of uploaded) {
           try {
@@ -191,17 +220,17 @@ export default function UploadPage() {
 
   const getStatusIcon = (status: string, id: number) => {
     if (processingIds.includes(id) || status === "processing") {
-      return <Loader2 className="w-4 h-4 animate-spin" />;
+      return <Loader2 className="h-4 w-4 animate-spin" />;
     }
     switch (status) {
       case "completed":
-        return <CheckCircle2 className="w-4 h-4" />;
+        return <CheckCircle2 className="h-4 w-4" />;
       case "failed":
-        return <AlertCircle className="w-4 h-4" />;
+        return <AlertCircle className="h-4 w-4" />;
       case "review_queue":
-        return <Clock className="w-4 h-4" />;
+        return <Clock className="h-4 w-4" />;
       default:
-        return <FileText className="w-4 h-4" />;
+        return <FileText className="h-4 w-4" />;
     }
   };
 
@@ -221,7 +250,16 @@ export default function UploadPage() {
     }
   };
 
-  const showBusyOverlay = isUploading;
+  const primarySuccessHref = uploadSuccess
+    ? uploadSuccess.ids.length === 1
+      ? `/audits?id=${uploadSuccess.ids[0]}`
+      : "/audits"
+    : "/audits";
+
+  const primarySuccessLabel =
+    uploadSuccess && uploadSuccess.ids.length === 1
+      ? "View audit result"
+      : "View audit results";
 
   return (
     <DashboardLayout>
@@ -250,73 +288,142 @@ export default function UploadPage() {
           },
         ]}
       />
-      <div className="space-y-6 max-w-4xl mx-auto">
-        <div>
-          <h1 className="text-3xl font-heading font-bold tracking-tight">
-            Upload Job Cards
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Upload single or multiple job sheets for automated AI-powered
-            auditing.
-          </p>
-        </div>
+      <div className="mx-auto max-w-4xl space-y-6">
+        <p className="text-[#706D6D]">
+          Drop a job sheet below — processing starts automatically. One clear
+          path from upload to audit result.
+        </p>
 
-        <Alert className="bg-blue-50 border-blue-200 text-blue-800">
-          <Info className="h-4 w-4 text-blue-800" />
-          <AlertTitle>AI-Powered Processing</AlertTitle>
+        {uploadSuccess ? (
+          <Alert className="border-primary/30 bg-[rgba(190,218,65,0.12)] text-[#333030]">
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+            <AlertTitle>Upload complete</AlertTitle>
+            <AlertDescription className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                {uploadSuccess.fileNames.length === 1
+                  ? `"${uploadSuccess.fileNames[0]}" is processing. You'll get a notification when the audit finishes.`
+                  : `${uploadSuccess.fileNames.length} files are processing. You'll get a notification when audits finish.`}
+              </span>
+              <Button
+                asChild
+                size="sm"
+                className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <Link href={primarySuccessHref}>
+                  {primarySuccessLabel}
+                  <ArrowRight className="ml-1.5 h-4 w-4" />
+                </Link>
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
+        <Alert className="border-[#DBEAFE] bg-[#F0F7FF] text-[#2868CE]">
+          <Info className="h-4 w-4" />
+          <AlertTitle>AI-powered processing</AlertTitle>
           <AlertDescription>
-            Files are processed with <strong>OCR text extraction</strong> and{" "}
-            <strong>Gemini 3.1 Pro</strong> judgment against the Gold Standard
-            specification. Progress updates live per stage — you can leave this
-            page and still get a completion notification.
+            OCR extraction and Gold Standard judgment run in the background.
+            Progress updates live — you can leave this page safely.
           </AlertDescription>
         </Alert>
 
-        <Card id="upload-area">
-          <CardHeader>
-            <CardTitle>File Upload</CardTitle>
+        <Card id="upload-area" className="overflow-hidden">
+          <CardHeader className="border-b border-[#EBE8E8] bg-white pb-4">
+            <div className="flex flex-wrap items-center gap-3 text-xs font-medium uppercase tracking-wider text-[#8A8787]">
+              <span className="flex items-center gap-1.5 rounded-full bg-[rgba(190,218,65,0.15)] px-2.5 py-1 text-[#333030]">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                  1
+                </span>
+                Technician
+              </span>
+              <span className="text-[#C5C2C2]">→</span>
+              <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[#EBE8E8] text-[10px] font-bold">
+                  2
+                </span>
+                Upload file
+              </span>
+              <span className="text-[#C5C2C2]">→</span>
+              <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[#EBE8E8] text-[10px] font-bold">
+                  3
+                </span>
+                Review result
+              </span>
+            </div>
+            <CardTitle className="mt-3">Upload job sheet</CardTitle>
             <CardDescription>
-              Drag and drop your job sheets here or click to browse. Processing
-              starts automatically in the background.
+              Drag and drop or browse. Processing begins as soon as the file is
+              accepted.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label
-                htmlFor="upload-technician"
-                className="text-sm font-medium"
-              >
-                Technician (for performance analytics)
-              </label>
-              <select
-                id="upload-technician"
-                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-                value={technicianId}
-                onChange={e => setTechnicianId(e.target.value)}
+          <CardContent className="space-y-5 pt-5">
+            <div
+              className={cn(
+                "rounded-lg border p-4 transition-colors duration-200",
+                technicianId
+                  ? "border-primary/40 bg-[rgba(190,218,65,0.08)]"
+                  : "border-[#EBE8E8] bg-[#F9F9F9]"
+              )}
+            >
+              <div className="mb-3 flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+                  <User className="h-4 w-4 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <label
+                    htmlFor="upload-technician"
+                    className="text-sm font-semibold text-[#333030]"
+                  >
+                    Assign technician
+                  </label>
+                  <p className="text-xs text-[#706D6D]">
+                    Required for scorecards. Pick now or let OCR auto-match the
+                    engineer name on the sheet.
+                  </p>
+                </div>
+                {selectedTechnician ? (
+                  <span className="shrink-0 rounded-full bg-primary px-2.5 py-0.5 text-xs font-medium text-primary-foreground">
+                    Assigned
+                  </span>
+                ) : (
+                  <span className="shrink-0 rounded-full border border-[#EBE8E8] bg-white px-2.5 py-0.5 text-xs text-[#8A8787]">
+                    Optional
+                  </span>
+                )}
+              </div>
+              <Select
+                value={technicianId || "auto"}
+                onValueChange={value =>
+                  setTechnicianId(value === "auto" ? "" : value)
+                }
                 disabled={isUploading}
               >
-                <option value="">
-                  Auto-match from OCR name (or leave unassigned)
-                </option>
-                {(technicians ?? []).map(t => (
-                  <option key={t.id} value={String(t.id)}>
-                    {t.name}
-                    {t.role === "technician" ? "" : ` (${t.role})`}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-muted-foreground">
-                Scorecards only include cards with a technician. Prefer picking
-                one here, or ensure a user exists whose name matches the
-                engineer on the sheet.
-              </p>
+                <SelectTrigger
+                  id="upload-technician"
+                  className="w-full bg-white"
+                >
+                  <SelectValue placeholder="Select technician" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">
+                    Auto-match from OCR name (or leave unassigned)
+                  </SelectItem>
+                  {(technicians ?? []).map(t => (
+                    <SelectItem key={t.id} value={String(t.id)}>
+                      {t.name}
+                      {t.role === "technician" ? "" : ` (${t.role})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {showBusyOverlay ? (
-              <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-lg bg-blue-50/50">
-                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                <p className="text-lg font-medium">Uploading files...</p>
-                <p className="text-sm text-muted-foreground">
+            {isUploading ? (
+              <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-primary/40 bg-[rgba(190,218,65,0.08)] py-12">
+                <Loader2 className="mb-4 h-12 w-12 animate-spin text-primary" />
+                <p className="text-lg font-medium">Uploading files…</p>
+                <p className="text-sm text-[#706D6D]">
                   Please wait while we upload your documents.
                 </p>
               </div>
@@ -328,35 +435,32 @@ export default function UploadPage() {
               />
             )}
 
-            {liveProgress && isActiveJobSheetStatus(liveProgress.status) && (
+            {liveProgress && isActiveJobSheetStatus(liveProgress.status) ? (
               <ProcessingProgressPanel
                 progress={liveProgress}
                 title="Live pipeline progress"
               />
-            )}
+            ) : null}
 
-            {intakeRejections.length > 0 && (
-              <div
-                className="mt-4 space-y-3"
-                data-testid="intake-retake-feedback"
-              >
+            {intakeRejections.length > 0 ? (
+              <div className="space-y-3" data-testid="intake-retake-feedback">
                 {intakeRejections.map(item => (
                   <Alert
                     key={item.fileName}
-                    className="bg-amber-50 border-amber-200 text-amber-900"
+                    className="border-amber-200 bg-amber-50 text-amber-900"
                   >
                     <AlertCircle className="h-4 w-4 text-amber-800" />
                     <AlertTitle>
                       Retake needed: {item.fileName}
-                      {item.qualityScore != null && (
-                        <span className="ml-2 font-normal text-sm">
+                      {item.qualityScore != null ? (
+                        <span className="ml-2 text-sm font-normal">
                           Quality {item.qualityScore}/100
                           {item.grade ? ` (grade ${item.grade})` : ""}
                         </span>
-                      )}
+                      ) : null}
                     </AlertTitle>
                     <AlertDescription>
-                      <ul className="mt-1 list-disc pl-4 space-y-1">
+                      <ul className="mt-1 list-disc space-y-1 pl-4">
                         {item.retakeFeedback.map(tip => (
                           <li key={tip}>{tip}</li>
                         ))}
@@ -365,16 +469,16 @@ export default function UploadPage() {
                   </Alert>
                 ))}
               </div>
-            )}
+            ) : null}
           </CardContent>
         </Card>
 
         <div className="grid gap-6 md:grid-cols-2">
           <Card id="upload-guidelines">
             <CardHeader>
-              <CardTitle>Upload Guidelines</CardTitle>
+              <CardTitle>Upload guidelines</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <CardContent className="space-y-2 text-sm text-[#706D6D]">
               <p>• Ensure the entire page is visible in the photo.</p>
               <p>• Avoid glare and shadows on the document.</p>
               <p>• Text should be sharp and readable.</p>
@@ -385,59 +489,64 @@ export default function UploadPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Recent Uploads</CardTitle>
+              <CardTitle>Recent uploads</CardTitle>
               <CardDescription>
-                Click to open the audit deep link, or re-process pending items
+                Open audit results or re-process pending items.
               </CardDescription>
             </CardHeader>
             <CardContent>
               {uploadsLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <Loader2 className="h-6 w-6 animate-spin text-[#8A8787]" />
                 </div>
               ) : recentUploads && recentUploads.length > 0 ? (
                 <div className="space-y-3">
                   {recentUploads.map(upload => (
                     <div
                       key={upload.id}
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                      className="flex items-center gap-3 rounded-lg p-2 transition-colors duration-200 hover:bg-[#F5F4F4]"
                     >
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center ${getStatusColor(upload.status, upload.id)}`}
+                        className={cn(
+                          "flex h-8 w-8 items-center justify-center rounded-full",
+                          getStatusColor(upload.status, upload.id)
+                        )}
                       >
                         {getStatusIcon(upload.status, upload.id)}
                       </div>
-                      <div
-                        className="flex-1 min-w-0 cursor-pointer"
+                      <button
+                        type="button"
+                        className="min-w-0 flex-1 cursor-pointer text-left"
                         onClick={() => setLocation(`/audits?id=${upload.id}`)}
                       >
-                        <p className="text-sm font-medium truncate">
+                        <p className="truncate text-sm font-medium">
                           {upload.fileName}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-[#8A8787]">
                           {formatDistanceToNow(new Date(upload.createdAt), {
                             addSuffix: true,
                           })}
                         </p>
-                      </div>
+                      </button>
                       {(upload.status === "pending" ||
                         upload.status === "failed") &&
-                        !processingIds.includes(upload.id) && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              handleProcessSingle(upload.id, upload.fileName)
-                            }
-                          >
-                            <Play className="w-3 h-3 mr-1" />
-                            Process
-                          </Button>
-                        )}
+                      !processingIds.includes(upload.id) ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            handleProcessSingle(upload.id, upload.fileName)
+                          }
+                        >
+                          <Play className="mr-1 h-3 w-3" />
+                          Process
+                        </Button>
+                      ) : null}
                       <span
-                        className={`text-xs font-medium px-2 py-1 rounded ${
+                        className={cn(
+                          "rounded px-2 py-1 text-xs font-medium",
                           processingIds.includes(upload.id) ||
-                          upload.status === "processing"
+                            upload.status === "processing"
                             ? "bg-blue-100 text-blue-700"
                             : upload.status === "completed"
                               ? "bg-green-100 text-green-700"
@@ -446,7 +555,7 @@ export default function UploadPage() {
                                 : upload.status === "review_queue"
                                   ? "bg-yellow-100 text-yellow-700"
                                   : "bg-gray-100 text-gray-700"
-                        }`}
+                        )}
                       >
                         {processingIds.includes(upload.id) ||
                         upload.status === "processing"
@@ -458,10 +567,12 @@ export default function UploadPage() {
                   ))}
                 </div>
               ) : (
-                <div className="text-sm text-muted-foreground text-center py-8">
-                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  No recent uploads found.
-                </div>
+                <EmptyState
+                  compact
+                  icon={UploadIcon}
+                  title="No uploads yet"
+                  description="Your recent job sheets will appear here after the first upload."
+                />
               )}
             </CardContent>
           </Card>
