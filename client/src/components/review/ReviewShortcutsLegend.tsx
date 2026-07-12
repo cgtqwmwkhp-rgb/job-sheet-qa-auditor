@@ -37,10 +37,10 @@ function ShortcutItem({ entry }: { entry: ShortcutEntry }) {
   );
 }
 
-export type ReviewShortcutsLegendVariant = "queue" | "workstation";
+export type ReviewShortcutsLegendVariant = "queue" | "workstation" | "list";
 
 interface ReviewShortcutsLegendProps {
-  /** "queue" shows queue + finding shortcuts; "workstation" shows finding-only. */
+  /** "queue" shows queue + finding shortcuts; "workstation" finding-only; "list" j/k/Enter. */
   variant: ReviewShortcutsLegendVariant;
   className?: string;
 }
@@ -49,15 +49,23 @@ export function ReviewShortcutsLegend({
   variant,
   className,
 }: ReviewShortcutsLegendProps) {
+  const listShortcuts: ShortcutEntry[] = [
+    { keys: ["j", "k"], label: "next / prev audit" },
+    { keys: ["Enter"], label: "open audit" },
+    { keys: ["?"], label: "toggle this legend" },
+  ];
+
   const entries: ShortcutEntry[] =
-    variant === "queue"
-      ? [...QUEUE_SHORTCUTS, ...FINDING_SHORTCUTS, ...META_SHORTCUTS]
-      : [
-          ...FINDING_SHORTCUTS,
-          ...META_SHORTCUTS.filter(
-            e => e.keys[0] !== "Enter" && e.keys[0] !== "?"
-          ),
-        ];
+    variant === "list"
+      ? listShortcuts
+      : variant === "queue"
+        ? [...QUEUE_SHORTCUTS, ...FINDING_SHORTCUTS, ...META_SHORTCUTS]
+        : [
+            ...FINDING_SHORTCUTS,
+            ...META_SHORTCUTS.filter(
+              e => e.keys[0] !== "Enter" && e.keys[0] !== "?"
+            ),
+          ];
 
   return (
     <Card className={className ?? "bg-muted/40"}>

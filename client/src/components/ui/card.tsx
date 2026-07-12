@@ -4,20 +4,25 @@ import { cn } from "@/lib/utils";
 
 /**
  * Card Component - Plantexpand Style Guide
- * 
+ *
  * - White background with 1px border (#EBE8E8)
  * - No shadows (border-based design)
  * - 12px border radius
  * - 16px padding
  * - Interactive cards have lime green border on hover
  */
-function Card({ className, interactive = false, ...props }: React.ComponentProps<"div"> & { interactive?: boolean }) {
+function Card({
+  className,
+  interactive = false,
+  ...props
+}: React.ComponentProps<"div"> & { interactive?: boolean }) {
   return (
     <div
       data-slot="card"
       className={cn(
         "bg-card text-card-foreground flex flex-col gap-4 rounded-xl border border-[#EBE8E8] p-4",
-        interactive && "cursor-pointer transition-colors duration-150 hover:border-primary",
+        interactive &&
+          "cursor-pointer transition-colors duration-[var(--duration-normal)] hover:border-primary",
         className
       )}
       {...props}

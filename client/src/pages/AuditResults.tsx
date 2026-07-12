@@ -13,10 +13,11 @@ import {
   ChevronRight,
   Clock,
   FileText,
+  Keyboard,
   Loader2,
   Search,
 } from "lucide-react";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/lib/trpc";
@@ -33,8 +34,11 @@ import {
   type AuditData,
   type Finding,
 } from "@/components/review/ReviewWorkstationPane";
+import { ReviewShortcutsLegend } from "@/components/review/ReviewShortcutsLegend";
 import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
 import { perfMark, PERF_MARKS, perfClear } from "@/lib/perf";
+import { useReviewQueueKeyboard } from "@/hooks/useReviewQueueKeyboard";
+import { usePersistFn } from "@/hooks/usePersistFn";
 
 interface AuditOutcomeSummary {
   result: string;
@@ -124,6 +128,9 @@ export default function AuditResults() {
   const [, setLocation] = useLocation();
   const [listSearch, setListSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [highlightIndex, setHighlightIndex] = useState(0);
+  const [showLegend, setShowLegend] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const [selectedAuditId, setSelectedAuditId] = useState<number | null>(() => {
     if (typeof window !== "undefined") {
@@ -269,10 +276,47 @@ export default function AuditResults() {
     });
   }, [allJobSheets, listSearch, statusFilter]);
 
+  const safeHighlightIndex =
+    filteredJobSheets.length === 0
+      ? 0
+      : Math.min(highlightIndex, filteredJobSheets.length - 1);
+
+  const onNext = usePersistFn(() => {
+    if (filteredJobSheets.length === 0) return;
+    setHighlightIndex(i =>
+      Math.min(
+        Math.min(i, filteredJobSheets.length - 1) + 1,
+        filteredJobSheets.length - 1
+      )
+    );
+  });
+  const onPrev = usePersistFn(() => {
+    if (filteredJobSheets.length === 0) return;
+    setHighlightIndex(i =>
+      Math.max(Math.min(i, filteredJobSheets.length - 1) - 1, 0)
+    );
+  });
+  const onOpenHighlighted = usePersistFn(() => {
+    const sheet = filteredJobSheets[safeHighlightIndex];
+    if (sheet) navigateToAudit(sheet.id);
+  });
+
+  useReviewQueueKeyboard(
+    {
+      onNext,
+      onPrev,
+      onApprove: () => undefined,
+      onReject: () => undefined,
+      onToggleLegend: () => setShowLegend(v => !v),
+      onFocusPane: onOpenHighlighted,
+    },
+    selectedAuditId == null
+  );
+
   if (isLoading && numericId > 0) {
     return (
       <DashboardLayout>
-        <div className="h-[calc(100vh-8rem)] flex flex-col animate-in fade-in duration-300">
+        <div className="h-[calc(100vh-8rem)] flex flex-col animate-in fade-in duration-[var(--duration-slow)]">
           <div className="flex items-center justify-between mb-4 shrink-0">
             <div className="space-y-2">
               <Skeleton className="h-8 w-64" />
@@ -291,7 +335,7 @@ export default function AuditResults() {
   if (numericId > 0 && jobSheetError) {
     return (
       <DashboardLayout>
-        <div className="flex flex-col items-center justify-center h-[50vh] animate-in fade-in duration-300">
+        <div className="flex flex-col items-center justify-center h-[50vh] animate-in fade-in duration-[var(--duration-slow)]">
           <div className="rounded-full bg-red-50 p-4 mb-4">
             <AlertCircle className="h-10 w-10 text-[#BA3737]" />
           </div>
@@ -316,7 +360,7 @@ export default function AuditResults() {
   ) {
     return (
       <DashboardLayout>
-        <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in duration-300">
+        <div className="space-y-6 max-w-2xl mx-auto animate-in fade-in duration-[var(--duration-slow)]">
           <div className="flex items-center justify-between gap-4">
             <div>
               <Button
@@ -369,18 +413,38 @@ export default function AuditResults() {
     return (
       <DashboardLayout>
         <div
-          className="space-y-5 animate-in fade-in duration-300"
+          className="space-y-5 animate-in fade-in duration-[var(--duration-slow)]"
           data-testid="audit-list"
         >
-          <div>
-            <h1 className="text-2xl font-heading font-bold tracking-tight text-[#333030]">
-              Audit Results
-            </h1>
-            <p className="text-[#706D6D] mt-1 text-sm">
-              Select an audit to review findings, documentation quality, and
-              reports.
-            </p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-heading font-bold tracking-tight text-[#333030]">
+                Audit Results
+              </h1>
+              <p className="text-[#706D6D] mt-1 text-sm">
+                Select an audit to review findings, documentation quality, and
+                reports. Use j/k to move, Enter to open.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1.5"
+              onClick={() => setShowLegend(v => !v)}
+              aria-pressed={showLegend}
+            >
+              <Keyboard className="h-4 w-4" />
+              Shortcuts
+            </Button>
           </div>
+
+          {showLegend ? (
+            <ReviewShortcutsLegend
+              variant="list"
+              className="bg-white border border-[#EBE8E8]"
+            />
+          ) : null}
 
           <div className="sticky top-0 z-10 -mx-1 px-1 py-2 bg-[#F9F9F9]/95 backdrop-blur-sm space-y-3">
             <div className="relative">
@@ -390,7 +454,10 @@ export default function AuditResults() {
                 placeholder="Search by reference, file, or site…"
                 className="pl-9 h-10 bg-white border-[#EBE8E8] focus-visible:ring-[#BEDA41]/40"
                 value={listSearch}
-                onChange={e => setListSearch(e.target.value)}
+                onChange={e => {
+                  setListSearch(e.target.value);
+                  setHighlightIndex(0);
+                }}
                 aria-label="Search audits"
               />
             </div>
@@ -399,9 +466,12 @@ export default function AuditResults() {
                 <button
                   key={chip.key}
                   type="button"
-                  onClick={() => setStatusFilter(chip.key)}
+                  onClick={() => {
+                    setStatusFilter(chip.key);
+                    setHighlightIndex(0);
+                  }}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors duration-150",
+                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors duration-[var(--duration-normal)]",
                     statusFilter === chip.key
                       ? "bg-[#BEDA41]/20 border-[#BEDA41] text-[#333030]"
                       : "bg-white border-[#EBE8E8] text-[#706D6D] hover:border-[#333030]/30"
@@ -464,22 +534,30 @@ export default function AuditResults() {
                 </CardTitle>
               </CardHeader>
               <ScrollArea className="h-[calc(100vh-18rem)]">
-                <div className="p-2 space-y-1">
-                  {filteredJobSheets.map(sheet => {
+                <div className="p-2 space-y-1" ref={listRef}>
+                  {filteredJobSheets.map((sheet, index) => {
                     const outcome = auditOutcomeMap.get(sheet.id);
+                    const isHighlighted = index === safeHighlightIndex;
                     return (
                       <div
                         key={sheet.id}
-                        className="group flex items-center gap-3 p-3 rounded-lg border border-transparent hover:border-[#BEDA41]/50 hover:bg-[#BEDA41]/5 transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BEDA41]"
+                        className={cn(
+                          "group flex items-center gap-3 p-3 rounded-lg border transition-all duration-[var(--duration-normal)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BEDA41]",
+                          isHighlighted
+                            ? "border-[#BEDA41] bg-[#BEDA41]/10 ring-1 ring-[#BEDA41]/40"
+                            : "border-transparent hover:border-[#BEDA41]/50 hover:bg-[#BEDA41]/5"
+                        )}
                         onClick={() => navigateToAudit(sheet.id)}
                         role="button"
                         tabIndex={0}
+                        aria-current={isHighlighted ? "true" : undefined}
                         onKeyDown={e => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
                             navigateToAudit(sheet.id);
                           }
                         }}
+                        onMouseEnter={() => setHighlightIndex(index)}
                       >
                         <div
                           className={cn(

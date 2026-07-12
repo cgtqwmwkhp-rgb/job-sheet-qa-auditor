@@ -340,7 +340,7 @@ export function EmailTemplateManager() {
           </CardHeader>
           <CardContent className="flex-1 overflow-auto p-4">
             {previewContent ? (
-              <div className="animate-in fade-in zoom-in-95 duration-300">
+              <div className="animate-in fade-in zoom-in-95 duration-[var(--duration-slow)]">
                 <div className="mb-4 text-sm border-b pb-2">
                   <div className="flex gap-2 mb-1">
                     <span className="text-muted-foreground w-12">To:</span>

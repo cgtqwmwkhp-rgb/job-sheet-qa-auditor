@@ -8,6 +8,7 @@ import { User } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { NotificationsDropdown } from "@/components/Notifications";
+import { CommandCenter } from "@/components/CommandCenter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -123,6 +124,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </p>
             <p className="truncate text-xs text-[#8A8787]">{page.subtitle}</p>
           </div>
+          <CommandCenter />
           <div className="flex items-center gap-0.5">
             <ThemeToggle />
             <NotificationsDropdown />

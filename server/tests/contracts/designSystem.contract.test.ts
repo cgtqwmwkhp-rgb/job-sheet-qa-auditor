@@ -124,11 +124,12 @@ describe("Design system — chrome wiring", () => {
     expect(src).toContain("Switch to dark mode");
   });
 
-  it("DashboardLayout includes skip link, theme toggle, and main landmark", () => {
+  it("DashboardLayout includes skip link, theme toggle, command center, and main landmark", () => {
     const src = fs.readFileSync(DASHBOARD_LAYOUT, "utf8");
     expect(src).toContain('href="#main-content"');
     expect(src).toContain("skip-link");
     expect(src).toContain("ThemeToggle");
+    expect(src).toContain("CommandCenter");
     expect(src).toContain('id="main-content"');
     expect(src).toContain('aria-label="Account menu"');
   });

@@ -5,7 +5,7 @@ import * as React from "react";
 
 /**
  * Input Component - Plantexpand Style Guide
- * 
+ *
  * - 40px height
  * - 14px padding horizontal, 10px vertical
  * - 8px border radius
@@ -30,9 +30,11 @@ function Input({
     onCompositionEnd: handleCompositionEnd,
     onKeyDown: handleKeyDown,
   } = useComposition<HTMLInputElement>({
-    onKeyDown: (e) => {
+    onKeyDown: e => {
       // Check if this is an Enter key that should be blocked
-      const isComposing = (e.nativeEvent as any).isComposing || dialogComposition.justEndedComposing();
+      const isComposing =
+        (e.nativeEvent as any).isComposing ||
+        dialogComposition.justEndedComposing();
 
       // If Enter key is pressed while composing or just after composition ended,
       // don't call the user's onKeyDown (this blocks the business logic)
@@ -67,7 +69,7 @@ function Input({
         // Base styles - Plantexpand
         "h-10 w-full min-w-0 rounded-lg border border-[#EBE8E8] bg-white px-3.5 py-2.5",
         "text-sm font-normal text-foreground",
-        "transition-[border-color,box-shadow] duration-150 ease-in-out",
+        "transition-[border-color,box-shadow] duration-[var(--duration-normal)] ease-in-out",
         // Placeholder
         "placeholder:text-[#B5B2B2]",
         // Focus state - Lime green ring

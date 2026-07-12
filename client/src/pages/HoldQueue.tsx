@@ -50,14 +50,21 @@ type HoldItem = {
   hoursUntilBreach?: number;
 };
 
-function HoldItemReasonChips({ jobSheetId }: { jobSheetId: number }) {
+function HoldItemReasonChips({
+  jobSheetId,
+  enabled,
+}: {
+  jobSheetId: number;
+  /** Only fetch for active / nearby rows to avoid N+1 on large queues. */
+  enabled: boolean;
+}) {
   const { data: auditResult } = trpc.audits.getByJobSheet.useQuery(
     { jobSheetId },
-    { staleTime: 60_000 }
+    { staleTime: 60_000, enabled }
   );
   const { data: findings } = trpc.audits.getFindings.useQuery(
     { auditResultId: auditResult?.id ?? 0 },
-    { enabled: !!auditResult?.id, staleTime: 60_000 }
+    { enabled: enabled && !!auditResult?.id, staleTime: 60_000 }
   );
 
   const chips = useMemo(() => {
@@ -480,28 +487,32 @@ export default function HoldQueue() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <Badge
-              variant={filterChip === "all" ? "default" : "secondary"}
-              className={cn(
-                "cursor-pointer",
-                filterChip === "all" &&
-                  "bg-primary text-[#333030] hover:bg-primary/90"
-              )}
+            <button
+              type="button"
+              aria-pressed={filterChip === "all"}
               onClick={() => setFilterChip("all")}
+              className={cn(
+                "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors duration-[var(--duration-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                filterChip === "all"
+                  ? "border-transparent bg-primary text-[#333030] hover:bg-primary/90"
+                  : "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              )}
             >
               All ({totalItems})
-            </Badge>
-            <Badge
-              variant={filterChip === "critical" ? "default" : "secondary"}
-              className={cn(
-                "cursor-pointer",
-                filterChip === "critical" &&
-                  "bg-primary text-[#333030] hover:bg-primary/90"
-              )}
+            </button>
+            <button
+              type="button"
+              aria-pressed={filterChip === "critical"}
               onClick={() => setFilterChip("critical")}
+              className={cn(
+                "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors duration-[var(--duration-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                filterChip === "critical"
+                  ? "border-transparent bg-primary text-[#333030] hover:bg-primary/90"
+                  : "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              )}
             >
               Critical
-            </Badge>
+            </button>
             {slaSummary && slaSummary.breachedCount > 0 && (
               <Badge variant="destructive" className="gap-1">
                 <Clock className="h-3 w-3" />
@@ -571,8 +582,15 @@ export default function HoldQueue() {
                   />
                 ) : (
                   <ul className="divide-y divide-[#EBE8E8]">
-                    {sortedFilteredItems.map(item => {
+                    {sortedFilteredItems.map((item, index) => {
                       const isActive = activeId === item.id;
+                      const activeIndex = sortedFilteredItems.findIndex(
+                        i => i.id === activeId
+                      );
+                      const chipsEnabled =
+                        isActive ||
+                        (activeIndex >= 0 &&
+                          Math.abs(index - activeIndex) <= 2);
                       return (
                         <li key={item.id}>
                           <div
@@ -640,7 +658,19 @@ export default function HoldQueue() {
                                   {item.site} • {item.date}
                                 </div>
                                 <div className="mt-1 flex items-center gap-2">
-                                  <HoldItemReasonChips jobSheetId={item.id} />
+                                  {chipsEnabled ? (
+                                    <HoldItemReasonChips
+                                      jobSheetId={item.id}
+                                      enabled
+                                    />
+                                  ) : item.severity === "critical" ? (
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-[10px] px-1.5 py-0 leading-4"
+                                    >
+                                      Critical
+                                    </Badge>
+                                  ) : null}
                                   {/* Quick actions: always visible on the active row; revealed
                                       on hover/focus for others so approve/reject take one click
                                       without first selecting the row. */}
