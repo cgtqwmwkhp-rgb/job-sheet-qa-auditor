@@ -7,6 +7,7 @@
 import type { EngineerDocumentRow } from "./aggregateFromDb";
 import { classifyFindingTheme, type CoachingThemeId } from "./coachingThemes";
 import type { RawFindingRow } from "./mapFindings";
+import { stripLetterheadNoise } from "../letterheadNoise";
 
 export interface EvidenceCite {
   jobSheetId: number;
@@ -186,7 +187,7 @@ function extractCommentSignals(report: Record<string, unknown> | null): {
     };
   }
   return {
-    snippet: truncate(asString(s.snippet), 220),
+    snippet: truncate(stripLetterheadNoise(asString(s.snippet) ?? ""), 220),
     hasWhat: asBool(s.hasWhat),
     hasNextAction: asBool(s.hasNextAction),
     hasPartsStance: asBool(s.hasPartsStance),
@@ -195,7 +196,12 @@ function extractCommentSignals(report: Record<string, unknown> | null): {
 }
 
 function findingSnippet(f: RawFindingRow): string | null {
-  return truncate(asString(f.normalisedSnippet) ?? asString(f.rawSnippet), 220);
+  return truncate(
+    stripLetterheadNoise(
+      asString(f.normalisedSnippet) ?? asString(f.rawSnippet) ?? ""
+    ),
+    220
+  );
 }
 
 /**

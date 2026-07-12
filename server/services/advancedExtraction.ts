@@ -13,6 +13,15 @@
 import { invokeLLM } from "../_core/llm";
 import { getProcessingSettings, ProcessingSettingsConfig } from "../db";
 import { extractCompletionYesNo } from "./extraction/completionYesNo";
+export {
+  isLetterheadNoise,
+  stripLetterheadNoise,
+  containsLetterheadNoise,
+} from "./letterheadNoise";
+import {
+  isLetterheadNoise,
+  rejectLetterheadExtractedValue,
+} from "./letterheadNoise";
 
 // ============================================================================
 // TYPES
@@ -696,20 +705,6 @@ export function normalizeDateExtractionValue(
   return v;
 }
 
-/** True when value looks like letterhead/footer noise (URLs, emails, phone numbers, company). */
-export function isLetterheadNoise(value: string): boolean {
-  const v = value.trim();
-  if (!v) return false;
-  if (/www\./i.test(v)) return true;
-  if (/https?:\/\//i.test(v)) return true;
-  if (/@/.test(v)) return true;
-  if (/\.com\b/i.test(v)) return true;
-  if (/\.co\.uk\b/i.test(v)) return true;
-  if (/\d{5,}/.test(v)) return true;
-  if (/plantexpand/i.test(v)) return true;
-  return false;
-}
-
 /** True when value is shaped like a username (firstname.lastname). */
 export function isUsernameShaped(value: string): boolean {
   return /^[A-Za-z][A-Za-z0-9]*\.[A-Za-z][A-Za-z0-9]*$/.test(value.trim());
@@ -908,7 +903,24 @@ export async function ensembleExtract(
     }
   }
 
-  // Engineer name hygiene: filter letterhead noise and prefer username-shaped values
+  // Letterhead/footer chrome (phone, www, Email, PlantExpand) — discard for ALL fields
+  {
+    const cleaned: typeof results = [];
+    for (const r of results) {
+      const scrubbed = rejectLetterheadExtractedValue(r.value);
+      if (scrubbed == null) continue;
+      cleaned.push(scrubbed === r.value ? r : { ...r, value: scrubbed });
+    }
+    if (
+      cleaned.length !== results.length ||
+      cleaned.some((r, i) => r !== results[i])
+    ) {
+      results.length = 0;
+      results.push(...cleaned);
+    }
+  }
+
+  // Engineer name hygiene: prefer username-shaped values after letterhead discard
   if (field.name === "engineer_name") {
     const cleaned = results.filter(r => !isLetterheadNoise(r.value ?? ""));
     if (cleaned.length > 0 && cleaned.length < results.length) {
@@ -919,6 +931,12 @@ export async function ensembleExtract(
       } else {
         results.length = 0;
         results.push(...cleaned);
+      }
+    } else if (cleaned.length > 0) {
+      const usernames = cleaned.filter(r => isUsernameShaped(r.value ?? ""));
+      if (usernames.length > 0) {
+        results.length = 0;
+        results.push(...usernames);
       }
     }
   }
