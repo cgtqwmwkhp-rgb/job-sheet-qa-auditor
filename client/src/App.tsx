@@ -92,7 +92,7 @@ function Router() {
   useEffect(() => {
     initializeErrorTracking({
       user: user ? {
-        id: user.id,
+        id: Number(user.id),
         email: user.email,
         role: user.role,
       } : undefined,

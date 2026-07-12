@@ -1,6 +1,6 @@
 /**
  * Form Validation Utilities
- * 
+ *
  * Client-side validation helpers with user-friendly error messages.
  * Provides immediate feedback before server validation.
  */
@@ -28,7 +28,7 @@ export function validateRequired(value: any, fieldName: string): string | null {
  */
 export function validateEmail(email: string): string | null {
   if (!email) return null; // Use validateRequired separately
-  
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return "Please enter a valid email address";
@@ -41,7 +41,7 @@ export function validateEmail(email: string): string | null {
  */
 export function validatePassword(password: string): string | null {
   if (!password) return null; // Use validateRequired separately
-  
+
   if (password.length < 8) {
     return "Password must be at least 8 characters";
   }
@@ -67,7 +67,7 @@ export function validateLength(
   fieldName: string = "Field"
 ): string | null {
   if (!value) return null;
-  
+
   if (min !== undefined && value.length < min) {
     return `${fieldName} must be at least ${min} characters`;
   }
@@ -89,7 +89,7 @@ export function validateNumber(
   if (typeof value !== "number" || isNaN(value)) {
     return `${fieldName} must be a valid number`;
   }
-  
+
   if (min !== undefined && value < min) {
     return `${fieldName} must be at least ${min}`;
   }
@@ -104,7 +104,7 @@ export function validateNumber(
  */
 export function validateUrl(url: string): string | null {
   if (!url) return null;
-  
+
   try {
     new URL(url);
     return null;
@@ -116,10 +116,7 @@ export function validateUrl(url: string): string | null {
 /**
  * Validate file size
  */
-export function validateFileSize(
-  file: File,
-  maxSizeMB: number
-): string | null {
+export function validateFileSize(file: File, maxSizeMB: number): string | null {
   const maxSizeBytes = maxSizeMB * 1024 * 1024;
   if (file.size > maxSizeBytes) {
     return `File size must be less than ${maxSizeMB}MB`;
@@ -136,14 +133,14 @@ export function validateFileType(
 ): string | null {
   const fileType = file.type || "";
   const fileExt = file.name.split(".").pop()?.toLowerCase() || "";
-  
-  const isAllowed = allowedTypes.some((type) => {
+
+  const isAllowed = allowedTypes.some(type => {
     if (type.startsWith(".")) {
       return fileExt === type.slice(1);
     }
     return fileType === type || fileType.startsWith(type + "/");
   });
-  
+
   if (!isAllowed) {
     return `File type not allowed. Accepted types: ${allowedTypes.join(", ")}`;
   }
@@ -155,10 +152,10 @@ export function validateFileType(
  */
 export function validatePhoneNumber(phone: string): string | null {
   if (!phone) return null;
-  
+
   // Remove all non-digit characters
   const digitsOnly = phone.replace(/\D/g, "");
-  
+
   if (digitsOnly.length < 10 || digitsOnly.length > 15) {
     return "Please enter a valid phone number";
   }
@@ -168,10 +165,13 @@ export function validatePhoneNumber(phone: string): string | null {
 /**
  * Validate date is not in the past
  */
-export function validateFutureDate(date: Date | string, fieldName: string = "Date"): string | null {
+export function validateFutureDate(
+  date: Date | string,
+  fieldName: string = "Date"
+): string | null {
   const inputDate = typeof date === "string" ? new Date(date) : date;
   const now = new Date();
-  
+
   if (inputDate < now) {
     return `${fieldName} must be in the future`;
   }
@@ -187,7 +187,7 @@ export function validateDateRange(
 ): string | null {
   const start = typeof startDate === "string" ? new Date(startDate) : startDate;
   const end = typeof endDate === "string" ? new Date(endDate) : endDate;
-  
+
   if (start >= end) {
     return "End date must be after start date";
   }
@@ -245,7 +245,7 @@ export function validateForm<T extends Record<string, any>>(
 ): ValidationResult {
   const errors: Record<string, string> = {};
   let valid = true;
-  
+
   for (const [field, validator] of Object.entries(validators)) {
     if (validator) {
       const error = validator(values[field as keyof T]);
@@ -255,7 +255,7 @@ export function validateForm<T extends Record<string, any>>(
       }
     }
   }
-  
+
   return { valid, errors };
 }
 
@@ -296,7 +296,7 @@ export function createDebouncedValidator<T>(
   delay: number = 300
 ): (value: T, callback: (error: string | null) => void) => void {
   let timeout: NodeJS.Timeout;
-  
+
   return (value: T, callback: (error: string | null) => void) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => {

@@ -1,7 +1,13 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Accordion,
   AccordionContent,
@@ -18,17 +24,25 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Edit, FileJson, History, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import {
+  Edit,
+  FileJson,
+  History,
+  Loader2,
+  Plus,
+  Save,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
-import { 
-  showSaveSuccessToast, 
+import {
+  showSaveSuccessToast,
   showMutationErrorToast,
   showErrorToast,
-  showSuccessToast 
+  showSuccessToast,
 } from "@/lib/toastHelpers";
 
 // Mock rules for demo (would be stored in spec JSON in real implementation)
@@ -64,7 +78,7 @@ export default function SpecManagement() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newSpecName, setNewSpecName] = useState("");
   const [newSpecVersion, setNewSpecVersion] = useState("1.0.0");
-  
+
   // Fetch specs from API
   const { data: specs, isLoading } = trpc.specs.list.useQuery();
   const createSpec = trpc.specs.create.useMutation();
@@ -77,55 +91,70 @@ export default function SpecManagement() {
       return;
     }
 
-    createSpec.mutate({
-      name: newSpecName,
-      version: newSpecVersion,
-      schema: {
+    createSpec.mutate(
+      {
         name: newSpecName,
         version: newSpecVersion,
-        rules: mockRules,
-        baseSchema: "Global_Base_V1",
+        schema: {
+          name: newSpecName,
+          version: newSpecVersion,
+          rules: mockRules,
+          baseSchema: "Global_Base_V1",
+        },
       },
-    }, {
-      onSuccess: () => {
-        toast.success("Specification created successfully");
-        setCreateDialogOpen(false);
-        setNewSpecName("");
-        setNewSpecVersion("1.0.0");
-        utils.specs.list.invalidate();
-      },
-      onError: () => {
-        toast.error("Failed to create specification");
+      {
+        onSuccess: () => {
+          toast.success("Specification created successfully");
+          setCreateDialogOpen(false);
+          setNewSpecName("");
+          setNewSpecVersion("1.0.0");
+          utils.specs.list.invalidate();
+        },
+        onError: () => {
+          toast.error("Failed to create specification");
+        },
       }
-    });
+    );
   };
 
   const handleActivateSpec = (id: number) => {
-    activateSpec.mutate({ id }, {
-      onSuccess: () => {
-        showSuccessToast("Specification activated", "This specification is now active for all audits");
-        utils.specs.list.invalidate();
-      },
-      onError: (error) => {
-        showMutationErrorToast(error, "activate specification");
+    activateSpec.mutate(
+      { id },
+      {
+        onSuccess: () => {
+          showSuccessToast(
+            "Specification activated",
+            "This specification is now active for all audits"
+          );
+          utils.specs.list.invalidate();
+        },
+        onError: error => {
+          showMutationErrorToast(error, "activate specification");
+        },
       }
-    });
+    );
   };
 
   // Get selected spec or first active one
-  const selectedSpec = specs?.find(s => s.id === selectedSpecId) || specs?.find(s => s.isActive) || specs?.[0];
+  const selectedSpec =
+    specs?.find(s => s.id === selectedSpecId) ||
+    specs?.find(s => s.isActive) ||
+    specs?.[0];
 
   // Parse rules from spec JSON
-  const currentRules = selectedSpec?.schema && typeof selectedSpec.schema === 'object' 
-    ? (selectedSpec.schema as any).rules || mockRules 
-    : mockRules;
+  const currentRules =
+    selectedSpec?.schema && typeof selectedSpec.schema === "object"
+      ? (selectedSpec.schema as any).rules || mockRules
+      : mockRules;
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-heading font-bold tracking-tight">Spec Management</h1>
+            <h1 className="text-3xl font-heading font-bold tracking-tight">
+              Spec Management
+            </h1>
             <p className="text-muted-foreground mt-1">
               Manage Gold Standard specifications and validation rules.
             </p>
@@ -152,34 +181,44 @@ export default function SpecManagement() {
                 </div>
               ) : specs && specs.length > 0 ? (
                 <div className="divide-y">
-                  {specs.map((spec) => (
-                    <div 
-                      key={spec.id} 
+                  {specs.map(spec => (
+                    <div
+                      key={spec.id}
                       className={`p-4 hover:bg-muted/50 cursor-pointer transition-colors ${
-                        selectedSpec?.id === spec.id 
-                          ? 'bg-muted/50 border-l-4 border-l-brand-lime' 
-                          : 'border-l-4 border-l-transparent'
+                        selectedSpec?.id === spec.id
+                          ? "bg-muted/50 border-l-4 border-l-brand-lime"
+                          : "border-l-4 border-l-transparent"
                       }`}
                       onClick={() => setSelectedSpecId(spec.id)}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-sm">GS-{spec.id}</span>
-                        <Badge variant={spec.isActive ? 'default' : 'secondary'}>
-                          {spec.isActive ? 'active' : 'archived'}
+                        <span className="font-semibold text-sm">
+                          GS-{spec.id}
+                        </span>
+                        <Badge
+                          variant={spec.isActive ? "default" : "secondary"}
+                        >
+                          {spec.isActive ? "active" : "archived"}
                         </Badge>
                       </div>
-                      <p className="text-sm font-medium truncate">{spec.name}</p>
+                      <p className="text-sm font-medium truncate">
+                        {spec.name}
+                      </p>
                       <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
                         <span>v{spec.version}</span>
                         <span>{currentRules.length} Rules</span>
-                        <span>{formatDistanceToNow(new Date(spec.createdAt), { addSuffix: true })}</span>
+                        <span>
+                          {formatDistanceToNow(new Date(spec.createdAt), {
+                            addSuffix: true,
+                          })}
+                        </span>
                       </div>
                       {!spec.isActive && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="w-full mt-2"
-                          onClick={(e) => {
+                          onClick={e => {
                             e.stopPropagation();
                             handleActivateSpec(spec.id);
                           }}
@@ -194,7 +233,9 @@ export default function SpecManagement() {
                 <div className="text-center py-8 text-muted-foreground">
                   <FileJson className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p>No specifications found.</p>
-                  <p className="text-sm">Create your first spec to get started.</p>
+                  <p className="text-sm">
+                    Create your first spec to get started.
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -205,13 +246,13 @@ export default function SpecManagement() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>
-                  Rules Definition: {selectedSpec ? `GS-${selectedSpec.id}` : 'No Spec Selected'}
+                  Rules Definition:{" "}
+                  {selectedSpec ? `GS-${selectedSpec.id}` : "No Spec Selected"}
                 </CardTitle>
                 <CardDescription>
-                  {selectedSpec 
+                  {selectedSpec
                     ? `Defining validation logic for "${selectedSpec.name}"`
-                    : 'Select or create a specification to view rules'
-                  }
+                    : "Select or create a specification to view rules"}
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -235,14 +276,20 @@ export default function SpecManagement() {
                       </div>
                       <div>
                         <p className="font-medium">Base Schema</p>
-                        <p className="text-xs text-muted-foreground">Inherits from Global_Base_V1</p>
+                        <p className="text-xs text-muted-foreground">
+                          Inherits from Global_Base_V1
+                        </p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm">View Schema</Button>
+                    <Button variant="ghost" size="sm">
+                      View Schema
+                    </Button>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">Validation Rules ({currentRules.length})</h3>
+                    <h3 className="text-sm font-semibold">
+                      Validation Rules ({currentRules.length})
+                    </h3>
                     <Button variant="ghost" size="sm" className="h-8">
                       <Plus className="w-3 h-3 mr-1" /> Add Rule
                     </Button>
@@ -253,28 +300,47 @@ export default function SpecManagement() {
                       <AccordionItem key={rule.id} value={rule.id}>
                         <AccordionTrigger className="hover:no-underline py-3 px-4 hover:bg-muted/50 rounded-lg">
                           <div className="flex items-center gap-4 w-full">
-                            <Badge variant="outline" className="font-mono">{rule.id}</Badge>
-                            <span className="font-medium flex-1 text-left">{rule.field}</span>
-                            <Badge variant="secondary" className="mr-4">{rule.type}</Badge>
+                            <Badge variant="outline" className="font-mono">
+                              {rule.id}
+                            </Badge>
+                            <span className="font-medium flex-1 text-left">
+                              {rule.field}
+                            </span>
+                            <Badge variant="secondary" className="mr-4">
+                              {rule.type}
+                            </Badge>
                           </div>
                         </AccordionTrigger>
                         <AccordionContent className="px-4 pb-4 pt-2">
                           <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-1">
-                                <label className="text-xs font-medium text-muted-foreground">Field Name</label>
-                                <div className="text-sm font-mono bg-muted p-2 rounded">{rule.field}</div>
+                                <label className="text-xs font-medium text-muted-foreground">
+                                  Field Name
+                                </label>
+                                <div className="text-sm font-mono bg-muted p-2 rounded">
+                                  {rule.field}
+                                </div>
                               </div>
                               <div className="space-y-1">
-                                <label className="text-xs font-medium text-muted-foreground">Validation Type</label>
-                                <div className="text-sm bg-muted p-2 rounded capitalize">{rule.type}</div>
+                                <label className="text-xs font-medium text-muted-foreground">
+                                  Validation Type
+                                </label>
+                                <div className="text-sm bg-muted p-2 rounded capitalize">
+                                  {rule.type}
+                                </div>
                               </div>
                             </div>
-                            
+
                             <div className="space-y-1">
-                              <label className="text-xs font-medium text-muted-foreground">Description</label>
+                              <label className="text-xs font-medium text-muted-foreground">
+                                Description
+                              </label>
                               {editingRule === rule.id ? (
-                                <Textarea defaultValue={rule.description} className="min-h-[80px]" />
+                                <Textarea
+                                  defaultValue={rule.description}
+                                  className="min-h-[80px]"
+                                />
                               ) : (
                                 <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded border">
                                   {rule.description}
@@ -284,25 +350,47 @@ export default function SpecManagement() {
 
                             {rule.pattern && (
                               <div className="space-y-1">
-                                <label className="text-xs font-medium text-muted-foreground">Regex Pattern</label>
-                                <div className="text-sm font-mono bg-muted p-2 rounded">{rule.pattern}</div>
+                                <label className="text-xs font-medium text-muted-foreground">
+                                  Regex Pattern
+                                </label>
+                                <div className="text-sm font-mono bg-muted p-2 rounded">
+                                  {rule.pattern}
+                                </div>
                               </div>
                             )}
 
                             <div className="flex items-center justify-end gap-2 pt-2">
                               {editingRule === rule.id ? (
                                 <>
-                                  <Button size="sm" variant="ghost" onClick={() => setEditingRule(null)}>Cancel</Button>
-                                  <Button size="sm" onClick={() => setEditingRule(null)}>
-                                    <Save className="w-3 h-3 mr-2" /> Save Changes
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setEditingRule(null)}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => setEditingRule(null)}
+                                  >
+                                    <Save className="w-3 h-3 mr-2" /> Save
+                                    Changes
                                   </Button>
                                 </>
                               ) : (
                                 <>
-                                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-destructive hover:text-destructive"
+                                  >
                                     <Trash2 className="w-3 h-3 mr-2" /> Delete
                                   </Button>
-                                  <Button size="sm" variant="outline" onClick={() => setEditingRule(rule.id)}>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setEditingRule(rule.id)}
+                                  >
                                     <Edit className="w-3 h-3 mr-2" /> Edit Rule
                                   </Button>
                                 </>
@@ -318,7 +406,9 @@ export default function SpecManagement() {
                 <div className="text-center py-12 text-muted-foreground">
                   <FileJson className="h-12 w-12 mx-auto mb-3 opacity-50" />
                   <p>No specification selected</p>
-                  <p className="text-sm">Select a spec from the list or create a new one.</p>
+                  <p className="text-sm">
+                    Select a spec from the list or create a new one.
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -338,27 +428,34 @@ export default function SpecManagement() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="spec-name">Specification Name</Label>
-              <Input 
+              <Input
                 id="spec-name"
                 placeholder="e.g., Standard Maintenance Job Sheet"
                 value={newSpecName}
-                onChange={(e) => setNewSpecName(e.target.value)}
+                onChange={e => setNewSpecName(e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="spec-version">Version</Label>
-              <Input 
+              <Input
                 id="spec-version"
                 placeholder="1.0.0"
                 value={newSpecVersion}
-                onChange={(e) => setNewSpecVersion(e.target.value)}
+                onChange={e => setNewSpecVersion(e.target.value)}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => setCreateDialogOpen(false)}
+            >
+              Cancel
+            </Button>
             <Button onClick={handleCreateSpec} disabled={createSpec.isPending}>
-              {createSpec.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {createSpec.isPending && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
               Create Specification
             </Button>
           </DialogFooter>

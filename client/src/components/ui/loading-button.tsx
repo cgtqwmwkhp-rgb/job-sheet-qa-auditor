@@ -5,11 +5,12 @@
  * Prevents double-clicks and provides visual feedback during async operations.
  */
 
-import { Button, type ButtonProps } from "./button";
+import { Button } from "./button";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { ComponentProps } from "react";
 
-export interface LoadingButtonProps extends ButtonProps {
+export interface LoadingButtonProps extends ComponentProps<typeof Button> {
   loading?: boolean;
   loadingText?: string;
 }

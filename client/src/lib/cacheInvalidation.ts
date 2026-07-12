@@ -253,6 +253,7 @@ export function useStaleWhileRevalidate<T>(
  */
 export async function batchInvalidate(
   utils: ReturnType<typeof trpc.useUtils>,
+  queryClient: ReturnType<typeof useQueryClient>,
   invalidations: Array<{
     type: "jobSheet" | "audit" | "dispute" | "user" | "all";
     id?: number;
@@ -269,7 +270,7 @@ export async function batchInvalidate(
       case "user":
         return id ? utils.users.get.invalidate({ id }) : utils.users.invalidate();
       case "all":
-        return utils.client.invalidateQueries();
+        return queryClient.invalidateQueries();
       default:
         return Promise.resolve();
     }
