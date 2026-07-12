@@ -60,10 +60,7 @@ router.get("/:versionId", requireQaLead, async (req, res) => {
       buffer = Buffer.from(await response.arrayBuffer());
     }
 
-    res.setHeader(
-      "Content-Type",
-      meta.fileType || "application/pdf"
-    );
+    res.setHeader("Content-Type", meta.fileType || "application/pdf");
     res.setHeader(
       "Content-Disposition",
       `inline; filename="${meta.fileName.replace(/"/g, "")}"`

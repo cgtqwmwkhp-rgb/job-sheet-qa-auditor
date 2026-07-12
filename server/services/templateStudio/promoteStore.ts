@@ -211,7 +211,9 @@ export function markPromoteApplied(
     throw new Error(`Promote request not found: ${promoteId}`);
   }
   if (req.status !== "approved") {
-    throw new Error(`Promote must be approved before apply (status=${req.status})`);
+    throw new Error(
+      `Promote must be approved before apply (status=${req.status})`
+    );
   }
   req.status = "applied";
   req.appliedBy = appliedBy;

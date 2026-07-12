@@ -66,9 +66,9 @@ describe("Template Studio contracts", () => {
         "engineerSignOff",
       ])
     );
-    expect(version.selectionConfigJson.requiredTokensAny.length).toBeGreaterThan(
-      0
-    );
+    expect(
+      version.selectionConfigJson.requiredTokensAny.length
+    ).toBeGreaterThan(0);
   });
 
   it("blocks viewer from studio mutations", async () => {

@@ -18,7 +18,9 @@ export interface StudioSampleMeta {
 
 const sampleByVersion = new Map<number, StudioSampleMeta>();
 
-export function getStudioSample(versionId: number): StudioSampleMeta | undefined {
+export function getStudioSample(
+  versionId: number
+): StudioSampleMeta | undefined {
   return sampleByVersion.get(versionId);
 }
 

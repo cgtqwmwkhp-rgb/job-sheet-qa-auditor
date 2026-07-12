@@ -2,10 +2,17 @@
  * Template Studio — starter draft artifacts that satisfy activation critical fields.
  */
 
-import type { SpecJson, SelectionConfig, RoiConfig } from "../templateRegistry/types";
+import type {
+  SpecJson,
+  SelectionConfig,
+  RoiConfig,
+} from "../templateRegistry/types";
 import { createStandardJobSheetRoi } from "../templateRegistry/roiValidator";
 
-export function createStudioStarterSpec(name: string, version = "0.1.0"): SpecJson {
+export function createStudioStarterSpec(
+  name: string,
+  version = "0.1.0"
+): SpecJson {
   return {
     name,
     version,
@@ -15,7 +22,13 @@ export function createStudioStarterSpec(name: string, version = "0.1.0"): SpecJs
         label: "Job Reference",
         type: "string",
         required: true,
-        extractionHints: ["job number", "job no", "job ref", "work order", "reference"],
+        extractionHints: [
+          "job number",
+          "job no",
+          "job ref",
+          "work order",
+          "reference",
+        ],
         aliases: ["Job No", "Work Order", "WO#"],
       },
       {
@@ -39,7 +52,12 @@ export function createStudioStarterSpec(name: string, version = "0.1.0"): SpecJs
         label: "Engineer Sign-Off",
         type: "string",
         required: true,
-        extractionHints: ["engineer signature", "technician sign", "signed by", "completed by"],
+        extractionHints: [
+          "engineer signature",
+          "technician sign",
+          "signed by",
+          "completed by",
+        ],
         aliases: ["Engineer Signature", "Technician Signature"],
       },
       {
@@ -63,7 +81,11 @@ export function createStudioStarterSpec(name: string, version = "0.1.0"): SpecJs
         label: "Customer Signature",
         type: "string",
         required: false,
-        extractionHints: ["customer signature", "customer sign-off", "authorized by"],
+        extractionHints: [
+          "customer signature",
+          "customer sign-off",
+          "authorized by",
+        ],
         aliases: ["Customer Sign-off"],
       },
     ],

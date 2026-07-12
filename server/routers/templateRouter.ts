@@ -140,7 +140,9 @@ async function applyPromotePack(
 
   let template = null as ReturnType<typeof getTemplate> | null;
   // Prefer slug lookup via list
-  const existing = listTemplates().find(t => t.templateId === pack.templateSlug);
+  const existing = listTemplates().find(
+    t => t.templateId === pack.templateSlug
+  );
   if (existing) {
     template = getTemplate(existing.id);
   } else {
@@ -287,7 +289,9 @@ export const templateRouter = router({
       return importBulkPack(input.pack as BulkImportPack, ctx.user.id);
     }),
 
-  getImportPackTemplate: qaLeadProcedure.query(() => createImportPackTemplate()),
+  getImportPackTemplate: qaLeadProcedure.query(() =>
+    createImportPackTemplate()
+  ),
 
   hasFixtures: protectedProcedure
     .input(z.object({ versionId: z.number() }))
@@ -505,8 +509,8 @@ export const templateRouter = router({
               existing.selectionConfigJson,
             roiJson:
               input.roiJson === undefined
-                ? existing.roiJson ?? undefined
-                : input.roiJson ?? undefined,
+                ? (existing.roiJson ?? undefined)
+                : (input.roiJson ?? undefined),
             changeNotes: input.changeNotes ?? "Studio save as new version",
             createdBy: ctx.user.id,
           });
@@ -732,7 +736,9 @@ export const templateRouter = router({
 
         // On production env, apply immediately after second approve
         const env = (process.env.APP_ENV || "").toLowerCase();
-        let applied = null as Awaited<ReturnType<typeof applyPromotePack>> | null;
+        let applied = null as Awaited<
+          ReturnType<typeof applyPromotePack>
+        > | null;
         if (env === "production" || env === "prod") {
           applied = await applyPromotePack(req.pack, ctx.user.id);
           markPromoteApplied(req.id, ctx.user.id);

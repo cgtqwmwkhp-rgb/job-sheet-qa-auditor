@@ -121,11 +121,36 @@ function diffSelection(
   b: SelectionConfig,
   entries: VersionDiffEntry[]
 ) {
-  pushChanged(entries, "selection.requiredTokensAll", a.requiredTokensAll, b.requiredTokensAll);
-  pushChanged(entries, "selection.requiredTokensAny", a.requiredTokensAny, b.requiredTokensAny);
-  pushChanged(entries, "selection.optionalTokens", a.optionalTokens, b.optionalTokens);
-  pushChanged(entries, "selection.formCodeRegex", a.formCodeRegex, b.formCodeRegex);
-  pushChanged(entries, "selection.tokenWeights", a.tokenWeights, b.tokenWeights);
+  pushChanged(
+    entries,
+    "selection.requiredTokensAll",
+    a.requiredTokensAll,
+    b.requiredTokensAll
+  );
+  pushChanged(
+    entries,
+    "selection.requiredTokensAny",
+    a.requiredTokensAny,
+    b.requiredTokensAny
+  );
+  pushChanged(
+    entries,
+    "selection.optionalTokens",
+    a.optionalTokens,
+    b.optionalTokens
+  );
+  pushChanged(
+    entries,
+    "selection.formCodeRegex",
+    a.formCodeRegex,
+    b.formCodeRegex
+  );
+  pushChanged(
+    entries,
+    "selection.tokenWeights",
+    a.tokenWeights,
+    b.tokenWeights
+  );
 }
 
 function diffRoi(

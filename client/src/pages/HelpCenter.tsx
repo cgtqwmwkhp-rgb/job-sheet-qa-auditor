@@ -427,10 +427,10 @@ export default function HelpCenter() {
                         Can I customize the "Gold Standard" rules?
                       </AccordionTrigger>
                       <AccordionContent className="text-muted-foreground">
-                        Yes. Use Template Studio (/specs) to upload a
-                        sample form, refine ROIs and selection tokens, run
-                        activation gates on staging, then dual-control promote
-                        to production. Spec Management gold-spec authoring is
+                        Yes. Use Template Studio (/specs) to upload a sample
+                        form, refine ROIs and selection tokens, run activation
+                        gates on staging, then dual-control promote to
+                        production. Spec Management gold-spec authoring is
                         deprecated — the live audit pipeline uses the template
                         registry.
                       </AccordionContent>

@@ -139,10 +139,7 @@ export default function TemplateStudio() {
     }
   );
 
-  const stepIndex = useMemo(
-    () => STEPS.findIndex(s => s.id === step),
-    [step]
-  );
+  const stepIndex = useMemo(() => STEPS.findIndex(s => s.id === step), [step]);
 
   const loadVersionIntoEditors = (v: NonNullable<typeof version>) => {
     setSpecJsonText(JSON.stringify(v.specJson, null, 2));
@@ -337,7 +334,9 @@ export default function TemplateStudio() {
       <div className="mx-auto flex max-w-6xl flex-col gap-6 pb-16">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-[#6B7A1A]">Template Studio</p>
+            <p className="text-sm font-medium text-[#6B7A1A]">
+              Template Studio
+            </p>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
               Onboard form types end-to-end
             </h1>
@@ -435,10 +434,14 @@ export default function TemplateStudio() {
 
               {!!promotes?.length && (
                 <div className="mt-8">
-                  <h3 className="mb-2 text-sm font-semibold">Pending promotes</h3>
+                  <h3 className="mb-2 text-sm font-semibold">
+                    Pending promotes
+                  </h3>
                   <div className="space-y-2">
                     {promotes
-                      .filter(p => p.status === "pending" || p.status === "approved")
+                      .filter(
+                        p => p.status === "pending" || p.status === "approved"
+                      )
                       .map(p => (
                         <div
                           key={p.id}
@@ -460,7 +463,10 @@ export default function TemplateStudio() {
                                         promoteId: p.id,
                                       });
                                       await refetchPromotes();
-                                      showSuccessToast("Promote approved", p.id);
+                                      showSuccessToast(
+                                        "Promote approved",
+                                        p.id
+                                      );
                                     } catch (err) {
                                       showErrorToast(
                                         "Approve failed",
@@ -737,7 +743,9 @@ export default function TemplateStudio() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <h3 className="text-sm font-semibold">Checklist / tokens</h3>
+                    <h3 className="text-sm font-semibold">
+                      Checklist / tokens
+                    </h3>
                     <p className="text-sm">
                       Checklist grid:{" "}
                       {proposeMut.data.proposal.hasChecklistGrid
@@ -794,7 +802,10 @@ export default function TemplateStudio() {
                         versionId,
                         roiJson: roi,
                       });
-                      showSuccessToast("ROI saved", `${roi.regions.length} regions`);
+                      showSuccessToast(
+                        "ROI saved",
+                        `${roi.regions.length} regions`
+                      );
                     } catch (err) {
                       showErrorToast(
                         "ROI save failed",
@@ -923,7 +934,9 @@ export default function TemplateStudio() {
                     <h4 className="font-medium">Preconditions</h4>
                     {activationReport.preconditions.blockingIssues.length ===
                     0 ? (
-                      <p className="text-muted-foreground">No blocking issues</p>
+                      <p className="text-muted-foreground">
+                        No blocking issues
+                      </p>
                     ) : (
                       <ul className="list-disc pl-5 text-destructive">
                         {activationReport.preconditions.blockingIssues.map(

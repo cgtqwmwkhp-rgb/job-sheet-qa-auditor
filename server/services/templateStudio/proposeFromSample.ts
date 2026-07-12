@@ -233,7 +233,10 @@ function suggestRoiFromLabels(
   const joined = lines.join("\n").toLowerCase();
   for (const region of regions) {
     const needle = region.name.replace(/([A-Z])/g, " $1").toLowerCase();
-    if (joined.includes(needle.trim()) || joined.includes(region.name.toLowerCase())) {
+    if (
+      joined.includes(needle.trim()) ||
+      joined.includes(region.name.toLowerCase())
+    ) {
       region.confidence = Math.min(0.95, region.confidence + 0.2);
       region.why += "; label evidence in OCR";
     }
@@ -247,7 +250,14 @@ async function callGeminiPropose(input: {
   rows: SelectionMarkRow[];
   seedSpec: SpecJson;
 }): Promise<{
-  fields?: Array<{ field: string; label: string; type: string; required: boolean; why?: string; confidence?: number }>;
+  fields?: Array<{
+    field: string;
+    label: string;
+    type: string;
+    required: boolean;
+    why?: string;
+    confidence?: number;
+  }>;
   tokens?: string[];
   error?: string;
 }> {
