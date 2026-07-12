@@ -356,6 +356,56 @@ Based on remaining audit findings:
 
 ---
 
+### Batch 7: Utility Infrastructure (Commit: 0a0130c)
+
+**1. Timeout Utilities**
+Created `server/utils/timeout.ts`:
+- `withTimeout()` - Promise timeout wrapper
+- `withRetryAndTimeout()` - Retry with exponential backoff
+- `TimeoutError` class for explicit handling
+- `TIMEOUT_CONFIG` with environment overrides
+- Prevents hung jobs from blocking the queue
+
+**Default Timeouts**:
+- Document processing: 10 minutes
+- OCR extraction: 3 minutes  
+- AI analysis: 5 minutes
+- File upload: 1 minute
+- External API: 30 seconds
+- Database query: 10 seconds
+
+**2. Transaction Utilities**
+Created `server/utils/transactions.ts`:
+- `withTransaction()` - Atomic operation wrapper
+- `TransactionError` class for rollback scenarios
+- `ensureIdempotent()` - State validation helper
+- Transaction pattern examples for common workflows
+- Foundation for multi-step atomic operations
+
+**3. Hardcoded Color Fixes**
+- **EntraSignIn.tsx**: 8 hardcoded hex → Tailwind classes
+- **DemoGateway.tsx**: 8 hardcoded hex → CSS variables
+- Uses semantic tokens: `text-foreground`, `text-muted-foreground`, `border`
+- Maintains Microsoft brand colors (intentional)
+- Improves dark mode compatibility
+
+**Benefits**:
+- Hung job detection and cleanup framework
+- Atomic audit result creation pattern
+- Resilient external API call pattern
+- Consistent theming across light/dark modes
+- Foundation for future timeout enforcement
+
+**Files Created**:
+- `server/utils/timeout.ts` - 135 lines
+- `server/utils/transactions.ts` - 142 lines
+
+**Files Modified**:
+- `client/src/pages/EntraSignIn.tsx`
+- `client/src/pages/DemoGateway.tsx`
+
+---
+
 ## Pull Request
 
 **Branch**: `cursor/fix-concurrent-reprocess-race-condition-a4fd`
