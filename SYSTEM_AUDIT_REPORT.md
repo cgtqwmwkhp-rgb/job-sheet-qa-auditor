@@ -1,4 +1,5 @@
 # System Audit Report - Best-in-Class Review
+
 **Date**: 2026-07-12  
 **Audit Scope**: Complete system architecture, integration, code quality, and UX/UI  
 **Rounds Completed**: 3 comprehensive reviews
@@ -11,14 +12,14 @@ This job-sheet-qa-auditor system has a **strong foundation** with mature backend
 
 **Overall Assessment by Area:**
 
-| Area | Grade | Status |
-|------|-------|--------|
-| Backend Pipeline | A- | Production-ready core with some unmounted features |
-| Frontend Architecture | C+ | Solid foundation with significant dead code and incomplete flows |
-| Testing Infrastructure | B- | Strong contract/parity testing; weak coverage & E2E |
-| API Integration | B+ | Well-designed but has authorization gaps |
-| UX/UI Quality | C+ | Excellent review workstation; many mock/stub features |
-| Code Quality | B | Good patterns with some duplication and drift |
+| Area                   | Grade | Status                                                           |
+| ---------------------- | ----- | ---------------------------------------------------------------- |
+| Backend Pipeline       | A-    | Production-ready core with some unmounted features               |
+| Frontend Architecture  | C+    | Solid foundation with significant dead code and incomplete flows |
+| Testing Infrastructure | B-    | Strong contract/parity testing; weak coverage & E2E              |
+| API Integration        | B+    | Well-designed but has authorization gaps                         |
+| UX/UI Quality          | C+    | Excellent review workstation; many mock/stub features            |
+| Code Quality           | B     | Good patterns with some duplication and drift                    |
 
 ---
 
@@ -31,7 +32,7 @@ This job-sheet-qa-auditor system has a **strong foundation** with mature backend
    - Risk: Cache inconsistencies, broken React Query behavior
    - Location: `client/src/App.tsx` line 224
 
-2. **Four Stage-5 Routers Not Mounted** 
+2. **Four Stage-5 Routers Not Mounted**
    - `auditRouter`, `pipelineRouter`, `reviewQueueRouter`, `exportsRouter` exist but unreachable
    - Creates confusion about which API to use (DB-backed vs in-memory)
    - Decision needed: mount them or mark as test-only
@@ -159,6 +160,7 @@ This job-sheet-qa-auditor system has a **strong foundation** with mature backend
 #### ❌ **Component Architecture Issues**
 
 **Duplicate/Dead Components (10+ files):**
+
 - `RoiEditor.tsx` + `RoiEditorV2.tsx` - 0 imports
 - `CommandCenter.tsx` - ⌘K search never wired
 - `FeedbackCockpit`, `CostCalculator`, `AssetTimeline` - unused
@@ -166,6 +168,7 @@ This job-sheet-qa-auditor system has a **strong foundation** with mature backend
 - `lib/api.ts` - abandoned wrapper with manual types (drift risk)
 
 **Dual Systems:**
+
 - Two tour systems: `OnboardingTour` + `GuidedTour`
 - Two query clients: configured in main.tsx + unconfigured in App.tsx
 - Two auth systems: `AuthContext` raw fetch + tRPC `useAuth`
@@ -173,21 +176,25 @@ This job-sheet-qa-auditor system has a **strong foundation** with mature backend
 #### ❌ **UX Quality Issues**
 
 **Accessibility Gaps:**
+
 - Portal bell button missing aria-label
 - Dashboard Enter handler without Space key support
 - 403 page has no navigation recovery
 - NotFound redirects technicians to staff route
 
 **Responsive Issues:**
+
 - DisputeManagement header may overflow on mobile
 - `useIsMobile` hook underutilized (mostly rely on Tailwind breakpoints)
 
 **Loading/Error States:**
+
 - Dashboard shows "..." with no error UI
 - Many pages lack query error handling
 - No per-route error boundaries
 
 **Form Validation:**
+
 - `react-hook-form` and `zod` installed but **never used**
 - Validation is ad-hoc toasts
 - No consistent field-level error display
@@ -220,17 +227,20 @@ This job-sheet-qa-auditor system has a **strong foundation** with mature backend
 #### ❌ **Coverage Gaps**
 
 **No Measured Coverage:**
+
 - Vitest has no coverage provider (@vitest/coverage-v8)
 - No minimum threshold enforcement
 - Line/branch coverage completely unknown
 
 **E2E Weaknesses:**
+
 - Real OAuth/Entra untested (E2E only covers demo gateway)
 - Core workflow (upload → process → review) not covered end-to-end
 - Analytics pages (10 pages) completely untested
 - Review workstation interactions not covered
 
 **Frontend Testing:**
+
 - ~70 application components: 4 test files
 - 32 pages: 0 dedicated tests
 - React Testing Library available but underutilized
@@ -238,11 +248,13 @@ This job-sheet-qa-auditor system has a **strong foundation** with mature backend
 #### ⚠️ **Test Quality Issues**
 
 **Structural vs Behavioral:**
+
 - ~35% of contract tests use `readFileSync` to assert string presence
 - Test documentation/intent, not behavior
 - High maintenance, can give false confidence
 
 **CI Inconsistencies:**
+
 - `pnpm lint` doesn't exist (CONTRIBUTING.md references it)
 - Node 22 in ci.yml, Node 20 in parity.yml
 - `validate:pii` and `validate:dataset` exist but not in CI
@@ -250,6 +262,7 @@ This job-sheet-qa-auditor system has a **strong foundation** with mature backend
 - Load tests always pass (`|| true`)
 
 **Documentation Drift:**
+
 - REPO_INDEX.md understates workflows (3 of 14 listed)
 - `pnpm check` misdescribed as "typecheck and lint"
 - No frontend testing guide
@@ -262,28 +275,33 @@ This job-sheet-qa-auditor system has a **strong foundation** with mature backend
 ### 🔴 Phase 1: Critical Architecture Fixes (Must Do)
 
 **1.1 Fix Duplicate QueryClient**
+
 - [ ] Remove duplicate QueryClientProvider from App.tsx
 - [ ] Verify all queries use configured client from main.tsx
 - **Risk if not fixed**: Cache corruption, broken refetching
 
 **1.2 Consolidate Authentication**
+
 - [ ] Migrate AuthContext to use trpc.auth.me
 - [ ] Remove _core/hooks/useAuth.ts
 - [ ] Ensure single source of auth truth
 - **Risk if not fixed**: Race conditions, role mismatches
 
 **1.3 Decision: Stage 5 Routers**
+
 - [ ] Either: Wire to DB-backed implementations and mount on appRouter
 - [ ] Or: Document as test-only and remove from routers/index.ts exports
 - **Recommended**: Option 2 (mark test-only) for speed
 
 **1.4 Add Coverage Instrumentation**
+
 - [ ] Install @vitest/coverage-v8
 - [ ] Configure vitest.config.ts with coverage provider
 - [ ] Set initial threshold (e.g. 60% on server/services/)
 - [ ] Add to CI as blocking gate
 
 **1.5 Fix Authorization Gaps**
+
 - [ ] Add resource-level checks to jobSheets.* operations
 - [ ] Enforce role checks in disputes API (not just client)
 - [ ] Scope audits.* by uploader/role
@@ -292,29 +310,34 @@ This job-sheet-qa-auditor system has a **strong foundation** with mature backend
 ### 🟠 Phase 2: Feature Completion & UX (High Priority)
 
 **2.1 Remove/Fix Mock Features**
+
 - [ ] Search page: Wire to real tRPC endpoint or hide from nav
 - [ ] Technician portal: Connect to real APIs or mark as "Demo"
 - [ ] Notification settings: Implement backend persistence or remove
 - [ ] Remove hardcoded activity timeline empty array
 
 **2.2 Complete Template System Integration**
+
 - [ ] Deprecate or redirect specs.* API to templates
 - [ ] Remove goldSpecId parameter from jobSheets.process
 - [ ] Update SpecManagement UI to use templates API
 - [ ] Document migration path in ADR
 
 **2.3 Fix Dark Mode**
+
 - [ ] Replace hardcoded hex colors in DashboardLayout, AppSidebar
 - [ ] Use CSS variables (bg-muted, text-muted-foreground)
 - [ ] Test all pages in dark mode
 - [ ] Update chart colors to use theme tokens
 
 **2.4 Fix Layout Consistency**
+
 - [ ] Wrap Settings in DashboardLayout
 - [ ] Wrap DisputeManagement in DashboardLayout
 - [ ] Ensure all staff pages have consistent navigation chrome
 
 **2.5 Fix Sidebar Navigation**
+
 - [ ] Filter User Management from nav for non-admins
 - [ ] Filter Settings from nav for viewers
 - [ ] Match ProtectedRoute role restrictions
@@ -322,6 +345,7 @@ This job-sheet-qa-auditor system has a **strong foundation** with mature backend
 ### 🟡 Phase 3: Code Quality & Testing (Important)
 
 **3.1 Remove Dead Code**
+
 - [ ] Delete: RoiEditor.tsx, RoiEditorV2.tsx, PdfPreview.tsx
 - [ ] Delete: CommandCenter.tsx, ManusDialog.tsx
 - [ ] Delete: FeedbackCockpit, CostCalculator, AssetTimeline
@@ -329,23 +353,27 @@ This job-sheet-qa-auditor system has a **strong foundation** with mature backend
 - [ ] Delete or adopt: lib/api.ts wrapper layer
 
 **3.2 Consolidate Duplicate Systems**
+
 - [ ] Pick one tour system (OnboardingTour or GuidedTour)
 - [ ] Remove unused tour implementation
 - [ ] Update OnboardingTour to skip "Coming Soon" pages
 
 **3.3 Add Critical E2E Tests**
+
 - [ ] OAuth/Entra sign-in flow
 - [ ] Upload → process → review → result full workflow
 - [ ] Review workstation interactions (at least smoke test)
 - [ ] Analytics pages (at least navigation smoke tests)
 
 **3.4 Add Frontend Unit Tests**
+
 - [ ] ReviewWorkstationPane (most critical component)
 - [ ] FileUploader
 - [ ] Key analytics chart components
 - [ ] DocumentViewer error states
 
 **3.5 Fix CI/Documentation Inconsistencies**
+
 - [ ] Add `pnpm lint` script matching CI ESLint
 - [ ] Align Node versions to 22 in all workflows
 - [ ] Wire validate:pii into ci.yml governance job
@@ -355,30 +383,35 @@ This job-sheet-qa-auditor system has a **strong foundation** with mature backend
 ### 🔵 Phase 4: Polish & Enhancement (Nice to Have)
 
 **4.1 Complete Webhook System**
+
 - [ ] Emit audit.completed from documentProcessor
 - [ ] Emit audit.failed on terminal errors
 - [ ] Create webhook management API (admin CRUD)
 - [ ] Add DB persistence for webhook configs
 
 **4.2 Improve Error Handling**
+
 - [ ] Replace all `throw new Error` with TRPCError
 - [ ] Add query error UI to Dashboard, Disputes, Users, AuditLog
 - [ ] Add per-route error boundaries
 - [ ] Route ServerError.tsx for 5xx scenarios
 
 **4.3 Form Validation Migration**
+
 - [ ] Adopt react-hook-form + zod for user invite
 - [ ] Apply to spec creation forms
 - [ ] Apply to dispute resolution
 - [ ] Apply to processing settings
 
 **4.4 Accessibility Improvements**
+
 - [ ] Add aria-label to portal bell
 - [ ] Add Space key support to clickable lists
 - [ ] Improve 403 page with role-aware navigation
 - [ ] Add aria-live to status indicators
 
 **4.5 Documentation Improvements**
+
 - [ ] Create docs/api/TRPC_REFERENCE.md
 - [ ] Add architecture overview for new contributors
 - [ ] Document contract test patterns (behavioral vs structural)
@@ -391,17 +424,20 @@ This job-sheet-qa-auditor system has a **strong foundation** with mature backend
 ### If Templates Added Before Fixes
 
 **High Risk (P0 issues):**
+
 - Duplicate QueryClient could cause template selection UI bugs
 - Auth race conditions could expose wrong templates to wrong roles
 - No coverage means template bugs ship undetected
 - Authorization gaps mean any user can process any template
 
 **Medium Risk (P1 issues):**
+
 - Template UI might follow mock/stub pattern of existing features
 - Dark mode breakage spreads to template management pages
 - Template workflows untested end-to-end
 
 **Low Risk (P2 issues):**
+
 - More dead code accumulates
 - Documentation becomes more out of date
 
