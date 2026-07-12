@@ -153,12 +153,10 @@ router.get(
           jobSheetId,
           userId: user?.userId,
         });
-        res
-          .status(403)
-          .json({
-            error: "Forbidden",
-            message: "You do not have access to this document",
-          });
+        res.status(403).json({
+          error: "Forbidden",
+          message: "You do not have access to this document",
+        });
         return;
       }
 
