@@ -353,8 +353,9 @@ export const appRouter = router({
 
     /**
      * Assign / clear technician attribution for engineer analytics.
+     * Available to all staff (analytics page is already RequireStaff).
      */
-    assignTechnician: qaLeadProcedure
+    assignTechnician: protectedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -390,18 +391,20 @@ export const appRouter = router({
       }),
 
     /**
-     * Backfill technicianId from OCR technicianName on unattributed sheets.
+     * Preview OCR names on unattributed sheets + auto-match status.
      */
-    backfillTechnicianAttribution: qaLeadProcedure
+    getAttributionGap: protectedProcedure
       .input(
         z
           .object({
-            limit: z.number().min(1).max(500).default(100),
+            startDate: z.string().optional(),
+            endDate: z.string().optional(),
+            limit: z.number().min(1).max(500).default(200),
           })
           .optional()
       )
-      .mutation(async ({ ctx, input }) => {
-        const { extractTechnicianNameFromFields, resolveTechnicianIdFromName } =
+      .query(async ({ input }) => {
+        const { extractTechnicianNameFromReport, buildAttributionClusters } =
           await import("./services/technicianAttribution");
 
         const users = await db.getAllUsers();
@@ -412,8 +415,122 @@ export const appRouter = router({
           role: u.role,
         }));
         const sheets = await db.getUnattributedJobSheets({
-          limit: input?.limit ?? 100,
+          limit: input?.limit ?? 200,
+          startDate: input?.startDate ? new Date(input.startDate) : undefined,
+          endDate: input?.endDate ? new Date(input.endDate) : undefined,
         });
+
+        const withNames: Array<{ id: number; extractedName: string | null }> =
+          [];
+        let noNameCount = 0;
+        for (const sheet of sheets) {
+          const report = await db.getLatestAuditReportJson(sheet.id);
+          const name = extractTechnicianNameFromReport(report);
+          withNames.push({ id: sheet.id, extractedName: name });
+          if (!name) noNameCount++;
+        }
+
+        const clusters = buildAttributionClusters({
+          sheets: withNames,
+          candidates,
+        });
+
+        return {
+          unattributedCount: sheets.length,
+          noNameCount,
+          matchableCount: clusters
+            .filter(c => c.match.technicianId != null)
+            .reduce((sum, c) => sum + c.sheetCount, 0),
+          unmatchedNameCount: clusters.filter(c => c.match.technicianId == null)
+            .length,
+          clusters: clusters.map(c => ({
+            extractedName: c.extractedName,
+            displayName: c.displayName,
+            sheetCount: c.sheetCount,
+            jobSheetIds: c.jobSheetIds.slice(0, 20),
+            matchedTechnicianId: c.match.technicianId,
+            matchConfidence: c.match.confidence,
+            suggestedUserName: c.suggestedUserName,
+          })),
+          users: candidates.map(c => ({
+            id: c.id,
+            name: c.name?.trim() || c.email || `User ${c.id}`,
+            role: c.role,
+          })),
+        };
+      }),
+
+    /**
+     * Backfill technicianId from OCR names on unattributed sheets.
+     * Open to all authenticated staff (was QA-lead-only — blocked viewers).
+     */
+    backfillTechnicianAttribution: protectedProcedure
+      .input(
+        z
+          .object({
+            limit: z.number().min(1).max(500).default(200),
+            startDate: z.string().optional(),
+            endDate: z.string().optional(),
+            createMissingUsers: z.boolean().optional(),
+          })
+          .optional()
+      )
+      .mutation(async ({ ctx, input }) => {
+        const {
+          extractTechnicianNameFromReport,
+          resolveTechnicianMatch,
+          buildAttributionClusters,
+          prettifyExtractedName,
+          attributionOpenIdForName,
+        } = await import("./services/technicianAttribution");
+
+        let users = await db.getAllUsers();
+        let candidates = users.map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+        }));
+        const sheets = await db.getUnattributedJobSheets({
+          limit: input?.limit ?? 200,
+          startDate: input?.startDate ? new Date(input.startDate) : undefined,
+          endDate: input?.endDate ? new Date(input.endDate) : undefined,
+        });
+
+        const withNames: Array<{ id: number; extractedName: string | null }> =
+          [];
+        for (const sheet of sheets) {
+          const report = await db.getLatestAuditReportJson(sheet.id);
+          withNames.push({
+            id: sheet.id,
+            extractedName: extractTechnicianNameFromReport(report),
+          });
+        }
+
+        let createdUsers = 0;
+        if (input?.createMissingUsers) {
+          const clusters = buildAttributionClusters({
+            sheets: withNames,
+            candidates,
+          });
+          for (const cluster of clusters) {
+            if (cluster.match.technicianId != null) continue;
+            const pretty = prettifyExtractedName(cluster.displayName);
+            const openId = attributionOpenIdForName(cluster.displayName);
+            const ensured = await db.ensureAttributionTechnicianUser({
+              openId,
+              name: pretty,
+            });
+            if (ensured.created) createdUsers++;
+          }
+          users = await db.getAllUsers();
+          candidates = users.map(u => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+          }));
+        }
 
         let attributed = 0;
         let unresolved = 0;
@@ -422,37 +539,34 @@ export const appRouter = router({
           jobSheetId: number;
           extractedName: string | null;
           technicianId: number | null;
+          confidence: string | null;
         }> = [];
+        const unresolvedNames = new Map<string, number>();
 
-        for (const sheet of sheets) {
-          const report = await db.getLatestAuditReportJson(sheet.id);
-          const fields =
-            report &&
-            typeof report === "object" &&
-            (report as { extractedFields?: Record<string, unknown> })
-              .extractedFields
-              ? (report as { extractedFields: Record<string, unknown> })
-                  .extractedFields
-              : null;
-          const name = extractTechnicianNameFromFields(fields);
-          const technicianId = resolveTechnicianIdFromName(name, candidates);
-          if (technicianId != null) {
-            await db.updateJobSheetTechnicianId(sheet.id, technicianId);
+        for (const row of withNames) {
+          const name = row.extractedName;
+          const match = resolveTechnicianMatch(name, candidates);
+          if (match.technicianId != null) {
+            await db.updateJobSheetTechnicianId(row.id, match.technicianId);
             attributed++;
-            if (samples.length < 10) {
+            if (samples.length < 15) {
               samples.push({
-                jobSheetId: sheet.id,
+                jobSheetId: row.id,
                 extractedName: name,
-                technicianId,
+                technicianId: match.technicianId,
+                confidence: match.confidence,
               });
             }
           } else if (name) {
             unresolved++;
-            if (samples.length < 10) {
+            const key = name.trim();
+            unresolvedNames.set(key, (unresolvedNames.get(key) ?? 0) + 1);
+            if (samples.length < 15) {
               samples.push({
-                jobSheetId: sheet.id,
+                jobSheetId: row.id,
                 extractedName: name,
                 technicianId: null,
+                confidence: null,
               });
             }
           } else {
@@ -469,6 +583,7 @@ export const appRouter = router({
             attributed,
             unresolved,
             noName,
+            createdUsers,
           },
         });
 
@@ -477,7 +592,134 @@ export const appRouter = router({
           attributed,
           unresolved,
           noName,
+          createdUsers,
           samples,
+          unresolvedNames: Array.from(unresolvedNames.entries())
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count),
+        };
+      }),
+
+    /**
+     * Assign all unattributed sheets with a given OCR name to one user.
+     */
+    assignByExtractedName: protectedProcedure
+      .input(
+        z.object({
+          extractedName: z.string().min(1),
+          technicianId: z.number(),
+          limit: z.number().min(1).max(500).default(200),
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const { extractTechnicianNameFromReport, canonicalizePersonName } =
+          await import("./services/technicianAttribution");
+
+        const user = await db.getUserById(input.technicianId);
+        if (!user) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Technician user not found",
+          });
+        }
+
+        const target = canonicalizePersonName(input.extractedName);
+        const sheets = await db.getUnattributedJobSheets({
+          limit: input.limit,
+          startDate: input.startDate ? new Date(input.startDate) : undefined,
+          endDate: input.endDate ? new Date(input.endDate) : undefined,
+        });
+
+        let assigned = 0;
+        for (const sheet of sheets) {
+          const report = await db.getLatestAuditReportJson(sheet.id);
+          const name = extractTechnicianNameFromReport(report);
+          if (!name) continue;
+          if (canonicalizePersonName(name) !== target) continue;
+          await db.updateJobSheetTechnicianId(sheet.id, input.technicianId);
+          assigned++;
+        }
+
+        await db.logAction({
+          userId: ctx.user.id,
+          action: "ASSIGN_BY_EXTRACTED_NAME",
+          entityType: "job_sheet",
+          details: {
+            extractedName: input.extractedName,
+            technicianId: input.technicianId,
+            assigned,
+          },
+        });
+
+        return { assigned, technicianId: input.technicianId };
+      }),
+
+    /**
+     * Create technician user from OCR name and attribute matching sheets.
+     */
+    ensureTechnicianFromName: protectedProcedure
+      .input(
+        z.object({
+          extractedName: z.string().min(1),
+          attributeMatchingSheets: z.boolean().default(true),
+          limit: z.number().min(1).max(500).default(200),
+          startDate: z.string().optional(),
+          endDate: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const {
+          prettifyExtractedName,
+          attributionOpenIdForName,
+          canonicalizePersonName,
+          extractTechnicianNameFromReport,
+        } = await import("./services/technicianAttribution");
+
+        const pretty = prettifyExtractedName(input.extractedName);
+        const openId = attributionOpenIdForName(input.extractedName);
+        const ensured = await db.ensureAttributionTechnicianUser({
+          openId,
+          name: pretty,
+        });
+
+        let assigned = 0;
+        if (input.attributeMatchingSheets) {
+          const target = canonicalizePersonName(input.extractedName);
+          const sheets = await db.getUnattributedJobSheets({
+            limit: input.limit,
+            startDate: input.startDate ? new Date(input.startDate) : undefined,
+            endDate: input.endDate ? new Date(input.endDate) : undefined,
+          });
+          for (const sheet of sheets) {
+            const report = await db.getLatestAuditReportJson(sheet.id);
+            const name = extractTechnicianNameFromReport(report);
+            if (!name) continue;
+            if (canonicalizePersonName(name) !== target) continue;
+            await db.updateJobSheetTechnicianId(sheet.id, ensured.id);
+            assigned++;
+          }
+        }
+
+        await db.logAction({
+          userId: ctx.user.id,
+          action: "ENSURE_TECHNICIAN_FROM_NAME",
+          entityType: "user",
+          entityId: ensured.id,
+          details: {
+            extractedName: input.extractedName,
+            prettyName: pretty,
+            created: ensured.created,
+            assigned,
+          },
+        });
+
+        return {
+          technicianId: ensured.id,
+          name: pretty,
+          created: ensured.created,
+          assigned,
         };
       }),
 

@@ -227,6 +227,39 @@ export async function getUserById(id: number) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+/**
+ * Create (or return existing) analytics technician user from an OCR name.
+ * Uses a synthetic openId so Azure AD login is not required for attribution.
+ */
+export async function ensureAttributionTechnicianUser(input: {
+  openId: string;
+  name: string;
+  email?: string | null;
+}): Promise<{ id: number; created: boolean }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await getUserByOpenId(input.openId);
+  if (existing) {
+    return { id: existing.id, created: false };
+  }
+
+  await db.insert(users).values({
+    openId: input.openId,
+    name: input.name,
+    email: input.email ?? null,
+    loginMethod: "attribution",
+    role: "technician",
+    lastSignedIn: new Date(),
+  });
+
+  const created = await getUserByOpenId(input.openId);
+  if (!created) {
+    throw new Error("Failed to create attribution technician user");
+  }
+  return { id: created.id, created: true };
+}
+
 // ============ JOB SHEET QUERIES ============
 
 export async function createJobSheet(data: InsertJobSheet) {
