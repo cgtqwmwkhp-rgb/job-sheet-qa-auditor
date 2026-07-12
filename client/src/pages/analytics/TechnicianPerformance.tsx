@@ -1,4 +1,5 @@
 import { AnalyticsLayout } from "./AnalyticsLayout";
+import { AnalyticsSkeleton } from "@/components/ui/loading-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -160,12 +161,7 @@ export default function TechnicianPerformance() {
         title="Technician Performance"
         description="Track and compare technician quality metrics."
       >
-        <div className="flex items-center justify-center h-[50vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-muted-foreground">
-            Loading engineer analytics...
-          </span>
-        </div>
+        <AnalyticsSkeleton />
       </AnalyticsLayout>
     );
   }

@@ -24,6 +24,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  StatCardSkeleton,
+  TableSkeleton,
+} from "@/components/ui/loading-skeleton";
 import { Loader2, PoundSterling, RefreshCw } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
@@ -211,9 +215,13 @@ export function ApiCostSettings() {
       </div>
 
       {query.isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground py-12 justify-center">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading cost summary…
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <StatCardSkeleton key={i} />
+            ))}
+          </div>
+          <TableSkeleton rows={5} columns={5} />
         </div>
       ) : query.isError ? (
         <Card>

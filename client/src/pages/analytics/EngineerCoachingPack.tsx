@@ -1,4 +1,5 @@
 import { AnalyticsLayout } from "./AnalyticsLayout";
+import { AnalyticsSkeleton } from "@/components/ui/loading-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +22,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
-  Loader2,
   Printer,
   Users,
 } from "lucide-react";
@@ -684,12 +684,7 @@ export default function EngineerCoachingPackPage() {
         title="Coaching pack"
         description="Building analytical feedback for this period."
       >
-        <div className="flex flex-col items-center justify-center h-[40vh] rounded-xl border border-border bg-white gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            Assembling coaching narrative and evidence…
-          </p>
-        </div>
+        <AnalyticsSkeleton />
       </AnalyticsLayout>
     );
   }

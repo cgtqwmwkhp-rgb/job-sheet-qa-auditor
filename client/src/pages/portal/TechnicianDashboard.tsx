@@ -65,6 +65,7 @@ export default function TechnicianDashboard() {
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Notifications"
             className="relative hover:bg-muted/50 rounded-full"
           >
             <Bell className="h-5 w-5 text-muted-foreground" />
@@ -75,6 +76,7 @@ export default function TechnicianDashboard() {
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Log out"
             onClick={handleLogout}
             className="hover:bg-muted/50 rounded-full"
           >

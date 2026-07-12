@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { TableSkeleton } from "@/components/ui/loading-skeleton";
 import {
   ShieldAlert,
   Search,
@@ -24,7 +25,6 @@ import {
   Download,
   User,
   Clock,
-  Loader2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { trpc } from "@/lib/trpc";
@@ -96,6 +96,7 @@ export default function AuditLog() {
                 <Button
                   variant="outline"
                   size="icon"
+                  aria-label="Filter events"
                   className="shrink-0 h-9 w-9"
                 >
                   <Filter className="h-4 w-4" />
@@ -110,8 +111,8 @@ export default function AuditLog() {
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <div className="p-4">
+                <TableSkeleton rows={8} columns={6} />
               </div>
             ) : filteredLogs.length > 0 ? (
               <div className="max-h-[min(70vh,640px)] overflow-auto">

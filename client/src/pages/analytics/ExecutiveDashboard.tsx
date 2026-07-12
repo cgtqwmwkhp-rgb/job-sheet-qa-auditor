@@ -1,13 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AnalyticsLayout } from "./AnalyticsLayout";
+import { AnalyticsSkeleton } from "@/components/ui/loading-skeleton";
 import {
   CheckCircle2,
   FileText,
   AlertTriangle,
   Users,
   BarChart3,
-  Loader2,
   ArrowRight,
 } from "lucide-react";
 import { Link } from "wouter";
@@ -65,12 +65,7 @@ export default function ExecutiveDashboard() {
         title="Executive Overview"
         description={`High-level operational metrics for ${periodLabel}.`}
       >
-        <div className="flex items-center justify-center h-[50vh] rounded-xl border border-border bg-white">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-muted-foreground">
-            Loading executive summary…
-          </span>
-        </div>
+        <AnalyticsSkeleton />
       </AnalyticsLayout>
     );
   }

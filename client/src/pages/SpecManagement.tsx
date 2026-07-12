@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ListSkeleton } from "@/components/ui/loading-skeleton";
 import {
   Edit,
   FileJson,
@@ -179,9 +180,7 @@ export default function SpecManagement() {
             </CardHeader>
             <CardContent className="p-0">
               {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
+                <ListSkeleton items={4} />
               ) : specs && specs.length > 0 ? (
                 <div className="max-h-[min(70vh,640px)] overflow-auto divide-y">
                   {specs.map(spec => (

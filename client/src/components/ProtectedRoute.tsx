@@ -17,8 +17,8 @@ export function ProtectedRoute({
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-[#ececec]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="h-screen w-full flex items-center justify-center bg-muted">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }

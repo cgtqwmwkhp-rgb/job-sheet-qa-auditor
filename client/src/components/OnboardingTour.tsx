@@ -1,23 +1,23 @@
 import { useState, useEffect } from "react";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogDescription,
-  DialogFooter
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { 
-  ChevronRight, 
-  ChevronLeft, 
-  X, 
-  LayoutDashboard, 
-  BarChart3, 
-  BrainCircuit, 
+import {
+  ChevronRight,
+  ChevronLeft,
+  X,
+  LayoutDashboard,
+  BarChart3,
+  BrainCircuit,
   Settings,
-  Book
+  Book,
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -32,34 +32,39 @@ interface TourStep {
 const TOUR_STEPS: TourStep[] = [
   {
     title: "Welcome to Job Sheet QA",
-    description: "Your new command center for automated audit compliance and operational excellence. Let's take a quick tour of the key features.",
+    description:
+      "Your new command center for automated audit compliance and operational excellence. Let's take a quick tour of the key features.",
     icon: <LayoutDashboard className="h-12 w-12 text-primary" />,
-    targetPath: "/"
+    targetPath: "/",
   },
   {
     title: "First Fix Analysis",
-    description: "Track return visits and identify 'Lemon' assets. Use the AI-driven insights to spot patterns in engineer performance and site access issues.",
+    description:
+      "Track return visits and identify 'Lemon' assets. Use the AI-driven insights to spot patterns in engineer performance and site access issues.",
     icon: <BarChart3 className="h-12 w-12 text-blue-500" />,
-    targetPath: "/analytics/first-fix"
+    targetPath: "/analytics/first-fix",
   },
   {
     title: "AI Auditor Persona",
-    description: "Configure the AI's 'lens'—adjust strictness, tone, and focus areas to match your specific compliance requirements.",
-    icon: <BrainCircuit className="h-12 w-12 text-purple-500" />,
-    targetPath: "/settings"
+    description:
+      "Configure the AI's 'lens'—adjust strictness, tone, and focus areas to match your specific compliance requirements.",
+    icon: <BrainCircuit className="h-12 w-12 text-primary" />,
+    targetPath: "/settings",
   },
   {
     title: "Technician Portal",
-    description: "Empower your team with their own dashboard to view scores, dispute findings, and manage notification preferences.",
+    description:
+      "Empower your team with their own dashboard to view scores, dispute findings, and manage notification preferences.",
     icon: <Settings className="h-12 w-12 text-green-500" />,
-    targetPath: "/portal/dashboard"
+    targetPath: "/portal/dashboard",
   },
   {
     title: "Help & Resources",
-    description: "Access comprehensive guides, FAQs, and best practices in our new Knowledge Base. Master the platform at your own pace.",
+    description:
+      "Access comprehensive guides, FAQs, and best practices in our new Knowledge Base. Master the platform at your own pace.",
     icon: <Book className="h-12 w-12 text-orange-500" />,
-    targetPath: "/help"
-  }
+    targetPath: "/help",
+  },
 ];
 
 export function OnboardingTour() {
@@ -115,10 +120,10 @@ export function OnboardingTour() {
           <div className="relative z-10 bg-background p-6 rounded-full shadow-lg ring-4 ring-background/50">
             {step.icon}
           </div>
-          
-          <Button 
-            variant="ghost" 
-            size="icon" 
+
+          <Button
+            variant="ghost"
+            size="icon"
             className="absolute top-2 right-2 rounded-full hover:bg-background/50"
             onClick={handleComplete}
           >
@@ -138,7 +143,9 @@ export function OnboardingTour() {
 
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              <span>Step {currentStep + 1} of {TOUR_STEPS.length}</span>
+              <span>
+                Step {currentStep + 1} of {TOUR_STEPS.length}
+              </span>
               <span>{Math.round(progress)}%</span>
             </div>
             <Progress value={progress} className="h-1.5" />

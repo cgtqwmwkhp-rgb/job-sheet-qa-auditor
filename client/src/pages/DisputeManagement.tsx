@@ -1,6 +1,10 @@
 import { useMemo, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { EmptyState } from "@/components/EmptyState";
+import {
+  ListSkeleton,
+  StatCardSkeleton,
+} from "@/components/ui/loading-skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -237,9 +241,22 @@ export default function DisputeManagement() {
   if (isLoading) {
     return (
       <DashboardLayout>
-        <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-[#706D6D]" />
-          <p className="text-sm text-[#706D6D]">Loading disputes…</p>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-heading font-bold tracking-tight text-[#333030]">
+              Dispute Management
+            </h1>
+            <p className="text-[#706D6D] mt-1">
+              Triage technician-contested findings — start review, escalate, or
+              resolve in one place.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </div>
+          <ListSkeleton items={5} />
         </div>
       </DashboardLayout>
     );

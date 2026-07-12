@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ListSkeleton } from "@/components/ui/loading-skeleton";
 import {
   AlertCircle,
   CheckCircle2,
@@ -218,10 +219,11 @@ export default function SearchPage() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-16 gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-[#706D6D]" />
-            <span className="text-[#706D6D]">Loading archive…</span>
-          </div>
+          <Card className="border-[#EBE8E8] bg-white">
+            <CardContent className="p-0">
+              <ListSkeleton items={5} />
+            </CardContent>
+          </Card>
         ) : allResults.length === 0 ? (
           <Card className="border-[#EBE8E8] bg-white">
             <CardContent className="py-4">

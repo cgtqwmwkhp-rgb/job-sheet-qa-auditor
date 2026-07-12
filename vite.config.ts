@@ -19,7 +19,7 @@ const plugins = [
       name: "Job Sheet QA Auditor",
       short_name: "JobQA",
       description: "Enterprise Job Sheet QA Auditor",
-      theme_color: "#4F46E5",
+      theme_color: "#BEDA41",
       background_color: "#ffffff",
       icons: [
         {

@@ -1,22 +1,28 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { 
-  BrainCircuit, 
-  Eye, 
-  Sparkles, 
-  Gauge, 
+import {
+  BrainCircuit,
+  Eye,
+  Sparkles,
+  Gauge,
   RefreshCw,
   Save,
   AlertCircle,
   CheckCircle2,
   Loader2,
-  Info
+  Info,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -54,7 +60,11 @@ export function ProcessingSettings() {
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const { data: serverConfig, isLoading, refetch } = trpc.processingSettings.get.useQuery();
+  const {
+    data: serverConfig,
+    isLoading,
+    refetch,
+  } = trpc.processingSettings.get.useQuery();
   const updateBatch = trpc.processingSettings.updateBatch.useMutation();
 
   useEffect(() => {
@@ -75,7 +85,7 @@ export function ProcessingSettings() {
         settingKey: key,
         settingValue: value,
       }));
-      
+
       await updateBatch.mutateAsync({ settings });
       toast.success("Processing settings saved successfully");
       setHasChanges(false);
@@ -111,15 +121,21 @@ export function ProcessingSettings() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-purple-500/10">
-                  <BrainCircuit className="h-5 w-5 text-purple-500" />
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <BrainCircuit className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg">LLM-Assisted Extraction</CardTitle>
-                  <CardDescription>Use AI to extract fields when pattern matching fails</CardDescription>
+                  <CardTitle className="text-lg">
+                    LLM-Assisted Extraction
+                  </CardTitle>
+                  <CardDescription>
+                    Use AI to extract fields when pattern matching fails
+                  </CardDescription>
                 </div>
               </div>
-              <Badge variant={config.llmFallbackEnabled ? "default" : "secondary"}>
+              <Badge
+                variant={config.llmFallbackEnabled ? "default" : "secondary"}
+              >
                 {config.llmFallbackEnabled ? "Enabled" : "Disabled"}
               </Badge>
             </div>
@@ -128,13 +144,20 @@ export function ProcessingSettings() {
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <Label className="text-base font-medium">Enable LLM Fallback</Label>
+                  <Label className="text-base font-medium">
+                    Enable LLM Fallback
+                  </Label>
                   <Tooltip>
                     <TooltipTrigger>
                       <Info className="h-4 w-4 text-muted-foreground" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
-                      <p>When enabled, the system will use Gemini 2.5 AI to extract fields that couldn't be found using regex or fuzzy matching. This improves accuracy but increases processing time.</p>
+                      <p>
+                        When enabled, the system will use Gemini 2.5 AI to
+                        extract fields that couldn't be found using regex or
+                        fuzzy matching. This improves accuracy but increases
+                        processing time.
+                      </p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -142,9 +165,11 @@ export function ProcessingSettings() {
                   Automatically invoke AI when confidence is below threshold
                 </p>
               </div>
-              <Switch 
+              <Switch
                 checked={config.llmFallbackEnabled}
-                onCheckedChange={(checked) => handleChange('llmFallbackEnabled', checked)}
+                onCheckedChange={checked =>
+                  handleChange("llmFallbackEnabled", checked)
+                }
               />
             </div>
 
@@ -160,14 +185,17 @@ export function ProcessingSettings() {
                   </div>
                   <Slider
                     value={[config.llmConfidenceThreshold]}
-                    onValueChange={([value]) => handleChange('llmConfidenceThreshold', value)}
+                    onValueChange={([value]) =>
+                      handleChange("llmConfidenceThreshold", value)
+                    }
                     min={50}
                     max={95}
                     step={5}
                     className="w-full"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Fields with confidence below this threshold will trigger LLM extraction
+                    Fields with confidence below this threshold will trigger LLM
+                    extraction
                   </p>
                 </div>
               </>
@@ -185,7 +213,9 @@ export function ProcessingSettings() {
                 </div>
                 <div>
                   <CardTitle className="text-lg">OCR Processing</CardTitle>
-                  <CardDescription>Optical character recognition for scanned documents</CardDescription>
+                  <CardDescription>
+                    Optical character recognition for scanned documents
+                  </CardDescription>
                 </div>
               </div>
               <Badge variant={config.ocrEnabled ? "default" : "secondary"}>
@@ -196,14 +226,16 @@ export function ProcessingSettings() {
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label className="text-base font-medium">Enable OCR Fallback</Label>
+                <Label className="text-base font-medium">
+                  Enable OCR Fallback
+                </Label>
                 <p className="text-sm text-muted-foreground">
                   Use Mistral OCR when embedded PDF text is unavailable
                 </p>
               </div>
-              <Switch 
+              <Switch
                 checked={config.ocrEnabled}
-                onCheckedChange={(checked) => handleChange('ocrEnabled', checked)}
+                onCheckedChange={checked => handleChange("ocrEnabled", checked)}
               />
             </div>
 
@@ -219,7 +251,9 @@ export function ProcessingSettings() {
                   </div>
                   <Slider
                     value={[config.ocrConfidenceThreshold]}
-                    onValueChange={([value]) => handleChange('ocrConfidenceThreshold', value)}
+                    onValueChange={([value]) =>
+                      handleChange("ocrConfidenceThreshold", value)
+                    }
                     min={40}
                     max={90}
                     step={5}
@@ -244,10 +278,14 @@ export function ProcessingSettings() {
                 </div>
                 <div>
                   <CardTitle className="text-lg">Fuzzy Matching</CardTitle>
-                  <CardDescription>Intelligent pattern matching for field labels</CardDescription>
+                  <CardDescription>
+                    Intelligent pattern matching for field labels
+                  </CardDescription>
                 </div>
               </div>
-              <Badge variant={config.fuzzyMatchingEnabled ? "default" : "secondary"}>
+              <Badge
+                variant={config.fuzzyMatchingEnabled ? "default" : "secondary"}
+              >
                 {config.fuzzyMatchingEnabled ? "Enabled" : "Disabled"}
               </Badge>
             </div>
@@ -255,14 +293,18 @@ export function ProcessingSettings() {
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label className="text-base font-medium">Enable Fuzzy Matching</Label>
+                <Label className="text-base font-medium">
+                  Enable Fuzzy Matching
+                </Label>
                 <p className="text-sm text-muted-foreground">
                   Use Levenshtein distance and phonetic matching for typos
                 </p>
               </div>
-              <Switch 
+              <Switch
                 checked={config.fuzzyMatchingEnabled}
-                onCheckedChange={(checked) => handleChange('fuzzyMatchingEnabled', checked)}
+                onCheckedChange={checked =>
+                  handleChange("fuzzyMatchingEnabled", checked)
+                }
               />
             </div>
 
@@ -278,14 +320,17 @@ export function ProcessingSettings() {
                   </div>
                   <Slider
                     value={[config.fuzzyMatchThreshold]}
-                    onValueChange={([value]) => handleChange('fuzzyMatchThreshold', value)}
+                    onValueChange={([value]) =>
+                      handleChange("fuzzyMatchThreshold", value)
+                    }
                     min={60}
                     max={95}
                     step={5}
                     className="w-full"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Higher values require closer matches, reducing false positives
+                    Higher values require closer matches, reducing false
+                    positives
                   </p>
                 </div>
               </>
@@ -301,8 +346,12 @@ export function ProcessingSettings() {
                 <Gauge className="h-5 w-5 text-green-500" />
               </div>
               <div>
-                <CardTitle className="text-lg">Performance & Reliability</CardTitle>
-                <CardDescription>Configure retry behavior and timeouts</CardDescription>
+                <CardTitle className="text-lg">
+                  Performance & Reliability
+                </CardTitle>
+                <CardDescription>
+                  Configure retry behavior and timeouts
+                </CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -316,7 +365,7 @@ export function ProcessingSettings() {
               </div>
               <Slider
                 value={[config.maxRetries]}
-                onValueChange={([value]) => handleChange('maxRetries', value)}
+                onValueChange={([value]) => handleChange("maxRetries", value)}
                 min={1}
                 max={5}
                 step={1}
@@ -338,7 +387,9 @@ export function ProcessingSettings() {
               </div>
               <Slider
                 value={[config.processingTimeoutMs / 1000]}
-                onValueChange={([value]) => handleChange('processingTimeoutMs', value * 1000)}
+                onValueChange={([value]) =>
+                  handleChange("processingTimeoutMs", value * 1000)
+                }
                 min={30}
                 max={180}
                 step={15}
@@ -359,7 +410,11 @@ export function ProcessingSettings() {
               You have unsaved changes
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={handleReset} disabled={isSaving}>
+              <Button
+                variant="outline"
+                onClick={handleReset}
+                disabled={isSaving}
+              >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Reset
               </Button>

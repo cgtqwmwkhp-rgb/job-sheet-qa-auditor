@@ -1,4 +1,5 @@
 import { AnalyticsLayout } from "./AnalyticsLayout";
+import { AnalyticsSkeleton } from "@/components/ui/loading-skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -16,13 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
-import {
-  AlertTriangle,
-  BrainCircuit,
-  Loader2,
-  Package,
-  Target,
-} from "lucide-react";
+import { AlertTriangle, BrainCircuit, Package, Target } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { PredictiveAlerts } from "@/components/PredictiveAlerts";
 import { useAnalyticsFilters } from "@/hooks/useAnalyticsFilters";
@@ -93,12 +88,7 @@ export default function PredictiveRisk() {
         title="Predictive Risk"
         description="Leading-indicator risk scoring and fix packs for entities needing attention."
       >
-        <div className="flex items-center justify-center h-[50vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-muted-foreground">
-            Loading predictive risk...
-          </span>
-        </div>
+        <AnalyticsSkeleton />
       </AnalyticsLayout>
     );
   }

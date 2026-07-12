@@ -122,6 +122,7 @@ export function NotificationsDropdown() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label="Dismiss notification"
                         className="h-4 w-4 hover:bg-transparent hover:text-destructive"
                         onClick={e => clearNotification(e, notification.id)}
                       >
