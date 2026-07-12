@@ -92,11 +92,13 @@ function Router() {
   // Initialize error tracking on mount
   useEffect(() => {
     initializeErrorTracking({
-      user: user ? {
-        id: Number(user.id),
-        email: user.email,
-        role: user.role,
-      } : undefined,
+      user: user
+        ? {
+            id: Number(user.id),
+            email: user.email,
+            role: user.role,
+          }
+        : undefined,
     });
   }, [user]);
 

@@ -1,6 +1,6 @@
 /**
  * Monitoring Dashboard
- * 
+ *
  * Displays real-time system health metrics, error tracking,
  * performance monitoring, and operational insights
  */
@@ -9,31 +9,50 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { 
-  Activity, 
-  AlertCircle, 
-  Clock, 
-  Database, 
-  TrendingUp, 
+import {
+  Activity,
+  AlertCircle,
+  Clock,
+  Database,
+  TrendingUp,
   Users,
   CheckCircle2,
   XCircle,
-  Zap
+  Zap,
 } from "lucide-react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 
 export default function Monitoring() {
   const [autoRefresh, setAutoRefresh] = useState(true);
-  
+
   // System health
-  const { data: health, refetch: refetchHealth } = trpc.system.health.useQuery();
-  
+  const { data: health, refetch: refetchHealth } =
+    trpc.system.health.useQuery();
+
   // Recent errors (would need endpoint)
   const [recentErrors] = useState([
     { id: 1, message: "Database timeout", count: 3, lastSeen: "2 min ago" },
-    { id: 2, message: "OCR service unavailable", count: 1, lastSeen: "15 min ago" }
+    {
+      id: 2,
+      message: "OCR service unavailable",
+      count: 1,
+      lastSeen: "15 min ago",
+    },
   ]);
-  
+
   // Performance metrics
   const [performanceData] = useState([
     { name: "00:00", avgResponse: 245, requests: 120 },
@@ -41,28 +60,28 @@ export default function Monitoring() {
     { name: "08:00", avgResponse: 312, requests: 340 },
     { name: "12:00", avgResponse: 278, requests: 450 },
     { name: "16:00", avgResponse: 298, requests: 380 },
-    { name: "20:00", avgResponse: 201, requests: 220 }
+    { name: "20:00", avgResponse: 201, requests: 220 },
   ]);
-  
+
   // Process status distribution
   const [statusData] = useState([
     { name: "Completed", value: 850, color: "#10b981" },
     { name: "Processing", value: 45, color: "#3b82f6" },
     { name: "Failed", value: 12, color: "#ef4444" },
-    { name: "Pending", value: 93, color: "#f59e0b" }
+    { name: "Pending", value: 93, color: "#f59e0b" },
   ]);
-  
+
   // Auto-refresh
   useEffect(() => {
     if (!autoRefresh) return;
-    
+
     const interval = setInterval(() => {
       refetchHealth();
     }, 30000); // Every 30 seconds
-    
+
     return () => clearInterval(interval);
   }, [autoRefresh, refetchHealth]);
-  
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -85,7 +104,7 @@ export default function Monitoring() {
           </button>
         </div>
       </div>
-      
+
       {/* System Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatusCard
@@ -116,7 +135,7 @@ export default function Monitoring() {
           subtitle="Last hour"
         />
       </div>
-      
+
       {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Response Time Chart */}
@@ -133,14 +152,18 @@ export default function Monitoring() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis dataKey="name" stroke="#9ca3af" />
                 <YAxis stroke="#9ca3af" />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px' }}
-                  labelStyle={{ color: '#f3f4f6' }}
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#1f2937",
+                    border: "none",
+                    borderRadius: "8px",
+                  }}
+                  labelStyle={{ color: "#f3f4f6" }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="avgResponse" 
-                  stroke="#3b82f6" 
+                <Line
+                  type="monotone"
+                  dataKey="avgResponse"
+                  stroke="#3b82f6"
                   strokeWidth={2}
                   name="Avg Response (ms)"
                 />
@@ -148,7 +171,7 @@ export default function Monitoring() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-        
+
         {/* Request Volume Chart */}
         <Card>
           <CardHeader>
@@ -163,9 +186,13 @@ export default function Monitoring() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis dataKey="name" stroke="#9ca3af" />
                 <YAxis stroke="#9ca3af" />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px' }}
-                  labelStyle={{ color: '#f3f4f6' }}
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#1f2937",
+                    border: "none",
+                    borderRadius: "8px",
+                  }}
+                  labelStyle={{ color: "#f3f4f6" }}
                 />
                 <Bar dataKey="requests" fill="#10b981" name="Requests" />
               </BarChart>
@@ -173,7 +200,7 @@ export default function Monitoring() {
           </CardContent>
         </Card>
       </div>
-      
+
       {/* Charts Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Status Distribution */}
@@ -195,20 +222,26 @@ export default function Monitoring() {
                   outerRadius={80}
                   paddingAngle={2}
                   dataKey="value"
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) =>
+                    `${name}: ${(percent * 100).toFixed(0)}%`
+                  }
                 >
                   {statusData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px' }}
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#1f2937",
+                    border: "none",
+                    borderRadius: "8px",
+                  }}
                 />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
-        
+
         {/* Recent Errors */}
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -225,13 +258,18 @@ export default function Monitoring() {
                   No recent errors
                 </div>
               ) : (
-                recentErrors.map((error) => (
-                  <div key={error.id} className="flex items-center justify-between p-3 border rounded-lg">
+                recentErrors.map(error => (
+                  <div
+                    key={error.id}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
                     <div className="flex items-center gap-3">
                       <XCircle className="h-5 w-5 text-red-500" />
                       <div>
                         <p className="font-medium">{error.message}</p>
-                        <p className="text-sm text-muted-foreground">{error.lastSeen}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {error.lastSeen}
+                        </p>
                       </div>
                     </div>
                     <Badge variant="destructive">{error.count}x</Badge>
@@ -242,7 +280,7 @@ export default function Monitoring() {
           </CardContent>
         </Card>
       </div>
-      
+
       {/* Database Stats */}
       <Card>
         <CardHeader>
@@ -278,7 +316,7 @@ export default function Monitoring() {
           </div>
         </CardContent>
       </Card>
-      
+
       {/* System Info */}
       <Card>
         <CardHeader>
@@ -290,7 +328,10 @@ export default function Monitoring() {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <InfoItem label="Version" value={health?.version || "1.0.0"} />
-            <InfoItem label="Environment" value={health?.environment || "production"} />
+            <InfoItem
+              label="Environment"
+              value={health?.environment || "production"}
+            />
             <InfoItem label="Uptime" value="14d 6h" />
             <InfoItem label="Last Deploy" value="2026-07-12" />
           </div>
@@ -310,14 +351,20 @@ interface StatusCardProps {
   subtitle?: string;
 }
 
-function StatusCard({ title, value, icon, variant, subtitle }: StatusCardProps) {
+function StatusCard({
+  title,
+  value,
+  icon,
+  variant,
+  subtitle,
+}: StatusCardProps) {
   const variantStyles = {
     success: "text-green-500 bg-green-500/10",
     warning: "text-yellow-500 bg-yellow-500/10",
     error: "text-red-500 bg-red-500/10",
-    info: "text-blue-500 bg-blue-500/10"
+    info: "text-blue-500 bg-blue-500/10",
   };
-  
+
   return (
     <Card>
       <CardContent className="pt-6">
@@ -350,16 +397,18 @@ function MetricBox({ label, value, max, suffix, status }: MetricBoxProps) {
   const statusColors = {
     healthy: "text-green-500",
     warning: "text-yellow-500",
-    error: "text-red-500"
+    error: "text-red-500",
   };
-  
+
   return (
     <div className="border rounded-lg p-4">
       <p className="text-sm text-muted-foreground mb-1">{label}</p>
       <p className={`text-xl font-bold ${statusColors[status]}`}>
         {value}
         {max && <span className="text-sm text-muted-foreground"> / {max}</span>}
-        {suffix && <span className="text-sm text-muted-foreground ml-1">{suffix}</span>}
+        {suffix && (
+          <span className="text-sm text-muted-foreground ml-1">{suffix}</span>
+        )}
       </p>
     </div>
   );
