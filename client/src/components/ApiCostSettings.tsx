@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -90,15 +90,18 @@ function ShareBar({ share }: { share?: number }) {
 }
 
 export function ApiCostSettings() {
-  const [window, setWindow] = useState<WindowHours>(48);
+  const [lookback, setLookback] = useState<WindowHours>(48);
   const [view, setView] = useState("overview");
-  const [currency, setCurrency] = useState<DisplayCurrency>("GBP");
+  const [currency, setCurrency] = useState<DisplayCurrency>(() => {
+    if (typeof globalThis === "undefined") return "GBP";
+    try {
+      return readStoredCurrency();
+    } catch {
+      return "GBP";
+    }
+  });
 
-  useEffect(() => {
-    setCurrency(readStoredCurrency());
-  }, []);
-
-  const windowHours = window === "all" ? null : window;
+  const windowHours = lookback === "all" ? null : lookback;
 
   const query = trpc.system.apiCostSummary.useQuery(
     {
@@ -174,9 +177,9 @@ export function ApiCostSettings() {
             </SelectContent>
           </Select>
           <Select
-            value={String(window)}
+            value={String(lookback)}
             onValueChange={v =>
-              setWindow(v === "all" ? "all" : (Number(v) as WindowHours))
+              setLookback(v === "all" ? "all" : (Number(v) as WindowHours))
             }
           >
             <SelectTrigger className="w-[160px]" aria-label="Cost time window">
