@@ -132,8 +132,8 @@ import {
 } from "./vlmInkVerification";
 import * as db from "../db";
 import {
-  extractTechnicianNameFromFields,
-  resolveTechnicianIdFromName,
+  extractTechnicianNameFromReport,
+  resolveTechnicianMatch,
 } from "./technicianAttribution";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -2176,11 +2176,12 @@ async function processJobSheetWithOptions(
     try {
       const sheetRow = await db.getJobSheetById(jobSheetId);
       if (sheetRow && sheetRow.technicianId == null) {
-        const name = extractTechnicianNameFromFields(
-          finalExtractedFields as Record<string, unknown>
-        );
+        const name = extractTechnicianNameFromReport({
+          extractedFields: finalExtractedFields,
+          extractedText,
+        });
         const users = await db.getAllUsers();
-        const resolvedId = resolveTechnicianIdFromName(
+        const match = resolveTechnicianMatch(
           name,
           users.map(u => ({
             id: u.id,
@@ -2189,12 +2190,13 @@ async function processJobSheetWithOptions(
             role: u.role,
           }))
         );
-        if (resolvedId != null) {
-          await db.updateJobSheetTechnicianId(jobSheetId, resolvedId);
+        if (match.technicianId != null) {
+          await db.updateJobSheetTechnicianId(jobSheetId, match.technicianId);
           console.log(`[DocumentProcessor] Attributed technician`, {
             jobSheetId,
-            technicianId: resolvedId,
+            technicianId: match.technicianId,
             extractedName: name,
+            confidence: match.confidence,
           });
         } else if (name) {
           console.log(

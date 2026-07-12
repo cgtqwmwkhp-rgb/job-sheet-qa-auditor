@@ -104,16 +104,53 @@ export default function TechnicianPerformance() {
   const backfillMutation =
     trpc.jobSheets.backfillTechnicianAttribution.useMutation({
       onSuccess: result => {
+        const extra =
+          result.createdUsers > 0
+            ? ` · created ${result.createdUsers} technician user(s)`
+            : "";
         toast.success(
           `Attributed ${result.attributed} of ${result.scanned} sheets` +
             (result.unresolved
-              ? ` (${result.unresolved} names unmatched — add matching technician users)`
-              : "")
+              ? ` (${result.unresolved} still unmatched)`
+              : "") +
+            extra
         );
         void utils.analytics.getEngineerSummary.invalidate();
+        void utils.jobSheets.getAttributionGap.invalidate();
       },
       onError: err => toast.error(err.message),
     });
+
+  const ensureFromNameMutation =
+    trpc.jobSheets.ensureTechnicianFromName.useMutation({
+      onSuccess: result => {
+        toast.success(
+          `${result.created ? "Created" : "Found"} ${result.name} · attributed ${result.assigned} card(s)`
+        );
+        void utils.analytics.getEngineerSummary.invalidate();
+        void utils.jobSheets.getAttributionGap.invalidate();
+      },
+      onError: err => toast.error(err.message),
+    });
+
+  const assignByNameMutation = trpc.jobSheets.assignByExtractedName.useMutation(
+    {
+      onSuccess: result => {
+        toast.success(`Assigned ${result.assigned} card(s)`);
+        void utils.analytics.getEngineerSummary.invalidate();
+        void utils.jobSheets.getAttributionGap.invalidate();
+      },
+      onError: err => toast.error(err.message),
+    }
+  );
+
+  const hasData = (summary?.engineerCount ?? 0) > 0;
+
+  const { data: attributionGap, isLoading: gapLoading } =
+    trpc.jobSheets.getAttributionGap.useQuery(
+      { startDate, endDate, limit: 200 },
+      { enabled: !isLoading && !error && !hasData }
+    );
 
   if (isLoading) {
     return (
@@ -148,41 +185,57 @@ export default function TechnicianPerformance() {
     );
   }
 
-  const hasData = (summary?.engineerCount ?? 0) > 0;
-  const unattributedCount = summary?.unattributedCount ?? 0;
+  const unattributedCount =
+    attributionGap?.unattributedCount ?? summary?.unattributedCount ?? 0;
 
   if (!hasData) {
+    const busy =
+      backfillMutation.isPending ||
+      ensureFromNameMutation.isPending ||
+      assignByNameMutation.isPending;
+
     return (
       <AnalyticsLayout
         title="Technician Performance"
         description="Track and compare technician quality metrics."
       >
-        <Card className="p-12">
-          <div className="flex flex-col items-center justify-center text-center gap-4">
+        <Card className="p-8 md:p-12">
+          <div className="flex flex-col items-center text-center gap-4">
             <Users className="h-16 w-16 text-muted-foreground" />
             <div>
               <h2 className="text-xl font-semibold mb-2">
                 No Technician Attribution Yet
               </h2>
-              <p className="text-muted-foreground max-w-lg mx-auto">
-                Processed job cards only appear here when they are linked to a
-                technician user. Uploads currently leave that blank unless you
-                pick a technician on upload, or we match the OCR engineer name
-                to a user account.
+              <p className="text-muted-foreground max-w-xl mx-auto">
+                Scorecards need each job card linked to a technician user. OCR
+                often prints names like <code>Richard.Newton</code> — we now
+                match those to users named Richard Newton, emails, or create a
+                technician account from the OCR name.
               </p>
               {unattributedCount > 0 && (
                 <p className="text-sm text-amber-800 mt-3">
                   {unattributedCount} processed card
                   {unattributedCount === 1 ? "" : "s"} in this period have no
-                  technician assigned.
+                  technician assigned
+                  {attributionGap
+                    ? ` · ${attributionGap.matchableCount} auto-matchable · ${attributionGap.unmatchedNameCount} unmatched name(s)`
+                    : ""}
+                  .
                 </p>
               )}
             </div>
+
             <div className="flex flex-wrap justify-center gap-2">
               <Button
                 type="button"
-                disabled={backfillMutation.isPending}
-                onClick={() => backfillMutation.mutate({ limit: 200 })}
+                disabled={busy}
+                onClick={() =>
+                  backfillMutation.mutate({
+                    limit: 200,
+                    startDate,
+                    endDate,
+                  })
+                }
               >
                 {backfillMutation.isPending ? (
                   <>
@@ -193,21 +246,140 @@ export default function TechnicianPerformance() {
                   "Backfill from OCR names"
                 )}
               </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={() =>
+                  backfillMutation.mutate({
+                    limit: 200,
+                    startDate,
+                    endDate,
+                    createMissingUsers: true,
+                  })
+                }
+              >
+                Create missing users + backfill
+              </Button>
               <Link href="/upload">
                 <Button type="button" variant="outline">
                   Upload with technician
                 </Button>
               </Link>
-              <Link href="/users">
-                <Button type="button" variant="ghost">
-                  Manage users
-                </Button>
-              </Link>
             </div>
-            <p className="text-xs text-muted-foreground max-w-md">
-              Tip: create users whose names match the engineer name printed on
-              the job card (role technician), then run backfill.
-            </p>
+
+            <div className="w-full max-w-3xl text-left mt-2">
+              <p className="text-sm font-medium mb-2">
+                OCR names found on unattributed cards
+              </p>
+              {gapLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Scanning OCR names…
+                </div>
+              ) : (attributionGap?.clusters.length ?? 0) === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No engineer names found in report fields or OCR text yet.
+                  Reprocess cards or assign a technician on upload.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {attributionGap!.clusters.map(cluster => (
+                    <div
+                      key={cluster.extractedName}
+                      className="border rounded-lg p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="font-medium text-sm">
+                          {cluster.displayName}
+                          <span className="text-muted-foreground font-normal">
+                            {" "}
+                            · {cluster.sheetCount} card
+                            {cluster.sheetCount === 1 ? "" : "s"}
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {cluster.matchedTechnicianId != null
+                            ? `Matched → ${cluster.suggestedUserName ?? `user #${cluster.matchedTechnicianId}`} (${cluster.matchConfidence})`
+                            : "No matching user yet"}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 shrink-0">
+                        {cluster.matchedTechnicianId != null ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() =>
+                              assignByNameMutation.mutate({
+                                extractedName: cluster.displayName,
+                                technicianId: cluster.matchedTechnicianId!,
+                                limit: 200,
+                                startDate,
+                                endDate,
+                              })
+                            }
+                          >
+                            Assign matched
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() =>
+                              ensureFromNameMutation.mutate({
+                                extractedName: cluster.displayName,
+                                attributeMatchingSheets: true,
+                                limit: 200,
+                                startDate,
+                                endDate,
+                              })
+                            }
+                          >
+                            Create “
+                            {cluster.displayName.replace(/[._-]+/g, " ")}” +
+                            assign
+                          </Button>
+                        )}
+                        {(attributionGap?.users.length ?? 0) > 0 && (
+                          <select
+                            className="h-9 rounded-md border border-input bg-background px-2 text-xs max-w-[180px]"
+                            defaultValue=""
+                            disabled={busy}
+                            onChange={e => {
+                              const id = Number(e.target.value);
+                              if (!Number.isFinite(id) || id <= 0) return;
+                              assignByNameMutation.mutate({
+                                extractedName: cluster.displayName,
+                                technicianId: id,
+                                limit: 200,
+                                startDate,
+                                endDate,
+                              });
+                              e.target.value = "";
+                            }}
+                          >
+                            <option value="">Map to existing user…</option>
+                            {attributionGap!.users.map(u => (
+                              <option key={u.id} value={u.id}>
+                                {u.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(attributionGap?.noNameCount ?? 0) > 0 && (
+                <p className="text-xs text-muted-foreground mt-3">
+                  {attributionGap!.noNameCount} card(s) have no extractable
+                  engineer name — assign those on Upload or via audit review.
+                </p>
+              )}
+            </div>
           </div>
         </Card>
       </AnalyticsLayout>
