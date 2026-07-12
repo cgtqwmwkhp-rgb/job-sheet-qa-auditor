@@ -703,7 +703,9 @@ export default function EngineerCoachingPackPage() {
         <Card className="p-10">
           <div className="flex flex-col items-center text-center gap-4">
             <AlertTriangle className="h-12 w-12 text-destructive" />
-            <h2 className="text-lg font-semibold">Failed to load coaching pack</h2>
+            <h2 className="text-lg font-semibold">
+              Failed to load coaching pack
+            </h2>
             <p className="text-muted-foreground max-w-md">{error.message}</p>
             <Link href="/analytics/technicians">
               <Button variant="outline" size="sm" className="gap-2">
@@ -726,7 +728,9 @@ export default function EngineerCoachingPackPage() {
         <Card className="p-10 border-dashed">
           <div className="flex flex-col items-center text-center gap-4 max-w-lg mx-auto">
             <Users className="h-12 w-12 text-muted-foreground" />
-            <h2 className="text-lg font-semibold">No attributed cards in period</h2>
+            <h2 className="text-lg font-semibold">
+              No attributed cards in period
+            </h2>
             <p className="text-muted-foreground">
               This technician has no attributed job cards in the selected
               reporting period. Adjust the period filter or resolve attribution

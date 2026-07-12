@@ -7,7 +7,13 @@
 
 import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
@@ -178,9 +184,13 @@ export default function Monitoring() {
           <Card className="p-12 border-destructive/30">
             <div className="flex flex-col items-center justify-center gap-3 text-center">
               <AlertCircle className="h-12 w-12 text-destructive" />
-              <h2 className="text-lg font-semibold">Unable to reach monitoring APIs</h2>
+              <h2 className="text-lg font-semibold">
+                Unable to reach monitoring APIs
+              </h2>
               <p className="text-muted-foreground max-w-md">
-                {healthErr?.message || versionErr?.message || "Health check failed."}
+                {healthErr?.message ||
+                  versionErr?.message ||
+                  "Health check failed."}
               </p>
               <Button variant="outline" size="sm" onClick={handleManualRefresh}>
                 Retry
@@ -215,7 +225,9 @@ export default function Monitoring() {
                   }
                   variant={systemHealthy ? "success" : "warning"}
                   subtitle={
-                    version?.environment || health?.config?.environment || "unknown env"
+                    version?.environment ||
+                    health?.config?.environment ||
+                    "unknown env"
                   }
                 />
                 <StatusCard
@@ -252,15 +264,22 @@ export default function Monitoring() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <InfoItem
                       label="Version"
-                      value={version?.gitShaShort || version?.gitSha || "unknown"}
+                      value={
+                        version?.gitShaShort || version?.gitSha || "unknown"
+                      }
                     />
                     <InfoItem
                       label="Environment"
                       value={
-                        version?.environment || health?.config?.environment || "unknown"
+                        version?.environment ||
+                        health?.config?.environment ||
+                        "unknown"
                       }
                     />
-                    <InfoItem label="Platform" value={version?.platformVersion || "—"} />
+                    <InfoItem
+                      label="Platform"
+                      value={version?.platformVersion || "—"}
+                    />
                     <InfoItem
                       label="Build time"
                       value={
@@ -322,13 +341,22 @@ export default function Monitoring() {
                       <Activity className="h-5 w-5" />
                       Response time (24h)
                     </CardTitle>
-                    <CardDescription>Average API latency by hour</CardDescription>
+                    <CardDescription>
+                      Average API latency by hour
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={250}>
                       <LineChart data={performanceData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="name" className="text-muted-foreground" tick={{ fontSize: 12 }} />
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          className="stroke-border"
+                        />
+                        <XAxis
+                          dataKey="name"
+                          className="text-muted-foreground"
+                          tick={{ fontSize: 12 }}
+                        />
                         <YAxis tick={{ fontSize: 12 }} />
                         <Tooltip
                           contentStyle={CHART_TOOLTIP_STYLE}
@@ -357,14 +385,22 @@ export default function Monitoring() {
                   <CardContent>
                     <ResponsiveContainer width="100%" height={250}>
                       <BarChart data={performanceData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          className="stroke-border"
+                        />
                         <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                         <YAxis tick={{ fontSize: 12 }} />
                         <Tooltip
                           contentStyle={CHART_TOOLTIP_STYLE}
                           labelStyle={{ color: "#333030" }}
                         />
-                        <Bar dataKey="requests" fill="#beda41" name="Requests" radius={[4, 4, 0, 0]} />
+                        <Bar
+                          dataKey="requests"
+                          fill="#beda41"
+                          name="Requests"
+                          radius={[4, 4, 0, 0]}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
@@ -421,7 +457,9 @@ export default function Monitoring() {
                       <AlertCircle className="h-5 w-5" />
                       Recent errors
                     </CardTitle>
-                    <CardDescription>Sample operational error feed</CardDescription>
+                    <CardDescription>
+                      Sample operational error feed
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -529,7 +567,9 @@ function StatusCard({
               <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
             )}
           </div>
-          <div className={cn("p-3 rounded-lg shrink-0", variantStyles[variant])}>
+          <div
+            className={cn("p-3 rounded-lg shrink-0", variantStyles[variant])}
+          >
             {icon}
           </div>
         </div>

@@ -129,7 +129,7 @@ export function FileUploader({
     <div className="space-y-4">
       <div
         {...getRootProps()}
-        className={`rounded-lg border-2 border-dashed p-10 text-center cursor-pointer outline-none transition-[border-color,background-color,box-shadow] duration-200 focus-visible:ring-[3px] focus-visible:ring-primary/30 ${
+        className={`rounded-lg border-2 border-dashed p-10 text-center cursor-pointer outline-none transition-[border-color,background-color,box-shadow] duration-[var(--duration-normal)] focus-visible:ring-[3px] focus-visible:ring-primary/30 ${
           isDragActive
             ? "border-primary bg-[rgba(190,218,65,0.12)] shadow-[0_0_0_4px_rgba(190,218,65,0.15)]"
             : "border-[#C5C2C2] hover:border-primary/60 hover:bg-[rgba(190,218,65,0.06)]"

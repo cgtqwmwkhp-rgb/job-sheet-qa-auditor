@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
+import { EmptyState } from "@/components/EmptyState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -353,15 +354,12 @@ export default function DisputeManagement() {
           <TabsContent value="pending" className="space-y-4 mt-4">
             {pendingDisputes.length === 0 ? (
               <Card className="border-dashed border-[#EBE8E8] bg-white">
-                <CardContent className="py-16 text-center">
-                  <Inbox className="h-12 w-12 text-[#BEDA41] mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-[#333030]">
-                    All caught up
-                  </h3>
-                  <p className="text-[#706D6D] mt-1 max-w-sm mx-auto">
-                    No pending disputes match your filters. Technicians can raise
-                    disputes from their portal when they contest a finding.
-                  </p>
+                <CardContent className="py-4">
+                  <EmptyState
+                    icon={Inbox}
+                    title="All caught up"
+                    description="No pending disputes match your filters. Technicians can raise disputes from their portal when they contest a finding."
+                  />
                 </CardContent>
               </Card>
             ) : (
@@ -480,15 +478,12 @@ export default function DisputeManagement() {
           <TabsContent value="history" className="space-y-4 mt-4">
             {resolvedDisputes.length === 0 ? (
               <Card className="border-dashed border-[#EBE8E8] bg-white">
-                <CardContent className="py-16 text-center">
-                  <FileText className="h-12 w-12 text-[#706D6D] mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-[#333030]">
-                    No resolution history
-                  </h3>
-                  <p className="text-[#706D6D] mt-1">
-                    Resolved disputes will appear here once you approve, reject,
-                    or escalate.
-                  </p>
+                <CardContent className="py-4">
+                  <EmptyState
+                    icon={FileText}
+                    title="No resolution history"
+                    description="Resolved disputes will appear here once you approve, reject, or escalate."
+                  />
                 </CardContent>
               </Card>
             ) : (

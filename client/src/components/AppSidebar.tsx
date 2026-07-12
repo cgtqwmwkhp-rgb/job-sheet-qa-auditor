@@ -96,7 +96,7 @@ export function AppSidebar() {
                       isActive={active}
                       tooltip={item.title}
                       className={cn(
-                        "relative mx-1 rounded-lg border-l-[3px] border-transparent text-sm text-[#706D6D] transition-colors duration-200 hover:bg-[#F5F4F4] hover:text-[#333030]",
+                        "relative mx-1 rounded-lg border-l-[3px] border-transparent text-sm text-[#706D6D] transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4] hover:text-[#333030]",
                         active &&
                           "border-l-primary bg-[rgba(190,218,65,0.15)] font-semibold text-[#333030] hover:bg-[rgba(190,218,65,0.22)] hover:text-[#333030]"
                       )}
@@ -104,7 +104,7 @@ export function AppSidebar() {
                       <Link href={item.url}>
                         <item.icon
                           className={cn(
-                            "size-4 stroke-[1.5] transition-colors duration-200",
+                            "size-4 stroke-[1.5] transition-colors duration-[var(--duration-normal)]",
                             active ? "text-primary" : "text-[#8A8787]"
                           )}
                         />
@@ -126,7 +126,7 @@ export function AppSidebar() {
               tooltip="Help & Resources"
               isActive={isActive("/help")}
               className={cn(
-                "mx-1 rounded-lg border-l-[3px] border-transparent text-[#706D6D] transition-colors duration-200 hover:bg-[#F5F4F4] hover:text-[#333030]",
+                "mx-1 rounded-lg border-l-[3px] border-transparent text-[#706D6D] transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4] hover:text-[#333030]",
                 isActive("/help") &&
                   "border-l-primary bg-[rgba(190,218,65,0.15)] font-semibold text-[#333030]"
               )}
@@ -143,7 +143,7 @@ export function AppSidebar() {
               tooltip="Settings"
               isActive={isActive("/settings")}
               className={cn(
-                "mx-1 rounded-lg border-l-[3px] border-transparent text-[#706D6D] transition-colors duration-200 hover:bg-[#F5F4F4] hover:text-[#333030]",
+                "mx-1 rounded-lg border-l-[3px] border-transparent text-[#706D6D] transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4] hover:text-[#333030]",
                 isActive("/settings") &&
                   "border-l-primary bg-[rgba(190,218,65,0.15)] font-semibold text-[#333030]"
               )}

@@ -1,4 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { EmptyState } from "@/components/EmptyState";
 import { ReviewWorkstationPane } from "@/components/review/ReviewWorkstationPane";
 import { ReviewShortcutsLegend } from "@/components/review/ReviewShortcutsLegend";
 import { Badge } from "@/components/ui/badge";
@@ -536,17 +537,12 @@ export default function HoldQueue() {
         )}
 
         {!isLoading && !error && holdItems.length === 0 && (
-          <Card className="p-12 border-[#EBE8E8] bg-white">
-            <div className="flex flex-col items-center justify-center text-center">
-              <Inbox className="h-16 w-16 text-[#706D6D] mb-4" />
-              <h2 className="text-xl font-semibold mb-2 text-[#333030]">
-                Review Queue Empty
-              </h2>
-              <p className="text-[#706D6D] max-w-md">
-                No job sheets are currently awaiting review. All documents have
-                been processed successfully.
-              </p>
-            </div>
+          <Card className="p-4 border-[#EBE8E8] bg-white">
+            <EmptyState
+              icon={Inbox}
+              title="Review queue empty"
+              description="No job sheets are currently awaiting review. All documents have been processed successfully."
+            />
           </Card>
         )}
 
@@ -567,9 +563,12 @@ export default function HoldQueue() {
               </CardHeader>
               <CardContent className="p-0 flex-1 overflow-y-auto">
                 {sortedFilteredItems.length === 0 ? (
-                  <div className="p-6 text-sm text-[#706D6D] text-center">
-                    No items match the current search/filter.
-                  </div>
+                  <EmptyState
+                    compact
+                    icon={Filter}
+                    title="No items match"
+                    description="Try clearing the search or filter."
+                  />
                 ) : (
                   <ul className="divide-y divide-[#EBE8E8]">
                     {sortedFilteredItems.map(item => {
@@ -580,7 +579,7 @@ export default function HoldQueue() {
                             role="button"
                             tabIndex={0}
                             className={cn(
-                              "w-full text-left px-3 py-2 border-l-4 transition-colors cursor-pointer",
+                              "group w-full text-left px-3 py-2 border-l-4 transition-colors cursor-pointer",
                               priorityBorderClass(item),
                               isActive
                                 ? "bg-[rgba(190,218,65,0.12)] ring-1 ring-inset ring-primary"
@@ -642,46 +641,52 @@ export default function HoldQueue() {
                                 </div>
                                 <div className="mt-1 flex items-center gap-2">
                                   <HoldItemReasonChips jobSheetId={item.id} />
-                                  {isActive ? (
-                                    <div
-                                      className="flex items-center gap-0.5 ml-auto shrink-0"
-                                      onClick={e => e.stopPropagation()}
+                                  {/* Quick actions: always visible on the active row; revealed
+                                      on hover/focus for others so approve/reject take one click
+                                      without first selecting the row. */}
+                                  <div
+                                    className={cn(
+                                      "flex items-center gap-0.5 ml-auto shrink-0 transition-opacity duration-[var(--duration-fast)]",
+                                      isActive
+                                        ? "opacity-100"
+                                        : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+                                    )}
+                                    onClick={e => e.stopPropagation()}
+                                  >
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0 text-emerald-700 hover:bg-emerald-50"
+                                      onClick={() => handleApprove(item.id)}
+                                      disabled={approveJobSheet.isPending}
+                                      aria-label="Approve"
+                                      title="Approve (a)"
                                     >
+                                      <CheckCircle2 className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0 text-red-600 hover:bg-red-50"
+                                      onClick={() => handleReject(item.id)}
+                                      disabled={updateStatus.isPending}
+                                      aria-label="Reject"
+                                      title="Reject (r)"
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                    </Button>
+                                    <Link href={`/audits?id=${item.id}`}>
                                       <Button
                                         size="sm"
                                         variant="ghost"
-                                        className="h-7 w-7 p-0 text-emerald-700 hover:bg-emerald-50"
-                                        onClick={() => handleApprove(item.id)}
-                                        disabled={approveJobSheet.isPending}
-                                        aria-label="Approve"
-                                        title="Approve (a)"
+                                        className="h-7 w-7 p-0 text-[#706D6D] hover:bg-[#F5F4F4]"
+                                        aria-label="Open full audit"
+                                        title="Open full audit"
                                       >
-                                        <CheckCircle2 className="w-4 h-4" />
+                                        <ExternalLink className="w-3.5 h-3.5" />
                                       </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-7 w-7 p-0 text-red-600 hover:bg-red-50"
-                                        onClick={() => handleReject(item.id)}
-                                        disabled={updateStatus.isPending}
-                                        aria-label="Reject"
-                                        title="Reject (r)"
-                                      >
-                                        <XCircle className="w-4 h-4" />
-                                      </Button>
-                                      <Link href={`/audits?id=${item.id}`}>
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          className="h-7 w-7 p-0 text-[#706D6D] hover:bg-[#F5F4F4]"
-                                          aria-label="Open full audit"
-                                          title="Open full audit"
-                                        >
-                                          <ExternalLink className="w-3.5 h-3.5" />
-                                        </Button>
-                                      </Link>
-                                    </div>
-                                  ) : null}
+                                    </Link>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -707,15 +712,12 @@ export default function HoldQueue() {
                   rejectPending={updateStatus.isPending}
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-[#706D6D] p-8 text-center">
-                  <Inbox className="h-12 w-12 mb-3 opacity-40" />
-                  <p className="font-medium text-[#333030]">
-                    Select a job sheet
-                  </p>
-                  <p className="text-sm mt-1 max-w-sm">
-                    Choose an item from the queue to open the review workstation
-                    (PDF + findings) without leaving this page.
-                  </p>
+                <div className="flex h-full items-center justify-center">
+                  <EmptyState
+                    icon={Inbox}
+                    title="Select a job sheet"
+                    description="Choose an item from the queue to open the review workstation (PDF + findings) without leaving this page."
+                  />
                 </div>
               )}
             </Card>

@@ -22,11 +22,13 @@ import {
   BarChart3,
   CheckCircle2,
   FileText,
+  GraduationCap,
   Loader2,
+  Minus,
   TrendingDown,
   TrendingUp,
+  Upload,
   Users,
-  Minus,
 } from "lucide-react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -210,7 +212,12 @@ export default function TechnicianPerformance() {
               </h2>
               <p className="text-muted-foreground">
                 Scorecards need each job card linked to a technician user. OCR
-                often prints names like <code className="text-sm bg-muted px-1.5 py-0.5 rounded">Richard.Newton</code> — we match those to users named Richard Newton, emails, or create a technician account from the OCR name.
+                often prints names like{" "}
+                <code className="text-sm bg-muted px-1.5 py-0.5 rounded">
+                  Richard.Newton
+                </code>{" "}
+                — we match those to users named Richard Newton, emails, or
+                create a technician account from the OCR name.
               </p>
               {unattributedCount > 0 && (
                 <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200/80 rounded-lg px-3 py-2 mt-3">

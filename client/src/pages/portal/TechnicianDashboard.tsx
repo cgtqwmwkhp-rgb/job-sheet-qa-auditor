@@ -48,7 +48,9 @@ export default function TechnicianDashboard() {
       <header className="bg-card border-b border-border/60 sticky top-0 z-10 px-4 py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 bg-primary rounded-lg flex items-center justify-center shadow-sm">
-            <span className="text-xs font-bold text-primary-foreground">PE</span>
+            <span className="text-xs font-bold text-primary-foreground">
+              PE
+            </span>
           </div>
           <div>
             <h1 className="font-semibold text-sm leading-tight text-foreground">
@@ -141,9 +143,15 @@ export default function TechnicianDashboard() {
         {/* Recent Activity Tabs */}
         <Tabs defaultValue="audits" className="w-full">
           <TabsList className="w-full grid grid-cols-3 mb-4 h-11 p-1 bg-muted/60">
-            <TabsTrigger value="audits" className="text-xs sm:text-sm">Recent Audits</TabsTrigger>
-            <TabsTrigger value="defects" className="text-xs sm:text-sm">My Defects</TabsTrigger>
-            <TabsTrigger value="settings" className="text-xs sm:text-sm">Settings</TabsTrigger>
+            <TabsTrigger value="audits" className="text-xs sm:text-sm">
+              Recent Audits
+            </TabsTrigger>
+            <TabsTrigger value="defects" className="text-xs sm:text-sm">
+              My Defects
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="text-xs sm:text-sm">
+              Settings
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="audits" className="space-y-3">
@@ -335,15 +343,24 @@ export default function TechnicianDashboard() {
 
       {/* Mobile Bottom Nav */}
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border/60 flex justify-around py-2 px-2 z-10 safe-area-pb shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
-        <Button variant="ghost" className="flex flex-col items-center gap-1 h-auto py-2 px-4 text-primary">
+        <Button
+          variant="ghost"
+          className="flex flex-col items-center gap-1 h-auto py-2 px-4 text-primary"
+        >
           <TrendingUp className="h-5 w-5" />
           <span className="text-[10px] font-semibold">Dashboard</span>
         </Button>
-        <Button variant="ghost" className="flex flex-col items-center gap-1 h-auto py-2 px-4 text-muted-foreground hover:text-foreground">
+        <Button
+          variant="ghost"
+          className="flex flex-col items-center gap-1 h-auto py-2 px-4 text-muted-foreground hover:text-foreground"
+        >
           <FileText className="h-5 w-5" />
           <span className="text-[10px] font-medium">My Jobs</span>
         </Button>
-        <Button variant="ghost" className="flex flex-col items-center gap-1 h-auto py-2 px-4 text-muted-foreground hover:text-foreground">
+        <Button
+          variant="ghost"
+          className="flex flex-col items-center gap-1 h-auto py-2 px-4 text-muted-foreground hover:text-foreground"
+        >
           <Calendar className="h-5 w-5" />
           <span className="text-[10px] font-medium">History</span>
         </Button>

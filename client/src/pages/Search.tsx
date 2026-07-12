@@ -1,5 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { DocOutcomeBadge } from "@/components/DocOutcomeBadge";
+import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -158,8 +159,7 @@ export default function SearchPage() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = document.activeElement?.tagName;
-      const inField =
-        tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+      const inField = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 
       if (e.key === "/" && !inField) {
         e.preventDefault();
@@ -171,14 +171,10 @@ export default function SearchPage() {
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setHighlightedIndex(i =>
-          i < filteredResults.length - 1 ? i + 1 : 0
-        );
+        setHighlightedIndex(i => (i < filteredResults.length - 1 ? i + 1 : 0));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setHighlightedIndex(i =>
-          i > 0 ? i - 1 : filteredResults.length - 1
-        );
+        setHighlightedIndex(i => (i > 0 ? i - 1 : filteredResults.length - 1));
       } else if (e.key === "Enter" && highlightedIndex >= 0) {
         e.preventDefault();
         const item = filteredResults[highlightedIndex];
@@ -228,30 +224,24 @@ export default function SearchPage() {
           </div>
         ) : allResults.length === 0 ? (
           <Card className="border-[#EBE8E8] bg-white">
-            <CardContent className="py-16 text-center">
-              <FileText className="h-14 w-14 text-[#706D6D] mx-auto mb-4 opacity-60" />
-              <h2 className="text-xl font-semibold text-[#333030]">
-                No documents yet
-              </h2>
-              <p className="text-[#706D6D] mt-2 max-w-md mx-auto">
-                Upload job sheets to build your searchable archive of audit
-                results.
-              </p>
-              <Link href="/upload">
-                <span className="inline-flex mt-4 text-sm font-medium text-[#333030] underline underline-offset-4 hover:text-primary">
-                  Go to upload
-                </span>
-              </Link>
+            <CardContent className="py-4">
+              <EmptyState
+                icon={FileText}
+                title="No documents yet"
+                description="Upload job sheets to build your searchable archive of audit results."
+                action={{ label: "Go to upload", href: "/upload" }}
+              />
             </CardContent>
           </Card>
         ) : filteredResults.length === 0 ? (
           <Card className="border-dashed border-[#EBE8E8] bg-white">
-            <CardContent className="py-12 text-center">
-              <SearchIcon className="h-10 w-10 text-[#706D6D] mx-auto mb-3 opacity-50" />
-              <p className="font-medium text-[#333030]">No matches</p>
-              <p className="text-sm text-[#706D6D] mt-1">
-                Try a different reference, filename, or site name.
-              </p>
+            <CardContent className="py-4">
+              <EmptyState
+                compact
+                icon={SearchIcon}
+                title="No matches"
+                description="Try a different reference, filename, or site name."
+              />
             </CardContent>
           </Card>
         ) : (
@@ -261,7 +251,11 @@ export default function SearchPage() {
               {filteredResults.length !== 1 ? "s" : ""}
               {query.trim() ? ` for “${query.trim()}”` : " (showing recent)"}
             </p>
-            <ul className="space-y-2" role="listbox" aria-label="Search results">
+            <ul
+              className="space-y-2"
+              role="listbox"
+              aria-label="Search results"
+            >
               {filteredResults.map((item, index) => {
                 const isHighlighted = index === highlightedIndex;
                 const showOutcome =
@@ -289,7 +283,9 @@ export default function SearchPage() {
                                   ? "bg-amber-100 text-amber-700"
                                   : item.status === "completed"
                                     ? "bg-[rgba(190,218,65,0.25)] text-[#333030]"
-                                    : isActiveJobSheetStatus(item.status as never)
+                                    : isActiveJobSheetStatus(
+                                          item.status as never
+                                        )
                                       ? "bg-[#DBEAFE] text-[#2868CE]"
                                       : "bg-[#F5F4F4] text-[#706D6D]"
                             )}

@@ -1,4 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
+import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +15,6 @@ import {
   FileText,
   Loader2,
   Search,
-  Upload,
 } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { useLocation } from "wouter";
@@ -255,10 +255,7 @@ export default function AuditResults() {
     return (allJobSheets ?? []).filter(sheet => {
       if (statusFilter !== "all") {
         if (statusFilter === "processing") {
-          if (
-            sheet.status !== "processing" &&
-            sheet.status !== "pending"
-          ) {
+          if (sheet.status !== "processing" && sheet.status !== "pending") {
             return false;
           }
         } else if (sheet.status !== statusFilter) {
@@ -266,7 +263,8 @@ export default function AuditResults() {
         }
       }
       if (!q) return true;
-      const hay = `${sheet.referenceNumber ?? ""} ${sheet.fileName} ${sheet.siteInfo ?? ""}`.toLowerCase();
+      const hay =
+        `${sheet.referenceNumber ?? ""} ${sheet.fileName} ${sheet.siteInfo ?? ""}`.toLowerCase();
       return hay.includes(q);
     });
   }, [allJobSheets, listSearch, statusFilter]);
@@ -370,7 +368,10 @@ export default function AuditResults() {
 
     return (
       <DashboardLayout>
-        <div className="space-y-5 animate-in fade-in duration-300" data-testid="audit-list">
+        <div
+          className="space-y-5 animate-in fade-in duration-300"
+          data-testid="audit-list"
+        >
           <div>
             <h1 className="text-2xl font-heading font-bold tracking-tight text-[#333030]">
               Audit Results
@@ -427,44 +428,29 @@ export default function AuditResults() {
               <AuditListSkeleton />
             </Card>
           ) : !allJobSheets || allJobSheets.length === 0 ? (
-            <Card className="border-[#EBE8E8] bg-white p-12">
-              <div className="flex flex-col items-center justify-center text-center">
-                <div className="rounded-full bg-[#BEDA41]/15 p-5 mb-4">
-                  <FileText className="h-10 w-10 text-[#333030]" />
-                </div>
-                <h2 className="text-xl font-semibold text-[#333030] mb-2">
-                  No audits yet
-                </h2>
-                <p className="text-[#706D6D] max-w-md mb-6 text-sm">
-                  Upload your first job sheet to start automated QA review.
-                </p>
-                <Button
-                  onClick={() => setLocation("/upload")}
-                  className="bg-[#BEDA41] text-[#333030] hover:bg-[#A8C038]"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Upload job sheet
-                </Button>
-              </div>
+            <Card className="border-[#EBE8E8] bg-white p-4">
+              <EmptyState
+                icon={FileText}
+                title="No audits yet"
+                description="Upload your first job sheet to start automated QA review."
+                action={{ label: "Upload job sheet", href: "/upload" }}
+              />
             </Card>
           ) : filteredJobSheets.length === 0 ? (
-            <Card className="border-dashed border-[#EBE8E8] bg-white p-10 text-center">
-              <Search className="h-8 w-8 text-[#8A8787] mx-auto mb-3" />
-              <p className="font-medium text-[#333030]">No matching audits</p>
-              <p className="text-sm text-[#706D6D] mt-1">
-                Try a different search term or clear filters.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4"
-                onClick={() => {
-                  setListSearch("");
-                  setStatusFilter("all");
+            <Card className="border-dashed border-[#EBE8E8] bg-white p-4">
+              <EmptyState
+                compact
+                icon={Search}
+                title="No matching audits"
+                description="Try a different search term or clear filters."
+                action={{
+                  label: "Clear filters",
+                  onClick: () => {
+                    setListSearch("");
+                    setStatusFilter("all");
+                  },
                 }}
-              >
-                Clear filters
-              </Button>
+              />
             </Card>
           ) : (
             <Card className="border-[#EBE8E8] bg-white overflow-hidden">
@@ -547,7 +533,10 @@ export default function AuditResults() {
                               showDocsHint={false}
                             />
                           ) : isTerminalJobSheetStatus(sheet.status) ? (
-                            <DocOutcomeBadge result={null} showDocsHint={false} />
+                            <DocOutcomeBadge
+                              result={null}
+                              showDocsHint={false}
+                            />
                           ) : null}
                           {outcome?.docQualityScore != null && (
                             <span

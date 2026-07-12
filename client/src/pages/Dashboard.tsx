@@ -167,7 +167,7 @@ export default function Dashboard() {
               <Link key={stat.title} href={stat.href}>
                 <Card
                   className={cn(
-                    "group cursor-pointer border-l-4 border-l-transparent bg-[#F9F9F9] shadow-none transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-l-primary hover:shadow-md",
+                    "group cursor-pointer border-l-4 border-l-transparent bg-[#F9F9F9] shadow-none transition-[transform,box-shadow,border-color] duration-[var(--duration-normal)] hover:-translate-y-0.5 hover:border-l-primary hover:shadow-md",
                     stat.accent,
                     stat.highlight && "bg-white"
                   )}
@@ -195,7 +195,7 @@ export default function Dashboard() {
                         >
                           {stat.value}
                         </p>
-                        <ArrowRight className="h-4 w-4 text-[#8A8787] opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+                        <ArrowRight className="h-4 w-4 text-[#8A8787] opacity-0 transition-opacity duration-[var(--duration-normal)] group-hover:opacity-100" />
                       </div>
                     )}
                   </CardContent>
@@ -310,7 +310,7 @@ export default function Dashboard() {
                         {recentJobSheets.map(sheet => (
                           <div
                             key={sheet.id}
-                            className="flex cursor-pointer items-center justify-between rounded-lg border p-4 transition-colors duration-200 hover:bg-[#F5F4F4]"
+                            className="flex cursor-pointer items-center justify-between rounded-lg border p-4 transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4]"
                             onClick={() => navigateToAudit(sheet.id)}
                             role="button"
                             tabIndex={0}

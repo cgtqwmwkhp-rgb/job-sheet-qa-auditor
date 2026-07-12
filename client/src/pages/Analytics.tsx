@@ -214,7 +214,9 @@ export default function Analytics() {
               <CardContent>
                 <div className="flex items-end justify-between gap-4">
                   <div>
-                    <div className="text-5xl font-bold tracking-tight">{passRate}%</div>
+                    <div className="text-5xl font-bold tracking-tight">
+                      {passRate}%
+                    </div>
                     <p className="text-sm text-muted-foreground mt-2">
                       Based on completed audits
                     </p>
@@ -247,7 +249,9 @@ export default function Analytics() {
                 <AlertTriangle className="h-4 w-4 text-destructive" />
               </CardHeader>
               <CardContent>
-                <div className={`text-3xl font-bold ${criticalIssues > 0 ? "text-destructive" : ""}`}>
+                <div
+                  className={`text-3xl font-bold ${criticalIssues > 0 ? "text-destructive" : ""}`}
+                >
                   {criticalIssues}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -263,7 +267,9 @@ export default function Analytics() {
                 <Users className="h-4 w-4 text-warning" />
               </CardHeader>
               <CardContent>
-                <div className={`text-3xl font-bold ${reviewQueue > 0 ? "text-warning" : ""}`}>
+                <div
+                  className={`text-3xl font-bold ${reviewQueue > 0 ? "text-warning" : ""}`}
+                >
                   {reviewQueue}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">

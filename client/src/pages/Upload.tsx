@@ -360,7 +360,7 @@ export default function UploadPage() {
           <CardContent className="space-y-5 pt-5">
             <div
               className={cn(
-                "rounded-lg border p-4 transition-colors duration-200",
+                "rounded-lg border p-4 transition-colors duration-[var(--duration-normal)]",
                 technicianId
                   ? "border-primary/40 bg-[rgba(190,218,65,0.08)]"
                   : "border-[#EBE8E8] bg-[#F9F9F9]"
@@ -504,7 +504,7 @@ export default function UploadPage() {
                   {recentUploads.map(upload => (
                     <div
                       key={upload.id}
-                      className="flex items-center gap-3 rounded-lg p-2 transition-colors duration-200 hover:bg-[#F5F4F4]"
+                      className="flex items-center gap-3 rounded-lg p-2 transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4]"
                     >
                       <div
                         className={cn(

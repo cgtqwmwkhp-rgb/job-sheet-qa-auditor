@@ -273,76 +273,80 @@ export default function UserManagement() {
                     {filteredUsers.map(user => (
                       <TableRow key={user.id}>
                         <TableCell className="pl-6">
-                        <div className="flex flex-col">
-                          <span className="font-medium">
-                            {user.name || "Unknown User"}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {user.email || "No email"}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {user.role === "admin" && (
-                            <Shield className="w-3 h-3 text-primary" />
-                          )}
-                          <span className="capitalize">
-                            {user.role?.replace("_", " ") || "User"}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={user.lastSignedIn ? "default" : "secondary"}
-                        >
-                          {user.lastSignedIn ? "active" : "inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {user.lastSignedIn
-                          ? formatDistanceToNow(new Date(user.lastSignedIn), {
-                              addSuffix: true,
-                            })
-                          : "Never"}
-                      </TableCell>
-                      <TableCell className="text-right pr-6">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem
-                              onClick={() => handleRoleChange(user.id, "admin")}
-                            >
-                              Make Admin
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleRoleChange(user.id, "qa_lead")
-                              }
-                            >
-                              Make QA Lead
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleRoleChange(user.id, "technician")
-                              }
-                            >
-                              Make Technician
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
-                              Deactivate User
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {user.name || "Unknown User"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {user.email || "No email"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {user.role === "admin" && (
+                              <Shield className="w-3 h-3 text-primary" />
+                            )}
+                            <span className="capitalize">
+                              {user.role?.replace("_", " ") || "User"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              user.lastSignedIn ? "default" : "secondary"
+                            }
+                          >
+                            {user.lastSignedIn ? "active" : "inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {user.lastSignedIn
+                            ? formatDistanceToNow(new Date(user.lastSignedIn), {
+                                addSuffix: true,
+                              })
+                            : "Never"}
+                        </TableCell>
+                        <TableCell className="text-right pr-6">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleRoleChange(user.id, "admin")
+                                }
+                              >
+                                Make Admin
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleRoleChange(user.id, "qa_lead")
+                                }
+                              >
+                                Make QA Lead
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleRoleChange(user.id, "technician")
+                                }
+                              >
+                                Make Technician
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive">
+                                Deactivate User
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </div>
