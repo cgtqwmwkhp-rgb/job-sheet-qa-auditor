@@ -22,6 +22,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import {
   AlertCircle,
   CheckCircle2,
+  ChevronLeft,
   Download,
   Eye,
   Flag,
@@ -272,6 +273,8 @@ export interface ReviewWorkstationPaneProps {
   rejectPending?: boolean;
   /** Ref for keyboard Enter → focus pane */
   paneRef?: RefObject<HTMLDivElement | null>;
+  /** Optional back navigation (Audit Results list → detail). */
+  onBack?: () => void;
 }
 
 export function ReviewWorkstationPane({
@@ -285,6 +288,7 @@ export function ReviewWorkstationPane({
   approvePending,
   rejectPending,
   paneRef,
+  onBack,
 }: ReviewWorkstationPaneProps) {
   const {
     data: jobSheetData,
@@ -468,6 +472,7 @@ export function ReviewWorkstationPane({
         approvePending={approvePending}
         rejectPending={rejectPending}
         paneRef={paneRef}
+        onBack={onBack}
         commentQualityDerived={commentQualityDerived}
         photoPairCompare={photoPairCompare}
         deepNoteAnalysis={deepNoteAnalysis}
@@ -487,6 +492,7 @@ function ReviewWorkstationContent({
   approvePending,
   rejectPending,
   paneRef,
+  onBack,
   commentQualityDerived,
   photoPairCompare,
   deepNoteAnalysis,
@@ -501,6 +507,7 @@ function ReviewWorkstationContent({
   approvePending?: boolean;
   rejectPending?: boolean;
   paneRef?: RefObject<HTMLDivElement | null>;
+  onBack?: () => void;
   commentQualityDerived: {
     signals: CommentQualitySignals | null;
     summary: string | null;
@@ -1045,10 +1052,22 @@ function ReviewWorkstationContent({
       className="flex flex-col outline-none overflow-hidden h-full min-h-0"
     >
       <div
-        className={`flex items-center justify-between shrink-0 gap-2 border-b border-border bg-white ${compact ? "px-2 py-1.5" : "px-3 py-2"}`}
+        className={`flex items-center justify-between shrink-0 gap-2 border-b border-[#EBE8E8] bg-white sticky top-0 z-10 ${compact ? "px-2 py-1.5" : "px-3 py-2"}`}
       >
         <div className="min-w-0 flex items-center gap-2 flex-wrap">
-          <h2 className="font-semibold tracking-tight truncate text-base">
+          {onBack && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-[#333030] hover:bg-[#F5F4F4] shrink-0"
+              onClick={onBack}
+              aria-label="Back to audit list"
+            >
+              <ChevronLeft className="w-4 h-4 mr-0.5" />
+              <span className="hidden sm:inline text-sm">All audits</span>
+            </Button>
+          )}
+          <h2 className="font-semibold tracking-tight truncate text-base text-[#333030]">
             {auditData.id}
           </h2>
           <Badge
