@@ -54,6 +54,12 @@ export function AppSidebar() {
     if (item.title === "Audit Log") {
       return hasRole(["admin"]);
     }
+    if (item.title === "User Management") {
+      return hasRole(["admin"]);
+    }
+    if (item.title === "Settings") {
+      return hasRole(["admin", "qa_lead"]);
+    }
     return true;
   });
 
