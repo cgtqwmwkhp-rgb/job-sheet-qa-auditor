@@ -220,7 +220,9 @@ export function ApiCostSettings() {
             </Card>
           </div>
 
-          <p className="text-xs text-muted-foreground">{summary?.retentionNote}</p>
+          <p className="text-xs text-muted-foreground">
+            {summary?.retentionNote}
+          </p>
 
           <Tabs value={view} onValueChange={setView} className="space-y-4">
             <TabsList className="flex flex-wrap h-auto gap-1">

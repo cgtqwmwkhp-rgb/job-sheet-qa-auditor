@@ -27,4 +27,3 @@ export {
 export function isFinOpsEnabled(): boolean {
   return process.env[FEATURE_FLAG] === "true";
 }
-

@@ -158,7 +158,9 @@ export default function Settings() {
 
               <TabsContent value="email-templates" className="mt-0 space-y-6">
                 <div className="mb-4">
-                  <h2 className="text-lg font-medium">Email Template Manager</h2>
+                  <h2 className="text-lg font-medium">
+                    Email Template Manager
+                  </h2>
                   <p className="text-sm text-muted-foreground">
                     Customize automated email content and AI generation rules.
                   </p>
@@ -301,8 +303,8 @@ export default function Settings() {
                     Document Processing Settings
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    Configure extraction strategies, AI fallback, and performance
-                    options.
+                    Configure extraction strategies, AI fallback, and
+                    performance options.
                   </p>
                 </div>
                 <ProcessingSettings />

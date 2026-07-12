@@ -246,9 +246,7 @@ function rollupByPeriod(
         outputTokens: rows.reduce((s, e) => s + e.outputTokens, 0),
         totalCostUsd,
         avgCostPerJobSheetUsd:
-          jobSheetsReviewed > 0
-            ? roundUsd(attributed / jobSheetsReviewed)
-            : 0,
+          jobSheetsReviewed > 0 ? roundUsd(attributed / jobSheetsReviewed) : 0,
         byTool: withShares(
           rollupBy(rows, e => e.tool, toolDisplayLabel),
           totalCostUsd
@@ -317,7 +315,10 @@ export function summarizeApiCosts(opts?: {
       rollupBy(filtered, e => `${e.provider}/${e.model}`),
       totalCostUsd
     ),
-    byStage: withShares(rollupBy(filtered, e => e.stage), totalCostUsd),
+    byStage: withShares(
+      rollupBy(filtered, e => e.stage),
+      totalCostUsd
+    ),
     byJobSheet: byJobSheet.slice(0, jobSheetLimit),
     byDay: rollupByPeriod(filtered, "day").slice(0, dayLimit),
     byMonth: rollupByPeriod(filtered, "month").slice(0, monthLimit),

@@ -15,7 +15,8 @@ const PRICING_TABLE: Array<{ match: RegExp; rates: TokenPricing }> = [
     rates: { inputPer1M: 1.25, outputPer1M: 10 },
   },
   {
-    match: /gemini-2\.5-flash|gemini-2\.0-flash|gemini-1\.5-flash|gemini-flash/i,
+    match:
+      /gemini-2\.5-flash|gemini-2\.0-flash|gemini-1\.5-flash|gemini-flash/i,
     rates: { inputPer1M: 0.15, outputPer1M: 0.6 },
   },
   {

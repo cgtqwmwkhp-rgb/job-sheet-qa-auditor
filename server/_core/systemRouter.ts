@@ -76,7 +76,13 @@ export const systemRouter = router({
             .optional()
             .default(24),
           recentLimit: z.number().int().min(1).max(100).optional().default(25),
-          jobSheetLimit: z.number().int().min(1).max(100).optional().default(40),
+          jobSheetLimit: z
+            .number()
+            .int()
+            .min(1)
+            .max(100)
+            .optional()
+            .default(40),
           dayLimit: z.number().int().min(1).max(366).optional().default(62),
           monthLimit: z.number().int().min(1).max(60).optional().default(24),
         })
