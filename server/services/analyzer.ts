@@ -246,6 +246,12 @@ Respond with a JSON object containing:
       { role: "system", content: ANALYSIS_SYSTEM_PROMPT },
       { role: "user", content: userContent },
     ],
+    costMeta: {
+      stage: "judgment",
+      provider: "gemini",
+      tool: "gemini_judgment",
+      jobSheetId: options.jobSheetId,
+    },
     responseFormat: {
       type: "json_schema",
       json_schema: {

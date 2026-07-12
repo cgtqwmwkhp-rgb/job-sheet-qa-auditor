@@ -10,6 +10,10 @@ import {
   FEATURE_FLAG,
   isFinOpsEnabled,
   rollupStageCosts,
+  estimateTokenCostUsd,
+  recordApiCost,
+  clearApiCostLedger,
+  summarizeApiCosts,
   type StageCostSample,
 } from "../../services/finOps";
 
@@ -19,10 +23,12 @@ describe("FinOps Contract (Phase 3.x)", () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
     delete process.env[FEATURE_FLAG];
+    clearApiCostLedger();
   });
 
   afterEach(() => {
     process.env = { ...originalEnv };
+    clearApiCostLedger();
   });
 
   describe("feature flag", () => {
@@ -123,6 +129,203 @@ describe("FinOps Contract (Phase 3.x)", () => {
           avgLatencyMs: 3_000,
         },
       ]);
+    });
+  });
+
+  describe("estimateTokenCostUsd", () => {
+    it("estimates gemini flash costs from tokens", () => {
+      const cost = estimateTokenCostUsd({
+        provider: "gemini",
+        model: "gemini-2.0-flash",
+        inputTokens: 1_000_000,
+        outputTokens: 1_000_000,
+      });
+      expect(cost).toBeCloseTo(0.75, 5);
+    });
+
+    it("estimates anthropic sonnet costs from tokens", () => {
+      const cost = estimateTokenCostUsd({
+        provider: "anthropic",
+        model: "claude-sonnet-4-20250514",
+        inputTokens: 1_000_000,
+        outputTokens: 0,
+      });
+      expect(cost).toBeCloseTo(3, 5);
+    });
+  });
+
+  describe("api cost ledger", () => {
+    it("records and summarizes by provider/model/stage", () => {
+      const now = new Date("2026-07-12T12:00:00.000Z");
+      recordApiCost({
+        provider: "gemini",
+        model: "gemini-2.5-pro",
+        stage: "judgment",
+        jobSheetId: 87,
+        inputTokens: 1000,
+        outputTokens: 200,
+        recordedAt: new Date("2026-07-12T11:00:00.000Z"),
+      });
+      recordApiCost({
+        provider: "openai",
+        model: "gpt-4o-mini",
+        stage: "coaching",
+        inputTokens: 500,
+        outputTokens: 100,
+        recordedAt: new Date("2026-07-12T11:30:00.000Z"),
+      });
+
+      const summary = summarizeApiCosts({
+        windowHours: 24,
+        recentLimit: 10,
+        now,
+      });
+
+      expect(summary.totalCalls).toBe(2);
+      expect(summary.totalCostUsd).toBeGreaterThan(0);
+      expect(summary.avgCostPerCallUsd).toBeGreaterThan(0);
+      expect(summary.jobSheetsReviewed).toBe(1);
+      expect(summary.avgCostPerJobSheetUsd).toBeGreaterThan(0);
+      expect(summary.byTool.map(b => b.key).sort()).toEqual([
+        "gemini_judgment",
+        "openai_coaching",
+      ]);
+      expect(summary.byTool[0].label).toBeTruthy();
+      expect(summary.byJobSheet).toEqual([
+        expect.objectContaining({
+          jobSheetId: 87,
+          callCount: 1,
+          byTool: [
+            expect.objectContaining({
+              key: "gemini_judgment",
+              label: "Gemini Judgment",
+            }),
+          ],
+        }),
+      ]);
+      expect(summary.byProvider.map(b => b.key).sort()).toEqual([
+        "gemini",
+        "openai",
+      ]);
+      expect(summary.byStage.map(b => b.key).sort()).toEqual([
+        "coaching",
+        "judgment",
+      ]);
+      expect(summary.recentEvents).toHaveLength(2);
+      expect(summary.retentionNote.length).toBeGreaterThan(20);
+    });
+
+    it("rolls up cost by day and month with tool breakdown", () => {
+      const now = new Date("2026-07-12T12:00:00.000Z");
+      recordApiCost({
+        provider: "gemini",
+        model: "gemini-2.5-pro",
+        stage: "judgment",
+        tool: "gemini_judgment",
+        jobSheetId: 1,
+        estimatedCostUsd: 0.03,
+        recordedAt: new Date("2026-07-11T10:00:00.000Z"),
+      });
+      recordApiCost({
+        provider: "anthropic",
+        model: "claude-sonnet",
+        stage: "coaching",
+        tool: "anthropic_coaching",
+        jobSheetId: 1,
+        estimatedCostUsd: 0.05,
+        recordedAt: new Date("2026-07-12T09:00:00.000Z"),
+      });
+      recordApiCost({
+        provider: "gemini",
+        model: "gemini-2.5-pro",
+        stage: "judgment",
+        tool: "gemini_judgment",
+        jobSheetId: 2,
+        estimatedCostUsd: 0.04,
+        recordedAt: new Date("2026-07-12T10:00:00.000Z"),
+      });
+
+      const summary = summarizeApiCosts({ windowHours: 48, now });
+
+      expect(summary.byDay.map(d => d.period)).toEqual([
+        "2026-07-12",
+        "2026-07-11",
+      ]);
+      expect(summary.byDay[0].totalCostUsd).toBeCloseTo(0.09);
+      expect(summary.byDay[0].jobSheetsReviewed).toBe(2);
+      expect(summary.byDay[0].avgCostPerJobSheetUsd).toBeCloseTo(0.045);
+      expect(summary.byDay[0].byTool.map(t => t.key).sort()).toEqual([
+        "anthropic_coaching",
+        "gemini_judgment",
+      ]);
+
+      expect(summary.byMonth).toHaveLength(1);
+      expect(summary.byMonth[0].period).toBe("2026-07");
+      expect(summary.byMonth[0].totalCostUsd).toBeCloseTo(0.12);
+      expect(summary.byMonth[0].jobSheetsReviewed).toBe(2);
+    });
+
+    it("averages cost across multiple job sheets", () => {
+      const now = new Date("2026-07-12T12:00:00.000Z");
+      recordApiCost({
+        provider: "gemini",
+        model: "gemini-2.0-flash",
+        stage: "judgment",
+        jobSheetId: 10,
+        estimatedCostUsd: 0.04,
+        recordedAt: new Date("2026-07-12T11:00:00.000Z"),
+      });
+      recordApiCost({
+        provider: "gemini",
+        model: "gemini-2.0-flash",
+        stage: "judgment",
+        jobSheetId: 11,
+        estimatedCostUsd: 0.06,
+        recordedAt: new Date("2026-07-12T11:10:00.000Z"),
+      });
+      recordApiCost({
+        provider: "gemini",
+        model: "gemini-2.0-flash",
+        stage: "judgment",
+        jobSheetId: 10,
+        estimatedCostUsd: 0.02,
+        recordedAt: new Date("2026-07-12T11:20:00.000Z"),
+      });
+
+      const summary = summarizeApiCosts({ windowHours: 48, now });
+      expect(summary.jobSheetsReviewed).toBe(2);
+      // Job 10 = 0.06, job 11 = 0.06 → avg 0.06
+      expect(summary.avgCostPerJobSheetUsd).toBeCloseTo(0.06);
+      expect(summary.avgCostPerCallUsd).toBeCloseTo(0.04);
+      expect(
+        summary.byJobSheet.find(j => j.jobSheetId === 10)?.totalCostUsd
+      ).toBeCloseTo(0.06);
+    });
+
+    it("filters events outside the lookback window", () => {
+      const now = new Date("2026-07-12T12:00:00.000Z");
+      recordApiCost({
+        provider: "gemini",
+        model: "gemini-2.0-flash",
+        stage: "judgment",
+        inputTokens: 100,
+        outputTokens: 10,
+        estimatedCostUsd: 0.01,
+        recordedAt: new Date("2026-07-10T12:00:00.000Z"),
+      });
+      recordApiCost({
+        provider: "gemini",
+        model: "gemini-2.0-flash",
+        stage: "judgment",
+        inputTokens: 100,
+        outputTokens: 10,
+        estimatedCostUsd: 0.02,
+        recordedAt: new Date("2026-07-12T11:00:00.000Z"),
+      });
+
+      const summary = summarizeApiCosts({ windowHours: 24, now });
+      expect(summary.totalCalls).toBe(1);
+      expect(summary.totalCostUsd).toBeCloseTo(0.02);
     });
   });
 });

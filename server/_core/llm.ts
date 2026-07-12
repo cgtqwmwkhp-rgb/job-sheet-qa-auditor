@@ -72,6 +72,13 @@ export type InvokeParams = {
   output_schema?: OutputSchema;
   responseFormat?: ResponseFormat;
   response_format?: ResponseFormat;
+  /** Optional attribution for admin API cost tracking. */
+  costMeta?: {
+    stage?: string;
+    provider?: string;
+    tool?: string;
+    jobSheetId?: number;
+  };
 };
 
 export type ToolCall = {
@@ -457,15 +464,46 @@ async function invokeGeminiDirect(params: InvokeParams): Promise<InvokeResult> {
   return mapGeminiResponseToInvokeResult(data, model);
 }
 
+function recordInvokeCost(
+  params: InvokeParams,
+  result: InvokeResult,
+  latencyMs: number
+): void {
+  const usage = result.usage;
+  if (!usage) return;
+  // Lazy import avoids circular deps with finOps consumers of llm.
+  void import("../services/finOps")
+    .then(({ recordApiCost }) => {
+      recordApiCost({
+        provider: params.costMeta?.provider || "gemini",
+        model: result.model || "unknown",
+        stage: params.costMeta?.stage || "judgment",
+        tool: params.costMeta?.tool,
+        jobSheetId: params.costMeta?.jobSheetId,
+        inputTokens: usage.prompt_tokens,
+        outputTokens: usage.completion_tokens,
+        latencyMs,
+      });
+    })
+    .catch(() => {
+      /* cost tracking must never break LLM calls */
+    });
+}
+
 /**
  * Invoke the judgment LLM.
  * - LLM_PROVIDER=mock → deterministic fixture (no network)
  * - otherwise → direct Google Gemini generateContent
  */
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  const started = Date.now();
   if (process.env.LLM_PROVIDER === "mock") {
-    return getMockLlmResponse(params);
+    const result = await getMockLlmResponse(params);
+    recordInvokeCost(params, result, Date.now() - started);
+    return result;
   }
 
-  return invokeGeminiDirect(params);
+  const result = await invokeGeminiDirect(params);
+  recordInvokeCost(params, result, Date.now() - started);
+  return result;
 }
