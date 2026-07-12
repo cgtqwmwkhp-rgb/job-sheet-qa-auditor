@@ -112,8 +112,12 @@ export const appRouter = router({
           })
           .optional()
       )
-      .query(async ({ input }) => {
-        return db.getJobSheets(input);
+      .query(async ({ ctx, input }) => {
+        const allJobSheets = await db.getJobSheets(input);
+        
+        // Object-level filtering: regular users only see their own uploads
+        const { filterJobSheetsByAccess } = await import("./utils/authorization");
+        return filterJobSheetsByAccess(allJobSheets, ctx.user);
       }),
 
     /** Users eligible for technician attribution on upload / assign. */
@@ -136,8 +140,14 @@ export const appRouter = router({
 
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return db.getJobSheetById(input.id);
+      .query(async ({ ctx, input }) => {
+        const jobSheet = await db.getJobSheetById(input.id);
+        
+        // Object-level authorization: ensure user can access this job sheet
+        const { enforceJobSheetAccess } = await import("./utils/authorization");
+        enforceJobSheetAccess(jobSheet, ctx.user);
+        
+        return jobSheet;
       }),
 
     /** PR-11: pollable per-stage processing progress (live → report → status). */
@@ -157,11 +167,18 @@ export const appRouter = router({
     // Get a fresh SAS URL for viewing/downloading the file
     getFileUrl: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
         const jobSheet = await db.getJobSheetById(input.id);
         if (!jobSheet) {
-          throw new Error("Job sheet not found");
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Job sheet not found",
+          });
         }
+
+        // Object-level authorization: ensure user can access this file
+        const { enforceJobSheetAccess } = await import("./utils/authorization");
+        enforceJobSheetAccess(jobSheet, ctx.user);
 
         // If we have a fileKey, generate a fresh SAS URL
         if (jobSheet.fileKey) {
@@ -814,19 +831,47 @@ export const appRouter = router({
           })
           .optional()
       )
-      .query(async ({ input }) => {
-        return db.getAuditResults(input);
+      .query(async ({ ctx, input }) => {
+        const allAudits = await db.getAuditResults(input);
+        
+        // Object-level filtering: regular users only see audits for their own uploads
+        // First, get all job sheets they have access to
+        const allJobSheets = await db.getJobSheets();
+        const { filterJobSheetsByAccess } = await import("./utils/authorization");
+        const accessibleJobSheets = filterJobSheetsByAccess(allJobSheets, ctx.user);
+        const accessibleJobSheetIds = new Set(accessibleJobSheets.map(js => js.id));
+        
+        // Filter audits to only those for accessible job sheets
+        return allAudits.filter(audit => accessibleJobSheetIds.has(audit.jobSheetId));
       }),
 
     getByJobSheet: protectedProcedure
       .input(z.object({ jobSheetId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
+        // Object-level authorization: check if user can access the job sheet
+        const jobSheet = await db.getJobSheetById(input.jobSheetId);
+        const { enforceJobSheetAccess } = await import("./utils/authorization");
+        enforceJobSheetAccess(jobSheet, ctx.user);
+        
         return db.getAuditResultByJobSheetId(input.jobSheetId);
       }),
 
     getFindings: protectedProcedure
       .input(z.object({ auditResultId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
+        // Object-level authorization: check if user can access the audit result
+        const audit = await db.getAuditResultById(input.auditResultId);
+        if (!audit) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Audit result not found",
+          });
+        }
+        
+        const jobSheet = await db.getJobSheetById(audit.jobSheetId);
+        const { enforceAuditAccess } = await import("./utils/authorization");
+        enforceAuditAccess(audit, jobSheet, ctx.user);
+        
         return db.getAuditFindingsByResultId(input.auditResultId);
       }),
   }),
@@ -1019,7 +1064,11 @@ export const appRouter = router({
 
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
+        // Object-level authorization: users can only access their own profile (unless admin)
+        const { enforceUserProfileAccess } = await import("./utils/authorization");
+        enforceUserProfileAccess(input.id, ctx.user);
+        
         return db.getUserById(input.id);
       }),
 
