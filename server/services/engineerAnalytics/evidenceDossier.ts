@@ -7,9 +7,7 @@
 import type { EngineerDocumentRow } from "./aggregateFromDb";
 import { classifyFindingTheme, type CoachingThemeId } from "./coachingThemes";
 import type { RawFindingRow } from "./mapFindings";
-import {
-  stripLetterheadNoise,
-} from "../letterheadNoise";
+import { stripLetterheadNoise } from "../letterheadNoise";
 
 export interface EvidenceCite {
   jobSheetId: number;
