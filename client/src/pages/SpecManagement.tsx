@@ -318,117 +318,118 @@ export default function SpecManagement() {
                       persistence ships.
                     </p>
                   ) : (
-                  <Accordion type="single" collapsible className="w-full">
-                    {currentRules.map((rule: any) => (
-                      <AccordionItem key={rule.id} value={rule.id}>
-                        <AccordionTrigger className="hover:no-underline py-3 px-4 hover:bg-muted/50 rounded-lg">
-                          <div className="flex items-center gap-4 w-full">
-                            <Badge variant="outline" className="font-mono">
-                              {rule.id}
-                            </Badge>
-                            <span className="font-medium flex-1 text-left">
-                              {rule.field}
-                            </span>
-                            <Badge variant="secondary" className="mr-4">
-                              {rule.type}
-                            </Badge>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="px-4 pb-4 pt-2">
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-1">
-                                <label className="text-xs font-medium text-muted-foreground">
-                                  Field Name
-                                </label>
-                                <div className="text-sm font-mono bg-muted p-2 rounded">
-                                  {rule.field}
-                                </div>
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-xs font-medium text-muted-foreground">
-                                  Validation Type
-                                </label>
-                                <div className="text-sm bg-muted p-2 rounded capitalize">
-                                  {rule.type}
-                                </div>
-                              </div>
+                    <Accordion type="single" collapsible className="w-full">
+                      {currentRules.map((rule: any) => (
+                        <AccordionItem key={rule.id} value={rule.id}>
+                          <AccordionTrigger className="hover:no-underline py-3 px-4 hover:bg-muted/50 rounded-lg">
+                            <div className="flex items-center gap-4 w-full">
+                              <Badge variant="outline" className="font-mono">
+                                {rule.id}
+                              </Badge>
+                              <span className="font-medium flex-1 text-left">
+                                {rule.field}
+                              </span>
+                              <Badge variant="secondary" className="mr-4">
+                                {rule.type}
+                              </Badge>
                             </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="px-4 pb-4 pt-2">
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <label className="text-xs font-medium text-muted-foreground">
+                                    Field Name
+                                  </label>
+                                  <div className="text-sm font-mono bg-muted p-2 rounded">
+                                    {rule.field}
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-xs font-medium text-muted-foreground">
+                                    Validation Type
+                                  </label>
+                                  <div className="text-sm bg-muted p-2 rounded capitalize">
+                                    {rule.type}
+                                  </div>
+                                </div>
+                              </div>
 
-                            <div className="space-y-1">
-                              <label className="text-xs font-medium text-muted-foreground">
-                                Description
-                              </label>
-                              {editingRule === rule.id ? (
-                                <Textarea
-                                  defaultValue={rule.description}
-                                  className="min-h-[80px]"
-                                />
-                              ) : (
-                                <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded border">
-                                  {rule.description}
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium text-muted-foreground">
+                                  Description
+                                </label>
+                                {editingRule === rule.id ? (
+                                  <Textarea
+                                    defaultValue={rule.description}
+                                    className="min-h-[80px]"
+                                  />
+                                ) : (
+                                  <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded border">
+                                    {rule.description}
+                                  </div>
+                                )}
+                              </div>
+
+                              {rule.pattern && (
+                                <div className="space-y-1">
+                                  <label className="text-xs font-medium text-muted-foreground">
+                                    Regex Pattern
+                                  </label>
+                                  <div className="text-sm font-mono bg-muted p-2 rounded">
+                                    {rule.pattern}
+                                  </div>
                                 </div>
                               )}
-                            </div>
 
-                            {rule.pattern && (
-                              <div className="space-y-1">
-                                <label className="text-xs font-medium text-muted-foreground">
-                                  Regex Pattern
-                                </label>
-                                <div className="text-sm font-mono bg-muted p-2 rounded">
-                                  {rule.pattern}
-                                </div>
+                              <div className="flex items-center justify-end gap-2 pt-2">
+                                {editingRule === rule.id ? (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setEditingRule(null)}
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        setEditingRule(null);
+                                        toast.message(
+                                          "Preview only — rule edits are not persisted yet"
+                                        );
+                                      }}
+                                    >
+                                      <Save className="w-3 h-3 mr-2" /> Done
+                                      editing
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="text-destructive hover:text-destructive"
+                                    >
+                                      <Trash2 className="w-3 h-3 mr-2" /> Delete
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setEditingRule(rule.id)}
+                                    >
+                                      <Edit className="w-3 h-3 mr-2" /> Edit
+                                      Rule
+                                    </Button>
+                                  </>
+                                )}
                               </div>
-                            )}
-
-                            <div className="flex items-center justify-end gap-2 pt-2">
-                              {editingRule === rule.id ? (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => setEditingRule(null)}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => {
-                                      setEditingRule(null);
-                                      toast.message(
-                                        "Preview only — rule edits are not persisted yet"
-                                      );
-                                    }}
-                                  >
-                                    <Save className="w-3 h-3 mr-2" /> Done
-                                    editing
-                                  </Button>
-                                </>
-                              ) : (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="text-destructive hover:text-destructive"
-                                  >
-                                    <Trash2 className="w-3 h-3 mr-2" /> Delete
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setEditingRule(rule.id)}
-                                  >
-                                    <Edit className="w-3 h-3 mr-2" /> Edit Rule
-                                  </Button>
-                                </>
-                              )}
                             </div>
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
                   )}
                 </div>
               ) : (

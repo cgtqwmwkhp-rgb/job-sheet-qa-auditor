@@ -752,8 +752,7 @@ export async function getDisputes(options?: {
     conditions.push(eq(disputes.reviewerId, options.reviewerId));
   }
 
-  const whereClause =
-    conditions.length > 0 ? and(...conditions) : undefined;
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
   const rows = await db
     .select({
@@ -772,10 +771,7 @@ export async function getDisputes(options?: {
     })
     .from(disputes)
     .leftJoin(auditFindings, eq(disputes.auditFindingId, auditFindings.id))
-    .leftJoin(
-      auditResults,
-      eq(auditFindings.auditResultId, auditResults.id)
-    )
+    .leftJoin(auditResults, eq(auditFindings.auditResultId, auditResults.id))
     .where(whereClause)
     .orderBy(desc(disputes.createdAt))
     .limit(options?.limit ?? 50)

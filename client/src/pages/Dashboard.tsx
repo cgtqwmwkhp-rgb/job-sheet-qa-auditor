@@ -95,8 +95,12 @@ export default function Dashboard() {
     setLocation(`/audits?id=${id}`);
   };
 
-  const { data: statsData, isLoading: statsLoading, isError: statsError, refetch: refetchStats } =
-    trpc.stats.dashboard.useQuery(undefined, { enabled: !!user });
+  const {
+    data: statsData,
+    isLoading: statsLoading,
+    isError: statsError,
+    refetch: refetchStats,
+  } = trpc.stats.dashboard.useQuery(undefined, { enabled: !!user });
   const { data: recentJobSheets, isLoading: jobSheetsLoading } =
     trpc.jobSheets.list.useQuery({ limit: 5 }, { enabled: !!user });
   const { data: holdQueueSheets, isLoading: holdLoading } =
