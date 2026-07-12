@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -24,15 +24,37 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DollarSign, Loader2, RefreshCw } from "lucide-react";
+import { Loader2, PoundSterling, RefreshCw } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
 type WindowHours = 1 | 24 | 48 | 168 | 720 | "all";
+type DisplayCurrency = "GBP" | "USD";
 
-function formatUsd(value: number): string {
-  if (value === 0) return "$0.00";
-  if (value < 0.01) return `$${value.toFixed(6)}`;
-  return `$${value.toFixed(4)}`;
+const CURRENCY_STORAGE_KEY = "finops-display-currency";
+
+function readStoredCurrency(): DisplayCurrency {
+  try {
+    const v = localStorage.getItem(CURRENCY_STORAGE_KEY);
+    if (v === "USD" || v === "GBP") return v;
+  } catch {
+    /* ignore */
+  }
+  return "GBP";
+}
+
+function formatMoney(
+  amountUsd: number,
+  currency: DisplayCurrency,
+  usdToGbp: number
+): string {
+  const value =
+    currency === "GBP"
+      ? Math.round(amountUsd * usdToGbp * 1_000_000) / 1_000_000
+      : amountUsd;
+  const symbol = currency === "GBP" ? "£" : "$";
+  if (value === 0) return `${symbol}0.00`;
+  if (value < 0.01) return `${symbol}${value.toFixed(6)}`;
+  return `${symbol}${value.toFixed(4)}`;
 }
 
 function formatTokens(n: number): string {
@@ -70,6 +92,11 @@ function ShareBar({ share }: { share?: number }) {
 export function ApiCostSettings() {
   const [window, setWindow] = useState<WindowHours>(48);
   const [view, setView] = useState("overview");
+  const [currency, setCurrency] = useState<DisplayCurrency>("GBP");
+
+  useEffect(() => {
+    setCurrency(readStoredCurrency());
+  }, []);
 
   const windowHours = window === "all" ? null : window;
 
@@ -85,6 +112,19 @@ export function ApiCostSettings() {
   );
 
   const summary = query.data;
+  const usdToGbp = summary?.fx?.usdToGbp ?? 0.746;
+
+  const money = (amountUsd: number) =>
+    formatMoney(amountUsd, currency, usdToGbp);
+
+  const onCurrencyChange = (next: DisplayCurrency) => {
+    setCurrency(next);
+    try {
+      localStorage.setItem(CURRENCY_STORAGE_KEY, next);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const totals = useMemo(
     () => ({
@@ -100,20 +140,39 @@ export function ApiCostSettings() {
     [summary]
   );
 
+  const fxNote =
+    currency === "GBP" && summary?.fx
+      ? `Showing GBP at £${summary.fx.usdToGbp.toFixed(4)} per $1 (${summary.fx.source === "frankfurter" ? "ECB mid-market" : summary.fx.source}${summary.fx.asOf ? `, ${summary.fx.asOf.slice(0, 10)}` : ""}). Provider list prices are USD.`
+      : currency === "USD"
+        ? "Showing USD (provider list-price estimates)."
+        : null;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h2 className="text-lg font-medium flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-muted-foreground" />
+            <PoundSterling className="h-5 w-5 text-muted-foreground" />
             API Cost Tracking
           </h2>
           <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-            Best-in-class FinOps view: cost by AI tool, job-sheet review, day,
-            and month. Estimates use public list rates — not provider invoices.
+            Cost by AI tool, job-sheet review, day, and month. Toggle GBP/USD —
+            estimates use public list rates, not provider invoices.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <Select
+            value={currency}
+            onValueChange={v => onCurrencyChange(v as DisplayCurrency)}
+          >
+            <SelectTrigger className="w-[120px]" aria-label="Display currency">
+              <SelectValue placeholder="Currency" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="GBP">£ GBP</SelectItem>
+              <SelectItem value="USD">$ USD</SelectItem>
+            </SelectContent>
+          </Select>
           <Select
             value={String(window)}
             onValueChange={v =>
@@ -156,7 +215,7 @@ export function ApiCostSettings() {
       ) : query.isError ? (
         <Card>
           <CardContent className="py-8 text-sm text-destructive">
-            Could not load API costs. Confirm you are signed in as an admin.
+            Could not load API costs. Confirm you have admin or QA lead access.
           </CardContent>
         </Card>
       ) : (
@@ -166,7 +225,7 @@ export function ApiCostSettings() {
               <CardHeader className="pb-2">
                 <CardDescription>Estimated spend</CardDescription>
                 <CardTitle className="text-2xl tabular-nums">
-                  {formatUsd(totals.cost)}
+                  {money(totals.cost)}
                 </CardTitle>
               </CardHeader>
             </Card>
@@ -174,7 +233,7 @@ export function ApiCostSettings() {
               <CardHeader className="pb-2">
                 <CardDescription>Avg / review</CardDescription>
                 <CardTitle className="text-xl tabular-nums">
-                  {formatUsd(totals.avgJob)}
+                  {money(totals.avgJob)}
                 </CardTitle>
               </CardHeader>
             </Card>
@@ -198,7 +257,7 @@ export function ApiCostSettings() {
               <CardHeader className="pb-2">
                 <CardDescription>Avg / call</CardDescription>
                 <CardTitle className="text-xl tabular-nums">
-                  {formatUsd(totals.avgCall)}
+                  {money(totals.avgCall)}
                 </CardTitle>
               </CardHeader>
             </Card>
@@ -222,6 +281,7 @@ export function ApiCostSettings() {
 
           <p className="text-xs text-muted-foreground">
             {summary?.retentionNote}
+            {fxNote ? ` ${fxNote}` : ""}
           </p>
 
           <Tabs value={view} onValueChange={setView} className="space-y-4">
@@ -256,8 +316,7 @@ export function ApiCostSettings() {
                               {row.label || row.key}
                             </span>
                             <span className="tabular-nums text-muted-foreground shrink-0">
-                              {formatUsd(row.totalCostUsd)} ·{" "}
-                              {formatPct(row.share)}
+                              {money(row.totalCostUsd)} · {formatPct(row.share)}
                             </span>
                           </div>
                           <ShareBar share={row.share} />
@@ -288,8 +347,8 @@ export function ApiCostSettings() {
                             {row.period}
                           </span>
                           <span className="tabular-nums text-muted-foreground">
-                            {formatUsd(row.totalCostUsd)} · avg{" "}
-                            {formatUsd(row.avgCostPerJobSheetUsd)}/review ·{" "}
+                            {money(row.totalCostUsd)} · avg{" "}
+                            {money(row.avgCostPerJobSheetUsd)}/review ·{" "}
                             {row.jobSheetsReviewed} reviews
                           </span>
                         </div>
@@ -350,7 +409,7 @@ export function ApiCostSettings() {
                                 {formatPct(row.share)}
                               </TableCell>
                               <TableCell className="text-right tabular-nums">
-                                {formatUsd(row.totalCostUsd)}
+                                {money(row.totalCostUsd)}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -407,8 +466,7 @@ export function ApiCostSettings() {
                                       variant="secondary"
                                       className="font-normal"
                                     >
-                                      {t.label || t.key}{" "}
-                                      {formatUsd(t.totalCostUsd)}
+                                      {t.label || t.key} {money(t.totalCostUsd)}
                                     </Badge>
                                   ))}
                                 </div>
@@ -421,7 +479,7 @@ export function ApiCostSettings() {
                                 {formatTokens(row.outputTokens)}
                               </TableCell>
                               <TableCell className="text-right tabular-nums font-medium">
-                                {formatUsd(row.totalCostUsd)}
+                                {money(row.totalCostUsd)}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -479,7 +537,7 @@ export function ApiCostSettings() {
                                 {row.callCount}
                               </TableCell>
                               <TableCell className="text-right tabular-nums">
-                                {formatUsd(row.avgCostPerJobSheetUsd)}
+                                {money(row.avgCostPerJobSheetUsd)}
                               </TableCell>
                               <TableCell>
                                 <div className="flex flex-wrap gap-1 max-w-md">
@@ -495,7 +553,7 @@ export function ApiCostSettings() {
                                 </div>
                               </TableCell>
                               <TableCell className="text-right tabular-nums font-medium">
-                                {formatUsd(row.totalCostUsd)}
+                                {money(row.totalCostUsd)}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -554,7 +612,7 @@ export function ApiCostSettings() {
                                 {row.callCount}
                               </TableCell>
                               <TableCell className="text-right tabular-nums">
-                                {formatUsd(row.avgCostPerJobSheetUsd)}
+                                {money(row.avgCostPerJobSheetUsd)}
                               </TableCell>
                               <TableCell>
                                 <div className="flex flex-wrap gap-1 max-w-md">
@@ -570,7 +628,7 @@ export function ApiCostSettings() {
                                 </div>
                               </TableCell>
                               <TableCell className="text-right tabular-nums font-medium">
-                                {formatUsd(row.totalCostUsd)}
+                                {money(row.totalCostUsd)}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -634,7 +692,7 @@ export function ApiCostSettings() {
                                 {formatTokens(event.outputTokens)}
                               </TableCell>
                               <TableCell className="text-right tabular-nums">
-                                {formatUsd(event.estimatedCostUsd)}
+                                {money(event.estimatedCostUsd)}
                               </TableCell>
                             </TableRow>
                           ))}

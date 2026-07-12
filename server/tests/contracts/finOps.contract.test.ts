@@ -328,4 +328,29 @@ describe("FinOps Contract (Phase 3.x)", () => {
       expect(summary.totalCostUsd).toBeCloseTo(0.02);
     });
   });
+
+  describe("FX conversion", () => {
+    it("converts USD to GBP with the given rate", async () => {
+      const { convertUsdToDisplay, clearUsdGbpRateCache } = await import(
+        "../../services/finOps"
+      );
+      clearUsdGbpRateCache();
+      expect(convertUsdToDisplay(1, "USD", 0.75)).toBe(1);
+      expect(convertUsdToDisplay(1, "GBP", 0.746)).toBeCloseTo(0.746);
+      expect(convertUsdToDisplay(10, "GBP", 0.75)).toBeCloseTo(7.5);
+    });
+
+    it("uses FINOPS_USD_TO_GBP env override when set", async () => {
+      const { getUsdToGbpRate, clearUsdGbpRateCache } = await import(
+        "../../services/finOps"
+      );
+      clearUsdGbpRateCache();
+      process.env.FINOPS_USD_TO_GBP = "0.8";
+      const rate = await getUsdToGbpRate({ forceRefresh: true });
+      expect(rate.source).toBe("env");
+      expect(rate.usdToGbp).toBe(0.8);
+      delete process.env.FINOPS_USD_TO_GBP;
+      clearUsdGbpRateCache();
+    });
+  });
 });
