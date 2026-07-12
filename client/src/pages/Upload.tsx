@@ -271,7 +271,7 @@ export default function UploadPage() {
             popover: {
               title: "Upload Zone",
               description:
-                "Drag and drop your PDF job sheets here. Files are processed through OCR and Gemini analysis with live per-stage progress.",
+                "Drag and drop your PDF job sheets here. Files are processed through OCR and Gemini 3.1 Pro analysis with live per-stage progress.",
               side: "bottom",
               align: "start",
             },

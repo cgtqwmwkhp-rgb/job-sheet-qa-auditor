@@ -540,7 +540,7 @@ export default function HoldQueue() {
           <Card className="p-4 border-[#EBE8E8] bg-white">
             <EmptyState
               icon={Inbox}
-              title="Review queue empty"
+              title="Review Queue Empty"
               description="No job sheets are currently awaiting review. All documents have been processed successfully."
             />
           </Card>

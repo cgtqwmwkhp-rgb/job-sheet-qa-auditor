@@ -121,7 +121,7 @@ export function AnalyticsLayout({
                 type="text"
                 value={site}
                 onChange={event => setSite(event.target.value)}
-                placeholder="All sites — type to narrow"
+                placeholder="Filter by site"
                 aria-label="Filter analytics by site"
                 className="h-10 text-sm bg-white"
               />

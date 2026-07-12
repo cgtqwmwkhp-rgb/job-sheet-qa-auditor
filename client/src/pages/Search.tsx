@@ -79,8 +79,13 @@ function JobSheetStatusBadge({ status }: { status: string }) {
 export default function SearchPage() {
   const [, setLocation] = useLocation();
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const [query, setQuery] = useState("");
+  const [query, setQueryState] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+
+  const setQuery = (next: string) => {
+    setQueryState(next);
+    setHighlightedIndex(0);
+  };
 
   const { data: jobSheets, isLoading: sheetsLoading } =
     trpc.jobSheets.list.useQuery({ limit: 100 });
@@ -153,9 +158,10 @@ export default function SearchPage() {
     searchInputRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    setHighlightedIndex(filteredResults.length > 0 ? 0 : -1);
-  }, [query, filteredResults.length]);
+  const activeHighlight =
+    filteredResults.length === 0
+      ? -1
+      : Math.min(Math.max(highlightedIndex, 0), filteredResults.length - 1);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -172,20 +178,26 @@ export default function SearchPage() {
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setHighlightedIndex(i => (i < filteredResults.length - 1 ? i + 1 : 0));
+        setHighlightedIndex(i => {
+          const cur = Math.min(Math.max(i, 0), filteredResults.length - 1);
+          return cur < filteredResults.length - 1 ? cur + 1 : 0;
+        });
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setHighlightedIndex(i => (i > 0 ? i - 1 : filteredResults.length - 1));
-      } else if (e.key === "Enter" && highlightedIndex >= 0) {
+        setHighlightedIndex(i => {
+          const cur = Math.min(Math.max(i, 0), filteredResults.length - 1);
+          return cur > 0 ? cur - 1 : filteredResults.length - 1;
+        });
+      } else if (e.key === "Enter" && activeHighlight >= 0) {
         e.preventDefault();
-        const item = filteredResults[highlightedIndex];
+        const item = filteredResults[activeHighlight];
         if (item) setLocation(`/audits?id=${item.id}`);
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [filteredResults, highlightedIndex, setLocation]);
+  }, [filteredResults, activeHighlight, setLocation]);
 
   return (
     <DashboardLayout>
@@ -259,7 +271,7 @@ export default function SearchPage() {
               aria-label="Search results"
             >
               {filteredResults.map((item, index) => {
-                const isHighlighted = index === highlightedIndex;
+                const isHighlighted = index === activeHighlight;
                 const showOutcome =
                   item.auditResult &&
                   isTerminalJobSheetStatus(item.status as never);
