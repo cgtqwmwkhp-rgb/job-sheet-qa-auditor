@@ -14,6 +14,18 @@ import {
   type ProcessStatusView,
 } from "@shared/processingProgress";
 
+/**
+ * Map analyzer documentation outcome onto job_sheets.status.
+ * FAIL must be "failed" — never "completed" (completed = docs PASS only).
+ */
+export function mapAnalyzerOverallToJobSheetStatus(
+  overallResult: string
+): JobSheetProcessStatus {
+  if (overallResult === "PASS") return "completed";
+  if (overallResult === "REVIEW_QUEUE") return "review_queue";
+  return "failed";
+}
+
 function asJobSheetStatus(status: string): JobSheetProcessStatus {
   if (
     status === "pending" ||

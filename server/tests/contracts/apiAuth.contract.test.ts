@@ -105,7 +105,9 @@ describe("API Authentication Contract", () => {
     });
 
     it("should return 401 for unauthenticated requests", () => {
-      expect(pdfProxyContent).toContain("res.status(401)");
+      expect(pdfProxyContent.replace(/\s+/g, " ")).toMatch(
+        /res\s*\.\s*status\s*\(\s*401\s*\)/
+      );
     });
 
     it("should NOT redirect to login", () => {

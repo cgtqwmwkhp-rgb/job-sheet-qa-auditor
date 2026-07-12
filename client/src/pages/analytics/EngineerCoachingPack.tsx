@@ -177,6 +177,7 @@ function CoachingPackView({
             </span>
             <span>
               Pass {m.passCount} · Review {m.reviewCount} · Fail {m.failCount}
+              <span className="text-muted-foreground"> (docs)</span>
             </span>
             <span>
               Doc% avg {m.avgDocPercent != null ? `${m.avgDocPercent}%` : "—"}

@@ -5,6 +5,8 @@
  * "Richard Newton", email locals, and unique surname fallbacks.
  */
 
+import { isLetterheadNoise, stripLetterheadNoise } from "./letterheadNoise";
+
 export interface TechnicianCandidate {
   id: number;
   name: string | null;
@@ -80,7 +82,10 @@ export function extractTechnicianNameFromFields(
   ];
   for (const key of keys) {
     const found = fieldValue(fields[key]);
-    if (found) return found;
+    if (found) {
+      const scrubbed = stripLetterheadNoise(found);
+      if (scrubbed && !isLetterheadNoise(scrubbed)) return scrubbed;
+    }
   }
   // Case-insensitive key scan for OCR variance
   for (const [key, entry] of Object.entries(fields)) {
@@ -92,7 +97,8 @@ export function extractTechnicianNameFromFields(
     ) {
       const found = fieldValue(entry);
       if (found && !/^(yes|no|n\/a|na|true|false)$/i.test(found)) {
-        return found;
+        const scrubbed = stripLetterheadNoise(found);
+        if (scrubbed && !isLetterheadNoise(scrubbed)) return scrubbed;
       }
     }
   }
@@ -124,7 +130,10 @@ export function extractTechnicianNameFromText(
       .replace(/[,;|].*$/, "")
       .trim();
     if (cleaned.length >= 2 && /[A-Za-z]/.test(cleaned)) {
-      return cleaned;
+      const scrubbed = stripLetterheadNoise(cleaned);
+      if (scrubbed && !isLetterheadNoise(scrubbed) && scrubbed.length >= 2) {
+        return scrubbed;
+      }
     }
   }
   return null;
