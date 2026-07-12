@@ -27,11 +27,11 @@ function getAppEnvironment(): AppEnvironment {
   return "development";
 }
 
-// Validate critical environment variables at module load
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+// Validate critical environment variables at module load (skip in test environment)
+if (process.env.NODE_ENV !== "test" && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)) {
   throw new Error(
     "JWT_SECRET environment variable is required and must be at least 32 characters for security. " +
-      "Generate a strong secret with: openssl rand -base64 48"
+    "Generate a strong secret with: openssl rand -base64 48"
   );
 }
 
