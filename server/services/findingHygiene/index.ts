@@ -12,6 +12,12 @@
  */
 
 import type { Finding } from "../analyzer";
+import {
+  isLetterheadNoise,
+  scrubLetterheadConflictParts,
+  scrubLetterheadFromSnippets,
+  stripLetterheadNoise,
+} from "../letterheadNoise";
 
 export const FEATURE_FLAG = "FEATURE_FINDING_HYGIENE";
 export const MAX_MISSING_FIELD_FINDINGS = 5;
@@ -163,8 +169,6 @@ function isNonsenseDateAssetConflict(finding: Finding): boolean {
 
 const ENGINEER_NAME_FIELD_RE = /engineer|technician/i;
 const USERNAME_RE = /^[A-Za-z][A-Za-z0-9]*\.[A-Za-z][A-Za-z0-9]*$/;
-const LETTERHEAD_NOISE_RE =
-  /www\.|https?:\/\/|@|\.com\b|\.co\.uk\b|\d{5,}|plantexpand/i;
 
 /** CONFLICT where one part is a username and another is letterhead noise. */
 function isNonsenseEngineerNameConflict(finding: Finding): boolean {
@@ -174,8 +178,38 @@ function isNonsenseEngineerNameConflict(finding: Finding): boolean {
   if (parts.length < 2) return false;
   return (
     parts.some(p => USERNAME_RE.test(p.trim())) &&
-    parts.some(p => LETTERHEAD_NOISE_RE.test(p.trim()))
+    parts.some(p => isLetterheadNoise(p.trim()))
   );
+}
+
+/**
+ * Any CONFLICT that mixes a real value with letterhead/footer chrome
+ * (phone, www, Email, PlantExpand) — keep only non-letterhead parts.
+ */
+function isLetterheadPollutionConflict(finding: Finding): boolean {
+  if (finding.reasonCode !== "CONFLICT") return false;
+  const parts = splitConflictParts(finding);
+  if (parts.length < 2) return false;
+  const hasLetterhead = parts.some(p => isLetterheadNoise(p.trim()));
+  const hasClean = parts.some(p => {
+    const scrubbed = stripLetterheadNoise(p.trim());
+    return Boolean(scrubbed) && !isLetterheadNoise(scrubbed!);
+  });
+  return hasLetterhead && hasClean;
+}
+
+function pickCleanFromLetterheadConflict(finding: Finding): string {
+  const parts = splitConflictParts(finding);
+  const cleaned = parts
+    .map(p => stripLetterheadNoise(p.trim()))
+    .filter((p): p is string => Boolean(p));
+  if (cleaned.length === 0) return "";
+  // Prefer username / short job digit
+  const username = cleaned.find(p => USERNAME_RE.test(p));
+  if (username) return username;
+  const digits = cleaned.find(p => /^\d{1,6}$/.test(p));
+  if (digits) return digits;
+  return cleaned[0];
 }
 
 function pickUsernameFromConflict(finding: Finding): string {
@@ -534,6 +568,20 @@ export function applyFindingHygiene(
           "Confirm the technician name on the document; ignore letterhead noise.",
       };
     }
+    if (isLetterheadPollutionConflict(f)) {
+      const clean = pickCleanFromLetterheadConflict(f);
+      return {
+        ...f,
+        reasonCode: "LOW_CONFIDENCE" as const,
+        severity: "S3" as const,
+        normalisedSnippet: clean,
+        rawSnippet: clean,
+        whyItMatters:
+          "Field value was confused with form letterhead/footer (phone, website, Email); kept the document value only.",
+        suggestedFix:
+          "Confirm the field on the document; ignore PlantExpand letterhead/footer chrome.",
+      };
+    }
     if (isNonsenseJobRefConflict(f)) {
       const digits = pickDigitsFromConflict(f);
       return {
@@ -549,6 +597,35 @@ export function applyFindingHygiene(
     }
     return f;
   });
+
+  // Final pass: strip letterhead chrome from every finding snippet (audit + coaching)
+  working = working
+    .map(f => {
+      const scrubbed = scrubLetterheadFromSnippets(f);
+      const norm = scrubLetterheadConflictParts(
+        scrubbed.normalisedSnippet ?? ""
+      );
+      const raw = scrubLetterheadConflictParts(scrubbed.rawSnippet ?? "");
+      return {
+        ...scrubbed,
+        normalisedSnippet: norm,
+        rawSnippet: raw,
+      };
+    })
+    .filter(f => {
+      // Drop CONFLICT/LOW_CONFIDENCE findings that had only letterhead left
+      if (
+        (f.reasonCode === "CONFLICT" || f.reasonCode === "LOW_CONFIDENCE") &&
+        !f.normalisedSnippet?.trim() &&
+        !f.rawSnippet?.trim() &&
+        /ENSEMBLE|letterhead|footer|chrome/i.test(
+          `${f.ruleId ?? ""} ${f.whyItMatters ?? ""}`
+        )
+      ) {
+        return false;
+      }
+      return true;
+    });
 
   // Inject VOR / asset / makeModel / mileage Present findings from text evidence
   if (options.documentText) {

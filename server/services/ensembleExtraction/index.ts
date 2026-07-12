@@ -17,6 +17,10 @@ import type {
 } from "../advancedExtraction";
 import type { ProcessingSettingsConfig } from "../../db";
 import type { Finding } from "../analyzer";
+import {
+  scrubLetterheadFromSnippets,
+  stripLetterheadNoise,
+} from "../letterheadNoise";
 
 export const ENGINE_VERSION = advancedExtraction.ENGINE_VERSION;
 
@@ -293,36 +297,71 @@ export function buildEnsembleReviewFindings(
 
   for (const field of signals.conflictFields) {
     const detail = fieldDetails[field];
-    findings.push({
-      ruleId: "ENSEMBLE",
-      fieldName: detail?.displayName ?? field,
-      severity: "S1",
-      reasonCode: "CONFLICT",
-      rawSnippet: detail?.evidence ?? "",
-      normalisedSnippet: detail?.conflictValues?.join(" | ") ?? "",
-      confidence: detail?.confidence ?? 0,
-      pageNumber: 1,
-      whyItMatters: `Ensemble strategies disagreed on ${field}. Manual resolution required.`,
-      suggestedFix:
-        "Review conflicting values and confirm the correct field value.",
-    });
+    const conflictNorm =
+      stripLetterheadNoise(detail?.conflictValues?.join(" | ") ?? "") ?? "";
+    const evidence = stripLetterheadNoise(detail?.evidence ?? "") ?? "";
+    // Skip conflicts that were only letterhead vs letterhead
+    if (!conflictNorm && !evidence) continue;
+    const cleanValue = stripLetterheadNoise(detail?.value ?? "");
+    // If after scrub only one clean value remains, demote to soft note
+    const parts = conflictNorm
+      .split("|")
+      .map(p => p.trim())
+      .filter(Boolean);
+    if (parts.length <= 1 && (parts[0] || cleanValue)) {
+      findings.push(
+        scrubLetterheadFromSnippets({
+          ruleId: "ENSEMBLE",
+          fieldName: detail?.displayName ?? field,
+          severity: "S3",
+          reasonCode: "LOW_CONFIDENCE",
+          rawSnippet: evidence || parts[0] || cleanValue || "",
+          normalisedSnippet: parts[0] || cleanValue || "",
+          confidence: detail?.confidence ?? 0,
+          pageNumber: 1,
+          whyItMatters: `Ensemble conflict on ${field} included form letterhead/footer chrome; kept the document value only.`,
+          suggestedFix:
+            "Confirm the field on the document; ignore PlantExpand letterhead/footer.",
+        })
+      );
+      continue;
+    }
+    findings.push(
+      scrubLetterheadFromSnippets({
+        ruleId: "ENSEMBLE",
+        fieldName: detail?.displayName ?? field,
+        severity: "S1",
+        reasonCode: "CONFLICT",
+        rawSnippet: evidence,
+        normalisedSnippet: conflictNorm,
+        confidence: detail?.confidence ?? 0,
+        pageNumber: 1,
+        whyItMatters: `Ensemble strategies disagreed on ${field}. Manual resolution required.`,
+        suggestedFix:
+          "Review conflicting values and confirm the correct field value.",
+      })
+    );
   }
 
   for (const field of signals.lowConfidenceFields) {
     if (signals.conflictFields.includes(field)) continue;
     const detail = fieldDetails[field];
-    findings.push({
-      ruleId: "ENSEMBLE",
-      fieldName: detail?.displayName ?? field,
-      severity: "S2",
-      reasonCode: "LOW_CONFIDENCE",
-      rawSnippet: detail?.evidence ?? "",
-      normalisedSnippet: detail?.value ?? "",
-      confidence: detail?.confidence ?? 0,
-      pageNumber: 1,
-      whyItMatters: `Ensemble consensus confidence for ${field} is below threshold ${llmThreshold}.`,
-      suggestedFix: "Verify the field value against the source document.",
-    });
+    const value = stripLetterheadNoise(detail?.value ?? "") ?? "";
+    const evidence = stripLetterheadNoise(detail?.evidence ?? "") ?? "";
+    findings.push(
+      scrubLetterheadFromSnippets({
+        ruleId: "ENSEMBLE",
+        fieldName: detail?.displayName ?? field,
+        severity: "S2",
+        reasonCode: "LOW_CONFIDENCE",
+        rawSnippet: evidence,
+        normalisedSnippet: value,
+        confidence: detail?.confidence ?? 0,
+        pageNumber: 1,
+        whyItMatters: `Ensemble consensus confidence for ${field} is below threshold ${llmThreshold}.`,
+        suggestedFix: "Verify the field value against the source document.",
+      })
+    );
   }
 
   for (const field of signals.missingRequired) {

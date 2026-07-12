@@ -10,6 +10,7 @@
  */
 
 import type { Finding } from "../analyzer";
+import { stripLetterheadNoise } from "../letterheadNoise";
 import {
   extractFailurePathSignals,
   extractNamedSection,
@@ -270,7 +271,7 @@ export function evaluateCommentQuality(
     isVagueOnly: analysis.isVagueOnly,
     isTooThin: analysis.isTooThin,
     missingAxes: analysis.missingAxes,
-    snippet: analysis.rawSnippet,
+    snippet: stripLetterheadNoise(analysis.rawSnippet) ?? "",
     coherent: false,
     returnVisit: fp.returnVisit,
     partsStillRequired: fp.partsStillRequired,
