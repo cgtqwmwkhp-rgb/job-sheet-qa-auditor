@@ -1212,8 +1212,6 @@ export const appRouter = router({
 
         const auditLogs = await db.getAuditLogs({
           userId: input.userId,
-          startDate: input.startDate,
-          endDate: input.endDate,
           limit: input.limit,
         });
 
