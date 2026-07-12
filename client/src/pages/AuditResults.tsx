@@ -276,27 +276,28 @@ export default function AuditResults() {
     });
   }, [allJobSheets, listSearch, statusFilter]);
 
-  useEffect(() => {
-    setHighlightIndex(0);
-  }, [listSearch, statusFilter]);
-
-  useEffect(() => {
-    if (filteredJobSheets.length === 0) return;
-    setHighlightIndex(i =>
-      Math.min(i, Math.max(0, filteredJobSheets.length - 1))
-    );
-  }, [filteredJobSheets.length]);
+  const safeHighlightIndex =
+    filteredJobSheets.length === 0
+      ? 0
+      : Math.min(highlightIndex, filteredJobSheets.length - 1);
 
   const onNext = usePersistFn(() => {
     if (filteredJobSheets.length === 0) return;
-    setHighlightIndex(i => Math.min(i + 1, filteredJobSheets.length - 1));
+    setHighlightIndex(i =>
+      Math.min(
+        Math.min(i, filteredJobSheets.length - 1) + 1,
+        filteredJobSheets.length - 1
+      )
+    );
   });
   const onPrev = usePersistFn(() => {
     if (filteredJobSheets.length === 0) return;
-    setHighlightIndex(i => Math.max(i - 1, 0));
+    setHighlightIndex(i =>
+      Math.max(Math.min(i, filteredJobSheets.length - 1) - 1, 0)
+    );
   });
   const onOpenHighlighted = usePersistFn(() => {
-    const sheet = filteredJobSheets[highlightIndex];
+    const sheet = filteredJobSheets[safeHighlightIndex];
     if (sheet) navigateToAudit(sheet.id);
   });
 
@@ -453,7 +454,10 @@ export default function AuditResults() {
                 placeholder="Search by reference, file, or site…"
                 className="pl-9 h-10 bg-white border-[#EBE8E8] focus-visible:ring-[#BEDA41]/40"
                 value={listSearch}
-                onChange={e => setListSearch(e.target.value)}
+                onChange={e => {
+                  setListSearch(e.target.value);
+                  setHighlightIndex(0);
+                }}
                 aria-label="Search audits"
               />
             </div>
@@ -462,7 +466,10 @@ export default function AuditResults() {
                 <button
                   key={chip.key}
                   type="button"
-                  onClick={() => setStatusFilter(chip.key)}
+                  onClick={() => {
+                    setStatusFilter(chip.key);
+                    setHighlightIndex(0);
+                  }}
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors duration-[var(--duration-normal)]",
                     statusFilter === chip.key
@@ -530,7 +537,7 @@ export default function AuditResults() {
                 <div className="p-2 space-y-1" ref={listRef}>
                   {filteredJobSheets.map((sheet, index) => {
                     const outcome = auditOutcomeMap.get(sheet.id);
-                    const isHighlighted = index === highlightIndex;
+                    const isHighlighted = index === safeHighlightIndex;
                     return (
                       <div
                         key={sheet.id}
