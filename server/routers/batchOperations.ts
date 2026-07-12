@@ -207,12 +207,8 @@ export const batchOperationsRouter = router({
       }
 
       // Assign all disputes
-      // TODO: Implement assignDisputeReviewer in db.ts
       for (const disputeId of input.disputeIds) {
-        // Stub for now - needs implementation
-        console.warn(
-          `TODO: Assign dispute ${disputeId} to reviewer ${input.reviewerId}`
-        );
+        await db.assignDisputeReviewer(disputeId, input.reviewerId, true);
       }
 
       await db.logAction({

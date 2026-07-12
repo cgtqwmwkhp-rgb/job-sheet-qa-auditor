@@ -344,6 +344,23 @@ export async function updateJobSheetTechnicianId(
 }
 
 /**
+ * Delete a job sheet and all associated data (cascades via foreign keys).
+ * This will automatically delete:
+ * - All audit results for this job sheet
+ * - All audit findings for those results
+ * - All disputes for those findings
+ * - All waivers for those findings
+ * 
+ * NOTE: This is a destructive operation. Consider soft delete for production use.
+ */
+export async function deleteJobSheet(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.delete(jobSheets).where(eq(jobSheets.id, id));
+}
+
+/**
  * Job sheets missing technician attribution (for backfill + gap metrics).
  */
 export async function getUnattributedJobSheets(options?: {
@@ -725,6 +742,27 @@ export async function updateDisputeStatus(
   }
 
   await db.update(disputes).set(updateData).where(eq(disputes.id, id));
+}
+
+/**
+ * Assign a reviewer to a dispute (typically a QA lead).
+ * Updates the dispute's reviewerId and optionally changes status to "under_review".
+ */
+export async function assignDisputeReviewer(
+  disputeId: number,
+  reviewerId: number,
+  updateStatus: boolean = true
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: Record<string, any> = { reviewerId };
+  if (updateStatus) {
+    updateData.status = "under_review";
+    updateData.updatedAt = new Date();
+  }
+
+  await db.update(disputes).set(updateData).where(eq(disputes.id, disputeId));
 }
 
 // ============ WAIVER QUERIES ============
