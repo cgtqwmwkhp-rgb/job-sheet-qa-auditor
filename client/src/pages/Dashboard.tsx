@@ -27,7 +27,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Link, useLocation } from "wouter";
 import { perfMark, perfClear, PERF_MARKS } from "@/lib/perf";
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { Activity } from "@/lib/api";
 import {
   Bar,
@@ -110,8 +110,9 @@ export default function Dashboard() {
     trpc.analytics.getExceptionSummary.useQuery(period, { enabled: !!user });
   const { data: driftAlertsData, isLoading: alertsLoading } =
     trpc.analytics.getDriftAlerts.useQuery(period, { enabled: !!user });
+  const [healthTs] = useState(() => Date.now());
   const { data: health } = trpc.system.health.useQuery(
-    { timestamp: Date.now() },
+    { timestamp: healthTs },
     { enabled: !!user, refetchInterval: 60_000 }
   );
 
