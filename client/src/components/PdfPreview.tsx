@@ -1,13 +1,19 @@
 /**
  * PDF Preview Component
- * 
+ *
  * PR-N: PDF.js integration for ROI editor preview.
  * Renders PDF pages with zoom/pan support for ROI authoring.
- * 
+ *
  * Uses PDF.js via CDN for minimal bundle impact.
  */
 
-import { useState, useRef, useEffect, useCallback, type CSSProperties } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  type CSSProperties,
+} from "react";
 
 /**
  * PDF.js library type definitions (minimal subset needed)
@@ -33,7 +39,9 @@ interface PDFRenderContext {
 }
 
 interface PDFJSLib {
-  getDocument(src: string | { data: ArrayBuffer }): { promise: Promise<PDFDocumentProxy> };
+  getDocument(src: string | { data: ArrayBuffer }): {
+    promise: Promise<PDFDocumentProxy>;
+  };
   GlobalWorkerOptions: { workerSrc: string };
 }
 
@@ -75,28 +83,28 @@ async function loadPdfJs(): Promise<PDFJSLib | null> {
   }
 
   // In test/CI environment, return null
-  if (typeof document === 'undefined') {
+  if (typeof document === "undefined") {
     return null;
   }
 
   try {
     // Load PDF.js from CDN
-    const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174';
-    
+    const PDFJS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174";
+
     await new Promise<void>((resolve, reject) => {
-      const script = document.createElement('script');
+      const script = document.createElement("script");
       script.src = `${PDFJS_CDN}/pdf.min.js`;
       script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load PDF.js'));
+      script.onerror = () => reject(new Error("Failed to load PDF.js"));
       document.head.appendChild(script);
     });
 
     const pdfjsLib = (window as any).pdfjsLib as PDFJSLib;
     pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN}/pdf.worker.min.js`;
-    
+
     return pdfjsLib;
   } catch (error) {
-    console.warn('PDF.js loading failed:', error);
+    console.warn("PDF.js loading failed:", error);
     return null;
   }
 }
@@ -111,7 +119,7 @@ export function PdfPreview({
   onPageChange,
   onPagesLoaded,
   onDimensionsChange,
-  className = '',
+  className = "",
   showPageControls = true,
   embedInParent = false,
 }: PdfPreviewProps) {
@@ -124,9 +132,11 @@ export function PdfPreview({
   const [pdfjsLib, setPdfjsLib] = useState<PDFJSLib | null>(null);
 
   const onPagesLoadedRef = useRef(onPagesLoaded);
-  onPagesLoadedRef.current = onPagesLoaded;
   const onDimensionsChangeRef = useRef(onDimensionsChange);
-  onDimensionsChangeRef.current = onDimensionsChange;
+  useEffect(() => {
+    onPagesLoadedRef.current = onPagesLoaded;
+    onDimensionsChangeRef.current = onDimensionsChange;
+  }, [onPagesLoaded, onDimensionsChange]);
 
   // Load PDF.js on mount
   useEffect(() => {
@@ -134,7 +144,7 @@ export function PdfPreview({
       if (lib) {
         setPdfjsLib(lib);
       } else {
-        setError('PDF preview not available');
+        setError("PDF preview not available");
       }
     });
   }, []);
@@ -154,10 +164,9 @@ export function PdfPreview({
         setError(null);
       }
       try {
-        const source = typeof pdfSource === 'string' 
-          ? pdfSource 
-          : { data: pdfSource };
-        
+        const source =
+          typeof pdfSource === "string" ? pdfSource : { data: pdfSource };
+
         const doc = await pdfjsLib.getDocument(source).promise;
         if (!cancelled) {
           setPdfDoc(doc);
@@ -167,8 +176,8 @@ export function PdfPreview({
         }
       } catch (err) {
         if (!cancelled) {
-          console.error('PDF load error:', err);
-          setError('Failed to load PDF');
+          console.error("PDF load error:", err);
+          setError("Failed to load PDF");
           setLoading(false);
         }
       }
@@ -192,10 +201,10 @@ export function PdfPreview({
         const pageObj = await pdfDoc.getPage(currentPage);
         const scale = zoom / 100;
         const viewport = pageObj.getViewport({ scale });
-        
+
         const canvas = canvasRef.current!;
-        const context = canvas.getContext('2d');
-        
+        const context = canvas.getContext("2d");
+
         if (!context) {
           return;
         }
@@ -210,8 +219,8 @@ export function PdfPreview({
           viewport: viewport,
         }).promise;
       } catch (err) {
-        console.error('Page render error:', err);
-        setError('Failed to render page');
+        console.error("Page render error:", err);
+        setError("Failed to render page");
       }
     };
 
@@ -219,31 +228,41 @@ export function PdfPreview({
   }, [pdfDoc, currentPage, zoom]);
 
   // Handle page navigation
-  const goToPage = useCallback((newPage: number) => {
-    const clampedPage = Math.max(1, Math.min(totalPages, newPage));
-    setCurrentPage(clampedPage);
-    onPageChange?.(clampedPage);
-  }, [totalPages, onPageChange]);
+  const goToPage = useCallback(
+    (newPage: number) => {
+      const clampedPage = Math.max(1, Math.min(totalPages, newPage));
+      setCurrentPage(clampedPage);
+      onPageChange?.(clampedPage);
+    },
+    [totalPages, onPageChange]
+  );
 
   // Placeholder when no PDF
   if (!pdfSource) {
     return (
-      <div 
+      <div
         className={className}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#f1f5f9',
-          border: '2px dashed #cbd5e1',
-          borderRadius: '8px',
-          minHeight: '400px',
-          color: '#64748b',
-          flexDirection: 'column',
-          gap: '8px',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#f1f5f9",
+          border: "2px dashed #cbd5e1",
+          borderRadius: "8px",
+          minHeight: "400px",
+          color: "#64748b",
+          flexDirection: "column",
+          gap: "8px",
         }}
       >
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        >
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
           <polyline points="14,2 14,8 20,8" />
           <line x1="16" y1="13" x2="8" y2="13" />
@@ -258,17 +277,17 @@ export function PdfPreview({
   // Loading state
   if (loading) {
     return (
-      <div 
+      <div
         className={className}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#f8fafc',
-          border: '1px solid #e2e8f0',
-          borderRadius: '8px',
-          minHeight: '400px',
-          color: '#64748b',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          borderRadius: "8px",
+          minHeight: "400px",
+          color: "#64748b",
         }}
       >
         Loading PDF...
@@ -279,17 +298,17 @@ export function PdfPreview({
   // Error state
   if (error) {
     return (
-      <div 
+      <div
         className={className}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
-          borderRadius: '8px',
-          minHeight: '400px',
-          color: '#dc2626',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#fef2f2",
+          border: "1px solid #fecaca",
+          borderRadius: "8px",
+          minHeight: "400px",
+          color: "#dc2626",
         }}
       >
         {error}
@@ -319,43 +338,46 @@ export function PdfPreview({
     >
       {/* Page controls */}
       {showPageControls && totalPages > 1 && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '12px',
-          marginBottom: '12px',
-          padding: '8px',
-          backgroundColor: '#f8fafc',
-          borderRadius: '6px',
-        }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "12px",
+            marginBottom: "12px",
+            padding: "8px",
+            backgroundColor: "#f8fafc",
+            borderRadius: "6px",
+          }}
+        >
           <button
             onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage <= 1}
             style={{
-              padding: '4px 12px',
-              backgroundColor: currentPage <= 1 ? '#e2e8f0' : '#3b82f6',
-              color: currentPage <= 1 ? '#94a3b8' : 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
+              padding: "4px 12px",
+              backgroundColor: currentPage <= 1 ? "#e2e8f0" : "#3b82f6",
+              color: currentPage <= 1 ? "#94a3b8" : "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: currentPage <= 1 ? "not-allowed" : "pointer",
             }}
           >
             ← Prev
           </button>
-          <span style={{ fontSize: '14px', color: '#475569' }}>
+          <span style={{ fontSize: "14px", color: "#475569" }}>
             Page {currentPage} of {totalPages}
           </span>
           <button
             onClick={() => goToPage(currentPage + 1)}
             disabled={currentPage >= totalPages}
             style={{
-              padding: '4px 12px',
-              backgroundColor: currentPage >= totalPages ? '#e2e8f0' : '#3b82f6',
-              color: currentPage >= totalPages ? '#94a3b8' : 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
+              padding: "4px 12px",
+              backgroundColor:
+                currentPage >= totalPages ? "#e2e8f0" : "#3b82f6",
+              color: currentPage >= totalPages ? "#94a3b8" : "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: currentPage >= totalPages ? "not-allowed" : "pointer",
             }}
           >
             Next →
@@ -389,13 +411,13 @@ export function PdfPreview({
           draggable={false}
           style={
             embedInParent
-              ? {
+              ? ({
                   // Intrinsic PDF.js bitmap size — never CSS-stretch (that squashes the page)
                   display: "block",
                   maxWidth: "none",
                   pointerEvents: "none",
                   userSelect: "none",
-                } as CSSProperties
+                } as CSSProperties)
               : {
                   display: "block",
                   margin: "0 auto",

@@ -3,7 +3,7 @@
  * These are evaluated live in documentProcessor via evaluateRangeRules.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -148,9 +148,7 @@ export function upsertRangeRuleInSpec(
   );
   const ruleId =
     draft.ruleId ??
-    (existingIdx >= 0
-      ? String(rules[existingIdx].ruleId)
-      : nextRuleId(rules));
+    (existingIdx >= 0 ? String(rules[existingIdx].ruleId) : nextRuleId(rules));
   const rule: RangeRuleDraft = {
     ...draft,
     ruleId,
@@ -228,47 +226,56 @@ export function ThresholdRulesPanel({
     );
   }, [parsed, extraFields, defaultField]);
 
-  useEffect(() => {
+  // Sync `field` from `defaultField` when it changes, without setState-in-effect
+  // (React's "adjust state during render" pattern — see react.dev/learn/you-might-not-need-an-effect).
+  const [prevDefaultField, setPrevDefaultField] = useState(defaultField);
+  if (defaultField !== prevDefaultField) {
+    setPrevDefaultField(defaultField);
     if (defaultField) setField(defaultField);
-  }, [defaultField]);
+  }
 
-  // Prefill editor from existing rule for selected field
-  useEffect(() => {
+  // Prefill editor from existing rule for selected field. Re-derived during
+  // render (instead of in an effect) whenever `field` or `parsed` changes, to
+  // avoid cascading-render setState-in-effect while preserving identical behavior.
+  const [prevPrefillKey, setPrevPrefillKey] = useState<{
+    field: string;
+    parsed: SpecLike | null;
+  }>({ field, parsed });
+  if (field !== prevPrefillKey.field || parsed !== prevPrefillKey.parsed) {
+    setPrevPrefillKey({ field, parsed });
     if (!field || !parsed?.rules) {
       setMeasurementEnabled(false);
-      return;
-    }
-    const existing = parsed.rules.find(
-      r => r.type === "range" && r.field === field
-    );
-    if (!existing) {
-      setMeasurementEnabled(false);
-      setBoundsMode("between");
-      setMin("");
-      setMax("");
-      setUnit("NM");
-      setSeverity("major");
-      return;
-    }
-    setMeasurementEnabled(true);
-    const range = (existing.range ?? {}) as {
-      min?: number | string;
-      max?: number | string;
-    };
-    if (existing.boundsMode) {
-      setBoundsMode(existing.boundsMode as BoundsMode);
     } else {
-      setBoundsMode("between");
-    }
-    setMin(range.min != null ? String(range.min) : "");
-    setMax(range.max != null ? String(range.max) : "");
-    setUnit(existing.unit ? String(existing.unit) : "NM");
-    if (existing.severity) {
-      setSeverity(
-        existing.severity as "critical" | "major" | "minor" | "info"
+      const existing = parsed.rules.find(
+        r => r.type === "range" && r.field === field
       );
+      if (!existing) {
+        setMeasurementEnabled(false);
+        setBoundsMode("between");
+        setMin("");
+        setMax("");
+        setUnit("NM");
+        setSeverity("major");
+      } else {
+        setMeasurementEnabled(true);
+        const range = (existing.range ?? {}) as {
+          min?: number | string;
+          max?: number | string;
+        };
+        setBoundsMode(
+          existing.boundsMode ? (existing.boundsMode as BoundsMode) : "between"
+        );
+        setMin(range.min != null ? String(range.min) : "");
+        setMax(range.max != null ? String(range.max) : "");
+        setUnit(existing.unit ? String(existing.unit) : "NM");
+        if (existing.severity) {
+          setSeverity(
+            existing.severity as "critical" | "major" | "minor" | "info"
+          );
+        }
+      }
     }
-  }, [field, parsed]);
+  }
 
   const writeRules = (rules: Array<Record<string, unknown>>) => {
     if (!parsed) return;
@@ -281,9 +288,7 @@ export function ThresholdRulesPanel({
       return;
     }
     writeRules(
-      parsed.rules.filter(
-        r => !(r.type === "range" && r.field === field)
-      )
+      parsed.rules.filter(r => !(r.type === "range" && r.field === field))
     );
     setMeasurementEnabled(false);
     setMin("");
@@ -318,8 +323,7 @@ export function ThresholdRulesPanel({
     }
 
     const label =
-      parsed.fields?.find(f => f.field === field)?.label ??
-      humanLabel(field);
+      parsed.fields?.find(f => f.field === field)?.label ?? humanLabel(field);
 
     const description =
       boundsMode === "under"
@@ -578,9 +582,7 @@ export function ThresholdRulesPanel({
         </p>
       </div>
 
-      {parseError && (
-        <p className="text-xs text-destructive">{parseError}</p>
-      )}
+      {parseError && <p className="text-xs text-destructive">{parseError}</p>}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div className="space-y-1 sm:col-span-2 lg:col-span-1">
