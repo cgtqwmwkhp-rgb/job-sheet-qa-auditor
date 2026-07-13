@@ -153,7 +153,7 @@ export function RoiEditorV2({
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [currentTool, setCurrentTool] = useState<string>('jobReference');
-  const [zoom, setZoom] = useState(100);
+  const [zoom, setZoom] = useState(150);
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [gridSize] = useState(0.05); // 5% grid
   const [showCriticalOnly, setShowCriticalOnly] = useState(false);
@@ -472,10 +472,11 @@ export function RoiEditorV2({
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Zoom controls */}
+          {/* Zoom controls — higher range for precise ROI placement */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
-              onClick={() => setZoom(z => Math.max(50, z - 25))}
+              type="button"
+              onClick={() => setZoom(z => Math.max(75, z - 25))}
               style={{
                 padding: '4px 8px',
                 backgroundColor: '#334155',
@@ -491,7 +492,8 @@ export function RoiEditorV2({
               {zoom}%
             </span>
             <button
-              onClick={() => setZoom(z => Math.min(200, z + 25))}
+              type="button"
+              onClick={() => setZoom(z => Math.min(300, z + 25))}
               style={{
                 padding: '4px 8px',
                 backgroundColor: '#334155',
@@ -502,6 +504,39 @@ export function RoiEditorV2({
               }}
             >
               +
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom(150)}
+              style={{
+                padding: '4px 8px',
+                backgroundColor: '#475569',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '11px',
+              }}
+              title="Reset to 150%"
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              onClick={() => setZoom(200)}
+              style={{
+                padding: '4px 8px',
+                backgroundColor: '#BEDA41',
+                color: '#1a1f0a',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: 600,
+              }}
+              title="Large view for accurate labelling"
+            >
+              Large
             </button>
           </div>
           
@@ -700,10 +735,17 @@ export function RoiEditorV2({
         style={{ display: 'none' }}
       />
 
-      {/* Canvas and Region List */}
-      <div style={{ display: 'flex', gap: '24px' }}>
+      {/* Canvas and Region List — PDF dominates for placement accuracy */}
+      <div
+        style={{
+          display: "flex",
+          gap: "16px",
+          alignItems: "stretch",
+          minHeight: "calc(100vh - 260px)",
+        }}
+      >
         {/* Canvas with PDF preview */}
-        <div style={{ flex: 2 }}>
+        <div style={{ flex: "1 1 auto", minWidth: 0 }}>
           <div style={{
             marginBottom: '8px',
             fontSize: '14px',
@@ -713,7 +755,7 @@ export function RoiEditorV2({
             alignItems: 'center',
           }}>
             <span>
-              {readOnly ? 'Preview Mode' : 'Click and drag to draw regions'}
+              {readOnly ? 'Preview Mode' : 'Click and drag to draw regions — zoom in for precision'}
               {pdfFileName && <span style={{ marginLeft: '12px', color: '#3b82f6' }}>({pdfFileName})</span>}
             </span>
             {totalPages > 1 && (
@@ -724,11 +766,13 @@ export function RoiEditorV2({
           <div
             style={{
               overflow: "auto",
-              maxHeight: "70vh",
+              height: "calc(100vh - 280px)",
+              minHeight: "640px",
+              maxHeight: "calc(100vh - 180px)",
               border: isDragOver ? "3px dashed #3b82f6" : "1px solid #e2e8f0",
               borderRadius: "8px",
               backgroundColor: "#64748b",
-              padding: "12px",
+              padding: "16px",
             }}
           >
           <div
@@ -895,8 +939,19 @@ export function RoiEditorV2({
           </div>
         </div>
 
-        {/* Region List Sidebar */}
-        <div style={{ flex: 1, minWidth: '280px' }}>
+        {/* Region List Sidebar — compact so PDF stays large */}
+        <div
+          style={{
+            flex: "0 0 300px",
+            width: 300,
+            maxWidth: 300,
+            alignSelf: "flex-start",
+            position: "sticky",
+            top: 0,
+            maxHeight: "calc(100vh - 200px)",
+            overflow: "auto",
+          }}
+        >
           <div style={{
             padding: '16px',
             backgroundColor: '#f8fafc',

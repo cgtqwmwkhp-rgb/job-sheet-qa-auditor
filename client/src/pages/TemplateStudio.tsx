@@ -508,7 +508,11 @@ export default function TemplateStudio() {
 
   return (
     <DashboardLayout>
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 pb-16">
+      <div
+        className={`mx-auto flex w-full flex-col gap-6 pb-16 ${
+          step === "roi" ? "max-w-[1600px] px-2" : "max-w-6xl"
+        }`}
+      >
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-sm font-medium text-[#6B7A1A]">
