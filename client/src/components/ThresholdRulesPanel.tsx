@@ -64,18 +64,25 @@ function isRangeRule(rule: Record<string, unknown>): boolean {
 }
 
 function formatBoundsSummary(rule: Record<string, unknown>): string {
-  const range = (rule.range ?? {}) as { min?: number | string; max?: number | string };
+  const range = (rule.range ?? {}) as {
+    min?: number | string;
+    max?: number | string;
+  };
   const unit = rule.unit ? ` ${rule.unit}` : "";
   const mode = rule.boundsMode as BoundsMode | undefined;
   if (mode === "under") return `≤ ${range.max ?? "?"}${unit}`;
   if (mode === "at_least") return `≥ ${range.min ?? "?"}${unit}`;
   if (mode === "over") return `> ${range.min ?? "?"}${unit}`;
   if (range.min != null && range.max != null) {
-    return `${range.min}${unit} – ${range.max}${unit}`;
+    return `${range.min}–${range.max}${unit}`;
   }
   if (range.min != null) return `≥ ${range.min}${unit}`;
   if (range.max != null) return `≤ ${range.max}${unit}`;
   return "no bounds";
+}
+
+function humanLabel(field: string): string {
+  return field.replace(/_/g, " ");
 }
 
 /** Ensure field exists as a number field with useful extraction hints. */
@@ -167,6 +174,7 @@ interface ThresholdRulesPanelProps {
   defaultField?: string;
   /** Extra field options (e.g. ROI region names) */
   extraFields?: string[];
+  /** Dense layout for the ROI Regions sidebar */
   compact?: boolean;
 }
 
@@ -185,6 +193,7 @@ export function ThresholdRulesPanel({
   const [severity, setSeverity] = useState<
     "critical" | "major" | "minor" | "info"
   >("major");
+  const [expanded, setExpanded] = useState(true);
 
   const parsed = useMemo((): SpecLike | null => {
     try {
@@ -204,17 +213,58 @@ export function ThresholdRulesPanel({
     return parsed.rules.filter(isRangeRule);
   }, [parsed]);
 
+  const activeRule = useMemo(() => {
+    if (!field) return null;
+    return rangeRules.find(r => r.field === field) ?? null;
+  }, [rangeRules, field]);
+
   const fieldOptions = useMemo(() => {
     const fromSpec = (parsed?.fields ?? []).map(f => f.field);
     return Array.from(
-      new Set([...fromSpec, ...extraFields, defaultField].filter(Boolean) as string[])
+      new Set(
+        [...fromSpec, ...extraFields, defaultField].filter(Boolean) as string[]
+      )
     );
   }, [parsed, extraFields, defaultField]);
 
-  // Keep field in sync when parent selects a region
   useEffect(() => {
     if (defaultField) setField(defaultField);
   }, [defaultField]);
+
+  // Prefill editor from existing rule for selected field
+  useEffect(() => {
+    if (!field || !parsed?.rules) {
+      return;
+    }
+    const existing = parsed.rules.find(
+      r => r.type === "range" && r.field === field
+    );
+    if (!existing) {
+      setBoundsMode("between");
+      setMin("");
+      setMax("");
+      setUnit("NM");
+      setSeverity("major");
+      return;
+    }
+    const range = (existing.range ?? {}) as {
+      min?: number | string;
+      max?: number | string;
+    };
+    if (existing.boundsMode) {
+      setBoundsMode(existing.boundsMode as BoundsMode);
+    } else {
+      setBoundsMode("between");
+    }
+    setMin(range.min != null ? String(range.min) : "");
+    setMax(range.max != null ? String(range.max) : "");
+    setUnit(existing.unit ? String(existing.unit) : "NM");
+    if (existing.severity) {
+      setSeverity(
+        existing.severity as "critical" | "major" | "minor" | "info"
+      );
+    }
+  }, [field, parsed]);
 
   const writeRules = (rules: Array<Record<string, unknown>>) => {
     if (!parsed) return;
@@ -225,17 +275,23 @@ export function ThresholdRulesPanel({
     if (!parsed || !field.trim()) return;
     const minN = min.trim() === "" ? undefined : Number(min);
     const maxN = max.trim() === "" ? undefined : Number(max);
-    if (boundsMode === "between" && (minN === undefined || maxN === undefined)) {
+    if (
+      boundsMode === "between" &&
+      (minN === undefined || maxN === undefined)
+    ) {
       return;
     }
     if (boundsMode === "under" && maxN === undefined) return;
-    if ((boundsMode === "at_least" || boundsMode === "over") && minN === undefined) {
+    if (
+      (boundsMode === "at_least" || boundsMode === "over") &&
+      minN === undefined
+    ) {
       return;
     }
 
     const label =
       parsed.fields?.find(f => f.field === field)?.label ??
-      field.replace(/_/g, " ");
+      humanLabel(field);
 
     const description =
       boundsMode === "under"
@@ -244,7 +300,9 @@ export function ThresholdRulesPanel({
           ? `${label} must be ≥ ${minN}${unit ? ` ${unit}` : ""}.`
           : boundsMode === "over"
             ? `${label} must be > ${minN}${unit ? ` ${unit}` : ""}.`
-            : `${label} must be between ${minN} and ${maxN}${unit ? ` ${unit}` : ""}.`;
+            : `${label} must be between ${minN} and ${maxN}${
+                unit ? ` ${unit}` : ""
+              }.`;
 
     const next = upsertRangeRuleInSpec(
       JSON.stringify(parsed),
@@ -272,13 +330,207 @@ export function ThresholdRulesPanel({
     writeRules(parsed.rules.filter(r => r.ruleId !== ruleId));
   };
 
+  const showMin =
+    boundsMode === "between" ||
+    boundsMode === "at_least" ||
+    boundsMode === "over";
+  const showMax = boundsMode === "between" || boundsMode === "under";
+
+  if (compact) {
+    return (
+      <div
+        className="overflow-hidden rounded-md border border-slate-200 bg-white"
+        data-testid="threshold-rules-panel"
+      >
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-2 bg-slate-50 px-2.5 py-2 text-left"
+          onClick={() => setExpanded(e => !e)}
+          data-testid="threshold-toggle"
+        >
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+            Threshold
+          </span>
+          <span className="truncate text-[11px] text-slate-500">
+            {activeRule
+              ? formatBoundsSummary(activeRule)
+              : field
+                ? humanLabel(field)
+                : "Set min / max + unit"}
+          </span>
+          <span className="shrink-0 text-[10px] text-slate-400">
+            {expanded ? "▾" : "▸"}
+          </span>
+        </button>
+
+        {expanded && (
+          <div className="space-y-2 border-t border-slate-100 p-2.5">
+            {parseError && (
+              <p className="text-[11px] text-destructive">{parseError}</p>
+            )}
+
+            <p className="text-[10px] leading-snug text-slate-500">
+              Live audit check for this ROI (e.g. 100–130 NM).
+            </p>
+
+            <div className="rounded bg-slate-50 px-2 py-1.5 text-[11px] font-medium text-slate-700">
+              {field ? humanLabel(field) : "Select a region first"}
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5">
+              <div className="space-y-0.5">
+                <Label className="text-[10px] text-slate-500">Check</Label>
+                <Select
+                  value={boundsMode}
+                  onValueChange={v => setBoundsMode(v as BoundsMode)}
+                  disabled={!!parseError}
+                >
+                  <SelectTrigger
+                    className="h-8 text-[11px]"
+                    data-testid="threshold-bounds-mode"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="between">Between</SelectItem>
+                    <SelectItem value="under">≤ Max</SelectItem>
+                    <SelectItem value="at_least">≥ Min</SelectItem>
+                    <SelectItem value="over">&gt; Min</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-0.5">
+                <Label className="text-[10px] text-slate-500">Unit</Label>
+                <Input
+                  className="h-8 text-[11px]"
+                  value={unit}
+                  onChange={e => setUnit(e.target.value)}
+                  placeholder="NM"
+                  data-testid="threshold-unit"
+                  disabled={!!parseError}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-1">
+              {UNIT_PRESETS.map(u => (
+                <button
+                  key={u}
+                  type="button"
+                  className={`rounded px-1.5 py-0.5 text-[10px] ${
+                    unit === u
+                      ? "bg-[#BEDA41] font-semibold text-[#1a1f0a]"
+                      : "border border-slate-200 text-slate-500 hover:border-[#BEDA41]"
+                  }`}
+                  onClick={() => setUnit(u)}
+                >
+                  {u}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5">
+              {showMin && (
+                <div className="space-y-0.5">
+                  <Label className="text-[10px] text-slate-500">Min</Label>
+                  <Input
+                    type="number"
+                    className="h-8 text-[11px]"
+                    value={min}
+                    onChange={e => setMin(e.target.value)}
+                    data-testid="threshold-min"
+                    disabled={!!parseError}
+                  />
+                </div>
+              )}
+              {showMax && (
+                <div className="space-y-0.5">
+                  <Label className="text-[10px] text-slate-500">Max</Label>
+                  <Input
+                    type="number"
+                    className="h-8 text-[11px]"
+                    value={max}
+                    onChange={e => setMax(e.target.value)}
+                    data-testid="threshold-max"
+                    disabled={!!parseError}
+                  />
+                </div>
+              )}
+              <div className="space-y-0.5">
+                <Label className="text-[10px] text-slate-500">Severity</Label>
+                <Select
+                  value={severity}
+                  onValueChange={v =>
+                    setSeverity(v as "critical" | "major" | "minor" | "info")
+                  }
+                  disabled={!!parseError}
+                >
+                  <SelectTrigger className="h-8 text-[11px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="critical">Critical</SelectItem>
+                    <SelectItem value="major">Major</SelectItem>
+                    <SelectItem value="minor">Minor</SelectItem>
+                    <SelectItem value="info">Info</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 flex-1 bg-[#BEDA41] text-[11px] font-semibold text-[#1a1f0a] hover:bg-[#a8c438]"
+                onClick={addOrUpdate}
+                disabled={!!parseError || !field.trim()}
+                data-testid="threshold-save-rule"
+              >
+                {activeRule ? "Update rule" : "Save rule"}
+              </Button>
+              {activeRule && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2 text-[11px] text-destructive"
+                  onClick={() => removeRule(String(activeRule.ruleId))}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+
+            {rangeRules.length > 0 && (
+              <ul className="max-h-24 space-y-1 overflow-auto border-t border-slate-100 pt-2">
+                {rangeRules.map(rule => (
+                  <li
+                    key={String(rule.ruleId)}
+                    className="flex items-center justify-between gap-1 text-[10px]"
+                  >
+                    <span className="truncate font-medium text-slate-700">
+                      {humanLabel(String(rule.field))}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 px-1 py-0 text-[9px]"
+                    >
+                      {formatBoundsSummary(rule)}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
-      className={
-        compact
-          ? "space-y-3 rounded-md border border-[#BEDA41]/40 bg-white p-3"
-          : "space-y-4 rounded-md border border-[#BEDA41]/40 bg-[#F7F9EC] p-4"
-      }
+      className="space-y-4 rounded-md border border-[#BEDA41]/40 bg-[#F7F9EC] p-4"
       data-testid="threshold-rules-panel"
     >
       <div>
@@ -286,9 +538,7 @@ export function ThresholdRulesPanel({
           Value thresholds (measurement)
         </h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          Example: Wheel Nut Torque between 100–130 NM. Rules save into{" "}
-          <code className="text-[11px]">specJson.rules</code> as type{" "}
-          <code className="text-[11px]">range</code> and run on every live
+          Example: Wheel Nut Torque between 100–130 NM. Rules run on every live
           audit when this template version is active.
         </p>
       </div>
@@ -298,7 +548,7 @@ export function ThresholdRulesPanel({
       )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="space-y-1">
+        <div className="space-y-1 sm:col-span-2 lg:col-span-1">
           <Label className="text-xs">Field / ROI</Label>
           <Select
             value={field || undefined}
@@ -311,7 +561,7 @@ export function ThresholdRulesPanel({
             <SelectContent>
               {fieldOptions.map(f => (
                 <SelectItem key={f} value={f}>
-                  {f}
+                  {humanLabel(f)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -346,22 +596,24 @@ export function ThresholdRulesPanel({
 
         <div className="space-y-1">
           <Label className="text-xs">Unit</Label>
-          <div className="flex gap-1">
-            <Input
-              className="h-9"
-              value={unit}
-              onChange={e => setUnit(e.target.value)}
-              placeholder="NM"
-              data-testid="threshold-unit"
-              disabled={!!parseError}
-            />
-          </div>
+          <Input
+            className="h-9"
+            value={unit}
+            onChange={e => setUnit(e.target.value)}
+            placeholder="NM"
+            data-testid="threshold-unit"
+            disabled={!!parseError}
+          />
           <div className="flex flex-wrap gap-1 pt-1">
             {UNIT_PRESETS.map(u => (
               <button
                 key={u}
                 type="button"
-                className="rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-[#BEDA41] hover:text-foreground"
+                className={`rounded px-1.5 py-0.5 text-[10px] ${
+                  unit === u
+                    ? "bg-[#BEDA41] font-semibold text-[#1a1f0a]"
+                    : "border border-slate-200 text-muted-foreground hover:border-[#BEDA41]"
+                }`}
                 onClick={() => setUnit(u)}
               >
                 {u}
@@ -370,9 +622,7 @@ export function ThresholdRulesPanel({
           </div>
         </div>
 
-        {(boundsMode === "between" ||
-          boundsMode === "at_least" ||
-          boundsMode === "over") && (
+        {showMin && (
           <div className="space-y-1">
             <Label className="text-xs">Min</Label>
             <Input
@@ -385,7 +635,7 @@ export function ThresholdRulesPanel({
           </div>
         )}
 
-        {(boundsMode === "between" || boundsMode === "under") && (
+        {showMax && (
           <div className="space-y-1">
             <Label className="text-xs">Max</Label>
             <Input
@@ -433,8 +683,8 @@ export function ThresholdRulesPanel({
 
       {rangeRules.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          No threshold rules yet. Select a field (e.g. Wheel_Nut_Torque), set
-          bounds and unit, then save.
+          No threshold rules yet. Select a field, set bounds and unit, then
+          save.
         </p>
       ) : (
         <ul className="space-y-2">
@@ -445,7 +695,7 @@ export function ThresholdRulesPanel({
             >
               <div>
                 <div className="font-medium text-[#333030]">
-                  {String(rule.field)}{" "}
+                  {humanLabel(String(rule.field))}{" "}
                   <Badge variant="outline" className="ml-1 text-[10px]">
                     {formatBoundsSummary(rule)}
                   </Badge>

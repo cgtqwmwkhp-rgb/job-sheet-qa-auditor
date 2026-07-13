@@ -1079,9 +1079,9 @@ export function RoiEditorV2({
         {/* Region List Sidebar — compact so PDF stays large */}
         <div
           style={{
-            flex: "0 0 300px",
-            width: 300,
-            maxWidth: 300,
+            flex: "0 0 320px",
+            width: 320,
+            maxWidth: 320,
             alignSelf: "flex-start",
             position: "sticky",
             top: 0,
@@ -1090,29 +1090,28 @@ export function RoiEditorV2({
           }}
         >
           <div style={{
-            padding: '16px',
+            padding: '12px',
             backgroundColor: '#f8fafc',
             borderRadius: '8px',
             border: '1px solid #e2e8f0',
           }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600 }}>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: 600 }}>
               Regions ({regions.length})
             </h3>
 
             {/* Missing critical warning */}
             {missingCritical.length > 0 && (
               <div style={{
-                padding: '10px 12px',
+                padding: '8px 10px',
                 backgroundColor: '#fef3c7',
                 border: '1px solid #fbbf24',
                 borderRadius: '6px',
-                marginBottom: '16px',
-                fontSize: '13px',
+                marginBottom: '12px',
+                fontSize: '12px',
+                lineHeight: 1.35,
               }}>
-                <strong>Missing critical:</strong>
-                <div style={{ marginTop: '4px' }}>
-                  {missingCritical.join(', ')}
-                </div>
+                <strong>Missing critical:</strong>{' '}
+                {missingCritical.join(', ')}
               </div>
             )}
 
@@ -1189,12 +1188,12 @@ export function RoiEditorV2({
               </ul>
             )}
 
-            {/* Threshold rules for selected ROI — live audit integration via specJson */}
+            {/* Threshold rules for selected ROI — compact collapsible */}
             {!readOnly &&
               selectedRegion &&
               specJsonText != null &&
               onSpecJsonChange && (
-              <div style={{ marginTop: 16 }} data-testid="roi-region-threshold">
+              <div style={{ marginTop: 12 }} data-testid="roi-region-threshold">
                 <ThresholdRulesPanel
                   compact
                   specJsonText={specJsonText}
@@ -1207,19 +1206,19 @@ export function RoiEditorV2({
 
             {/* Actions */}
             {!readOnly && (
-              <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+              <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
                 <button
                   onClick={clearAll}
                   style={{
                     flex: 1,
-                    padding: '10px 16px',
+                    padding: '8px 12px',
                     backgroundColor: '#f8fafc',
                     color: '#374151',
                     border: '1px solid #e2e8f0',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     fontWeight: 500,
-                    fontSize: '14px',
+                    fontSize: '13px',
                   }}
                 >
                   Clear All
@@ -1229,14 +1228,14 @@ export function RoiEditorV2({
                   disabled={missingCritical.length > 0}
                   style={{
                     flex: 1,
-                    padding: '10px 16px',
+                    padding: '8px 12px',
                     backgroundColor: missingCritical.length > 0 ? '#94a3b8' : '#3b82f6',
                     color: 'white',
                     border: 'none',
                     borderRadius: '6px',
                     cursor: missingCritical.length > 0 ? 'not-allowed' : 'pointer',
                     fontWeight: 500,
-                    fontSize: '14px',
+                    fontSize: '13px',
                   }}
                   title={missingCritical.length > 0 ? 'Add all critical ROIs before saving' : undefined}
                 >
@@ -1247,13 +1246,13 @@ export function RoiEditorV2({
           </div>
 
           {/* JSON Preview */}
-          <details style={{ marginTop: '16px' }}>
+          <details style={{ marginTop: 12 }}>
             <summary style={{
               cursor: 'pointer',
-              padding: '8px 12px',
+              padding: '6px 10px',
               backgroundColor: '#f1f5f9',
               borderRadius: '6px',
-              fontSize: '14px',
+              fontSize: '12px',
               fontWeight: 500,
             }}>
               View JSON
