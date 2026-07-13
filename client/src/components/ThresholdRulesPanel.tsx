@@ -193,7 +193,8 @@ export function ThresholdRulesPanel({
   const [severity, setSeverity] = useState<
     "critical" | "major" | "minor" | "info"
   >("major");
-  const [expanded, setExpanded] = useState(true);
+  /** Measurement/threshold is opt-in — off unless a rule already exists or user enables it */
+  const [measurementEnabled, setMeasurementEnabled] = useState(false);
 
   const parsed = useMemo((): SpecLike | null => {
     try {
@@ -234,12 +235,14 @@ export function ThresholdRulesPanel({
   // Prefill editor from existing rule for selected field
   useEffect(() => {
     if (!field || !parsed?.rules) {
+      setMeasurementEnabled(false);
       return;
     }
     const existing = parsed.rules.find(
       r => r.type === "range" && r.field === field
     );
     if (!existing) {
+      setMeasurementEnabled(false);
       setBoundsMode("between");
       setMin("");
       setMax("");
@@ -247,6 +250,7 @@ export function ThresholdRulesPanel({
       setSeverity("major");
       return;
     }
+    setMeasurementEnabled(true);
     const range = (existing.range ?? {}) as {
       min?: number | string;
       max?: number | string;
@@ -269,6 +273,30 @@ export function ThresholdRulesPanel({
   const writeRules = (rules: Array<Record<string, unknown>>) => {
     if (!parsed) return;
     onSpecJsonChange(JSON.stringify({ ...parsed, rules }, null, 2));
+  };
+
+  const clearMeasurementForField = () => {
+    if (!parsed?.rules || !field) {
+      setMeasurementEnabled(false);
+      return;
+    }
+    writeRules(
+      parsed.rules.filter(
+        r => !(r.type === "range" && r.field === field)
+      )
+    );
+    setMeasurementEnabled(false);
+    setMin("");
+    setMax("");
+  };
+
+  const setMeasurementToggle = (on: boolean) => {
+    if (!on) {
+      if (activeRule) clearMeasurementForField();
+      else setMeasurementEnabled(false);
+      return;
+    }
+    setMeasurementEnabled(true);
   };
 
   const addOrUpdate = () => {
@@ -342,35 +370,42 @@ export function ThresholdRulesPanel({
         className="overflow-hidden rounded-md border border-slate-200 bg-white"
         data-testid="threshold-rules-panel"
       >
-        <button
-          type="button"
-          className="flex w-full items-center justify-between gap-2 bg-slate-50 px-2.5 py-2 text-left"
-          onClick={() => setExpanded(e => !e)}
+        <label
+          className="flex w-full cursor-pointer items-center justify-between gap-2 bg-slate-50 px-2.5 py-2.5"
           data-testid="threshold-toggle"
         >
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-            Threshold
-          </span>
-          <span className="truncate text-[11px] text-slate-500">
-            {activeRule
-              ? formatBoundsSummary(activeRule)
-              : field
-                ? humanLabel(field)
-                : "Set min / max + unit"}
-          </span>
-          <span className="shrink-0 text-[10px] text-slate-400">
-            {expanded ? "▾" : "▸"}
-          </span>
-        </button>
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold text-slate-700">
+              Measurement check
+            </div>
+            <div className="truncate text-[10px] text-slate-500">
+              {measurementEnabled
+                ? activeRule
+                  ? formatBoundsSummary(activeRule)
+                  : "On — set min/max + unit, then save rule"
+                : "Off — not required for this label"}
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            role="switch"
+            aria-label="Enable measurement check for this ROI"
+            checked={measurementEnabled}
+            onChange={e => setMeasurementToggle(e.target.checked)}
+            className="h-4 w-4 shrink-0 accent-[#BEDA41]"
+            data-testid="threshold-enabled-switch"
+          />
+        </label>
 
-        {expanded && (
+        {measurementEnabled && (
           <div className="space-y-2 border-t border-slate-100 p-2.5">
             {parseError && (
               <p className="text-[11px] text-destructive">{parseError}</p>
             )}
 
             <p className="text-[10px] leading-snug text-slate-500">
-              Live audit check for this ROI (e.g. 100–130 NM).
+              Optional live audit rule (e.g. torque 100–130 NM). Leave off for
+              labels like Asset ID or signatures.
             </p>
 
             <div className="rounded bg-slate-50 px-2 py-1.5 text-[11px] font-medium text-slate-700">

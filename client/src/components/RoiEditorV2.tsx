@@ -1284,9 +1284,16 @@ export function RoiEditorV2({
               </div>
             )}
 
-            {/* Actions */}
+            {/* Actions — allow saving progress even if some critical ROIs are still missing */}
             {!readOnly && (
-              <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {missingCritical.length > 0 && (
+                  <p style={{ margin: 0, fontSize: 11, color: '#92400e', lineHeight: 1.35 }}>
+                    You can save progress now. Still missing critical labels:{' '}
+                    {missingCritical.join(', ')}.
+                  </p>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   onClick={clearAll}
                   style={{
@@ -1305,22 +1312,35 @@ export function RoiEditorV2({
                 </button>
                 <button
                   onClick={handleSave}
-                  disabled={missingCritical.length > 0}
+                  disabled={regions.filter(r => r.enabled !== false).length === 0}
                   style={{
                     flex: 1,
                     padding: '8px 12px',
-                    backgroundColor: missingCritical.length > 0 ? '#94a3b8' : '#3b82f6',
+                    backgroundColor:
+                      regions.filter(r => r.enabled !== false).length === 0
+                        ? '#94a3b8'
+                        : '#3b82f6',
                     color: 'white',
                     border: 'none',
                     borderRadius: '6px',
-                    cursor: missingCritical.length > 0 ? 'not-allowed' : 'pointer',
+                    cursor:
+                      regions.filter(r => r.enabled !== false).length === 0
+                        ? 'not-allowed'
+                        : 'pointer',
                     fontWeight: 500,
                     fontSize: '13px',
                   }}
-                  title={missingCritical.length > 0 ? 'Add all critical ROIs before saving' : undefined}
+                  title={
+                    regions.filter(r => r.enabled !== false).length === 0
+                      ? 'Draw at least one region first'
+                      : missingCritical.length > 0
+                        ? 'Saves current regions (critical labels still missing)'
+                        : 'Save ROI regions'
+                  }
                 >
                   Save ROI
                 </button>
+                </div>
               </div>
             )}
           </div>
