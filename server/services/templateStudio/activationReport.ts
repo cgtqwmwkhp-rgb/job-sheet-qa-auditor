@@ -1,5 +1,5 @@
 /**
- * Template Studio — activation report (gates + fixtures + collision preview).
+ * Template Studio — activation report (gates + fixtures + collision + dry-run).
  */
 
 import {
@@ -19,6 +19,7 @@ import {
   runFixtureMatrix,
   type FixtureRunReport,
 } from "../templateRegistry";
+import { getDryRunGateStatus, type DryRunReport } from "./dryRunAudit";
 
 export interface ActivationReport {
   versionId: number;
@@ -34,10 +35,19 @@ export interface ActivationReport {
     blocking: boolean;
   };
   collision: CollisionReport;
+  dryRun: {
+    allowed: boolean;
+    blocking: boolean;
+    code: string;
+    message: string;
+    report: DryRunReport | null;
+  };
   environment: string;
 }
 
-export function buildActivationReport(versionId: number): ActivationReport {
+export async function buildActivationReport(
+  versionId: number
+): Promise<ActivationReport> {
   const version = getTemplateVersion(versionId);
   if (!version) {
     throw new Error(`Version not found: ${versionId}`);
@@ -72,8 +82,13 @@ export function buildActivationReport(versionId: number): ActivationReport {
   const existing = listTemplateFingerprints(version.templateId);
   const collision = detectTemplateCollisions(candidate, existing);
 
+  const dryGate = await getDryRunGateStatus(versionId);
+
   const allowed =
-    preconditions.allowed && !fixturesBlocking && collision.allowed;
+    preconditions.allowed &&
+    !fixturesBlocking &&
+    collision.allowed &&
+    dryGate.allowed;
 
   return {
     versionId,
@@ -89,6 +104,13 @@ export function buildActivationReport(versionId: number): ActivationReport {
       blocking: fixturesBlocking,
     },
     collision,
+    dryRun: {
+      allowed: dryGate.allowed,
+      blocking: dryGate.blocking,
+      code: dryGate.code,
+      message: dryGate.message,
+      report: dryGate.report,
+    },
     environment: process.env.APP_ENV || process.env.NODE_ENV || "development",
   };
 }

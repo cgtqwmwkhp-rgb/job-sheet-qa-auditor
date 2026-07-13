@@ -140,7 +140,7 @@ export async function requestPromote(input: {
     throw new Error(`Template not found: ${version.templateId}`);
   }
 
-  const report = buildActivationReport(input.versionId);
+  const report = await buildActivationReport(input.versionId);
   if (!report.allowed) {
     throw new Error(
       "Activation report still has blocking issues — fix before requesting promote"

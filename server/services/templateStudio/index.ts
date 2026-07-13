@@ -12,3 +12,4 @@ export * from "./proposeFromSample";
 export * from "./stagingVerify";
 export * from "./envGuards";
 export * from "./durableStore";
+export * from "./dryRunAudit";
