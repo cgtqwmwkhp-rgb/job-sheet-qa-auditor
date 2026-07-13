@@ -1,0 +1,38 @@
+name: Ops — Promote staff roles (production)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment database
+        required: true
+        default: production
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+  promote:
+    name: Promote user → qa_lead
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.4.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install mysql2 only
+        run: pnpm add mysql2@3.11.5 --ignore-workspace
+
+      - name: Promote legacy viewer users to qa_lead
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/ops/promote-staff-to-qalead.mjs
