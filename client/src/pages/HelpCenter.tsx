@@ -430,8 +430,8 @@ export default function HelpCenter() {
                         Yes. Use Template Studio (/template-studio) to upload a
                         sample form, refine ROIs and selection tokens, run
                         activation gates on staging, then dual-control promote
-                        to production. The live audit pipeline uses the
-                        template registry — not legacy gold-spec authoring.
+                        to production. The live audit pipeline uses the template
+                        registry — not legacy gold-spec authoring.
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-4">
