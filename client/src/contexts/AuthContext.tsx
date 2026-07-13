@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 
 export type UserRole = "admin" | "qa_lead" | "technician" | "viewer";
 
@@ -120,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const login = (role: UserRole) => {
+  const login = useCallback((role: UserRole) => {
     if (!isDemoAuthAllowed()) return;
     try {
       localStorage.setItem("demo_user_role", role);
@@ -141,9 +148,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: role === "technician" ? "john@example.com" : "sarah@example.com",
       role,
     });
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     try {
       localStorage.removeItem("demo_user_role");
       localStorage.removeItem("demo_user_name");
@@ -152,17 +159,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       /* ignore */
     }
     window.location.href = "/.auth/logout?post_logout_redirect_uri=/login";
-  };
+  }, []);
 
-  const hasRole = (roles: UserRole[]) => {
-    if (!user) return false;
-    return roles.includes(user.role);
-  };
+  const hasRole = useCallback(
+    (roles: UserRole[]) => {
+      if (!user) return false;
+      return roles.includes(user.role);
+    },
+    [user]
+  );
+
+  const value = useMemo(
+    () => ({ user, login, logout, isLoading, hasRole }),
+    [user, login, logout, isLoading, hasRole]
+  );
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading, hasRole }}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
   );
 }
 

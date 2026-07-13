@@ -116,6 +116,11 @@ export function PdfPreview({
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
   const [pdfjsLib, setPdfjsLib] = useState<PDFJSLib | null>(null);
 
+  const onPagesLoadedRef = useRef(onPagesLoaded);
+  onPagesLoadedRef.current = onPagesLoaded;
+  const onDimensionsChangeRef = useRef(onDimensionsChange);
+  onDimensionsChangeRef.current = onDimensionsChange;
+
   // Load PDF.js on mount
   useEffect(() => {
     loadPdfJs().then(lib => {
@@ -150,7 +155,7 @@ export function PdfPreview({
         if (!cancelled) {
           setPdfDoc(doc);
           setTotalPages(doc.numPages);
-          onPagesLoaded?.(doc.numPages);
+          onPagesLoadedRef.current?.(doc.numPages);
           setLoading(false);
         }
       } catch (err) {
@@ -167,7 +172,7 @@ export function PdfPreview({
     return () => {
       cancelled = true;
     };
-  }, [pdfjsLib, pdfSource, onPagesLoaded]);
+  }, [pdfjsLib, pdfSource]);
 
   // Render page when page/zoom changes
   useEffect(() => {
@@ -191,7 +196,7 @@ export function PdfPreview({
         canvas.height = viewport.height;
         canvas.width = viewport.width;
 
-        onDimensionsChange?.(viewport.width, viewport.height);
+        onDimensionsChangeRef.current?.(viewport.width, viewport.height);
 
         await pageObj.render({
           canvasContext: context,
@@ -204,7 +209,7 @@ export function PdfPreview({
     };
 
     renderPage();
-  }, [pdfDoc, currentPage, zoom, onDimensionsChange]);
+  }, [pdfDoc, currentPage, zoom]);
 
   // Handle page navigation
   const goToPage = useCallback((newPage: number) => {

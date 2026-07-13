@@ -77,10 +77,12 @@ export function RoiEditor({
   const [currentTool, setCurrentTool] = useState<string>('jobReference');
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // Notify parent of changes
+  // Notify parent when regions change only (ref avoids inline-onChange loops).
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   useEffect(() => {
-    onChange?.({ regions });
-  }, [regions, onChange]);
+    onChangeRef.current?.({ regions });
+  }, [regions]);
 
   /**
    * Get color for region type

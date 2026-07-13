@@ -21,6 +21,7 @@ import { ListSkeleton } from "@/components/ui/loading-skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import { showErrorToast, showSuccessToast } from "@/lib/toastHelpers";
+import { roiDraftEquals } from "@/lib/roiDraftEquals";
 import {
   Check,
   ChevronLeft,
@@ -30,7 +31,7 @@ import {
   Sparkles,
   Upload,
 } from "lucide-react";
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useSearch } from "wouter";
 
 type WizardStep =
@@ -176,15 +177,41 @@ export default function TemplateStudio() {
 
   useEffect(() => {
     if (versionId == null) return;
+    let cancelled = false;
     void utils.templates.studio.getSample
       .fetch({ versionId })
       .then(sample => {
-        if (sample?.sampleUrl) setSampleUrl(sample.sampleUrl);
+        if (cancelled || !sample?.sampleUrl) return;
+        // SAS URLs can differ per fetch — only update when the value changes
+        // to avoid effect↔setState feedback if deps ever re-fire.
+        setSampleUrl(prev =>
+          prev === sample.sampleUrl ? prev : sample.sampleUrl
+        );
       })
       .catch(() => {
         /* no sample yet */
       });
-  }, [versionId, utils.templates.studio.getSample]);
+    return () => {
+      cancelled = true;
+    };
+    // utils is a stable tRPC proxy; do not list nested procedure refs as deps
+    // (they can be new identities each render and re-trigger the fetch).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- versionId is the only trigger
+  }, [versionId]);
+
+  const handleRoiChange = useCallback(
+    (roi: {
+      regions: Array<{
+        name: string;
+        page: number;
+        bounds: { x: number; y: number; width: number; height: number };
+        fields?: string[];
+      }>;
+    }) => {
+      setRoiDraft(prev => (roiDraftEquals(prev, roi) ? prev : roi));
+    },
+    []
+  );
 
   const applyQuickStartResult = (result: {
     template: { id: number; name: string };
@@ -1004,7 +1031,7 @@ export default function TemplateStudio() {
               <RoiEditorV2
                 initialRoi={roiDraft ?? version?.roiJson ?? undefined}
                 pdfUrl={sampleUrl ?? undefined}
-                onChange={roi => setRoiDraft(roi)}
+                onChange={handleRoiChange}
                 onSave={roi => {
                   setRoiDraft(roi);
                   void (async () => {

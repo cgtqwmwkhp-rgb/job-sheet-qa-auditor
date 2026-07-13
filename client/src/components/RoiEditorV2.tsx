@@ -201,10 +201,15 @@ export function RoiEditorV2({
     setIsDragOver(false);
   }, []);
 
-  // Notify parent of changes
+  // Notify parent when regions change only.
+  // Keep onChange in a ref — inline parent callbacks (e.g. Template Studio
+  // `onChange={roi => setRoiDraft(roi)}`) get a new identity every render and
+  // would otherwise re-fire this effect → setState → max update depth (#185).
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   useEffect(() => {
-    onChange?.({ regions });
-  }, [regions, onChange]);
+    onChangeRef.current?.({ regions });
+  }, [regions]);
 
   /**
    * Get color for region type
