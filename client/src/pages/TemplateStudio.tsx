@@ -1028,8 +1028,9 @@ export default function TemplateStudio() {
             <CardHeader>
               <CardTitle>ROI editor</CardTitle>
               <CardDescription>
-                Drag regions on the sample. Save writes to the live registry
-                version.
+                ROI = Region of Interest. Draw boxes on the sample; the floating
+                labels panel stays visible while you scroll. Save writes to the
+                live registry version.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

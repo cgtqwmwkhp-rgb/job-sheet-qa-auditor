@@ -171,6 +171,8 @@ export function RoiEditorV2({
   const [customLabelCritical, setCustomLabelCritical] = useState(false);
   /** Natural PDF page size at current zoom — drives overlay coordinate space */
   const [pageSize, setPageSize] = useState({ width: 595, height: 842 });
+  /** Floating draw palette — stays visible while scrolling the PDF */
+  const [drawPaletteOpen, setDrawPaletteOpen] = useState(true);
 
   const allRoiTypes = useMemo(
     () => [...STANDARD_ROI_TYPES, ...customTypes],
@@ -552,178 +554,75 @@ export function RoiEditorV2({
         </div>
       </div>
 
-      {/* Quick actions bar */}
+      {/* Compact templates row (not the draw palette) */}
       <div style={{
         display: 'flex',
         gap: '8px',
-        marginBottom: '16px',
+        marginBottom: '12px',
         flexWrap: 'wrap',
+        alignItems: 'center',
       }}>
-        {/* Template buttons */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '13px', color: '#6b7280', marginRight: '4px' }}>Templates:</span>
-          {Object.keys(ROI_TEMPLATES).map(type => (
-            <button
-              key={type}
-              onClick={() => applyTemplate(type)}
-              disabled={readOnly}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: '#f1f5f9',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-                fontSize: '13px',
-                cursor: readOnly ? 'not-allowed' : 'pointer',
-                textTransform: 'capitalize',
-              }}
-            >
-              {type}
-            </button>
-          ))}
-        </div>
-        
-        {/* Copy from previous */}
+        <span style={{ fontSize: '12px', color: '#6b7280' }}>Templates:</span>
+        {Object.keys(ROI_TEMPLATES).map(type => (
+          <button
+            key={type}
+            type="button"
+            onClick={() => applyTemplate(type)}
+            disabled={readOnly}
+            style={{
+              padding: '4px 10px',
+              backgroundColor: '#f1f5f9',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              fontSize: '12px',
+              cursor: readOnly ? 'not-allowed' : 'pointer',
+              textTransform: 'capitalize',
+            }}
+          >
+            {type}
+          </button>
+        ))}
         {previousVersionRoi && (
           <button
+            type="button"
             onClick={copyFromPrevious}
             disabled={readOnly}
             style={{
-              padding: '6px 12px',
+              padding: '4px 10px',
               backgroundColor: '#dbeafe',
               color: '#1d4ed8',
               border: '1px solid #93c5fd',
               borderRadius: '6px',
-              fontSize: '13px',
+              fontSize: '12px',
               cursor: readOnly ? 'not-allowed' : 'pointer',
               fontWeight: 500,
             }}
           >
-            Copy from Previous Version
+            Copy previous
           </button>
         )}
-        
-        {/* Show critical only toggle */}
-        <label style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          fontSize: '13px',
-          marginLeft: 'auto',
-        }}>
-          <input
-            type="checkbox"
-            checked={showCriticalOnly}
-            onChange={(e) => setShowCriticalOnly(e.target.checked)}
-          />
-          Show critical only
-        </label>
-      </div>
-
-      {/* Toolbar */}
-      <div style={{
-        display: 'flex',
-        gap: '8px',
-        marginBottom: '16px',
-        flexWrap: 'wrap',
-        padding: '12px',
-        backgroundColor: '#f8fafc',
-        borderRadius: '8px',
-        border: '1px solid #e2e8f0',
-      }}>
-        <span style={{ fontWeight: 600, marginRight: '8px', alignSelf: 'center', fontSize: '13px' }}>
-          Draw:
-        </span>
-        {filteredTypes.map(type => (
-          <button
-            key={type.id}
-            onClick={() => setCurrentTool(type.id)}
-            disabled={readOnly}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '6px',
-              border: currentTool === type.id ? `2px solid ${type.color}` : '1px solid #e2e8f0',
-              backgroundColor: currentTool === type.id ? `${type.color}20` : 'white',
-              color: currentTool === type.id ? type.color : '#374151',
-              cursor: readOnly ? 'not-allowed' : 'pointer',
-              fontSize: '12px',
-              fontWeight: currentTool === type.id ? 600 : 400,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-          >
-            {type.critical && (
-              <span style={{ color: '#dc2626', fontSize: '10px' }}>●</span>
-            )}
-            {type.label}
-          </button>
-        ))}
-        {!readOnly && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              marginLeft: "8px",
-              paddingLeft: "8px",
-              borderLeft: "1px solid #e2e8f0",
-            }}
-          >
-            <input
-              type="text"
-              value={customLabelDraft}
-              onChange={e => setCustomLabelDraft(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addCustomLabel();
-                }
-              }}
-              placeholder="Custom label…"
-              style={{
-                padding: "6px 10px",
-                border: "1px solid #e2e8f0",
-                borderRadius: "6px",
-                fontSize: "12px",
-                minWidth: "140px",
-              }}
-            />
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                fontSize: "11px",
-                color: "#6b7280",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={customLabelCritical}
-                onChange={e => setCustomLabelCritical(e.target.checked)}
-              />
-              Critical
-            </label>
-            <button
-              type="button"
-              onClick={addCustomLabel}
-              disabled={!customLabelDraft.trim()}
-              style={{
-                padding: "6px 12px",
-                borderRadius: "6px",
-                border: "1px solid #BEDA41",
-                backgroundColor: "#BEDA41",
-                color: "#1a1f0a",
-                fontSize: "12px",
-                fontWeight: 600,
-                cursor: customLabelDraft.trim() ? "pointer" : "not-allowed",
-                opacity: customLabelDraft.trim() ? 1 : 0.5,
-              }}
-            >
-              + Add label
-            </button>
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={() => setDrawPaletteOpen(o => !o)}
+          style={{
+            marginLeft: 'auto',
+            padding: '4px 12px',
+            backgroundColor: drawPaletteOpen ? '#1e293b' : '#BEDA41',
+            color: drawPaletteOpen ? '#fff' : '#1a1f0a',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+          title={
+            drawPaletteOpen
+              ? 'Hide floating draw labels'
+              : 'Show floating draw labels'
+          }
+        >
+          {drawPaletteOpen ? 'Hide labels panel' : 'Show labels panel'}
+        </button>
       </div>
 
       {/* Hidden file input */}
@@ -744,8 +643,8 @@ export function RoiEditorV2({
           minHeight: "calc(100vh - 260px)",
         }}
       >
-        {/* Canvas with PDF preview */}
-        <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+        {/* Canvas with PDF preview + floating draw palette */}
+        <div style={{ flex: "1 1 auto", minWidth: 0, position: "relative" }}>
           <div style={{
             marginBottom: '8px',
             fontSize: '14px',
@@ -755,13 +654,244 @@ export function RoiEditorV2({
             alignItems: 'center',
           }}>
             <span>
-              {readOnly ? 'Preview Mode' : 'Click and drag to draw regions — zoom in for precision'}
+              {readOnly
+                ? 'Preview Mode'
+                : `Drawing: ${regionLabel(currentTool)} — scroll the PDF; labels panel stays put`}
               {pdfFileName && <span style={{ marginLeft: '12px', color: '#3b82f6' }}>({pdfFileName})</span>}
             </span>
             {totalPages > 1 && (
               <span>Page {currentPage} of {totalPages}</span>
             )}
           </div>
+
+          {/* Floating draw palette — fixed over the viewer while PDF scrolls */}
+          {drawPaletteOpen ? (
+            <div
+              data-testid="roi-draw-palette"
+              style={{
+                position: "absolute",
+                top: 40,
+                left: 12,
+                zIndex: 30,
+                width: 220,
+                maxHeight: "min(70vh, 560px)",
+                overflow: "auto",
+                backgroundColor: "rgba(255,255,255,0.97)",
+                border: "1px solid #e2e8f0",
+                borderRadius: "10px",
+                boxShadow: "0 10px 30px rgba(15,23,42,0.18)",
+                padding: "10px",
+                backdropFilter: "blur(6px)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 8,
+                  gap: 8,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1e293b" }}>
+                    Draw labels
+                  </div>
+                  <div style={{ fontSize: 10, color: "#64748b" }}>
+                    ROI = Region of Interest
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDrawPaletteOpen(false)}
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                    borderRadius: 6,
+                    padding: "2px 8px",
+                    fontSize: 11,
+                    cursor: "pointer",
+                    color: "#475569",
+                  }}
+                  title="Hide panel"
+                >
+                  Hide
+                </button>
+              </div>
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 11,
+                  color: "#64748b",
+                  marginBottom: 8,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={showCriticalOnly}
+                  onChange={e => setShowCriticalOnly(e.target.checked)}
+                />
+                Critical only
+              </label>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                  marginBottom: 8,
+                }}
+              >
+                {filteredTypes.map(type => {
+                  const active = currentTool === type.id;
+                  return (
+                    <button
+                      key={type.id}
+                      type="button"
+                      onClick={() => setCurrentTool(type.id)}
+                      disabled={readOnly}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "6px 8px",
+                        borderRadius: 6,
+                        border: active
+                          ? `2px solid ${type.color}`
+                          : "1px solid #e2e8f0",
+                        backgroundColor: active ? `${type.color}18` : "#fff",
+                        color: active ? type.color : "#334155",
+                        cursor: readOnly ? "not-allowed" : "pointer",
+                        fontSize: 12,
+                        fontWeight: active ? 700 : 500,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 999,
+                          backgroundColor: type.color,
+                          flexShrink: 0,
+                        }}
+                      />
+                      {type.critical && (
+                        <span style={{ color: "#dc2626", fontSize: 9 }}>●</span>
+                      )}
+                      <span style={{ flex: 1 }}>{type.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {!readOnly && (
+                <div
+                  style={{
+                    borderTop: "1px solid #e2e8f0",
+                    paddingTop: 8,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={customLabelDraft}
+                    onChange={e => setCustomLabelDraft(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addCustomLabel();
+                      }
+                    }}
+                    placeholder="Custom label…"
+                    style={{
+                      padding: "6px 8px",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      width: "100%",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        fontSize: 11,
+                        color: "#64748b",
+                        flex: 1,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={customLabelCritical}
+                        onChange={e => setCustomLabelCritical(e.target.checked)}
+                      />
+                      Critical
+                    </label>
+                    <button
+                      type="button"
+                      onClick={addCustomLabel}
+                      disabled={!customLabelDraft.trim()}
+                      style={{
+                        padding: "5px 10px",
+                        borderRadius: 6,
+                        border: "1px solid #BEDA41",
+                        backgroundColor: "#BEDA41",
+                        color: "#1a1f0a",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: customLabelDraft.trim()
+                          ? "pointer"
+                          : "not-allowed",
+                        opacity: customLabelDraft.trim() ? 1 : 0.5,
+                      }}
+                    >
+                      + Add
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              data-testid="roi-draw-palette-show"
+              onClick={() => setDrawPaletteOpen(true)}
+              style={{
+                position: "absolute",
+                top: 40,
+                left: 12,
+                zIndex: 30,
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: "1px solid #BEDA41",
+                backgroundColor: "#BEDA41",
+                color: "#1a1f0a",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                boxShadow: "0 6px 16px rgba(15,23,42,0.15)",
+              }}
+            >
+              Show labels
+            </button>
+          )}
+
           {/* Shared scrollport: PDF + ROI labels must move together */}
           <div
             style={{
