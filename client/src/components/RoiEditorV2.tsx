@@ -15,6 +15,14 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { PdfPreview } from './PdfPreview';
 import { ThresholdRulesPanel } from './ThresholdRulesPanel';
+import {
+  getRoiDrawGuidance,
+} from './roiDrawGuidance';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 /**
  * ROI Region type
@@ -857,7 +865,7 @@ export function RoiEditorV2({
                     Draw labels
                   </div>
                   <div style={{ fontSize: 10, color: "#64748b" }}>
-                    ROI = Region of Interest
+                    ROI = Region of Interest · hover a label for how to draw
                   </div>
                 </div>
                 <button
@@ -906,44 +914,95 @@ export function RoiEditorV2({
               >
                 {filteredTypes.map(type => {
                   const active = currentTool === type.id;
+                  const specMeta = specFields.find(f => f.field === type.id);
+                  const guidance = getRoiDrawGuidance(type.id, {
+                    label: type.label,
+                    fieldType: specMeta?.type,
+                  });
                   return (
-                    <button
-                      key={type.id}
-                      type="button"
-                      onClick={() => setCurrentTool(type.id)}
-                      disabled={readOnly}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "6px 8px",
-                        borderRadius: 6,
-                        border: active
-                          ? `2px solid ${type.color}`
-                          : "1px solid #e2e8f0",
-                        backgroundColor: active ? `${type.color}18` : "#fff",
-                        color: active ? type.color : "#334155",
-                        cursor: readOnly ? "not-allowed" : "pointer",
-                        fontSize: 12,
-                        fontWeight: active ? 700 : 500,
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 999,
-                          backgroundColor: type.color,
-                          flexShrink: 0,
-                        }}
-                      />
-                      {type.critical && (
-                        <span style={{ color: "#dc2626", fontSize: 9 }}>●</span>
-                      )}
-                      <span style={{ flex: 1 }}>{type.label}</span>
-                    </button>
+                    <Tooltip key={type.id} delayDuration={200}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => setCurrentTool(type.id)}
+                          disabled={readOnly}
+                          aria-label={`${type.label}. ${guidance.summary} How to draw: ${guidance.howToDraw}`}
+                          data-testid={`roi-draw-tool-${type.id}`}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            width: "100%",
+                            textAlign: "left",
+                            padding: "6px 8px",
+                            borderRadius: 6,
+                            border: active
+                              ? `2px solid ${type.color}`
+                              : "1px solid #e2e8f0",
+                            backgroundColor: active
+                              ? `${type.color}18`
+                              : "#fff",
+                            color: active ? type.color : "#334155",
+                            cursor: readOnly ? "not-allowed" : "pointer",
+                            fontSize: 12,
+                            fontWeight: active ? 700 : 500,
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 999,
+                              backgroundColor: type.color,
+                              flexShrink: 0,
+                            }}
+                          />
+                          {type.critical && (
+                            <span
+                              style={{ color: "#dc2626", fontSize: 9 }}
+                            >
+                              ●
+                            </span>
+                          )}
+                          <span style={{ flex: 1 }}>{type.label}</span>
+                          <span
+                            aria-hidden
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "#94a3b8",
+                              lineHeight: 1,
+                            }}
+                          >
+                            ?
+                          </span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="right"
+                        sideOffset={8}
+                        className="z-[80] max-w-[280px] space-y-1.5 border border-slate-700 bg-slate-900 p-3 text-left text-xs text-slate-50 shadow-lg"
+                      >
+                        <div className="font-semibold text-white">
+                          {type.label}
+                        </div>
+                        <p className="text-slate-200 leading-snug">
+                          {guidance.summary}
+                        </p>
+                        <p className="leading-snug">
+                          <span className="font-semibold text-[#BEDA41]">
+                            Look for:
+                          </span>{" "}
+                          {guidance.lookFor}
+                        </p>
+                        <p className="leading-snug">
+                          <span className="font-semibold text-[#BEDA41]">
+                            How to draw:
+                          </span>{" "}
+                          {guidance.howToDraw}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
                   );
                 })}
               </div>

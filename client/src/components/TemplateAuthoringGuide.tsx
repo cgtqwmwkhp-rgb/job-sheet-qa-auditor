@@ -15,6 +15,10 @@ import {
 
 const RULES: Array<{ title: string; body: string }> = [
   {
+    title: "Hover Draw labels for how-to",
+    body: "Each label in the floating Draw labels panel shows what to look for and whether to box the printed heading with the value, value-only, or the whole tickbox grid.",
+  },
+  {
     title: "One field id — never invent a parallel label",
     body: "Draw labels must use the exact field id from Suggest fields / Fields & rules (e.g. serialNumber, not Serial_Number). Duplicates break extraction and thresholds.",
   },
