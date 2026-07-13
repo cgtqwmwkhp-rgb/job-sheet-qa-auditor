@@ -29,10 +29,14 @@ export interface AzureSelectionMark {
 export interface AzureTextLine {
   pageNumber: number;
   content: string;
-  /** Approximate vertical center as % of page height. */
+  /** Approximate vertical center as % of page height (0–100). */
   yPercent: number;
-  /** Left edge as % of page width. */
+  /** Left edge as % of page width (0–100). */
   xPercent: number;
+  /** Line width as % of page width (0–100). */
+  widthPercent?: number;
+  /** Line height as % of page height (0–100). */
+  heightPercent?: number;
 }
 
 export interface ParsedAzureDiResult {
@@ -237,13 +241,18 @@ export function parseAzureDiResponse(raw: unknown): ParsedAzureDiResult {
           if (poly.length < 8) continue;
           const ys = [poly[1], poly[3], poly[5], poly[7]];
           const xs = [poly[0], poly[2], poly[4], poly[6]];
-          const yMid = (Math.min(...ys) + Math.max(...ys)) / 2;
+          const yMin = Math.min(...ys);
+          const yMax = Math.max(...ys);
           const xMin = Math.min(...xs);
+          const xMax = Math.max(...xs);
+          const yMid = (yMin + yMax) / 2;
           linesOut.push({
             pageNumber,
             content: lineContent.trim(),
             yPercent: clampPercent((yMid / height) * 100),
             xPercent: clampPercent((xMin / width) * 100),
+            widthPercent: clampPercent(((xMax - xMin) / width) * 100),
+            heightPercent: clampPercent(((yMax - yMin) / height) * 100),
           });
         }
       }

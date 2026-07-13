@@ -209,10 +209,18 @@ export function PdfPreview({
           return;
         }
 
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
+        const outputScale =
+          typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
 
+        canvas.height = Math.floor(viewport.height * outputScale);
+        canvas.width = Math.floor(viewport.width * outputScale);
+        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
+
+        // Report CSS pixel size — ROI overlay must match this box exactly
         onDimensionsChangeRef.current?.(viewport.width, viewport.height);
+
+        context.setTransform(outputScale, 0, 0, outputScale, 0, 0);
 
         await pageObj.render({
           canvasContext: context,

@@ -15,6 +15,10 @@ import {
 
 const RULES: Array<{ title: string; body: string }> = [
   {
+    title: "ROI boxes must be OCR-placed, not generic",
+    body: "Suggest fields runs Azure DI layout and places regions on real printed labels (e.g. Job ID). Maintenance/Inspection/Installation starters are NOT a detailed review — never save them as-is.",
+  },
+  {
     title: "Hover Draw labels for how-to",
     body: "Each label in the floating Draw labels panel shows what to look for and whether to box the printed heading with the value, value-only, or the whole tickbox grid.",
   },

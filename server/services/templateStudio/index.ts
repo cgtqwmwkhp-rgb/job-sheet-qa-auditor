@@ -9,6 +9,7 @@ export * from "./promoteStore";
 export * from "./scaffoldFixtures";
 export * from "./versionDiff";
 export * from "./proposeFromSample";
+export * from "./roiProposeFromLayout";
 export * from "./stagingVerify";
 export * from "./envGuards";
 export * from "./durableStore";

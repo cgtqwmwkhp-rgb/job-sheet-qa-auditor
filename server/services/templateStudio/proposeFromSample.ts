@@ -22,11 +22,16 @@ import type {
   RuleSpec,
 } from "../templateRegistry/types";
 import {
-  createStudioStarterRoi,
   createStudioStarterSelection,
   createStudioStarterSpec,
 } from "./starterDraft";
 import { getStudioSampleUrl } from "./sampleStore";
+import {
+  suggestRoiFromLayoutEvidence,
+  type ProposedRoiRegion,
+} from "./roiProposeFromLayout";
+
+export type { ProposedRoiRegion } from "./roiProposeFromLayout";
 
 export interface ProposedField {
   field: FieldSpec;
@@ -38,17 +43,6 @@ export interface ProposedField {
 
 export interface ProposedRule {
   rule: RuleSpec;
-  confidence: number;
-  source: string;
-  why: string;
-  accepted?: boolean;
-}
-
-export interface ProposedRoiRegion {
-  name: string;
-  page: number;
-  bounds: { x: number; y: number; width: number; height: number };
-  fields?: string[];
   confidence: number;
   source: string;
   why: string;
@@ -91,14 +85,14 @@ const LABEL_TO_FIELD: Array<{
   required: boolean;
 }> = [
   {
-    re: /job\s*(no|number|ref|reference)|work\s*order|wo\s*#/i,
+    re: /job\s*(id|no|number|ref|reference)|work\s*order|wo\s*#/i,
     field: "jobReference",
     label: "Job Reference",
     type: "string",
     required: true,
   },
   {
-    re: /asset|serial\s*(no|number)?|plant\s*no|equipment/i,
+    re: /asset(\s*(id|no|number))?|serial\s*(no|number)?|plant\s*no|equipment/i,
     field: "assetId",
     label: "Asset ID",
     type: "string",
@@ -196,55 +190,6 @@ function buildRulesFromFields(fields: ProposedField[]): ProposedRule[] {
     }));
 }
 
-function suggestRoiFromLabels(
-  lines: string[],
-  hasChecklist: boolean
-): ProposedRoiRegion[] {
-  const base = createStudioStarterRoi();
-  const regions: ProposedRoiRegion[] = base.regions.map(r => ({
-    ...r,
-    confidence: 0.5,
-    source: "starter-roi",
-    why: "Standard job-sheet ROI scaffold",
-    accepted: true,
-  }));
-
-  if (hasChecklist) {
-    const existing = regions.find(r => r.name === "tickboxBlock");
-    if (!existing) {
-      regions.push({
-        name: "tickboxBlock",
-        page: 1,
-        bounds: { x: 0.05, y: 0.25, width: 0.9, height: 0.45 },
-        fields: ["complianceTickboxes"],
-        confidence: 0.7,
-        source: "selection-marks",
-        why: "Checklist columns Ok|Adv|Fail|N/A detected in layout",
-        accepted: true,
-      });
-    } else {
-      existing.confidence = 0.75;
-      existing.source = "selection-marks";
-      existing.why = "Checklist grid detected — tickbox ROI retained";
-    }
-  }
-
-  // Boost confidence when labels appear in OCR text
-  const joined = lines.join("\n").toLowerCase();
-  for (const region of regions) {
-    const needle = region.name.replace(/([A-Z])/g, " $1").toLowerCase();
-    if (
-      joined.includes(needle.trim()) ||
-      joined.includes(region.name.toLowerCase())
-    ) {
-      region.confidence = Math.min(0.95, region.confidence + 0.2);
-      region.why += "; label evidence in OCR";
-    }
-  }
-
-  return regions;
-}
-
 async function callGeminiPropose(input: {
   layoutText: string;
   rows: SelectionMarkRow[];
@@ -336,6 +281,8 @@ export async function proposeFromSample(input: {
   let layoutAvailable = false;
   let layoutError: string | undefined;
   let selectionMarkRows: SelectionMarkRow[] = [];
+  let layoutLines: import("../ocrAdapter/parseAzureDiResponse").AzureTextLine[] =
+    [];
   let lines: string[] = [];
 
   if (!sample) {
@@ -346,7 +293,8 @@ export async function proposeFromSample(input: {
       layoutError = layout.error || "Azure DI layout failed";
     } else {
       layoutAvailable = true;
-      lines = (layout.lines ?? []).map(l => l.content || "");
+      layoutLines = layout.lines ?? [];
+      lines = layoutLines.map(l => l.content || "");
       layoutText =
         layout.layoutText?.trim() || lines.filter(Boolean).join("\n");
       selectionMarkRows = mapSelectionMarksToRows(layout.selectionMarks ?? [], {
@@ -486,7 +434,12 @@ export async function proposeFromSample(input: {
     "compliance",
   ].filter((t, i, arr) => arr.indexOf(t) === i);
 
-  const roiRegions = suggestRoiFromLabels(lines, hasChecklistGrid);
+  const roiRegions = suggestRoiFromLayoutEvidence({
+    lines: layoutLines,
+    selectionRows: selectionMarkRows,
+    hasChecklist: hasChecklistGrid,
+    layoutAvailable,
+  });
 
   const acceptedFields = proposedFields
     .filter(f => f.accepted !== false)

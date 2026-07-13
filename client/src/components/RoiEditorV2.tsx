@@ -12,7 +12,7 @@
  * - ROI resize handles
  */
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, type CSSProperties } from 'react';
 import { PdfPreview } from './PdfPreview';
 import { ThresholdRulesPanel } from './ThresholdRulesPanel';
 import {
@@ -132,6 +132,12 @@ interface RoiEditorV2Props {
   onSpecJsonChange?: (next: string) => void;
   /** Canonical spec fields — draw palette binds ROI names to these ids */
   specFields?: Array<{ field: string; label: string; type?: string }>;
+  /** How current regions were produced — drives accuracy banners */
+  roiProvenance?: {
+    mode: "ocr-layout" | "starter-fallback" | "manual" | "unknown";
+    ocrPlacedCount?: number;
+    fallbackCount?: number;
+  };
 }
 
 const CUSTOM_COLOR_PALETTE = [
@@ -173,6 +179,118 @@ function fieldsForTool(tool: string): string[] {
   return [tool];
 }
 
+type ResizeHandle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+
+interface NormBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Accept 0–1 or legacy 0–100 percent coords. */
+function normalizeBoundValue(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  if (n > 1 && n <= 100) return n / 100;
+  return n;
+}
+
+function clampBounds(b: NormBounds): NormBounds {
+  let x = Math.max(0, Math.min(1, b.x));
+  let y = Math.max(0, Math.min(1, b.y));
+  let width = Math.max(0.008, Math.min(1, b.width));
+  let height = Math.max(0.008, Math.min(1, b.height));
+  if (x + width > 1) width = 1 - x;
+  if (y + height > 1) height = 1 - y;
+  return { x, y, width: Math.max(0.008, width), height: Math.max(0.008, height) };
+}
+
+function normalizeRegionBounds(bounds: NormBounds): NormBounds {
+  return clampBounds({
+    x: normalizeBoundValue(bounds.x),
+    y: normalizeBoundValue(bounds.y),
+    width: normalizeBoundValue(bounds.width),
+    height: normalizeBoundValue(bounds.height),
+  });
+}
+
+function applyResize(
+  start: NormBounds,
+  handle: ResizeHandle,
+  dx: number,
+  dy: number
+): NormBounds {
+  let { x, y, width, height } = start;
+  if (handle.includes("e")) width = width + dx;
+  if (handle.includes("w")) {
+    x = x + dx;
+    width = width - dx;
+  }
+  if (handle.includes("s")) height = height + dy;
+  if (handle.includes("n")) {
+    y = y + dy;
+    height = height - dy;
+  }
+  // Prevent inverted boxes while dragging
+  if (width < 0.008) {
+    if (handle.includes("w")) x = start.x + start.width - 0.008;
+    width = 0.008;
+  }
+  if (height < 0.008) {
+    if (handle.includes("n")) y = start.y + start.height - 0.008;
+    height = 0.008;
+  }
+  return clampBounds({ x, y, width, height });
+}
+
+const HANDLE_CURSOR: Record<ResizeHandle, string> = {
+  n: "ns-resize",
+  s: "ns-resize",
+  e: "ew-resize",
+  w: "ew-resize",
+  ne: "nesw-resize",
+  sw: "nesw-resize",
+  nw: "nwse-resize",
+  se: "nwse-resize",
+};
+
+const ALL_HANDLES: ResizeHandle[] = ["n", "s", "e", "w", "ne", "nw", "se", "sw"];
+
+function handleStyle(handle: ResizeHandle): CSSProperties {
+  const edge = 8;
+  const half = edge / 2;
+  const base: CSSProperties = {
+    position: "absolute",
+    width: edge,
+    height: edge,
+    backgroundColor: "#fff",
+    border: "2px solid #1e293b",
+    borderRadius: 2,
+    zIndex: 8,
+    boxSizing: "border-box",
+    pointerEvents: "auto",
+    cursor: HANDLE_CURSOR[handle],
+  };
+  switch (handle) {
+    case "n":
+      return { ...base, left: `calc(50% - ${half}px)`, top: -half, width: 14, marginLeft: -3 };
+    case "s":
+      return { ...base, left: `calc(50% - ${half}px)`, bottom: -half, width: 14, marginLeft: -3 };
+    case "e":
+      return { ...base, right: -half, top: `calc(50% - ${half}px)`, height: 14, marginTop: -3 };
+    case "w":
+      return { ...base, left: -half, top: `calc(50% - ${half}px)`, height: 14, marginTop: -3 };
+    case "ne":
+      return { ...base, right: -half, top: -half };
+    case "nw":
+      return { ...base, left: -half, top: -half };
+    case "se":
+      return { ...base, right: -half, bottom: -half };
+    case "sw":
+      return { ...base, left: -half, bottom: -half };
+  }
+}
+
 /**
  * ROI Editor V2 Component
  */
@@ -190,8 +308,15 @@ export function RoiEditorV2({
   specJsonText,
   onSpecJsonChange,
   specFields = [],
+  roiProvenance,
 }: RoiEditorV2Props) {
-  const [regions, setRegions] = useState<RoiRegion[]>(initialRoi?.regions ?? []);
+  const [regions, setRegions] = useState<RoiRegion[]>(() =>
+    (initialRoi?.regions ?? []).map(r => ({
+      ...r,
+      bounds: normalizeRegionBounds(r.bounds),
+      enabled: r.enabled ?? true,
+    }))
+  );
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
@@ -207,6 +332,17 @@ export function RoiEditorV2({
   const drawStartRef = useRef<{ x: number; y: number } | null>(null);
   const currentToolRef = useRef(currentTool);
   currentToolRef.current = currentTool;
+  /** Move / resize in progress (mutually exclusive with draw) */
+  const interactRef = useRef<
+    | null
+    | {
+        kind: "move" | "resize";
+        name: string;
+        handle?: ResizeHandle;
+        origin: { x: number; y: number };
+        startBounds: NormBounds;
+      }
+  >(null);
   const [localPdfData, setLocalPdfData] = useState<ArrayBuffer | null>(null);
   const [pdfFileName, setPdfFileName] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -555,14 +691,45 @@ export function RoiEditorV2({
     [readOnly, clientToNorm]
   );
 
-  // Document-level move/up so drawing still completes if cursor leaves the page
+  // Document-level move/up for draw + move/resize
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
+      const interact = interactRef.current;
+      if (interact) {
+        const pt = clientToNorm(e.clientX, e.clientY);
+        if (!pt) return;
+        const dx = pt.x - interact.origin.x;
+        const dy = pt.y - interact.origin.y;
+        const next =
+          interact.kind === "move"
+            ? clampBounds({
+                x: interact.startBounds.x + dx,
+                y: interact.startBounds.y + dy,
+                width: interact.startBounds.width,
+                height: interact.startBounds.height,
+              })
+            : applyResize(
+                interact.startBounds,
+                interact.handle ?? "se",
+                dx,
+                dy
+              );
+        setRegions(prev =>
+          prev.map(r =>
+            r.name === interact.name ? { ...r, bounds: next } : r
+          )
+        );
+        return;
+      }
       if (!isDrawingRef.current) return;
-      const pt = clientToNorm(e.clientX, e.clientY);
-      if (pt) setDrawCurrent(pt);
+      const drawPt = clientToNorm(e.clientX, e.clientY);
+      if (drawPt) setDrawCurrent(drawPt);
     };
     const onUp = (e: MouseEvent) => {
+      if (interactRef.current) {
+        interactRef.current = null;
+        return;
+      }
       if (!isDrawingRef.current) return;
       finishDraw(e.clientX, e.clientY);
     };
@@ -573,6 +740,44 @@ export function RoiEditorV2({
       window.removeEventListener("mouseup", onUp);
     };
   }, [clientToNorm, finishDraw]);
+
+  const beginMoveRegion = (
+    name: string,
+    bounds: NormBounds,
+    clientX: number,
+    clientY: number
+  ) => {
+    if (readOnly) return;
+    const origin = clientToNorm(clientX, clientY);
+    if (!origin) return;
+    interactRef.current = {
+      kind: "move",
+      name,
+      origin,
+      startBounds: { ...bounds },
+    };
+    setSelectedRegion(name);
+  };
+
+  const beginResizeRegion = (
+    name: string,
+    bounds: NormBounds,
+    handle: ResizeHandle,
+    clientX: number,
+    clientY: number
+  ) => {
+    if (readOnly) return;
+    const origin = clientToNorm(clientX, clientY);
+    if (!origin) return;
+    interactRef.current = {
+      kind: "resize",
+      name,
+      handle,
+      origin,
+      startBounds: { ...bounds },
+    };
+    setSelectedRegion(name);
+  };
 
   /**
    * Delete a region
@@ -594,13 +799,25 @@ export function RoiEditorV2({
   };
 
   /**
-   * Apply template
+   * Apply rough starter layout — NEVER form-accurate; author must place on real fields.
    */
   const applyTemplate = (templateType: string) => {
     const template = ROI_TEMPLATES[templateType];
-    if (template) {
-      setRegions(template.regions.map(r => ({ ...r, enabled: true })));
-    }
+    if (!template) return;
+    const ok = window.confirm(
+      `“${templateType}” places ROUGH starter boxes only — they are NOT aligned to this PDF.\n\n` +
+        `You must drag and resize every box onto the real printed field (label + value) before Save ROI.\n\n` +
+        `Continue and replace current regions?`
+    );
+    if (!ok) return;
+    setRegions(
+      template.regions.map(r => ({
+        ...r,
+        bounds: normalizeRegionBounds(r.bounds),
+        enabled: true,
+        fields: r.fields ?? fieldsForTool(r.name),
+      }))
+    );
   };
 
   /**
@@ -764,13 +981,16 @@ export function RoiEditorV2({
         flexWrap: 'wrap',
         alignItems: 'center',
       }}>
-        <span style={{ fontSize: '12px', color: '#6b7280' }}>Templates:</span>
+        <span style={{ fontSize: '12px', color: '#6b7280' }}>
+          Rough starters (not form-accurate):
+        </span>
         {Object.keys(ROI_TEMPLATES).map(type => (
           <button
             key={type}
             type="button"
             onClick={() => applyTemplate(type)}
             disabled={readOnly}
+            title="Places approximate boxes only — you must move each onto the real printed field"
             style={{
               padding: '4px 10px',
               backgroundColor: '#f1f5f9',
@@ -1202,6 +1422,83 @@ export function RoiEditorV2({
             </button>
           )}
 
+            {/* Accuracy coaching — announce OCR vs generic repeatedly */}
+            {regions.length > 0 && (
+              <div
+                data-testid="roi-accuracy-banner"
+                style={{
+                  marginBottom: 8,
+                  padding: "10px 12px",
+                  backgroundColor:
+                    roiProvenance?.mode === "ocr-layout"
+                      ? "#ECFDF5"
+                      : "#FEF3C7",
+                  border:
+                    roiProvenance?.mode === "ocr-layout"
+                      ? "2px solid #10B981"
+                      : "2px solid #F59E0B",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  color:
+                    roiProvenance?.mode === "ocr-layout"
+                      ? "#064E3B"
+                      : "#78350F",
+                  lineHeight: 1.45,
+                  fontWeight: 500,
+                }}
+              >
+                {roiProvenance?.mode === "ocr-layout" ? (
+                  <>
+                    <strong>OCR-placed regions (evidence-based).</strong> Boxes
+                    were proposed from Azure DI layout geometry on this sample —
+                    still verify each one sits on the printed label + value.
+                    Select → drag to move → hover edge/corner to resize.
+                  </>
+                ) : roiProvenance?.mode === "starter-fallback" ? (
+                  <>
+                    <strong>
+                      GENERIC STARTER ONLY — not form-accurate. Do not trust these
+                      boxes.
+                    </strong>{" "}
+                    OCR layout was unavailable, so positions are a scaffold.
+                    Run <em>Suggest fields</em> with a sample PDF for OCR-placed
+                    regions, or draw/resize every box onto the real printed field
+                    before Save ROI.
+                  </>
+                ) : (
+                  <>
+                    <strong>Placement must match the printed field.</strong>{" "}
+                    Prefer OCR propose (Suggest fields) over rough starters.
+                    Select a box, drag to move, hover an edge/corner to resize.
+                    Job Reference must sit on Job ID (label + value) — not
+                    Completion Details. Rough starters are guesses only.
+                  </>
+                )}
+              </div>
+            )}
+            {(roiProvenance?.mode === "starter-fallback" ||
+              !roiProvenance ||
+              roiProvenance.mode === "unknown") && (
+              <div
+                data-testid="roi-accuracy-banner-repeat"
+                style={{
+                  marginBottom: 8,
+                  padding: "8px 10px",
+                  backgroundColor: "#FEE2E2",
+                  border: "1px solid #EF4444",
+                  borderRadius: 8,
+                  fontSize: 11,
+                  color: "#7F1D1D",
+                  lineHeight: 1.4,
+                }}
+              >
+                Reminder: generic Maintenance / Inspection / Installation layouts
+                are <strong>not</strong> a detailed review of this PDF. Only
+                OCR-informed propose (or careful manual draw) produces a usable
+                template.
+              </div>
+            )}
+
           {/* Shared scrollport: PDF + ROI labels must move together */}
           <div
             style={{
@@ -1232,7 +1529,7 @@ export function RoiEditorV2({
               position: 'relative',
               cursor: readOnly ? 'default' : isDrawing ? 'crosshair' : 'crosshair',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              overflow: 'hidden',
+              overflow: 'visible',
               margin: '0 auto',
               flexShrink: 0,
               transition: 'border-color 0.2s',
@@ -1347,17 +1644,30 @@ export function RoiEditorV2({
               />
             )}
 
-            {/* Rendered regions */}
-            {regions.filter(r => r.enabled !== false).map(region => (
+            {/* Rendered regions — click to select, drag to move, edges to resize */}
+            {regions.filter(r => r.enabled !== false).map(region => {
+              const selected = selectedRegion === region.name;
+              const color = getRegionColor(region.name);
+              return (
               <div
                 key={region.name}
+                data-testid={`roi-region-${region.name}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedRegion(region.name);
+                  setCurrentTool(region.name);
                 }}
                 onMouseDown={(e) => {
                   // Don't start a new draw when clicking an existing region
                   e.stopPropagation();
+                  if (e.button !== 0 || readOnly) return;
+                  e.preventDefault();
+                  beginMoveRegion(
+                    region.name,
+                    region.bounds,
+                    e.clientX,
+                    e.clientY
+                  );
                 }}
                 style={{
                   position: 'absolute',
@@ -1365,15 +1675,20 @@ export function RoiEditorV2({
                   top: `${region.bounds.y * 100}%`,
                   width: `${region.bounds.width * 100}%`,
                   height: `${region.bounds.height * 100}%`,
-                  backgroundColor: `${getRegionColor(region.name)}30`,
-                  border: `2px solid ${getRegionColor(region.name)}`,
+                  backgroundColor: `${color}30`,
+                  border: `2px solid ${color}`,
                   borderRadius: '4px',
-                  cursor: 'pointer',
+                  cursor: readOnly ? 'default' : 'move',
                   boxSizing: 'border-box',
-                  outline: selectedRegion === region.name ? `3px solid ${getRegionColor(region.name)}` : 'none',
+                  outline: selected ? `3px solid ${color}` : 'none',
                   outlineOffset: '2px',
-                  zIndex: selectedRegion === region.name ? 5 : 4,
+                  zIndex: selected ? 5 : 4,
                 }}
+                title={
+                  readOnly
+                    ? regionLabel(region.name)
+                    : "Drag to move · hover edges/corners to resize"
+                }
               >
                 <span style={{
                   position: 'absolute',
@@ -1381,7 +1696,7 @@ export function RoiEditorV2({
                   left: '2px',
                   fontSize: '10px',
                   fontWeight: 600,
-                  color: getRegionColor(region.name),
+                  color,
                   backgroundColor: 'white',
                   padding: '1px 4px',
                   borderRadius: '3px',
@@ -1398,8 +1713,29 @@ export function RoiEditorV2({
                   )}
                   {regionLabel(region.name)}
                 </span>
+                {selected && !readOnly &&
+                  ALL_HANDLES.map(handle => (
+                    <div
+                      key={handle}
+                      data-testid={`roi-resize-${region.name}-${handle}`}
+                      style={handleStyle(handle)}
+                      onMouseDown={e => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        if (e.button !== 0) return;
+                        beginResizeRegion(
+                          region.name,
+                          region.bounds,
+                          handle,
+                          e.clientX,
+                          e.clientY
+                        );
+                      }}
+                    />
+                  ))}
               </div>
-            ))}
+              );
+            })}
           </div>
           </div>
         </div>

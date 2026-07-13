@@ -99,6 +99,11 @@ export default function TemplateStudio() {
     source: string;
     fieldCount: number;
     rejectedFieldIds?: string[];
+    roiProvenance?: {
+      mode: "ocr-layout" | "starter-fallback" | "manual" | "unknown";
+      ocrPlacedCount: number;
+      fallbackCount: number;
+    };
   } | null>(null);
   const [quickStarting, setQuickStarting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -230,6 +235,7 @@ export default function TemplateStudio() {
       proposedSpec: { fields: Array<{ field: string }> };
       fields?: Array<{ confidence: number; field: { field: string } }>;
       selectionTokens?: { confidence: number };
+      roiRegions?: Array<{ source: string }>;
     };
     sampleUrl: string;
   }) => {
@@ -243,6 +249,11 @@ export default function TemplateStudio() {
       fieldConfs.length > 0
         ? fieldConfs.reduce((a, b) => a + b, 0) / fieldConfs.length
         : (result.proposal.selectionTokens?.confidence ?? 0.5);
+    const rois = result.proposal.roiRegions ?? [];
+    const ocrPlacedCount = rois.filter(r => r.source === "ocr-layout").length;
+    const fallbackCount = rois.filter(
+      r => r.source === "starter-roi-fallback"
+    ).length;
     setProposalPreview({
       confidence,
       source: result.proposal.geminiUsed
@@ -251,6 +262,18 @@ export default function TemplateStudio() {
           ? "OCR heuristics"
           : "Starter scaffold",
       fieldCount: result.proposal.proposedSpec.fields.length,
+      roiProvenance: {
+        mode:
+          ocrPlacedCount > 0
+            ? "ocr-layout"
+            : fallbackCount > 0
+              ? "starter-fallback"
+              : result.proposal.layoutAvailable
+                ? "unknown"
+                : "starter-fallback",
+        ocrPlacedCount,
+        fallbackCount,
+      },
     });
     setStep("propose");
   };
@@ -407,14 +430,41 @@ export default function TemplateStudio() {
             ? "OCR heuristics"
             : "Starter scaffold (no sample OCR)",
         fieldCount: result.proposal.proposedSpec.fields.length,
+        roiProvenance: (() => {
+          const rois = result.proposal.roiRegions ?? [];
+          const ocrPlacedCount = rois.filter(r => r.source === "ocr-layout")
+            .length;
+          const fallbackCount = rois.filter(
+            r => r.source === "starter-roi-fallback"
+          ).length;
+          return {
+            mode:
+              ocrPlacedCount > 0
+                ? ("ocr-layout" as const)
+                : fallbackCount > 0
+                  ? ("starter-fallback" as const)
+                  : ("unknown" as const),
+            ocrPlacedCount,
+            fallbackCount,
+          };
+        })(),
       });
       showSuccessToast(
         applyAccepted ? "Accepted fields saved to draft" : "Field preview ready",
-        result.proposal.geminiUsed
-          ? "Gemini + OCR"
-          : result.proposal.layoutAvailable
-            ? "OCR heuristics"
-            : "Starter scaffold (no sample OCR)"
+        (() => {
+          const rois = result.proposal.roiRegions ?? [];
+          const ocrN = rois.filter(r => r.source === "ocr-layout").length;
+          const base = result.proposal.geminiUsed
+            ? "Gemini + OCR"
+            : result.proposal.layoutAvailable
+              ? "OCR heuristics"
+              : "Starter scaffold (no sample OCR)";
+          if (ocrN > 0) return `${base} · ${ocrN} OCR-placed ROI boxes`;
+          if (!result.proposal.layoutAvailable) {
+            return `${base} · ROI is GENERIC ONLY — place manually`;
+          }
+          return base;
+        })()
       );
       return result.proposal;
     } catch (err) {
@@ -1099,13 +1149,37 @@ export default function TemplateStudio() {
             <CardHeader>
               <CardTitle>ROI editor</CardTitle>
               <CardDescription>
-                ROI = Region of Interest. Draw boxes on the sample; select a
-                region to set value thresholds (e.g. Wheel Nut Torque 100–130
-                NM). Those rules run on live audits when the template is
-                activated. Save writes geometry + rules to the draft version.
+                ROI = Region of Interest. Boxes must come from OCR layout on
+                this sample (Suggest fields), not from generic Maintenance /
+                Inspection / Installation guesses. Verify every box sits on the
+                printed label + value, then Save.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {(proposalPreview?.roiProvenance?.mode === "starter-fallback" ||
+                proposalPreview?.roiProvenance?.mode === "unknown" ||
+                !proposalPreview?.roiProvenance) && (
+                <div
+                  className="rounded-md border-2 border-amber-500 bg-amber-50 px-3 py-2 text-xs text-amber-950"
+                  data-testid="studio-roi-generic-warning"
+                >
+                  <strong>Generic ROI is not a template review.</strong> Run
+                  Suggest fields with the sample attached so regions are placed
+                  from OCR geometry. Rough starters delay accurate authoring —
+                  treat them as last resort only.
+                </div>
+              )}
+              {proposalPreview?.roiProvenance?.mode === "ocr-layout" && (
+                <div
+                  className="rounded-md border-2 border-emerald-500 bg-emerald-50 px-3 py-2 text-xs text-emerald-950"
+                  data-testid="studio-roi-ocr-banner"
+                >
+                  <strong>OCR-placed regions loaded.</strong>{" "}
+                  {proposalPreview.roiProvenance.ocrPlacedCount} boxes from
+                  layout evidence — still drag/resize any that miss the printed
+                  field.
+                </div>
+              )}
               <TemplateAuthoringGuide compact />
               <RoiEditorV2
                 initialRoi={roiDraft ?? version?.roiJson ?? undefined}
@@ -1113,6 +1187,7 @@ export default function TemplateStudio() {
                 onChange={handleRoiChange}
                 specJsonText={specJsonText}
                 onSpecJsonChange={setSpecJsonText}
+                roiProvenance={proposalPreview?.roiProvenance}
                 specFields={(() => {
                   try {
                     const parsed = JSON.parse(specJsonText || "{}") as {
