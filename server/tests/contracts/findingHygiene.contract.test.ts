@@ -13,6 +13,9 @@ import {
   hasVorBannerEvidence,
   hasOnlyInformationalFindings,
   injectPresentFieldFindings,
+  extractMakeModelFromText,
+  sanitizeMakeModelValue,
+  MAX_MAKE_MODEL_LENGTH,
 } from "../../services/findingHygiene";
 import type { Finding } from "../../services/analyzer";
 import {
@@ -225,10 +228,46 @@ Technician Signature
       injected.find(f => f.fieldName === "assetId")?.normalisedSnippet
     ).toBe("BN21ACO_TL");
     expect(injected.some(f => f.fieldName === "makeModel")).toBe(true);
+    expect(
+      injected.find(f => f.fieldName === "makeModel")?.normalisedSnippet
+    ).toBe("TAILLIFT");
     expect(injected.some(f => f.fieldName === "mileageHours")).toBe(true);
     expect(
       injected.find(f => f.fieldName === "mileageHours")?.normalisedSnippet
     ).toBe("74685");
+  });
+
+  it("truncates flat OCR makeModel before Customer and other job-summary fields", () => {
+    const flatOcr =
+      "Make/Model: TOWMATE TRAILERS FLATBED TRAILER Customer: Openreach Site Address / Contact: Ipswich Telephone Exchange Miles/Hours: 0 Serial No: null Completion Details Date: 02/07/2026 Job ID : 87";
+    expect(extractMakeModelFromText(flatOcr)).toBe(
+      "TOWMATE TRAILERS FLATBED TRAILER"
+    );
+    expect(
+      sanitizeMakeModelValue(
+        "TOWMATE TRAILERS FLATBED TRAILER Customer: Openreach Site Address"
+      )
+    ).toBe("TOWMATE TRAILERS FLATBED TRAILER");
+    const injected = injectPresentFieldFindings([], flatOcr);
+    expect(
+      injected.find(f => f.fieldName === "makeModel")?.normalisedSnippet
+    ).toBe("TOWMATE TRAILERS FLATBED TRAILER");
+  });
+
+  it("sanitizes bloated preExtracted makeModel from failed ensemble bleed", () => {
+    const bloated =
+      "Make/Model: TOWMATE TRAILERS FLATBED TRAILER Customer: Openreach Miles/Hours: 0";
+    const injected = injectPresentFieldFindings([], "", {
+      makeModel: { value: bloated, confidence: 75, pageNumber: 1 },
+    });
+    expect(
+      injected.find(f => f.fieldName === "makeModel")?.normalisedSnippet
+    ).toBe("TOWMATE TRAILERS FLATBED TRAILER");
+  });
+
+  it("rejects makeModel values that exceed max length after boundary trim", () => {
+    const tooLong = `${"A".repeat(MAX_MAKE_MODEL_LENGTH + 5)} Customer: X`;
+    expect(sanitizeMakeModelValue(tooLong)).toBeUndefined();
   });
 
   it("applyFindingHygiene injects Present fields from documentText", () => {

@@ -21,6 +21,7 @@ import {
   scrubLetterheadFromSnippets,
   stripLetterheadNoise,
 } from "../letterheadNoise";
+import { sanitizeMakeModelValue } from "../findingHygiene";
 
 export const ENGINE_VERSION = advancedExtraction.ENGINE_VERSION;
 
@@ -146,10 +147,18 @@ function mapFieldDetails(
     };
 
     if (goldField) {
-      fieldDetails[goldField] = artifact;
-      if (detail.value) {
+      const mappedValue =
+        goldField === "makeModel"
+          ? sanitizeMakeModelValue(detail.value ?? undefined)
+          : detail.value;
+      const mappedArtifact: EnsembleFieldArtifact = {
+        ...artifact,
+        value: mappedValue ?? null,
+      };
+      fieldDetails[goldField] = mappedArtifact;
+      if (mappedValue) {
         ensembleExtractedFields[goldField] = {
-          value: detail.value,
+          value: mappedValue,
           confidence: detail.confidence,
           pageNumber: 1,
         };
@@ -165,6 +174,9 @@ function mapFieldDetails(
         lowConfidenceMapped.push(goldField);
       }
       if (detail.required && !detail.value) {
+        missingRequiredMapped.push(goldField);
+      }
+      if (goldField === "makeModel" && detail.value && !mappedValue) {
         missingRequiredMapped.push(goldField);
       }
     } else {

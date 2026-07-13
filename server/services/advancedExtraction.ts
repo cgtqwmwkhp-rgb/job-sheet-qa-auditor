@@ -144,9 +144,9 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     required: true,
     severity: "S1",
     regexPatterns: [
-      /Make[/\s]*Model[:\s]*([^\n]+?)(?=\n|Serial|$)/i,
-      /Make[:\s]*([^\n]+?)(?=\n|Model|$)/i,
-      /Equipment[:\s]*([^\n]+?)(?=\n|Serial|$)/i,
+      /Make[/\s]*Model[:\s]*([^\n]+?)(?=\n|Serial|Customer|Site\s+Address|Miles|Completion|Job\s*ID|$)/i,
+      /Make[:\s]*([^\n]+?)(?=\n|Model|Serial|Customer|$)/i,
+      /Equipment[:\s]*([^\n]+?)(?=\n|Serial|Customer|$)/i,
     ],
     fuzzyLabels: [
       "Make/Model",

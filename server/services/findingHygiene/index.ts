@@ -328,6 +328,90 @@ function buildPresentVorFinding(): Finding {
   };
 }
 
+/** Max plausible make/model length — longer values are field-bleed from flat OCR. */
+export const MAX_MAKE_MODEL_LENGTH = 80;
+
+/** Min length after sanitization (reject label fragments). */
+export const MIN_MAKE_MODEL_LENGTH = 2;
+
+/**
+ * Job-summary labels that commonly follow Make/Model on a single flattened OCR line.
+ * Used to truncate captures before the next field (fail-soft ensemble fallback).
+ */
+const MAKE_MODEL_BOUNDARY_LABELS =
+  "Customer|Serial(?:\\s*(?:No|Number|#))?|Site(?:\\s+Address)?(?:\\s*/\\s*Contact)?|Miles(?:\\s*/\\s*Hours)?|(?:Asset\\s*)?(?:Mileage|Hours)(?:\\s*/\\s*(?:Hours|Mileage))?|Completion(?:\\s+Details)?|Job\\s*(?:ID|No)|Compliance(?:\\s+Type|\\s+Title)?|Technician|Engineer|Registration|Reg(?:istration)?(?:\\s+No)?|VIN|S\\/N|Asset\\s*(?:No|Number|#)|Next\\s+Service|Safe\\s+(?:to\\s+)?Use|All\\s+Works|Return\\s+Visit|Completed\\?|Asset\\s+Safe";
+
+const MAKE_MODEL_INLINE_BOUNDARY_RE = new RegExp(
+  `\\s+(?=(?:${MAKE_MODEL_BOUNDARY_LABELS})\\b\\s*[:.?])`,
+  "i"
+);
+
+const MAKE_MODEL_FIELD_LABEL_IN_VALUE_RE = new RegExp(
+  `\\b(?:${MAKE_MODEL_BOUNDARY_LABELS})\\b\\s*[:.]`,
+  "i"
+);
+
+const MAKE_MODEL_EMPTY_RE = /^(null|n\/a|none|nil|-|—|–|\.)$/i;
+
+/**
+ * Truncate make/model values that include subsequent job-summary fields (flat OCR bleed).
+ */
+export function sanitizeMakeModelValue(
+  raw: string | undefined | null
+): string | undefined {
+  if (!raw) return undefined;
+
+  let value = raw.trim().replace(/^Make\s*[/&]?\s*Model\s*[:.]?\s*/i, "").trim();
+  if (!value) return undefined;
+
+  const inlineBoundary = value.search(MAKE_MODEL_INLINE_BOUNDARY_RE);
+  if (inlineBoundary > 0) {
+    value = value.slice(0, inlineBoundary).trim();
+  } else if (MAKE_MODEL_FIELD_LABEL_IN_VALUE_RE.test(value)) {
+    const labelMatch = value.match(MAKE_MODEL_FIELD_LABEL_IN_VALUE_RE);
+    if (labelMatch?.index != null && labelMatch.index > 0) {
+      value = value.slice(0, labelMatch.index).trim();
+    }
+  }
+
+  // First line only when OCR still has hard breaks inside the captured span.
+  const firstLine = value.split(/[\r\n]+/)[0]?.trim();
+  value = firstLine || value;
+
+  value = value.replace(/\s{2,}/g, " ").trim();
+  if (
+    !value ||
+    value.length < MIN_MAKE_MODEL_LENGTH ||
+    value.length > MAX_MAKE_MODEL_LENGTH ||
+    MAKE_MODEL_EMPTY_RE.test(value)
+  ) {
+    return undefined;
+  }
+
+  return value;
+}
+
+/**
+ * Extract make/model from document text with field-boundary guards (ensemble fail-soft path).
+ */
+export function extractMakeModelFromText(text: string): string | undefined {
+  const patterns = [
+    /Make\s*[/&]?\s*Model\s*[:.]?\s*(.+)/i,
+    /Make\s*[:.]?\s*(.+?)(?=\s+Model\s*[:.])/i,
+    /Equipment\s*[:.]?\s*(.+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      const sanitized = sanitizeMakeModelValue(match[1]);
+      if (sanitized) return sanitized;
+    }
+  }
+
+  return undefined;
+}
+
 function buildPresentFieldFinding(
   fieldName: string,
   label: string,
@@ -401,8 +485,9 @@ export function injectPresentFieldFindings(
     );
   }
 
-  const makeMatch = text.match(/Make\s*[/&]?\s*Model\s*[:.]?\s*([^\n\r]+)/i);
-  const makeValue = preExtracted.makeModel?.value || makeMatch?.[1]?.trim();
+  const makeValue =
+    sanitizeMakeModelValue(preExtracted.makeModel?.value) ??
+    extractMakeModelFromText(text);
   if (makeValue && !hasField("makeModel")) {
     out.push(
       buildPresentFieldFinding(
