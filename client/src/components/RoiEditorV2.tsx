@@ -14,6 +14,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { PdfPreview } from './PdfPreview';
+import { ThresholdRulesPanel } from './ThresholdRulesPanel';
 
 /**
  * ROI Region type
@@ -112,6 +113,10 @@ interface RoiEditorV2Props {
   documentType?: 'maintenance' | 'inspection' | 'installation';
   /** Show PDF preview panel */
   showPdfPreview?: boolean;
+  /** Live specJson text — used to attach threshold rules to regions */
+  specJsonText?: string;
+  /** Persist threshold / field updates into Studio draft */
+  onSpecJsonChange?: (next: string) => void;
 }
 
 const CUSTOM_COLOR_PALETTE = [
@@ -147,6 +152,8 @@ export function RoiEditorV2({
   readOnly = false,
   documentType,
   showPdfPreview = true,
+  specJsonText,
+  onSpecJsonChange,
 }: RoiEditorV2Props) {
   const [regions, setRegions] = useState<RoiRegion[]>(initialRoi?.regions ?? []);
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
@@ -1180,6 +1187,22 @@ export function RoiEditorV2({
                   </li>
                 ))}
               </ul>
+            )}
+
+            {/* Threshold rules for selected ROI — live audit integration via specJson */}
+            {!readOnly &&
+              selectedRegion &&
+              specJsonText != null &&
+              onSpecJsonChange && (
+              <div style={{ marginTop: 16 }} data-testid="roi-region-threshold">
+                <ThresholdRulesPanel
+                  compact
+                  specJsonText={specJsonText}
+                  onSpecJsonChange={onSpecJsonChange}
+                  defaultField={selectedRegion}
+                  extraFields={regions.map(r => r.name)}
+                />
+              </div>
             )}
 
             {/* Actions */}

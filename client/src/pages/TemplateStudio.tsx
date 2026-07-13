@@ -6,6 +6,7 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { RoiEditorV2 } from "@/components/RoiEditorV2";
 import { ConditionalRulesPanel } from "@/components/ConditionalRulesPanel";
+import { ThresholdRulesPanel } from "@/components/ThresholdRulesPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -451,6 +452,24 @@ export default function TemplateStudio() {
     if (!versionId || !roiDraft) return;
     try {
       await updateRoi.mutateAsync({ versionId, roiJson: roiDraft });
+      // Persist threshold rules authored on the ROI step into the same draft
+      if (specJsonText.trim()) {
+        try {
+          const specJson = JSON.parse(specJsonText);
+          const selectionConfigJson = selectionJsonText.trim()
+            ? JSON.parse(selectionJsonText)
+            : undefined;
+          await saveDraft.mutateAsync({
+            versionId,
+            specJson,
+            selectionConfigJson,
+            roiJson: roiDraft,
+            changeNotes: "Studio ROI + threshold rules save",
+          });
+        } catch {
+          // ROI geometry still saved; fields step can fix invalid JSON
+        }
+      }
       showSuccessToast("ROI saved", `${roiDraft.regions.length} regions`);
     } catch (err) {
       showErrorToast(
@@ -1028,9 +1047,10 @@ export default function TemplateStudio() {
             <CardHeader>
               <CardTitle>ROI editor</CardTitle>
               <CardDescription>
-                ROI = Region of Interest. Draw boxes on the sample; the floating
-                labels panel stays visible while you scroll. Save writes to the
-                live registry version.
+                ROI = Region of Interest. Draw boxes on the sample; select a
+                region to set value thresholds (e.g. Wheel Nut Torque 100–130
+                NM). Those rules run on live audits when the template is
+                activated. Save writes geometry + rules to the draft version.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1038,6 +1058,8 @@ export default function TemplateStudio() {
                 initialRoi={roiDraft ?? version?.roiJson ?? undefined}
                 pdfUrl={sampleUrl ?? undefined}
                 onChange={handleRoiChange}
+                specJsonText={specJsonText}
+                onSpecJsonChange={setSpecJsonText}
                 onSave={roi => {
                   setRoiDraft(roi);
                   void (async () => {
@@ -1046,6 +1068,19 @@ export default function TemplateStudio() {
                         versionId,
                         roiJson: roi,
                       });
+                      if (specJsonText.trim()) {
+                        try {
+                          const specJson = JSON.parse(specJsonText);
+                          await saveDraft.mutateAsync({
+                            versionId,
+                            specJson,
+                            roiJson: roi,
+                            changeNotes: "Studio ROI + threshold rules save",
+                          });
+                        } catch {
+                          /* geometry saved */
+                        }
+                      }
                       showSuccessToast(
                         "ROI saved",
                         `${roi.regions.length} regions`
@@ -1102,6 +1137,13 @@ export default function TemplateStudio() {
               <ConditionalRulesPanel
                 specJsonText={specJsonText}
                 onSpecJsonChange={setSpecJsonText}
+              />
+              <ThresholdRulesPanel
+                specJsonText={specJsonText}
+                onSpecJsonChange={setSpecJsonText}
+                extraFields={
+                  (roiDraft?.regions ?? []).map(r => r.name) as string[]
+                }
               />
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="space-y-2">

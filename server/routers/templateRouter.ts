@@ -91,7 +91,14 @@ const ruleSpecSchema = z.object({
   field: z.string(),
   description: z.string(),
   severity: z.enum(["critical", "major", "minor", "info"]),
-  type: z.enum(["required", "format", "range", "pattern", "custom"]),
+  type: z.enum([
+    "required",
+    "format",
+    "range",
+    "pattern",
+    "custom",
+    "implies",
+  ]),
   pattern: z.string().optional(),
   range: z
     .object({
@@ -99,8 +106,16 @@ const ruleSpecSchema = z.object({
       max: z.union([z.number(), z.string()]).optional(),
     })
     .optional(),
+  boundsMode: z
+    .enum(["between", "under", "at_least", "over"])
+    .optional(),
+  unit: z.string().optional(),
   enabled: z.boolean(),
   tags: z.array(z.string()).optional(),
+  whenField: z.string().optional(),
+  whenValue: z.string().optional(),
+  thenField: z.string().optional(),
+  thenValue: z.string().optional(),
 });
 
 const specJsonSchema = z.object({

@@ -70,6 +70,10 @@ import {
   type FailurePathSignals,
 } from "./jobSummaryConsistency";
 import { evaluateImpliesRules } from "./impliesRules";
+import {
+  enrichFieldMapFromRangeRules,
+  evaluateRangeRules,
+} from "./rangeRules";
 import type { RuleSpec } from "./templateRegistry/types";
 import {
   evaluateWastedJourneyConsistency,
@@ -1956,36 +1960,51 @@ async function processJobSheetWithOptions(
         });
       }
 
-      // Studio-authored if/then (implies) rules — VOR-style consistency
-      const impliesSpec = usedTemplateVersionId
+      // Studio-authored template rules (implies + numeric thresholds)
+      const templateSpec = usedTemplateVersionId
         ? getTemplateVersion(usedTemplateVersionId)?.specJson
         : null;
-      const impliesFieldMap: Record<string, unknown> = {};
+      const templateRules = (templateSpec?.rules ?? []) as RuleSpec[];
+      let templateFieldMap: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(
         ensembleResult?.ensembleExtractedFields ?? {}
       )) {
-        impliesFieldMap[k] = v.value;
+        templateFieldMap[k] = v.value;
       }
       for (const [k, v] of Object.entries(
         selectionMarksResult?.preExtractedFields ?? {}
       )) {
-        if (impliesFieldMap[k] == null) impliesFieldMap[k] = v.value;
+        if (templateFieldMap[k] == null) templateFieldMap[k] = v.value;
       }
-      if (consistency.signals.vor) impliesFieldMap.vorStatus = "Present";
-      if (consistency.signals.unsafe) impliesFieldMap.safeToUse = "No";
-      else if (consistency.signals.safeYes) impliesFieldMap.safeToUse = "Yes";
+      for (const [k, v] of Object.entries(
+        analysisResult.extractedFields ?? {}
+      )) {
+        if (templateFieldMap[k] == null && v?.value != null) {
+          templateFieldMap[k] = v.value;
+        }
+      }
+      if (consistency.signals.vor) templateFieldMap.vorStatus = "Present";
+      if (consistency.signals.unsafe) templateFieldMap.safeToUse = "No";
+      else if (consistency.signals.safeYes) templateFieldMap.safeToUse = "Yes";
       if (consistency.signals.incomplete)
-        impliesFieldMap.allWorksCompleted = "No";
+        templateFieldMap.allWorksCompleted = "No";
       else if (consistency.signals.worksCompleteYes)
-        impliesFieldMap.allWorksCompleted = "Yes";
+        templateFieldMap.allWorksCompleted = "Yes";
       if (consistency.signals.returnVisit)
-        impliesFieldMap.returnVisitNeeded = "Yes";
+        templateFieldMap.returnVisitNeeded = "Yes";
       else if (consistency.signals.returnVisitNo)
-        impliesFieldMap.returnVisitNeeded = "No";
+        templateFieldMap.returnVisitNeeded = "No";
+
+      templateFieldMap = enrichFieldMapFromRangeRules(
+        templateFieldMap,
+        templateRules,
+        extractedText,
+        templateSpec?.fields
+      );
 
       const impliesFindings = evaluateImpliesRules(
-        (impliesSpec?.rules ?? []) as RuleSpec[],
-        impliesFieldMap
+        templateRules,
+        templateFieldMap
       );
       if (impliesFindings.length > 0) {
         analysisResult = {
@@ -1995,6 +2014,20 @@ async function processJobSheetWithOptions(
         };
         recordStage({
           stage: "Implies Consistency",
+          status: "success",
+          durationMs: 0,
+        });
+      }
+
+      const rangeFindings = evaluateRangeRules(templateRules, templateFieldMap);
+      if (rangeFindings.length > 0) {
+        analysisResult = {
+          ...analysisResult,
+          findings: [...analysisResult.findings, ...rangeFindings],
+          summary: `${analysisResult.summary} [RANGE] ${rangeFindings.length} threshold rule(s)`,
+        };
+        recordStage({
+          stage: "Range / Threshold Rules",
           status: "success",
           durationMs: 0,
         });
@@ -2631,14 +2664,46 @@ function convertSpecJsonToGoldSpec(specJson: any): GoldSpec {
   return {
     name: specJson.name || "Template Spec",
     version: specJson.version || "1.0.0",
-    rules: (specJson.rules || []).map((rule: any) => ({
-      id: rule.ruleId,
-      field: rule.field,
-      type: rule.type === "required" ? "presence" : rule.type,
-      required: rule.type === "required",
-      description: rule.description || "",
-      pattern: rule.pattern,
-      format: rule.pattern,
-    })),
+    rules: (specJson.rules || []).map((rule: any) => {
+      const min =
+        rule.range?.min !== undefined && rule.range?.min !== ""
+          ? Number(rule.range.min)
+          : undefined;
+      const max =
+        rule.range?.max !== undefined && rule.range?.max !== ""
+          ? Number(rule.range.max)
+          : undefined;
+      const unitSuffix = rule.unit ? ` (${rule.unit})` : "";
+      const boundsNote =
+        rule.type === "range"
+          ? ` Threshold${unitSuffix}: ${
+              rule.boundsMode === "under"
+                ? `≤ ${max}`
+                : rule.boundsMode === "at_least"
+                  ? `≥ ${min}`
+                  : rule.boundsMode === "over"
+                    ? `> ${min}`
+                    : `${min ?? "…"}–${max ?? "…"}`
+            }.`
+          : "";
+      return {
+        id: rule.ruleId,
+        field: rule.field,
+        type:
+          rule.type === "required"
+            ? "presence"
+            : rule.type === "range"
+              ? "range"
+              : rule.type === "pattern"
+                ? "regex"
+                : "format",
+        required: rule.type === "required",
+        description: `${rule.description || ""}${boundsNote}`.trim(),
+        pattern: rule.pattern,
+        format: rule.pattern,
+        minValue: Number.isFinite(min) ? min : undefined,
+        maxValue: Number.isFinite(max) ? max : undefined,
+      };
+    }),
   };
 }

@@ -83,6 +83,17 @@ export interface RuleSpec {
   pattern?: string;
   /** Range for range rules */
   range?: { min?: number | string; max?: number | string };
+  /**
+   * How to interpret range bounds:
+   * - between: min ≤ value ≤ max
+   * - under: value ≤ max
+   * - at_least: value ≥ min
+   * - over: value > min (strict)
+   * When omitted, classic min/max (any present bound) applies.
+   */
+  boundsMode?: 'between' | 'under' | 'at_least' | 'over';
+  /** Measurement unit for range rules (e.g. NM, mm, PSI) */
+  unit?: string;
   /** Whether rule is enabled */
   enabled: boolean;
   /** Tags for filtering */
