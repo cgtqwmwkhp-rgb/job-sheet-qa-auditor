@@ -57,6 +57,12 @@ interface PdfPreviewProps {
   className?: string;
   /** Whether to show page controls */
   showPageControls?: boolean;
+  /**
+   * Fill the parent box with no internal scroll.
+   * Use when ROI overlays are siblings of this preview — otherwise the
+   * canvas scrolls inside maxHeight while labels stay fixed (critical desync).
+   */
+  embedInParent?: boolean;
 }
 
 /**
@@ -107,6 +113,7 @@ export function PdfPreview({
   onDimensionsChange,
   className = '',
   showPageControls = true,
+  embedInParent = false,
 }: PdfPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(false);
@@ -291,7 +298,14 @@ export function PdfPreview({
   }
 
   return (
-    <div className={className}>
+    <div
+      className={className}
+      style={
+        embedInParent
+          ? { width: "100%", height: "100%", overflow: "hidden" }
+          : undefined
+      }
+    >
       {/* Page controls */}
       {showPageControls && totalPages > 1 && (
         <div style={{
@@ -338,22 +352,41 @@ export function PdfPreview({
         </div>
       )}
 
-      {/* Canvas container */}
-      <div style={{
-        overflow: 'auto',
-        maxHeight: '600px',
-        border: '1px solid #e2e8f0',
-        borderRadius: '8px',
-        backgroundColor: '#64748b',
-        padding: '16px',
-      }}>
-        <canvas 
+      {/* Canvas container — embed mode shares scroll with ROI overlays */}
+      <div
+        style={
+          embedInParent
+            ? {
+                width: "100%",
+                height: "100%",
+                overflow: "hidden",
+                backgroundColor: "#ffffff",
+              }
+            : {
+                overflow: "auto",
+                maxHeight: "600px",
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                backgroundColor: "#64748b",
+                padding: "16px",
+              }
+        }
+      >
+        <canvas
           ref={canvasRef}
-          style={{
-            display: 'block',
-            margin: '0 auto',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-          }}
+          style={
+            embedInParent
+              ? {
+                  display: "block",
+                  width: "100%",
+                  height: "100%",
+                }
+              : {
+                  display: "block",
+                  margin: "0 auto",
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                }
+          }
         />
       </div>
     </div>

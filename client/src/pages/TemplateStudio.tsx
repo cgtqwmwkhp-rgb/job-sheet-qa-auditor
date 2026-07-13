@@ -5,6 +5,7 @@
 
 import DashboardLayout from "@/components/DashboardLayout";
 import { RoiEditorV2 } from "@/components/RoiEditorV2";
+import { ConditionalRulesPanel } from "@/components/ConditionalRulesPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -1093,6 +1094,10 @@ export default function TemplateStudio() {
                   onChange={e => setTokensText(e.target.value)}
                 />
               </div>
+              <ConditionalRulesPanel
+                specJsonText={specJsonText}
+                onSpecJsonChange={setSpecJsonText}
+              />
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="space-y-2">
                   <Label>specJson</Label>

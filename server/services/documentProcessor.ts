@@ -69,6 +69,8 @@ import {
   evaluateJobSummaryConsistency,
   type FailurePathSignals,
 } from "./jobSummaryConsistency";
+import { evaluateImpliesRules } from "./impliesRules";
+import type { RuleSpec } from "./templateRegistry/types";
 import {
   evaluateWastedJourneyConsistency,
   isWastedJourneyDocument,
@@ -1949,6 +1951,50 @@ async function processJobSheetWithOptions(
         };
         recordStage({
           stage: "Comment Quality",
+          status: "success",
+          durationMs: 0,
+        });
+      }
+
+      // Studio-authored if/then (implies) rules — VOR-style consistency
+      const impliesSpec = usedTemplateVersionId
+        ? getTemplateVersion(usedTemplateVersionId)?.specJson
+        : null;
+      const impliesFieldMap: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(
+        ensembleResult?.ensembleExtractedFields ?? {}
+      )) {
+        impliesFieldMap[k] = v.value;
+      }
+      for (const [k, v] of Object.entries(
+        selectionMarksResult?.preExtractedFields ?? {}
+      )) {
+        if (impliesFieldMap[k] == null) impliesFieldMap[k] = v.value;
+      }
+      if (consistency.signals.vor) impliesFieldMap.vorStatus = "Present";
+      if (consistency.signals.unsafe) impliesFieldMap.safeToUse = "No";
+      else if (consistency.signals.safeYes) impliesFieldMap.safeToUse = "Yes";
+      if (consistency.signals.incomplete)
+        impliesFieldMap.allWorksCompleted = "No";
+      else if (consistency.signals.worksCompleteYes)
+        impliesFieldMap.allWorksCompleted = "Yes";
+      if (consistency.signals.returnVisit)
+        impliesFieldMap.returnVisitNeeded = "Yes";
+      else if (consistency.signals.returnVisitNo)
+        impliesFieldMap.returnVisitNeeded = "No";
+
+      const impliesFindings = evaluateImpliesRules(
+        (impliesSpec?.rules ?? []) as RuleSpec[],
+        impliesFieldMap
+      );
+      if (impliesFindings.length > 0) {
+        analysisResult = {
+          ...analysisResult,
+          findings: [...analysisResult.findings, ...impliesFindings],
+          summary: `${analysisResult.summary} [IMPLIES] ${impliesFindings.length} consistency rule(s)`,
+        };
+        recordStage({
+          stage: "Implies Consistency",
           status: "success",
           durationMs: 0,
         });

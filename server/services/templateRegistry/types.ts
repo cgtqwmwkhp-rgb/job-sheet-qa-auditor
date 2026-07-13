@@ -71,14 +71,14 @@ export interface FieldSpec {
 export interface RuleSpec {
   /** Unique rule ID (e.g., 'R001') */
   ruleId: string;
-  /** Field this rule validates */
+  /** Field this rule validates (for implies: the THEN field) */
   field: string;
   /** Rule description */
   description: string;
   /** Rule severity */
   severity: 'critical' | 'major' | 'minor' | 'info';
   /** Validation type */
-  type: 'required' | 'format' | 'range' | 'pattern' | 'custom';
+  type: 'required' | 'format' | 'range' | 'pattern' | 'custom' | 'implies';
   /** Pattern for format/pattern rules */
   pattern?: string;
   /** Range for range rules */
@@ -87,6 +87,14 @@ export interface RuleSpec {
   enabled: boolean;
   /** Tags for filtering */
   tags?: string[];
+  /**
+   * Implies / if-then consistency (VOR-style):
+   * when whenField matches whenValue → thenField must match thenValue.
+   */
+  whenField?: string;
+  whenValue?: string;
+  thenField?: string;
+  thenValue?: string;
 }
 
 /**

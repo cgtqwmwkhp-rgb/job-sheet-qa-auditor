@@ -12,7 +12,7 @@
  * - ROI resize handles
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { PdfPreview } from './PdfPreview';
 
 /**
@@ -114,6 +114,25 @@ interface RoiEditorV2Props {
   showPdfPreview?: boolean;
 }
 
+const CUSTOM_COLOR_PALETTE = [
+  '#0ea5e9',
+  '#14b8a6',
+  '#a855f7',
+  '#f43f5e',
+  '#eab308',
+  '#22c55e',
+  '#64748b',
+];
+
+function slugifyLabel(label: string): string {
+  const slug = label
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_|_$/g, "")
+    .replace(/_+/g, "_");
+  return slug || "customField";
+}
+
 /**
  * ROI Editor V2 Component
  */
@@ -145,6 +164,42 @@ export function RoiEditorV2({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [customTypes, setCustomTypes] = useState<
+    Array<{ id: string; label: string; color: string; critical: boolean }>
+  >([]);
+  const [customLabelDraft, setCustomLabelDraft] = useState("");
+  const [customLabelCritical, setCustomLabelCritical] = useState(false);
+
+  const allRoiTypes = useMemo(
+    () => [...STANDARD_ROI_TYPES, ...customTypes],
+    [customTypes]
+  );
+
+  // Seed custom types from existing regions that aren't in the standard menu
+  useEffect(() => {
+    const known = new Set(STANDARD_ROI_TYPES.map(t => t.id));
+    const extras = (initialRoi?.regions ?? [])
+      .map(r => r.name)
+      .filter(name => !known.has(name as (typeof STANDARD_ROI_TYPES)[number]["id"]));
+    if (extras.length === 0) return;
+    setCustomTypes(prev => {
+      const have = new Set(prev.map(t => t.id));
+      const next = [...prev];
+      extras.forEach((id, i) => {
+        if (have.has(id)) return;
+        next.push({
+          id,
+          label: id.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+          color: CUSTOM_COLOR_PALETTE[i % CUSTOM_COLOR_PALETTE.length],
+          critical: false,
+        });
+        have.add(id);
+      });
+      return next;
+    });
+    // only on mount / initialRoi identity
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Use provided PDF data or local upload
   const effectivePdfSource = pdfData ?? localPdfData ?? pdfUrl ?? undefined;
@@ -215,16 +270,42 @@ export function RoiEditorV2({
    * Get color for region type
    */
   const getRegionColor = (name: string): string => {
-    const type = STANDARD_ROI_TYPES.find(t => t.id === name);
+    const type = allRoiTypes.find(t => t.id === name);
     return type?.color ?? '#6b7280';
+  };
+
+  const regionLabel = (name: string): string => {
+    const type = allRoiTypes.find(t => t.id === name);
+    return type?.label ?? name;
   };
 
   /**
    * Check if region type is critical
    */
   const isCritical = (name: string): boolean => {
-    const type = STANDARD_ROI_TYPES.find(t => t.id === name);
+    const type = allRoiTypes.find(t => t.id === name);
     return type?.critical ?? false;
+  };
+
+  const addCustomLabel = () => {
+    const label = customLabelDraft.trim();
+    if (!label || readOnly) return;
+    let id = slugifyLabel(label);
+    const existingIds = new Set(allRoiTypes.map(t => t.id));
+    if (existingIds.has(id)) {
+      let n = 2;
+      while (existingIds.has(`${id}_${n}`)) n += 1;
+      id = `${id}_${n}`;
+    }
+    const color =
+      CUSTOM_COLOR_PALETTE[customTypes.length % CUSTOM_COLOR_PALETTE.length];
+    setCustomTypes(prev => [
+      ...prev,
+      { id, label, color, critical: customLabelCritical },
+    ]);
+    setCurrentTool(id);
+    setCustomLabelDraft("");
+    setCustomLabelCritical(false);
   };
 
   /**
@@ -347,15 +428,15 @@ export function RoiEditorV2({
    */
   const getMissingCritical = (): string[] => {
     const presentNames = new Set(regions.filter(r => r.enabled !== false).map(r => r.name));
-    return STANDARD_ROI_TYPES
+    return allRoiTypes
       .filter(t => t.critical && !presentNames.has(t.id))
       .map(t => t.label);
   };
 
   const missingCritical = getMissingCritical();
   const filteredTypes = showCriticalOnly 
-    ? STANDARD_ROI_TYPES.filter(t => t.critical)
-    : STANDARD_ROI_TYPES;
+    ? allRoiTypes.filter(t => t.critical)
+    : allRoiTypes;
 
   return (
     <div className="roi-editor-v2" style={{ fontFamily: 'system-ui, sans-serif' }}>
@@ -540,6 +621,72 @@ export function RoiEditorV2({
             {type.label}
           </button>
         ))}
+        {!readOnly && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              marginLeft: "8px",
+              paddingLeft: "8px",
+              borderLeft: "1px solid #e2e8f0",
+            }}
+          >
+            <input
+              type="text"
+              value={customLabelDraft}
+              onChange={e => setCustomLabelDraft(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addCustomLabel();
+                }
+              }}
+              placeholder="Custom label…"
+              style={{
+                padding: "6px 10px",
+                border: "1px solid #e2e8f0",
+                borderRadius: "6px",
+                fontSize: "12px",
+                minWidth: "140px",
+              }}
+            />
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                fontSize: "11px",
+                color: "#6b7280",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={customLabelCritical}
+                onChange={e => setCustomLabelCritical(e.target.checked)}
+              />
+              Critical
+            </label>
+            <button
+              type="button"
+              onClick={addCustomLabel}
+              disabled={!customLabelDraft.trim()}
+              style={{
+                padding: "6px 12px",
+                borderRadius: "6px",
+                border: "1px solid #BEDA41",
+                backgroundColor: "#BEDA41",
+                color: "#1a1f0a",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: customLabelDraft.trim() ? "pointer" : "not-allowed",
+                opacity: customLabelDraft.trim() ? 1 : 0.5,
+              }}
+            >
+              + Add label
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Hidden file input */}
@@ -571,6 +718,17 @@ export function RoiEditorV2({
               <span>Page {currentPage} of {totalPages}</span>
             )}
           </div>
+          {/* Shared scrollport: PDF + ROI labels must move together */}
+          <div
+            style={{
+              overflow: "auto",
+              maxHeight: "70vh",
+              border: isDragOver ? "3px dashed #3b82f6" : "1px solid #e2e8f0",
+              borderRadius: "8px",
+              backgroundColor: "#64748b",
+              padding: "12px",
+            }}
+          >
           <div
             ref={canvasRef}
             onMouseDown={handleMouseDown}
@@ -583,12 +741,13 @@ export function RoiEditorV2({
               maxWidth: '100%',
               aspectRatio: '595 / 842',
               backgroundColor: '#ffffff',
-              border: isDragOver ? '3px dashed #3b82f6' : '2px solid #e2e8f0',
+              border: '2px solid #e2e8f0',
               borderRadius: '8px',
               position: 'relative',
               cursor: readOnly ? 'default' : 'crosshair',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
               overflow: 'hidden',
+              margin: '0 auto',
               transition: 'border-color 0.2s',
             }}
           >
@@ -615,6 +774,7 @@ export function RoiEditorV2({
                 onPageChange={setCurrentPage}
                 onPagesLoaded={setTotalPages}
                 showPageControls={false}
+                embedInParent
                 className="absolute inset-0"
               />
             )}
@@ -691,6 +851,7 @@ export function RoiEditorV2({
                   boxSizing: 'border-box',
                   outline: selectedRegion === region.name ? `3px solid ${getRegionColor(region.name)}` : 'none',
                   outlineOffset: '2px',
+                  zIndex: selectedRegion === region.name ? 3 : 2,
                 }}
               >
                 <span style={{
@@ -707,14 +868,18 @@ export function RoiEditorV2({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '2px',
+                  pointerEvents: 'none',
+                  whiteSpace: 'nowrap',
+                  zIndex: 1,
                 }}>
                   {isCritical(region.name) && (
                     <span style={{ color: '#dc2626' }}>●</span>
                   )}
-                  {STANDARD_ROI_TYPES.find(t => t.id === region.name)?.label ?? region.name}
+                  {regionLabel(region.name)}
                 </span>
               </div>
             ))}
+          </div>
           </div>
         </div>
 
@@ -793,7 +958,7 @@ export function RoiEditorV2({
                         {isCritical(region.name) && (
                           <span style={{ color: '#dc2626', marginRight: '4px' }}>●</span>
                         )}
-                        {STANDARD_ROI_TYPES.find(t => t.id === region.name)?.label ?? region.name}
+                        {regionLabel(region.name)}
                       </span>
                     </div>
                     {!readOnly && (
