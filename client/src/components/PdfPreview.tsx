@@ -7,7 +7,7 @@
  * Uses PDF.js via CDN for minimal bundle impact.
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, type CSSProperties } from 'react';
 
 /**
  * PDF.js library type definitions (minimal subset needed)
@@ -307,6 +307,12 @@ export function PdfPreview({
               height: "fit-content",
               overflow: "visible",
               lineHeight: 0,
+              // Parent ROI editor owns hit-testing / drag-draw
+              pointerEvents: "none",
+              position: "absolute",
+              left: 0,
+              top: 0,
+              zIndex: 0,
             }
           : undefined
       }
@@ -380,13 +386,16 @@ export function PdfPreview({
       >
         <canvas
           ref={canvasRef}
+          draggable={false}
           style={
             embedInParent
               ? {
                   // Intrinsic PDF.js bitmap size — never CSS-stretch (that squashes the page)
                   display: "block",
                   maxWidth: "none",
-                }
+                  pointerEvents: "none",
+                  userSelect: "none",
+                } as CSSProperties
               : {
                   display: "block",
                   margin: "0 auto",

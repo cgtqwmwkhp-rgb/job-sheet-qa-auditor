@@ -159,6 +159,7 @@ export function RoiEditorV2({
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
+  const [drawCurrent, setDrawCurrent] = useState<{ x: number; y: number } | null>(null);
   const [currentTool, setCurrentTool] = useState<string>('jobReference');
   const [zoom, setZoom] = useState(150);
   const [snapToGrid, setSnapToGrid] = useState(false);
@@ -166,6 +167,10 @@ export function RoiEditorV2({
   const [showCriticalOnly, setShowCriticalOnly] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isDrawingRef = useRef(false);
+  const drawStartRef = useRef<{ x: number; y: number } | null>(null);
+  const currentToolRef = useRef(currentTool);
+  currentToolRef.current = currentTool;
   const [localPdfData, setLocalPdfData] = useState<ArrayBuffer | null>(null);
   const [pdfFileName, setPdfFileName] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -327,57 +332,107 @@ export function RoiEditorV2({
     return Math.round(value / gridSize) * gridSize;
   }, [snapToGrid, gridSize]);
 
-  /**
-   * Handle mouse down on canvas
-   */
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (readOnly || !canvasRef.current) return;
+  const clientToNorm = useCallback(
+    (clientX: number, clientY: number) => {
+      const el = canvasRef.current;
+      if (!el) return null;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+      const x = snapValue((clientX - rect.left) / rect.width);
+      const y = snapValue((clientY - rect.top) / rect.height);
+      return {
+        x: Math.max(0, Math.min(1, x)),
+        y: Math.max(0, Math.min(1, y)),
+      };
+    },
+    [snapValue]
+  );
 
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = snapValue((e.clientX - rect.left) / rect.width);
-    const y = snapValue((e.clientY - rect.top) / rect.height);
+  const finishDraw = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!isDrawingRef.current || !drawStartRef.current) return;
+      const end = clientToNorm(clientX, clientY);
+      const start = drawStartRef.current;
+      isDrawingRef.current = false;
+      drawStartRef.current = null;
+      setIsDrawing(false);
+      setDrawStart(null);
+      setDrawCurrent(null);
+      if (!end) return;
 
-    setIsDrawing(true);
-    setDrawStart({ x, y });
-  }, [readOnly, snapValue]);
+      const x = Math.min(start.x, end.x);
+      const y = Math.min(start.y, end.y);
+      const width = Math.abs(end.x - start.x);
+      const height = Math.abs(end.y - start.y);
 
-  /**
-   * Handle mouse up on canvas
-   */
-  const handleMouseUp = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDrawing || !drawStart || !canvasRef.current) return;
+      // Allow slightly smaller boxes — old 0.01 threshold rejected many attempts
+      if (width < 0.005 || height < 0.005) return;
 
-    const rect = canvasRef.current.getBoundingClientRect();
-    const endX = snapValue((e.clientX - rect.left) / rect.width);
-    const endY = snapValue((e.clientY - rect.top) / rect.height);
-
-    const x = Math.min(drawStart.x, endX);
-    const y = Math.min(drawStart.y, endY);
-    const width = Math.abs(endX - drawStart.x);
-    const height = Math.abs(endY - drawStart.y);
-
-    if (width > 0.01 && height > 0.01) {
+      const tool = currentToolRef.current;
       const newRegion: RoiRegion = {
-        name: currentTool,
-        page: 1,
+        name: tool,
+        page: currentPage,
         bounds: {
-          x: Math.max(0, Math.min(1, x)),
-          y: Math.max(0, Math.min(1, y)),
-          width: Math.max(0.01, Math.min(1 - x, width)),
-          height: Math.max(0.01, Math.min(1 - y, height)),
+          x,
+          y,
+          width: Math.max(0.005, Math.min(1 - x, width)),
+          height: Math.max(0.005, Math.min(1 - y, height)),
         },
         enabled: true,
       };
 
       setRegions(prev => {
-        const filtered = prev.filter(r => r.name !== currentTool);
+        const filtered = prev.filter(r => r.name !== tool);
         return [...filtered, newRegion];
       });
-    }
+      setSelectedRegion(tool);
+      // Keep labels panel open after first successful draw so next labels are obvious
+      setDrawPaletteOpen(true);
+    },
+    [clientToNorm, currentPage]
+  );
 
-    setIsDrawing(false);
-    setDrawStart(null);
-  }, [isDrawing, drawStart, currentTool, snapValue]);
+  /**
+   * Handle mouse down on canvas — start ROI drag
+   */
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (readOnly || !canvasRef.current) return;
+      // Ignore right-click / middle-click
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const start = clientToNorm(e.clientX, e.clientY);
+      if (!start) return;
+
+      isDrawingRef.current = true;
+      drawStartRef.current = start;
+      setIsDrawing(true);
+      setDrawStart(start);
+      setDrawCurrent(start);
+    },
+    [readOnly, clientToNorm]
+  );
+
+  // Document-level move/up so drawing still completes if cursor leaves the page
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!isDrawingRef.current) return;
+      const pt = clientToNorm(e.clientX, e.clientY);
+      if (pt) setDrawCurrent(pt);
+    };
+    const onUp = (e: MouseEvent) => {
+      if (!isDrawingRef.current) return;
+      finishDraw(e.clientX, e.clientY);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [clientToNorm, finishDraw]);
 
   /**
    * Delete a region
@@ -663,7 +718,7 @@ export function RoiEditorV2({
             <span>
               {readOnly
                 ? 'Preview Mode'
-                : `Drawing: ${regionLabel(currentTool)} — scroll the PDF; labels panel stays put`}
+                : `Click and drag on the PDF to place “${regionLabel(currentTool)}”. Open the labels panel to switch fields.`}
               {pdfFileName && <span style={{ marginLeft: '12px', color: '#3b82f6' }}>({pdfFileName})</span>}
             </span>
             {totalPages > 1 && (
@@ -915,10 +970,10 @@ export function RoiEditorV2({
           <div
             ref={canvasRef}
             onMouseDown={handleMouseDown}
-            onMouseUp={handleMouseUp}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
+            data-testid="roi-draw-surface"
             style={{
               // Size from real PDF bitmap — never maxWidth+aspectRatio squash
               width: pageSize.width,
@@ -927,12 +982,14 @@ export function RoiEditorV2({
               border: '2px solid #e2e8f0',
               borderRadius: '8px',
               position: 'relative',
-              cursor: readOnly ? 'default' : 'crosshair',
+              cursor: readOnly ? 'default' : isDrawing ? 'crosshair' : 'crosshair',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
               overflow: 'hidden',
               margin: '0 auto',
               flexShrink: 0,
               transition: 'border-color 0.2s',
+              userSelect: 'none',
+              touchAction: 'none',
             }}
           >
             {/* Grid overlay when snap enabled */}
@@ -950,7 +1007,7 @@ export function RoiEditorV2({
               }} />
             )}
 
-            {/* PDF Preview using PDF.js — natural aspect, overlays share this box */}
+            {/* PDF Preview using PDF.js — natural aspect; pointer-events none so drag-draw works */}
             {showPdfPreview && effectivePdfSource && (
               <PdfPreview
                 pdfSource={effectivePdfSource}
@@ -968,7 +1025,6 @@ export function RoiEditorV2({
                 }}
                 showPageControls={false}
                 embedInParent
-                className="absolute left-0 top-0"
               />
             )}
 
@@ -1023,6 +1079,26 @@ export function RoiEditorV2({
               </div>
             )}
 
+            {/* Live rubber-band while dragging a new ROI */}
+            {isDrawing && drawStart && drawCurrent && (
+              <div
+                data-testid="roi-draw-preview"
+                style={{
+                  position: "absolute",
+                  left: `${Math.min(drawStart.x, drawCurrent.x) * 100}%`,
+                  top: `${Math.min(drawStart.y, drawCurrent.y) * 100}%`,
+                  width: `${Math.abs(drawCurrent.x - drawStart.x) * 100}%`,
+                  height: `${Math.abs(drawCurrent.y - drawStart.y) * 100}%`,
+                  border: `2px dashed ${getRegionColor(currentTool)}`,
+                  backgroundColor: `${getRegionColor(currentTool)}25`,
+                  borderRadius: 4,
+                  pointerEvents: "none",
+                  zIndex: 6,
+                  boxSizing: "border-box",
+                }}
+              />
+            )}
+
             {/* Rendered regions */}
             {regions.filter(r => r.enabled !== false).map(region => (
               <div
@@ -1030,6 +1106,10 @@ export function RoiEditorV2({
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedRegion(region.name);
+                }}
+                onMouseDown={(e) => {
+                  // Don't start a new draw when clicking an existing region
+                  e.stopPropagation();
                 }}
                 style={{
                   position: 'absolute',
@@ -1044,7 +1124,7 @@ export function RoiEditorV2({
                   boxSizing: 'border-box',
                   outline: selectedRegion === region.name ? `3px solid ${getRegionColor(region.name)}` : 'none',
                   outlineOffset: '2px',
-                  zIndex: selectedRegion === region.name ? 3 : 2,
+                  zIndex: selectedRegion === region.name ? 5 : 4,
                 }}
               >
                 <span style={{
