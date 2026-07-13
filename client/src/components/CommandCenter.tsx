@@ -130,7 +130,7 @@ export function CommandCenter() {
               <span>Upload Job Sheet</span>
             </CommandItem>
             <CommandItem
-              onSelect={() => runCommand(() => setLocation("/specs"))}
+              onSelect={() => runCommand(() => setLocation("/template-studio"))}
             >
               <FileText className="mr-2 h-4 w-4" />
               <span>Template Studio</span>

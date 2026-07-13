@@ -109,6 +109,7 @@ test.describe("Demo Gateway UI", () => {
     await expect(page.locator("text=Admin / QA Lead")).toBeVisible();
     await expect(page.locator("text=Executive Dashboard")).toBeVisible();
     await expect(page.locator("text=Template Studio")).toBeVisible();
+    await expect(page.locator("text=Spec Management")).toHaveCount(0);
     await expect(page.locator("text=User Control")).toBeVisible();
   });
 

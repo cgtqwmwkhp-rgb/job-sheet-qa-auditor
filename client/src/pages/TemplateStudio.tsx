@@ -1,6 +1,6 @@
 /**
- * Template Studio — replace Spec Management.
- * Wizard: Identity → Sample → Propose → ROI → Tokens/Fields → Gates → Activate → Promote
+ * Template Studio — upload-first form authoring.
+ * Flow: Drop PDF → propose → ROI → Fields → Gates → Activate → Promote
  */
 
 import DashboardLayout from "@/components/DashboardLayout";
@@ -27,16 +27,16 @@ import {
   ChevronRight,
   FileText,
   Loader2,
-  Plus,
   Sparkles,
   Upload,
 } from "lucide-react";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
+import { useSearch } from "wouter";
 
 type WizardStep =
+  | "upload"
   | "catalog"
   | "identity"
-  | "sample"
   | "propose"
   | "roi"
   | "fields"
@@ -44,8 +44,6 @@ type WizardStep =
   | "promote";
 
 const STEPS: Array<{ id: WizardStep; label: string }> = [
-  { id: "identity", label: "Identity" },
-  { id: "sample", label: "Sample PDF" },
   { id: "propose", label: "Propose" },
   { id: "roi", label: "ROI" },
   { id: "fields", label: "Fields & Tokens" },
@@ -70,8 +68,16 @@ export default function TemplateStudio() {
   const { hasRole } = useAuth();
   const canAuthor = hasRole(["admin", "qa_lead"]);
   const utils = trpc.useUtils();
+  const search = useSearch();
+  const fromJobSheetParam = useMemo(() => {
+    const raw = new URLSearchParams(search).get("fromJobSheet");
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [search]);
+  const bootstrappedJobRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [step, setStep] = useState<WizardStep>("catalog");
+  const [step, setStep] = useState<WizardStep>("upload");
   const [templateId, setTemplateId] = useState<number | null>(null);
   const [versionId, setVersionId] = useState<number | null>(null);
   const [name, setName] = useState("");
@@ -79,6 +85,14 @@ export default function TemplateStudio() {
   const [client, setClient] = useState("");
   const [tokensText, setTokensText] = useState("job, sheet");
   const [sampleUrl, setSampleUrl] = useState<string | null>(null);
+  const [proposalPreview, setProposalPreview] = useState<{
+    confidence: number;
+    source: string;
+    fieldCount: number;
+    rejectedFieldIds?: string[];
+  } | null>(null);
+  const [quickStarting, setQuickStarting] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [roiDraft, setRoiDraft] = useState<{
     regions: Array<{
       name: string;
@@ -116,6 +130,9 @@ export default function TemplateStudio() {
   const createDraft = trpc.templates.studio.createDraft.useMutation();
   const attachSample = trpc.templates.studio.attachSample.useMutation();
   const proposeMut = trpc.templates.studio.proposeFromSample.useMutation();
+  const quickStart = trpc.templates.studio.quickStartFromSample.useMutation();
+  const bootstrapJob =
+    trpc.templates.studio.bootstrapFromJobSheet.useMutation();
   const saveDraft = trpc.templates.studio.saveDraft.useMutation();
   const updateRoi = trpc.templates.updateRoi.useMutation();
   const activateStaging = trpc.templates.studio.activateStaging.useMutation();
@@ -167,18 +184,111 @@ export default function TemplateStudio() {
       });
   }, [versionId, utils.templates.studio.getSample]);
 
+  const applyQuickStartResult = (result: {
+    template: { id: number; name: string };
+    version: NonNullable<typeof version>;
+    proposal: {
+      geminiUsed: boolean;
+      layoutAvailable: boolean;
+      proposedSpec: { fields: Array<{ field: string }> };
+      fields?: Array<{ confidence: number; field: { field: string } }>;
+      selectionTokens?: { confidence: number };
+    };
+    sampleUrl: string;
+  }) => {
+    setTemplateId(result.template.id);
+    setVersionId(result.version.id);
+    setName(result.template.name);
+    setSampleUrl(result.sampleUrl);
+    loadVersionIntoEditors(result.version);
+    const fieldConfs = result.proposal.fields?.map(f => f.confidence) ?? [];
+    const confidence =
+      fieldConfs.length > 0
+        ? fieldConfs.reduce((a, b) => a + b, 0) / fieldConfs.length
+        : (result.proposal.selectionTokens?.confidence ?? 0.5);
+    setProposalPreview({
+      confidence,
+      source: result.proposal.geminiUsed
+        ? "Gemini + OCR"
+        : result.proposal.layoutAvailable
+          ? "OCR heuristics"
+          : "Starter scaffold",
+      fieldCount: result.proposal.proposedSpec.fields.length,
+    });
+    setStep("propose");
+  };
+
+  const handleQuickStartFile = async (file: File) => {
+    if (!canAuthor) return;
+    setQuickStarting(true);
+    try {
+      const fileBase64 = await fileToBase64(file);
+      const result = await quickStart.mutateAsync({
+        fileName: file.name,
+        fileType: file.type || "application/pdf",
+        fileBase64,
+        name: name.trim() || undefined,
+        client: client.trim() || undefined,
+        selectionTokens: tokensText
+          .split(",")
+          .map(t => t.trim())
+          .filter(Boolean),
+      });
+      applyQuickStartResult(
+        result as Parameters<typeof applyQuickStartResult>[0]
+      );
+      await utils.templates.list.invalidate();
+      showSuccessToast(
+        "Draft ready",
+        `${result.template.name} — review the proposal`
+      );
+    } catch (err) {
+      showErrorToast(
+        "Quick start failed",
+        err instanceof Error ? err.message : "Unknown error"
+      );
+    } finally {
+      setQuickStarting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!canAuthor || fromJobSheetParam == null) return;
+    if (bootstrappedJobRef.current === fromJobSheetParam) return;
+    bootstrappedJobRef.current = fromJobSheetParam;
+    setQuickStarting(true);
+    void bootstrapJob
+      .mutateAsync({ jobSheetId: fromJobSheetParam })
+      .then(result => {
+        applyQuickStartResult(
+          result as Parameters<typeof applyQuickStartResult>[0]
+        );
+        void utils.templates.list.invalidate();
+        showSuccessToast(
+          "Teaching from job sheet",
+          `Job #${fromJobSheetParam} loaded into Studio`
+        );
+      })
+      .catch(err => {
+        showErrorToast(
+          "Bootstrap failed",
+          err instanceof Error ? err.message : "Could not load job sheet PDF"
+        );
+        bootstrappedJobRef.current = null;
+      })
+      .finally(() => setQuickStarting(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot deep-link
+  }, [canAuthor, fromJobSheetParam]);
+
   const openTemplate = (id: number, activeVersionId: number | null) => {
     setTemplateId(id);
     if (activeVersionId) {
       setVersionId(activeVersionId);
     } else {
-      const t = templates?.find(x => x.id === id);
-      // Prefer latest via listVersions after set
       setVersionId(null);
       void utils.templates.listVersions.fetch({ templateId: id }).then(vs => {
         if (vs?.[0]) setVersionId(vs[0].id);
       });
-      void t;
     }
     setStep("identity");
   };
@@ -203,7 +313,7 @@ export default function TemplateStudio() {
       loadVersionIntoEditors(result.version);
       await utils.templates.list.invalidate();
       showSuccessToast("Draft created", result.template.templateId);
-      setStep("sample");
+      setStep("propose");
     } catch (err) {
       showErrorToast(
         "Create failed",
@@ -248,6 +358,19 @@ export default function TemplateStudio() {
         loadVersionIntoEditors(result.appliedVersion);
         await utils.templates.getVersion.invalidate({ versionId });
       }
+      setProposalPreview({
+        confidence:
+          result.proposal.fields.length > 0
+            ? result.proposal.fields.reduce((a, f) => a + f.confidence, 0) /
+              result.proposal.fields.length
+            : result.proposal.selectionTokens.confidence,
+        source: result.proposal.geminiUsed
+          ? "Gemini + OCR"
+          : result.proposal.layoutAvailable
+            ? "OCR heuristics"
+            : "Starter scaffold (no sample OCR)",
+        fieldCount: result.proposal.proposedSpec.fields.length,
+      });
       showSuccessToast(
         applyAccepted ? "Proposal applied" : "Proposal ready",
         result.proposal.geminiUsed
@@ -310,7 +433,6 @@ export default function TemplateStudio() {
   const handleActivate = async () => {
     if (!versionId) return;
     try {
-      // Ensure fixtures exist before activate (do not silently invent on activate)
       const has = await utils.templates.hasFixtures.fetch({ versionId });
       if (!has.hasFixtures) {
         await scaffoldFixtures.mutateAsync({ versionId });
@@ -351,6 +473,9 @@ export default function TemplateStudio() {
     );
   }
 
+  const showWizardChrome =
+    step !== "upload" && step !== "catalog" && versionId != null;
+
   return (
     <DashboardLayout>
       <div className="mx-auto flex max-w-6xl flex-col gap-6 pb-16">
@@ -360,21 +485,28 @@ export default function TemplateStudio() {
               Template Studio
             </p>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              Onboard form types end-to-end
+              Upload a new form
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Upload a sample, refine ROIs and selection tokens, pass activation
-              gates on staging, then dual-control promote to production.
+              Drop a blank or filled sample PDF. We draft fields, ROIs, and
+              selection tokens — you refine, gate, and activate on staging.
             </p>
           </div>
-          {step !== "catalog" && (
-            <Button variant="outline" onClick={() => setStep("catalog")}>
-              Catalog
-            </Button>
-          )}
+          <div className="flex gap-2">
+            {step !== "upload" && (
+              <Button variant="outline" onClick={() => setStep("upload")}>
+                New upload
+              </Button>
+            )}
+            {step !== "catalog" && (
+              <Button variant="outline" onClick={() => setStep("catalog")}>
+                Existing templates
+              </Button>
+            )}
+          </div>
         </div>
 
-        {step !== "catalog" && (
+        {showWizardChrome && (
           <div className="flex flex-wrap gap-2">
             {STEPS.map((s, i) => (
               <button
@@ -395,27 +527,89 @@ export default function TemplateStudio() {
           </div>
         )}
 
+        {step === "upload" && (
+          <div
+            className={`relative overflow-hidden rounded-xl border-2 border-dashed transition ${
+              dragOver
+                ? "border-[#BEDA41] bg-[rgba(190,218,65,0.12)]"
+                : "border-[#EBE8E8] bg-gradient-to-b from-[#F7F9EC] to-white"
+            }`}
+            onDragOver={e => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => {
+              e.preventDefault();
+              setDragOver(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) void handleQuickStartFile(file);
+            }}
+          >
+            <div className="flex flex-col items-center justify-center gap-4 px-6 py-20 text-center">
+              {quickStarting || bootstrapJob.isPending ? (
+                <>
+                  <Loader2 className="h-10 w-10 animate-spin text-[#6B7A1A]" />
+                  <p className="text-sm font-medium text-[#333030]">
+                    Creating draft, reading sample, proposing fields…
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#BEDA41]/20">
+                    <Upload className="h-7 w-7 text-[#6B7A1A]" />
+                  </div>
+                  <div>
+                    <p className="text-lg font-semibold text-[#333030]">
+                      Drop a form PDF here
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Or choose a file — one pass from sample to proposal.
+                    </p>
+                  </div>
+                  <Button
+                    size="lg"
+                    className="bg-[#BEDA41] text-[#1a1f0a] hover:bg-[#a8c238]"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={quickStart.isPending}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Choose PDF
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/pdf,image/png,image/jpeg"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) void handleQuickStartFile(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  {fromJobSheetParam != null && (
+                    <p className="text-xs text-muted-foreground">
+                      Deep-link from job sheet #{fromJobSheetParam}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {step === "catalog" && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Template catalog</CardTitle>
+                <CardTitle>Existing templates</CardTitle>
                 <CardDescription>
                   Live registry versions used by upload selection.
                 </CardDescription>
               </div>
-              <Button
-                onClick={() => {
-                  setTemplateId(null);
-                  setVersionId(null);
-                  setName("");
-                  setSlug("");
-                  setSpecJsonText("");
-                  setStep("identity");
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                New draft
+              <Button onClick={() => setStep("upload")}>
+                <Upload className="mr-2 h-4 w-4" />
+                Upload new form
               </Button>
             </CardHeader>
             <CardContent>
@@ -423,7 +617,7 @@ export default function TemplateStudio() {
                 <ListSkeleton />
               ) : !templates?.length ? (
                 <p className="text-sm text-muted-foreground">
-                  No templates yet. Create a draft to start.
+                  No templates yet. Upload a sample to start.
                 </p>
               ) : (
                 <div className="divide-y rounded-md border">
@@ -627,7 +821,7 @@ export default function TemplateStudio() {
                   </Button>
                 )}
                 {versionId && (
-                  <Button onClick={() => setStep("sample")}>
+                  <Button onClick={() => setStep("propose")}>
                     Continue
                     <ChevronRight className="ml-1 h-4 w-4" />
                   </Button>
@@ -637,169 +831,162 @@ export default function TemplateStudio() {
           </Card>
         )}
 
-        {step === "sample" && versionId && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Sample PDF</CardTitle>
-              <CardDescription>
-                Attach a blank or lightly filled form for ROI + OCR propose.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#BEDA41]/60 bg-[#BEDA41]/5 px-6 py-12 text-center">
-                <Upload className="h-8 w-8 text-[#6B7A1A]" />
-                <span className="text-sm font-medium">
-                  Drop PDF or click to upload
-                </span>
-                <input
-                  type="file"
-                  accept="application/pdf,image/jpeg,image/png"
-                  className="hidden"
-                  onChange={e => {
-                    const f = e.target.files?.[0];
-                    if (f) void handleAttachSample(f);
-                  }}
-                />
-              </label>
-              {sampleUrl && (
-                <p className="text-xs text-muted-foreground">
-                  Sample URL: {sampleUrl}
-                </p>
-              )}
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setStep("identity")}>
-                  <ChevronLeft className="mr-1 h-4 w-4" />
-                  Back
-                </Button>
-                <Button onClick={() => setStep("propose")}>
-                  Continue
-                  <ChevronRight className="ml-1 h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {step === "propose" && versionId && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-[#6B7A1A]" />
-                AI / OCR propose
-              </CardTitle>
-              <CardDescription>
-                Review proposed fields with confidence and sources. Reject weak
-                items before applying.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  disabled={proposeMut.isPending}
-                  onClick={() => void handlePropose(false)}
-                >
-                  {proposeMut.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Generate proposal
-                </Button>
-                <Button
-                  disabled={proposeMut.isPending || !proposeMut.data}
-                  onClick={() => void handlePropose(true)}
-                >
-                  Apply accepted
-                </Button>
-              </div>
-
-              {proposeMut.data?.proposal && (
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold">Fields</h3>
-                    {proposeMut.data.proposal.fields.map(f => {
-                      const rejected = rejectedFields.has(f.field.field);
-                      return (
-                        <div
-                          key={f.field.field}
-                          className={`rounded-md border px-3 py-2 text-sm ${
-                            rejected ? "opacity-50" : ""
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium">{f.field.label}</span>
-                            <Badge variant="secondary">
-                              {(f.confidence * 100).toFixed(0)}% · {f.source}
-                            </Badge>
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {f.why}
-                          </p>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="mt-1 h-7 px-2"
-                            onClick={() => {
-                              setRejectedFields(prev => {
-                                const next = new Set(prev);
-                                if (next.has(f.field.field))
-                                  next.delete(f.field.field);
-                                else next.add(f.field.field);
-                                return next;
-                              });
-                            }}
-                          >
-                            {rejected ? "Undo reject" : "Reject"}
-                          </Button>
-                        </div>
-                      );
-                    })}
-                    {proposeMut.data.proposal.layoutError && (
-                      <p className="text-xs text-amber-700">
-                        Layout note: {proposeMut.data.proposal.layoutError}
-                      </p>
-                    )}
-                    {proposeMut.data.proposal.geminiError && (
-                      <p className="text-xs text-muted-foreground">
-                        Gemini: {proposeMut.data.proposal.geminiError}
-                      </p>
-                    )}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="overflow-hidden">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Sample PDF</CardTitle>
+                <CardDescription>
+                  {name || "New form"} · confidence{" "}
+                  {proposalPreview
+                    ? `${(proposalPreview.confidence * 100).toFixed(0)}% · ${proposalPreview.source}`
+                    : "review proposal"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {sampleUrl ? (
+                  <iframe
+                    title="Template sample"
+                    src={sampleUrl}
+                    className="h-[520px] w-full rounded-md border bg-white"
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No sample attached yet.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-[#6B7A1A]" />
+                  AI / OCR propose
+                </CardTitle>
+                <CardDescription>
+                  Review proposed fields with confidence and sources. Reject
+                  weak items before applying.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {proposalPreview && !proposeMut.data?.proposal && (
+                  <div className="rounded-md border border-[#BEDA41]/40 bg-[#BEDA41]/10 px-3 py-2 text-sm">
+                    Quick-start applied {proposalPreview.fieldCount} fields (
+                    {(proposalPreview.confidence * 100).toFixed(0)}% ·{" "}
+                    {proposalPreview.source}). Re-run propose to refine or
+                    continue to ROI.
                   </div>
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold">
-                      Checklist / tokens
-                    </h3>
-                    <p className="text-sm">
-                      Checklist grid:{" "}
-                      {proposeMut.data.proposal.hasChecklistGrid
-                        ? "detected"
-                        : "not detected"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Tokens:{" "}
-                      {proposeMut.data.proposal.selectionTokens.requiredTokensAny.join(
-                        ", "
-                      )}
-                    </p>
-                    <pre className="max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">
-                      {proposeMut.data.proposal.layoutTextPreview ||
-                        "(no OCR text)"}
-                    </pre>
-                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    disabled={proposeMut.isPending}
+                    onClick={() => void handlePropose(false)}
+                  >
+                    {proposeMut.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Generate proposal
+                  </Button>
+                  <Button
+                    disabled={proposeMut.isPending || !proposeMut.data}
+                    onClick={() => void handlePropose(true)}
+                  >
+                    Apply accepted
+                  </Button>
                 </div>
-              )}
 
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setStep("sample")}>
-                  <ChevronLeft className="mr-1 h-4 w-4" />
-                  Back
-                </Button>
-                <Button onClick={() => setStep("roi")}>
-                  Continue to ROI
-                  <ChevronRight className="ml-1 h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                {proposeMut.data?.proposal && (
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold">Fields</h3>
+                      {proposeMut.data.proposal.fields.map(f => {
+                        const rejected = rejectedFields.has(f.field.field);
+                        return (
+                          <div
+                            key={f.field.field}
+                            className={`rounded-md border px-3 py-2 text-sm ${
+                              rejected ? "opacity-50" : ""
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium">
+                                {f.field.label}
+                              </span>
+                              <Badge variant="secondary">
+                                {(f.confidence * 100).toFixed(0)}% · {f.source}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {f.why}
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="mt-1 h-7 px-2"
+                              onClick={() => {
+                                setRejectedFields(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(f.field.field))
+                                    next.delete(f.field.field);
+                                  else next.add(f.field.field);
+                                  return next;
+                                });
+                              }}
+                            >
+                              {rejected ? "Undo reject" : "Reject"}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                      {proposeMut.data.proposal.layoutError && (
+                        <p className="text-xs text-amber-700">
+                          Layout note: {proposeMut.data.proposal.layoutError}
+                        </p>
+                      )}
+                      {proposeMut.data.proposal.geminiError && (
+                        <p className="text-xs text-muted-foreground">
+                          Gemini: {proposeMut.data.proposal.geminiError}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold">
+                        Checklist / tokens
+                      </h3>
+                      <p className="text-sm">
+                        Checklist grid:{" "}
+                        {proposeMut.data.proposal.hasChecklistGrid
+                          ? "detected"
+                          : "not detected"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Tokens:{" "}
+                        {proposeMut.data.proposal.selectionTokens.requiredTokensAny.join(
+                          ", "
+                        )}
+                      </p>
+                      <pre className="max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">
+                        {proposeMut.data.proposal.layoutTextPreview ||
+                          "(no OCR text)"}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setStep("upload")}>
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    Back
+                  </Button>
+                  <Button onClick={() => setStep("roi")}>
+                    Continue to ROI
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {step === "roi" && versionId && (

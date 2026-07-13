@@ -72,7 +72,11 @@ const REASON_PRIORITY = [
 
 export function deriveReasonChips(
   findings: FindingLike[],
-  opts?: { hasMajorFails?: boolean; auditResult?: string | null }
+  opts?: {
+    hasMajorFails?: boolean;
+    auditResult?: string | null;
+    needsTemplateAuthoring?: boolean;
+  }
 ): ReasonChip[] {
   const open = findings.filter(
     f =>
@@ -82,6 +86,15 @@ export function deriveReasonChips(
   );
 
   const chips: ReasonChip[] = [];
+
+  if (opts?.needsTemplateAuthoring) {
+    chips.push({
+      key: "new-form-type",
+      label: "New form type",
+      variant: "warning",
+      className: "bg-[#BEDA41]/30 text-[#3d4a0f] border-[#BEDA41]/60",
+    });
+  }
 
   if (opts?.hasMajorFails) {
     chips.push({

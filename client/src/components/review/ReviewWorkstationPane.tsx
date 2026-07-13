@@ -177,6 +177,8 @@ export interface AuditData {
   /** Failure-path signals extracted from Job Summary consistency check. */
   failurePathSignals?: FailurePathSignals | null;
   failurePathSignalSummary?: string | null;
+  /** Unknown / low-confidence form — teach in Template Studio. */
+  needsTemplateAuthoring?: boolean;
 }
 
 export function mapFindingsFromApi(
@@ -349,6 +351,14 @@ export function ReviewWorkstationPane({
           docQualityPenalties: mapDocQualityPenaltiesFromReport(
             auditResult?.reportJson
           ),
+          needsTemplateAuthoring: Boolean(
+            (
+              auditResult?.reportJson as
+                | { needsTemplateAuthoring?: boolean }
+                | null
+                | undefined
+            )?.needsTemplateAuthoring
+          ),
           ...(() => {
             const fps = mapFailurePathSignalsFromReport(
               auditResult?.reportJson
@@ -409,6 +419,16 @@ export function ReviewWorkstationPane({
         docQualityPenalties,
         failurePathSignals: failurePathSignalsDerived.signals,
         failurePathSignalSummary: failurePathSignalsDerived.signalSummary,
+        needsTemplateAuthoring:
+          auditDataProp.needsTemplateAuthoring ??
+          Boolean(
+            (
+              auditResult?.reportJson as
+                | { needsTemplateAuthoring?: boolean }
+                | null
+                | undefined
+            )?.needsTemplateAuthoring
+          ),
       }
     : fetchedAuditData
       ? {
@@ -1208,6 +1228,25 @@ function ReviewWorkstationContent({
           variant="workstation"
           className="bg-muted/40 shrink-0 border-b"
         />
+      )}
+
+      {canOverrideTemplate && auditData.needsTemplateAuthoring && (
+        <div className="shrink-0 border-b border-[#BEDA41]/50 bg-[#BEDA41]/15 px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-[#333030]">
+            Unknown or low-confidence form — teach the ordering tool what to
+            look for in Template Studio.
+          </p>
+          <Button
+            size="sm"
+            className="h-8 bg-[#BEDA41] text-[#1a1f0a] hover:bg-[#a8c238]"
+            onClick={() => {
+              window.location.href = `/template-studio?fromJobSheet=${jobSheetId}`;
+            }}
+          >
+            <FileText className="w-4 h-4 mr-1.5" />
+            Teach in Template Studio
+          </Button>
+        </div>
       )}
 
       <ResizablePanelGroup

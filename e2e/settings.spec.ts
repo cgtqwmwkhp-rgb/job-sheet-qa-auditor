@@ -50,6 +50,7 @@ test.describe("Template Studio", () => {
     await page.waitForTimeout(500);
 
     await expect(page.locator("text=Template Studio")).toBeVisible();
+    await expect(page.locator("text=Spec Management")).toHaveCount(0);
   });
 });
 

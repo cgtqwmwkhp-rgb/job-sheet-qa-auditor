@@ -38,7 +38,7 @@ const items = [
   { title: "Hold Queue", url: "/hold-queue", icon: ShieldAlert },
   { title: "Disputes", url: "/disputes", icon: MessageSquareWarning },
   { title: "Search", url: "/search", icon: Search },
-  { title: "Template Studio", url: "/specs", icon: FileText },
+  { title: "Template Studio", url: "/template-studio", icon: FileText },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Monitoring", url: "/monitoring", icon: Activity },
   { title: "User Management", url: "/users", icon: Users },
