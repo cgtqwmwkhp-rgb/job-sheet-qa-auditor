@@ -19,6 +19,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ListSkeleton } from "@/components/ui/loading-skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
@@ -403,7 +408,7 @@ export default function TemplateStudio() {
         fieldCount: result.proposal.proposedSpec.fields.length,
       });
       showSuccessToast(
-        applyAccepted ? "Proposal applied" : "Proposal ready",
+        applyAccepted ? "Accepted fields saved to draft" : "Field preview ready",
         result.proposal.geminiUsed
           ? "Gemini + OCR"
           : result.proposal.layoutAvailable
@@ -914,39 +919,61 @@ export default function TemplateStudio() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-[#6B7A1A]" />
-                  AI / OCR propose
+                  AI / OCR field suggestions
                 </CardTitle>
                 <CardDescription>
-                  Review proposed fields with confidence and sources. Reject
-                  weak items before applying.
+                  1) Preview fields from the sample → 2) Reject weak ones → 3)
+                  Save accepted fields to the draft → 4) Continue to draw
+                  regions on the PDF.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {proposalPreview && !proposeMut.data?.proposal && (
                   <div className="rounded-md border border-[#BEDA41]/40 bg-[#BEDA41]/10 px-3 py-2 text-sm">
-                    Quick-start applied {proposalPreview.fieldCount} fields (
+                    Quick-start already saved {proposalPreview.fieldCount}{" "}
+                    fields to this draft (
                     {(proposalPreview.confidence * 100).toFixed(0)}% ·{" "}
-                    {proposalPreview.source}). Re-run propose to refine or
-                    continue to ROI.
+                    {proposalPreview.source}). You can preview again to refine,
+                    or go straight to drawing regions.
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    disabled={proposeMut.isPending}
-                    onClick={() => void handlePropose(false)}
-                  >
-                    {proposeMut.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Generate proposal
-                  </Button>
-                  <Button
-                    disabled={proposeMut.isPending || !proposeMut.data}
-                    onClick={() => void handlePropose(true)}
-                  >
-                    Apply accepted
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        disabled={proposeMut.isPending}
+                        onClick={() => void handlePropose(false)}
+                      >
+                        {proposeMut.isPending && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Preview AI fields
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs">
+                      Re-scan the sample with AI/OCR and show suggested fields
+                      for review. Does not change the draft until you save
+                      accepted fields.
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex">
+                        <Button
+                          disabled={proposeMut.isPending || !proposeMut.data}
+                          onClick={() => void handlePropose(true)}
+                        >
+                          Save accepted to draft
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs">
+                      {proposeMut.data
+                        ? "Write the accepted (non-rejected) fields into this template draft so ROI and audits can use them."
+                        : "Run “Preview AI fields” first, then reject anything weak, then save."}
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
 
                 {proposeMut.data?.proposal && (
@@ -1028,14 +1055,34 @@ export default function TemplateStudio() {
                 )}
 
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setStep("upload")}>
-                    <ChevronLeft className="mr-1 h-4 w-4" />
-                    Back
-                  </Button>
-                  <Button onClick={() => setStep("roi")}>
-                    Continue to ROI
-                    <ChevronRight className="ml-1 h-4 w-4" />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        onClick={() => setStep("upload")}
+                      >
+                        <ChevronLeft className="mr-1 h-4 w-4" />
+                        Back to upload
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs">
+                      Return to the upload step to attach a different sample
+                      PDF.
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button onClick={() => setStep("roi")}>
+                        Next: draw regions
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs">
+                      Go to the ROI editor to click-and-drag boxes on the PDF
+                      (Job Reference, Asset ID, signatures, torque fields,
+                      etc.). Does not re-run AI.
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               </CardContent>
             </Card>
