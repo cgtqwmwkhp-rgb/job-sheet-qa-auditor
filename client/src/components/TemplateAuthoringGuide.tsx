@@ -19,6 +19,10 @@ const RULES: Array<{ title: string; body: string }> = [
     body: "Each label in the floating Draw labels panel shows what to look for and whether to box the printed heading with the value, value-only, or the whole tickbox grid.",
   },
   {
+    title: "Custom labels are remembered",
+    body: "When you + Add a custom label, it is saved for the next template and added to this template's Fields list under the same field id — reuse it so extraction and thresholds stay consistent.",
+  },
+  {
     title: "One field id — never invent a parallel label",
     body: "Draw labels must use the exact field id from Suggest fields / Fields & rules (e.g. serialNumber, not Serial_Number). Duplicates break extraction and thresholds.",
   },

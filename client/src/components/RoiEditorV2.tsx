@@ -19,6 +19,11 @@ import {
   getRoiDrawGuidance,
 } from './roiDrawGuidance';
 import {
+  ensureSpecField,
+  loadRememberedRoiLabels,
+  rememberRoiLabel,
+} from './roiLabelMemory';
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -209,7 +214,14 @@ export function RoiEditorV2({
   const [isDragOver, setIsDragOver] = useState(false);
   const [customTypes, setCustomTypes] = useState<
     Array<{ id: string; label: string; color: string; critical: boolean }>
-  >([]);
+  >(() =>
+    loadRememberedRoiLabels().map(l => ({
+      id: l.id,
+      label: l.label,
+      color: l.color,
+      critical: l.critical,
+    }))
+  );
   const [customLabelDraft, setCustomLabelDraft] = useState("");
   const [customLabelCritical, setCustomLabelCritical] = useState(false);
   /** Natural PDF page size at current zoom — drives overlay coordinate space */
@@ -245,6 +257,7 @@ export function RoiEditorV2({
   );
 
   // Seed custom types from existing regions that aren't in the standard menu
+  // (merge with cross-template memory — do not wipe remembered labels)
   useEffect(() => {
     const known = new Set(STANDARD_ROI_TYPES.map(t => t.id));
     const extras = (initialRoi?.regions ?? [])
@@ -256,11 +269,16 @@ export function RoiEditorV2({
       const next = [...prev];
       extras.forEach((id, i) => {
         if (have.has(id)) return;
+        const remembered = loadRememberedRoiLabels().find(l => l.id === id);
         next.push({
           id,
-          label: id.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
-          color: CUSTOM_COLOR_PALETTE[i % CUSTOM_COLOR_PALETTE.length],
-          critical: false,
+          label:
+            remembered?.label ??
+            id.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+          color:
+            remembered?.color ??
+            CUSTOM_COLOR_PALETTE[i % CUSTOM_COLOR_PALETTE.length],
+          critical: remembered?.critical ?? false,
         });
         have.add(id);
       });
@@ -270,6 +288,27 @@ export function RoiEditorV2({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Persist label to memory + current template fields (GIGO consistency). */
+  const integrateCustomLabel = useCallback(
+    (entry: {
+      id: string;
+      label: string;
+      color: string;
+      critical: boolean;
+      type?: string;
+    }) => {
+      rememberRoiLabel(entry);
+      if (!onSpecJsonChange) return;
+      const next = ensureSpecField(specJsonText, {
+        field: entry.id,
+        label: entry.label,
+        type: entry.type ?? "string",
+        required: entry.critical,
+      });
+      if (next) onSpecJsonChange(next);
+    },
+    [onSpecJsonChange, specJsonText]
+  );
   // Use provided PDF data or local upload
   const effectivePdfSource = pdfData ?? localPdfData ?? pdfUrl ?? undefined;
 
@@ -398,10 +437,15 @@ export function RoiEditorV2({
     }
     const color =
       CUSTOM_COLOR_PALETTE[customTypes.length % CUSTOM_COLOR_PALETTE.length];
-    setCustomTypes(prev => [
-      ...prev,
-      { id, label, color, critical: customLabelCritical },
-    ]);
+    const entry = {
+      id,
+      label,
+      color,
+      critical: customLabelCritical,
+      type: "string" as const,
+    };
+    setCustomTypes(prev => [...prev, entry]);
+    integrateCustomLabel(entry);
     setCurrentTool(id);
     setCustomLabelDraft("");
     setCustomLabelCritical(false);
@@ -472,8 +516,20 @@ export function RoiEditorV2({
       setSelectedRegion(tool);
       // Keep labels panel open after first successful draw so next labels are obvious
       setDrawPaletteOpen(true);
+
+      // Drawing a remembered/custom label keeps field id in the live template spec
+      const toolMeta = allRoiTypes.find(t => t.id === tool);
+      const isStandard = STANDARD_ROI_TYPES.some(t => t.id === tool);
+      if (toolMeta && !isStandard) {
+        integrateCustomLabel({
+          id: toolMeta.id,
+          label: toolMeta.label,
+          color: toolMeta.color,
+          critical: toolMeta.critical,
+        });
+      }
     },
-    [clientToNorm, currentPage]
+    [clientToNorm, currentPage, allRoiTypes, integrateCustomLabel]
   );
 
   /**
@@ -865,7 +921,8 @@ export function RoiEditorV2({
                     Draw labels
                   </div>
                   <div style={{ fontSize: 10, color: "#64748b" }}>
-                    ROI = Region of Interest · hover a label for how to draw
+                    ROI = Region of Interest · hover for how to draw · custom
+                    labels are remembered for the next template
                   </div>
                 </div>
                 <button
@@ -919,12 +976,29 @@ export function RoiEditorV2({
                     label: type.label,
                     fieldType: specMeta?.type,
                   });
+                  const isRemembered =
+                    !STANDARD_ROI_TYPES.some(t => t.id === type.id) &&
+                    !specFields.some(f => f.field === type.id);
                   return (
                     <Tooltip key={type.id} delayDuration={200}>
                       <TooltipTrigger asChild>
                         <button
                           type="button"
-                          onClick={() => setCurrentTool(type.id)}
+                          onClick={() => {
+                            setCurrentTool(type.id);
+                            // Selecting a remembered/custom label binds it into this template
+                            if (
+                              !STANDARD_ROI_TYPES.some(t => t.id === type.id)
+                            ) {
+                              integrateCustomLabel({
+                                id: type.id,
+                                label: type.label,
+                                color: type.color,
+                                critical: type.critical,
+                                type: specMeta?.type ?? "string",
+                              });
+                            }
+                          }}
                           disabled={readOnly}
                           aria-label={`${type.label}. ${guidance.summary} How to draw: ${guidance.howToDraw}`}
                           data-testid={`roi-draw-tool-${type.id}`}
@@ -965,6 +1039,20 @@ export function RoiEditorV2({
                             </span>
                           )}
                           <span style={{ flex: 1 }}>{type.label}</span>
+                          {isRemembered && (
+                            <span
+                              title="Saved from a previous template"
+                              style={{
+                                fontSize: 9,
+                                fontWeight: 700,
+                                color: "#64748b",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.02em",
+                              }}
+                            >
+                              saved
+                            </span>
+                          )}
                           <span
                             aria-hidden
                             style={{
@@ -1027,7 +1115,7 @@ export function RoiEditorV2({
                         addCustomLabel();
                       }
                     }}
-                    placeholder="Custom label…"
+                    placeholder="Custom label… (saved for next template)"
                     style={{
                       padding: "6px 8px",
                       border: "1px solid #e2e8f0",
@@ -1037,6 +1125,10 @@ export function RoiEditorV2({
                       boxSizing: "border-box",
                     }}
                   />
+                  <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.35 }}>
+                    New labels are stored in browser memory and added to this
+                    template&apos;s fields so ids stay consistent next time.
+                  </div>
                   <div
                     style={{
                       display: "flex",
