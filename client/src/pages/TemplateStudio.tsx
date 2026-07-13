@@ -52,10 +52,10 @@ type WizardStep =
   | "promote";
 
 const STEPS: Array<{ id: WizardStep; label: string }> = [
-  { id: "propose", label: "Propose" },
-  { id: "roi", label: "ROI" },
-  { id: "fields", label: "Fields & Tokens" },
-  { id: "gates", label: "Gates" },
+  { id: "propose", label: "Suggest fields" },
+  { id: "roi", label: "Draw regions" },
+  { id: "fields", label: "Fields & rules" },
+  { id: "gates", label: "Test & activate" },
   { id: "promote", label: "Promote" },
 ];
 
