@@ -71,6 +71,41 @@ const validSelectionConfig: SelectionConfig = {
   optionalTokens: ["customer"],
 };
 
+const validRoiJson = {
+  regions: [
+    {
+      name: "jobReference",
+      page: 1,
+      bounds: { x: 0.05, y: 0.1, width: 0.4, height: 0.05 },
+      fields: ["jobReference"],
+    },
+    {
+      name: "assetId",
+      page: 1,
+      bounds: { x: 0.5, y: 0.1, width: 0.4, height: 0.05 },
+      fields: ["assetId"],
+    },
+    {
+      name: "date",
+      page: 1,
+      bounds: { x: 0.7, y: 0.02, width: 0.25, height: 0.04 },
+      fields: ["date"],
+    },
+    {
+      name: "tickboxBlock",
+      page: 1,
+      bounds: { x: 0.05, y: 0.25, width: 0.9, height: 0.4 },
+      fields: ["complianceTickboxes"],
+    },
+    {
+      name: "signatureBlock",
+      page: 1,
+      bounds: { x: 0, y: 0.85, width: 1, height: 0.15 },
+      fields: ["engineerSignOff", "customerSignature"],
+    },
+  ],
+};
+
 // Invalid spec missing critical fields
 const invalidSpecJson: SpecJson = {
   name: "Invalid Spec",
@@ -111,11 +146,41 @@ describe("Activation Gates - PR-D Contract Tests", () => {
     it("should pass with valid spec and selection config", () => {
       const result = checkActivationPreconditions(
         validSpecJson,
-        validSelectionConfig
+        validSelectionConfig,
+        validRoiJson
       );
 
       expect(result.allowed).toBe(true);
       expect(result.blockingIssues).toHaveLength(0);
+    });
+
+    it("should block when ROI config is missing", () => {
+      const result = checkActivationPreconditions(
+        validSpecJson,
+        validSelectionConfig,
+        null
+      );
+      expect(result.allowed).toBe(false);
+      expect(
+        result.blockingIssues.some(i => i.code === "MISSING_ROI_CONFIG")
+      ).toBe(true);
+    });
+
+    it("should block when a critical ROI is missing", () => {
+      const incompleteRoi = {
+        regions: validRoiJson.regions.filter(r => r.name !== "tickboxBlock"),
+      };
+      const result = checkActivationPreconditions(
+        validSpecJson,
+        validSelectionConfig,
+        incompleteRoi
+      );
+      expect(result.allowed).toBe(false);
+      expect(
+        result.blockingIssues.some(
+          i => i.code === "MISSING_CRITICAL_ROI" && i.field === "tickboxBlock"
+        )
+      ).toBe(true);
     });
 
     it("should fail when all critical fields are missing", () => {
@@ -153,7 +218,7 @@ describe("Activation Gates - PR-D Contract Tests", () => {
         optionalTokens: [],
       };
 
-      const result = checkActivationPreconditions(validSpecJson, config);
+      const result = checkActivationPreconditions(validSpecJson, config, validRoiJson);
 
       expect(result.allowed).toBe(true);
     });
@@ -165,7 +230,7 @@ describe("Activation Gates - PR-D Contract Tests", () => {
         optionalTokens: [],
       };
 
-      const result = checkActivationPreconditions(validSpecJson, config);
+      const result = checkActivationPreconditions(validSpecJson, config, validRoiJson);
 
       expect(result.allowed).toBe(true);
     });
@@ -178,7 +243,7 @@ describe("Activation Gates - PR-D Contract Tests", () => {
         optionalTokens: [],
       };
 
-      const result = checkActivationPreconditions(validSpecJson, config);
+      const result = checkActivationPreconditions(validSpecJson, config, validRoiJson);
 
       expect(result.allowed).toBe(true);
     });
@@ -191,7 +256,8 @@ describe("Activation Gates - PR-D Contract Tests", () => {
 
       const result = checkActivationPreconditions(
         noRulesSpec,
-        validSelectionConfig
+        validSelectionConfig,
+        validRoiJson
       );
 
       expect(result.allowed).toBe(false);
@@ -212,7 +278,8 @@ describe("Activation Gates - PR-D Contract Tests", () => {
     it("should generate warnings for missing recommended fields", () => {
       const result = checkActivationPreconditions(
         validSpecJson,
-        validSelectionConfig
+        validSelectionConfig,
+        validRoiJson
       );
 
       // Recommended fields should be in warnings
@@ -236,6 +303,7 @@ describe("Activation Gates - PR-D Contract Tests", () => {
         version: "1.0.0",
         specJson: invalidSpecJson,
         selectionConfigJson: emptySelectionConfig,
+        roiJson: validRoiJson,
         createdBy: 1,
       });
 
@@ -254,6 +322,7 @@ describe("Activation Gates - PR-D Contract Tests", () => {
         version: "1.0.0",
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: validRoiJson,
         createdBy: 1,
       });
 
@@ -274,6 +343,7 @@ describe("Activation Gates - PR-D Contract Tests", () => {
         version: "1.0.0",
         specJson: invalidSpecJson,
         selectionConfigJson: emptySelectionConfig,
+        roiJson: validRoiJson,
         createdBy: 1,
       });
 
@@ -315,6 +385,7 @@ describe("Activation Gates - PR-D Contract Tests", () => {
           requiredTokensAny: ["repair"],
           optionalTokens: ["customer", "signature"],
         },
+        roiJson: validRoiJson,
         createdBy: 1,
       });
 
@@ -348,6 +419,7 @@ describe("Activation Gates - PR-D Contract Tests", () => {
           requiredTokensAny: ["rare"],
           optionalTokens: [],
         },
+        roiJson: validRoiJson,
         createdBy: 1,
       });
 
@@ -399,6 +471,7 @@ describe("Activation Gates - PR-D Contract Tests", () => {
           requiredTokensAny: ["repair"],
           optionalTokens: ["customer"],
         },
+        roiJson: validRoiJson,
         createdBy: 1,
       });
 
@@ -412,6 +485,7 @@ describe("Activation Gates - PR-D Contract Tests", () => {
           requiredTokensAny: ["maintenance"],
           optionalTokens: ["customer"],
         },
+        roiJson: validRoiJson,
         createdBy: 1,
       });
 

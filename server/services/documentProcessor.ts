@@ -74,6 +74,11 @@ import {
   enrichFieldMapFromRangeRules,
   evaluateRangeRules,
 } from "./rangeRules";
+import {
+  extractFieldsFromRoiSpatial,
+  mergeRoiSpatialFields,
+  type PreExtractedFieldMap,
+} from "./roiSpatialExtraction";
 import type { RuleSpec } from "./templateRegistry/types";
 import {
   evaluateWastedJourneyConsistency,
@@ -1263,6 +1268,70 @@ async function processJobSheetWithOptions(
   }
 
   // =========================================================================
+  // Stage 1.79: ROI Spatial Extraction — filter layout evidence into roiJson
+  // Fail-soft; prefers geometry inside drawn boxes for GIGO.
+  // =========================================================================
+  const roiSpatialStartTime = Date.now();
+  let roiSpatialFields: PreExtractedFieldMap = {};
+  try {
+    const pinnedVersion = usedTemplateVersionId
+      ? getTemplateVersion(usedTemplateVersionId)
+      : null;
+    const roiConfig = pinnedVersion?.roiJson;
+    if (roiConfig?.regions?.length) {
+      const spatial = extractFieldsFromRoiSpatial({
+        roiConfig,
+        lines: selectionMarksResult?.lines,
+        selectionMarks: selectionMarksResult?.selectionMarks,
+        fieldSpecs: pinnedVersion?.specJson?.fields,
+        headerText: extractedText.slice(0, 4000),
+      });
+      roiSpatialFields = spatial.fields;
+      if (spatial.warnings.length) {
+        console.info(
+          "[DocumentProcessor] ROI spatial warnings:",
+          spatial.warnings.slice(0, 5).join("; ")
+        );
+      }
+      recordStage(
+        {
+          stage: "ROI Spatial Extraction",
+          status:
+            Object.keys(roiSpatialFields).length > 0 ? "success" : "skipped",
+          durationMs: Date.now() - roiSpatialStartTime,
+        },
+        "Pipeline Integration"
+      );
+    } else {
+      recordStage(
+        {
+          stage: "ROI Spatial Extraction",
+          status: "skipped",
+          durationMs: Date.now() - roiSpatialStartTime,
+        },
+        "Pipeline Integration"
+      );
+    }
+  } catch (roiSpatialError) {
+    console.warn(
+      "[DocumentProcessor] ROI spatial extraction failed (non-fatal):",
+      roiSpatialError
+    );
+    recordStage(
+      {
+        stage: "ROI Spatial Extraction",
+        status: "failed",
+        durationMs: Date.now() - roiSpatialStartTime,
+        error:
+          roiSpatialError instanceof Error
+            ? roiSpatialError.message
+            : "ROI spatial failed",
+      },
+      "Pipeline Integration"
+    );
+  }
+
+  // =========================================================================
   // Stage 1.85: Pipeline Integration (Phase 1.4) — FULL path only
   // Master-flagged and fail-soft; sub-flags are no-ops unless enabled.
   // Persists artifacts on reportJson without changing canonical analysis.
@@ -1411,39 +1480,66 @@ async function processJobSheetWithOptions(
             ...(ensembleResult?.ensembleExtractedFields ?? {}),
             ...(selectionMarksResult?.preExtractedFields ?? {}),
           });
+          const withRoi = mergeRoiSpatialFields(base, roiSpatialFields, {
+            preferRoiFor: new Set(
+              Object.keys(roiSpatialFields).filter(
+                k =>
+                  k === "complianceTickboxes" ||
+                  k === "jobReference" ||
+                  k === "assetId" ||
+                  k === "date" ||
+                  k === "expiryDate"
+              )
+            ),
+          });
           // Text-layer signature label → Present hint for Gemini (ink not in OCR)
           if (
             hasSignatureLabelEvidence(extractedText) &&
-            !base.customerSignature &&
-            !base.engineerSignOff
+            !withRoi.customerSignature &&
+            !withRoi.engineerSignOff
           ) {
             const present = {
               value: "Present",
               confidence: 75,
               pageNumber: 1,
             };
-            base.customerSignature = present;
-            base.engineerSignOff = present;
+            withRoi.customerSignature = present;
+            withRoi.engineerSignOff = present;
           }
           // Anthropic VLM ink result overrides / strengthens signature hint
           if (vlmInkResult?.preExtractedHint) {
-            base.customerSignature = vlmInkResult.preExtractedHint;
-            base.engineerSignOff = vlmInkResult.preExtractedHint;
+            withRoi.customerSignature = vlmInkResult.preExtractedHint;
+            withRoi.engineerSignOff = vlmInkResult.preExtractedHint;
           }
-          if (hasVorBannerEvidence(extractedText) && !base.vorStatus) {
-            base.vorStatus = {
+          if (hasVorBannerEvidence(extractedText) && !withRoi.vorStatus) {
+            withRoi.vorStatus = {
               value: "Present",
               confidence: 85,
               pageNumber: 1,
             };
           }
-          return Object.keys(base).length > 0 ? base : undefined;
+          return Object.keys(withRoi).length > 0 ? withRoi : undefined;
         })(),
         preExtractedHintsBlock: (() => {
-          const fields = aliasCanonicalExtractedFields({
-            ...(ensembleResult?.ensembleExtractedFields ?? {}),
-            ...(selectionMarksResult?.preExtractedFields ?? {}),
-          });
+          const fields = mergeRoiSpatialFields(
+            aliasCanonicalExtractedFields({
+              ...(ensembleResult?.ensembleExtractedFields ?? {}),
+              ...(selectionMarksResult?.preExtractedFields ?? {}),
+            }),
+            roiSpatialFields,
+            {
+              preferRoiFor: new Set(
+                Object.keys(roiSpatialFields).filter(
+                  k =>
+                    k === "complianceTickboxes" ||
+                    k === "jobReference" ||
+                    k === "assetId" ||
+                    k === "date" ||
+                    k === "expiryDate"
+                )
+              ),
+            }
+          );
           if (
             hasSignatureLabelEvidence(extractedText) &&
             !fields.customerSignature &&
@@ -1975,6 +2071,18 @@ async function processJobSheetWithOptions(
         selectionMarksResult?.preExtractedFields ?? {}
       )) {
         if (templateFieldMap[k] == null) templateFieldMap[k] = v.value;
+      }
+      for (const [k, v] of Object.entries(roiSpatialFields)) {
+        if (templateFieldMap[k] == null) templateFieldMap[k] = v.value;
+        else if (
+          k === "complianceTickboxes" ||
+          k === "jobReference" ||
+          k === "assetId" ||
+          k === "date" ||
+          k === "expiryDate"
+        ) {
+          templateFieldMap[k] = v.value;
+        }
       }
       for (const [k, v] of Object.entries(
         analysisResult.extractedFields ?? {}

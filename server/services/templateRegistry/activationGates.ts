@@ -5,9 +5,10 @@
  * Prevents unsafe activation by validating:
  * - Selection config completeness
  * - Critical fields presence in spec
+ * - Critical ROIs + field↔ROI parity (GIGO)
  */
 
-import type { SpecJson, SelectionConfig } from './types';
+import type { SpecJson, SelectionConfig, RoiConfig, RoiRegion } from './types';
 
 /**
  * Critical fields that must be present in any activated template spec
@@ -26,6 +27,17 @@ export const RECOMMENDED_FIELDS = [
   'expiryDate',
   'complianceTickboxes',
   'customerSignature',
+] as const;
+
+/**
+ * Critical ROI region names that must be drawn before activate
+ */
+export const CRITICAL_ROI_NAMES = [
+  'jobReference',
+  'assetId',
+  'date',
+  'tickboxBlock',
+  'signatureBlock',
 ] as const;
 
 /**
@@ -51,16 +63,51 @@ export interface ActivationIssue {
   field?: string;
 }
 
+function enabledRegions(roiJson?: RoiConfig | null): RoiRegion[] {
+  return (roiJson?.regions ?? []).filter(
+    r => (r as { enabled?: boolean }).enabled !== false
+  );
+}
+
+/** ROI covers a field via name match or region.fields */
+export function regionCoversField(region: RoiRegion, fieldId: string): boolean {
+  if (region.name === fieldId) return true;
+  if (region.fields?.includes(fieldId)) return true;
+  // Canonical aliases used in Studio
+  if (fieldId === 'engineerSignOff') {
+    return (
+      region.name === 'engineerSignature' ||
+      region.name === 'signatureBlock' ||
+      region.fields?.includes('engineerSignOff') === true
+    );
+  }
+  if (fieldId === 'customerSignature') {
+    return (
+      region.name === 'customerSignature' ||
+      region.name === 'signatureBlock' ||
+      region.fields?.includes('customerSignature') === true
+    );
+  }
+  if (fieldId === 'complianceTickboxes') {
+    return region.name === 'tickboxBlock' || region.fields?.includes('complianceTickboxes') === true;
+  }
+  return false;
+}
+
+export function findRegionForField(
+  regions: RoiRegion[],
+  fieldId: string
+): RoiRegion | undefined {
+  return regions.find(r => regionCoversField(r, fieldId));
+}
+
 /**
  * Check activation preconditions for a template version
- * 
- * @param specJson - The specification JSON
- * @param selectionConfigJson - The selection configuration
- * @returns Precondition check result
  */
 export function checkActivationPreconditions(
   specJson: SpecJson,
-  selectionConfigJson: SelectionConfig
+  selectionConfigJson: SelectionConfig,
+  roiJson?: RoiConfig | null
 ): ActivationPreconditionResult {
   const blockingIssues: ActivationIssue[] = [];
   const warnings: ActivationIssue[] = [];
@@ -123,6 +170,86 @@ export function checkActivationPreconditions(
       message: 'Spec must have at least one validation rule',
     });
     fixPaths['NO_VALIDATION_RULES'] = 'Add at least one rule to specJson.rules';
+  }
+
+  // --- ROI readiness (GIGO) ---
+  const regions = enabledRegions(roiJson);
+
+  if (!roiJson || regions.length === 0) {
+    blockingIssues.push({
+      code: 'MISSING_ROI_CONFIG',
+      message: 'Template must have ROI regions drawn before activation',
+    });
+    fixPaths['MISSING_ROI_CONFIG'] =
+      'Open Draw regions, place critical ROIs, and Save ROI';
+  } else {
+    for (const roiName of CRITICAL_ROI_NAMES) {
+      const found =
+        roiName === 'signatureBlock'
+          ? regions.some(
+              r =>
+                r.name === 'signatureBlock' ||
+                r.name === 'engineerSignature' ||
+                r.fields?.includes('engineerSignOff')
+            )
+          : regions.some(r => r.name === roiName);
+      if (!found) {
+        blockingIssues.push({
+          code: 'MISSING_CRITICAL_ROI',
+          message: `Critical ROI '${roiName}' is missing`,
+          field: roiName,
+        });
+        fixPaths[`MISSING_CRITICAL_ROI:${roiName}`] =
+          `Draw a region named '${roiName}' on the sample PDF`;
+      }
+    }
+
+    // Critical field ↔ ROI parity (blocking)
+    for (const criticalField of CRITICAL_FIELDS) {
+      if (!specFieldIds.has(criticalField)) continue;
+      if (!findRegionForField(regions, criticalField)) {
+        blockingIssues.push({
+          code: 'CRITICAL_FIELD_NO_ROI',
+          message: `Critical field '${criticalField}' has no matching ROI region`,
+          field: criticalField,
+        });
+        fixPaths[`CRITICAL_FIELD_NO_ROI:${criticalField}`] =
+          `Draw an ROI whose name or fields[] is '${criticalField}' (engineerSignOff may use signatureBlock / engineerSignature)`;
+      }
+    }
+
+    // Recommended field ↔ ROI parity (warnings)
+    for (const recommendedField of RECOMMENDED_FIELDS) {
+      if (!specFieldIds.has(recommendedField)) continue;
+      if (!findRegionForField(regions, recommendedField)) {
+        warnings.push({
+          code: 'RECOMMENDED_FIELD_NO_ROI',
+          message: `Recommended field '${recommendedField}' has no matching ROI`,
+          field: recommendedField,
+        });
+      }
+    }
+
+    // Orphan ROIs (warn)
+    for (const region of regions) {
+      const covered =
+        specFieldIds.has(region.name) ||
+        (region.fields ?? []).some(f => specFieldIds.has(f)) ||
+        region.name === 'header' ||
+        region.name === 'tickboxBlock' ||
+        region.name === 'signatureBlock' ||
+        region.name === 'workDescription' ||
+        region.name === 'partsUsed' ||
+        region.name === 'engineerSignature' ||
+        region.name === 'customerSignature';
+      if (!covered) {
+        warnings.push({
+          code: 'ORPHAN_ROI',
+          message: `ROI '${region.name}' is not linked to a spec field — rename to a field id or set region.fields`,
+          field: region.name,
+        });
+      }
+    }
   }
 
   return {

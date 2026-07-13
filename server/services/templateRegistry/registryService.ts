@@ -85,16 +85,21 @@ let nextVersionId = 1;
 
 /**
  * Compute deterministic SHA-256 hash of template version content.
- * Hash includes specJson + selectionConfigJson (not ROI as it's optional).
+ * Hash includes specJson + selectionConfigJson + roiJson (ROI edits invalidate dry-run ack).
  *
  * CRITICAL: Uses stable JSON stringification for determinism.
  */
 export function computeVersionHash(
   specJson: SpecJson,
-  selectionConfigJson: SelectionConfig
+  selectionConfigJson: SelectionConfig,
+  roiJson?: RoiConfig | null
 ): string {
   // Create combined object and deep sort for determinism
-  const combined = { selection: selectionConfigJson, spec: specJson };
+  const combined = {
+    selection: selectionConfigJson,
+    spec: specJson,
+    roi: roiJson ?? null,
+  };
   const sortedContent = JSON.stringify(sortObjectKeys(combined));
 
   return createHash("sha256").update(sortedContent).digest("hex");
@@ -164,7 +169,8 @@ export function uploadTemplateVersion(
   // Compute deterministic hash
   const hashSha256 = computeVersionHash(
     input.specJson,
-    input.selectionConfigJson
+    input.selectionConfigJson,
+    input.roiJson ?? null
   );
 
   // Check for duplicate hash (same content)
@@ -360,7 +366,8 @@ export function activateVersion(
   if (!options.skipPreconditions) {
     const preconditionResult = checkActivationPreconditions(
       version.specJson,
-      version.selectionConfigJson
+      version.selectionConfigJson,
+      version.roiJson
     );
 
     if (!preconditionResult.allowed) {
@@ -479,6 +486,16 @@ export function updateVersionRoi(
   }
 
   version.roiJson = roiJson;
+  version.hashSha256 = computeVersionHash(
+    version.specJson,
+    version.selectionConfigJson,
+    version.roiJson
+  );
+
+  const template = templateStore.get(version.templateId);
+  if (template) {
+    persistTemplateVersionToMysqlBestEffort(version, template);
+  }
 
   return version;
 }
@@ -515,7 +532,8 @@ export function updateDraftVersion(
 
   version.hashSha256 = computeVersionHash(
     version.specJson,
-    version.selectionConfigJson
+    version.selectionConfigJson,
+    version.roiJson
   );
 
   const template = templateStore.get(version.templateId);

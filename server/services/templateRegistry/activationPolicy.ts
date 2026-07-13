@@ -136,7 +136,8 @@ export function runPolicyCheck(
   // 1. Check base preconditions (selection config, critical fields)
   const preconditions = checkActivationPreconditions(
     specJson,
-    selectionConfigJson
+    selectionConfigJson,
+    roiJson
   );
   if (!preconditions.allowed) {
     for (const issue of preconditions.blockingIssues) {

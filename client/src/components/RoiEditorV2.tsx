@@ -117,6 +117,8 @@ interface RoiEditorV2Props {
   specJsonText?: string;
   /** Persist threshold / field updates into Studio draft */
   onSpecJsonChange?: (next: string) => void;
+  /** Canonical spec fields — draw palette binds ROI names to these ids */
+  specFields?: Array<{ field: string; label: string; type?: string }>;
 }
 
 const CUSTOM_COLOR_PALETTE = [
@@ -129,6 +131,16 @@ const CUSTOM_COLOR_PALETTE = [
   '#64748b',
 ];
 
+const CRITICAL_FIELD_IDS = new Set([
+  'jobReference',
+  'assetId',
+  'date',
+  'expiryDate',
+  'engineerSignOff',
+  'tickboxBlock',
+  'complianceTickboxes',
+]);
+
 function slugifyLabel(label: string): string {
   const slug = label
     .trim()
@@ -136,6 +148,16 @@ function slugifyLabel(label: string): string {
     .replace(/^_|_$/g, "")
     .replace(/_+/g, "_");
   return slug || "customField";
+}
+
+function fieldsForTool(tool: string): string[] {
+  if (tool === "tickboxBlock") return ["complianceTickboxes"];
+  if (tool === "engineerSignature") return ["engineerSignOff"];
+  if (tool === "customerSignature") return ["customerSignature"];
+  if (tool === "signatureBlock") {
+    return ["engineerSignOff", "customerSignature"];
+  }
+  return [tool];
 }
 
 /**
@@ -154,6 +176,7 @@ export function RoiEditorV2({
   showPdfPreview = true,
   specJsonText,
   onSpecJsonChange,
+  specFields = [],
 }: RoiEditorV2Props) {
   const [regions, setRegions] = useState<RoiRegion[]>(initialRoi?.regions ?? []);
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
@@ -186,9 +209,31 @@ export function RoiEditorV2({
   /** Floating draw palette — stays visible while scrolling the PDF */
   const [drawPaletteOpen, setDrawPaletteOpen] = useState(true);
 
-  const allRoiTypes = useMemo(
-    () => [...STANDARD_ROI_TYPES, ...customTypes],
-    [customTypes]
+  const allRoiTypes = useMemo(() => {
+    const standard = STANDARD_ROI_TYPES.map(t => ({ ...t }));
+    const known = new Set<string>(standard.map(t => t.id));
+    // Alias: engineerSignOff appears as engineerSignature in draw tools
+    known.add("engineerSignOff");
+    known.add("complianceTickboxes");
+
+    const fromSpec = specFields
+      .filter(f => !known.has(f.field) && f.field !== "header")
+      .map((f, i) => ({
+        id: f.field,
+        label: f.label || f.field,
+        color: CUSTOM_COLOR_PALETTE[i % CUSTOM_COLOR_PALETTE.length],
+        critical: CRITICAL_FIELD_IDS.has(f.field),
+      }));
+
+    for (const t of fromSpec) known.add(t.id);
+
+    const fromCustom = customTypes.filter(t => !known.has(t.id));
+    return [...standard, ...fromSpec, ...fromCustom];
+  }, [specFields, customTypes]);
+
+  const specFieldIdSet = useMemo(
+    () => new Set(specFields.map(f => f.field)),
+    [specFields]
   );
 
   // Seed custom types from existing regions that aren't in the standard menu
@@ -306,7 +351,37 @@ export function RoiEditorV2({
   const addCustomLabel = () => {
     const label = customLabelDraft.trim();
     if (!label || readOnly) return;
-    let id = slugifyLabel(label);
+
+    // Bind to an existing spec field id when label matches (prevents duplicates)
+    const matchedSpec = specFields.find(
+      f =>
+        f.field.toLowerCase() === label.toLowerCase() ||
+        f.field.toLowerCase() === slugifyLabel(label).toLowerCase() ||
+        (f.label && f.label.toLowerCase() === label.toLowerCase())
+    );
+    if (matchedSpec) {
+      setCurrentTool(matchedSpec.field);
+      setCustomLabelDraft("");
+      setCustomLabelCritical(false);
+      setDrawPaletteOpen(true);
+      return;
+    }
+
+    // Also bind if slug matches an existing palette id
+    const slug = slugifyLabel(label);
+    const existingTool = allRoiTypes.find(
+      t =>
+        t.id.toLowerCase() === slug.toLowerCase() ||
+        t.label.toLowerCase() === label.toLowerCase()
+    );
+    if (existingTool) {
+      setCurrentTool(existingTool.id);
+      setCustomLabelDraft("");
+      setCustomLabelCritical(false);
+      return;
+    }
+
+    let id = slug;
     const existingIds = new Set(allRoiTypes.map(t => t.id));
     if (existingIds.has(id)) {
       let n = 2;
@@ -378,6 +453,7 @@ export function RoiEditorV2({
           width: Math.max(0.005, Math.min(1 - x, width)),
           height: Math.max(0.005, Math.min(1 - y, height)),
         },
+        fields: fieldsForTool(tool),
         enabled: true,
       };
 
@@ -725,6 +801,27 @@ export function RoiEditorV2({
               <span>Page {currentPage} of {totalPages}</span>
             )}
           </div>
+          {(currentTool === "tickboxBlock" ||
+            currentTool === "complianceTickboxes") &&
+            !readOnly && (
+            <div
+              style={{
+                marginBottom: 8,
+                padding: "8px 10px",
+                borderRadius: 6,
+                backgroundColor: "#FEF9C3",
+                border: "1px solid #FDE68A",
+                fontSize: 12,
+                color: "#854D0E",
+                lineHeight: 1.35,
+              }}
+              data-testid="tickbox-draw-coach"
+            >
+              Tickbox tip: cover the full checklist grid — row requirement text
+              + all four columns (Ok / Adv / Fail / N/A) and the column headers.
+              One block, not one ROI per column.
+            </div>
+          )}
 
           {/* Floating draw palette — fixed over the viewer while PDF scrolls */}
           {drawPaletteOpen ? (
@@ -1243,6 +1340,39 @@ export function RoiEditorV2({
                         )}
                         {regionLabel(region.name)}
                       </span>
+                      {specFields.length > 0 && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            color:
+                              specFieldIdSet.has(region.name) ||
+                              (region.fields ?? []).some(f =>
+                                specFieldIdSet.has(f)
+                              ) ||
+                              region.name === "tickboxBlock" ||
+                              region.name === "signatureBlock" ||
+                              region.name === "engineerSignature" ||
+                              region.name === "customerSignature" ||
+                              region.name === "header" ||
+                              region.name === "workDescription"
+                                ? "#64748b"
+                                : "#b45309",
+                          }}
+                        >
+                          {specFieldIdSet.has(region.name) ||
+                          (region.fields ?? []).some(f =>
+                            specFieldIdSet.has(f)
+                          ) ||
+                          region.name === "tickboxBlock" ||
+                          region.name === "signatureBlock" ||
+                          region.name === "engineerSignature" ||
+                          region.name === "customerSignature" ||
+                          region.name === "header" ||
+                          region.name === "workDescription"
+                            ? "linked"
+                            : "orphan — rename to a field id"}
+                        </span>
+                      )}
                     </div>
                     {!readOnly && (
                       <button

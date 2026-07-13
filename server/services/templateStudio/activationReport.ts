@@ -57,7 +57,8 @@ export async function buildActivationReport(
 
   const preconditions = checkActivationPreconditions(
     version.specJson,
-    version.selectionConfigJson
+    version.selectionConfigJson,
+    version.roiJson
   );
 
   const hasFixtures = hasFixturePack(versionId);

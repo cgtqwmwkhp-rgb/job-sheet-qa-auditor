@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { templateRouter } from '../../routers/templateRouter';
 import { resetRegistry } from '../../services/templateRegistry';
+import { createStandardJobSheetRoi } from '../../services/templateRegistry/roiValidator';
 import { router } from '../../_core/trpc';
 import type { User } from '../../../drizzle/schema';
 
@@ -117,6 +118,7 @@ describe('Template Router - PR-C Contract Tests', () => {
         version: '1.0.0',
         specJson: testSpecJson,
         selectionConfigJson: testSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
       });
       
       const versions = await userCaller.templates.listVersions({ templateId: template.id });
@@ -168,6 +170,7 @@ describe('Template Router - PR-C Contract Tests', () => {
         version: '1.0.0',
         specJson: testSpecJson,
         selectionConfigJson: testSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         changeNotes: 'Initial version',
       });
       
@@ -191,6 +194,7 @@ describe('Template Router - PR-C Contract Tests', () => {
           version: '1.0.0',
           specJson: testSpecJson,
           selectionConfigJson: testSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         })
       ).rejects.toThrow();
     });
@@ -208,6 +212,7 @@ describe('Template Router - PR-C Contract Tests', () => {
         version: '1.0.0',
         specJson: testSpecJson,
         selectionConfigJson: testSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
       });
       
       expect(version.isActive).toBe(false);
@@ -231,6 +236,7 @@ describe('Template Router - PR-C Contract Tests', () => {
         version: '1.0.0',
         specJson: testSpecJson,
         selectionConfigJson: testSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
       });
       
       await expect(
@@ -303,6 +309,7 @@ describe('Template Router - PR-C Contract Tests', () => {
         version: '1.0.0',
         specJson: testSpecJson,
         selectionConfigJson: testSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
       });
       
       await caller.templates.activateVersion({ versionId: version.id });

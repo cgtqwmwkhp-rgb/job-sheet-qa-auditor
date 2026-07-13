@@ -7,6 +7,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { RoiEditorV2 } from "@/components/RoiEditorV2";
 import { ConditionalRulesPanel } from "@/components/ConditionalRulesPanel";
 import { ThresholdRulesPanel } from "@/components/ThresholdRulesPanel";
+import { TemplateAuthoringGuide } from "@/components/TemplateAuthoringGuide";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -586,6 +587,8 @@ export default function TemplateStudio() {
         )}
 
         {step === "upload" && (
+          <div className="space-y-4">
+            <TemplateAuthoringGuide defaultOpen />
           <div
             className={`relative overflow-hidden rounded-xl border-2 border-dashed transition ${
               dragOver
@@ -653,6 +656,7 @@ export default function TemplateStudio() {
                 </>
               )}
             </div>
+          </div>
           </div>
         )}
 
@@ -928,6 +932,7 @@ export default function TemplateStudio() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <TemplateAuthoringGuide compact />
                 {proposalPreview && !proposeMut.data?.proposal && (
                   <div className="rounded-md border border-[#BEDA41]/40 bg-[#BEDA41]/10 px-3 py-2 text-sm">
                     Quick-start already saved {proposalPreview.fieldCount}{" "}
@@ -1101,12 +1106,27 @@ export default function TemplateStudio() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <TemplateAuthoringGuide compact />
               <RoiEditorV2
                 initialRoi={roiDraft ?? version?.roiJson ?? undefined}
                 pdfUrl={sampleUrl ?? undefined}
                 onChange={handleRoiChange}
                 specJsonText={specJsonText}
                 onSpecJsonChange={setSpecJsonText}
+                specFields={(() => {
+                  try {
+                    const parsed = JSON.parse(specJsonText || "{}") as {
+                      fields?: Array<{
+                        field: string;
+                        label: string;
+                        type?: string;
+                      }>;
+                    };
+                    return parsed.fields ?? [];
+                  } catch {
+                    return [];
+                  }
+                })()}
                 onSave={roi => {
                   setRoiDraft(roi);
                   void (async () => {

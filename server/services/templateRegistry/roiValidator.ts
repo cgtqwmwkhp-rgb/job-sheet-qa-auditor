@@ -192,11 +192,47 @@ export function createStandardJobSheetRoi(): RoiConfig {
   return {
     regions: [
       { name: 'header', page: 1, bounds: { x: 0, y: 0, width: 1, height: 0.1 } },
-      { name: 'jobReference', page: 1, bounds: { x: 0.05, y: 0.1, width: 0.4, height: 0.05 } },
-      { name: 'assetId', page: 1, bounds: { x: 0.5, y: 0.1, width: 0.45, height: 0.05 } },
-      { name: 'date', page: 1, bounds: { x: 0.7, y: 0.02, width: 0.25, height: 0.04 } },
-      { name: 'workDescription', page: 1, bounds: { x: 0.05, y: 0.2, width: 0.9, height: 0.4 } },
-      { name: 'signatureBlock', page: 1, bounds: { x: 0, y: 0.85, width: 1, height: 0.15 } },
+      {
+        name: 'jobReference',
+        page: 1,
+        bounds: { x: 0.05, y: 0.1, width: 0.4, height: 0.05 },
+        fields: ['jobReference'],
+      },
+      {
+        name: 'assetId',
+        page: 1,
+        bounds: { x: 0.5, y: 0.1, width: 0.45, height: 0.05 },
+        fields: ['assetId'],
+      },
+      {
+        name: 'date',
+        page: 1,
+        bounds: { x: 0.7, y: 0.02, width: 0.25, height: 0.04 },
+        fields: ['date'],
+      },
+      {
+        name: 'expiryDate',
+        page: 1,
+        bounds: { x: 0.7, y: 0.07, width: 0.25, height: 0.04 },
+        fields: ['expiryDate'],
+      },
+      {
+        name: 'tickboxBlock',
+        page: 1,
+        bounds: { x: 0.05, y: 0.25, width: 0.9, height: 0.45 },
+        fields: ['complianceTickboxes'],
+      },
+      {
+        name: 'workDescription',
+        page: 1,
+        bounds: { x: 0.05, y: 0.2, width: 0.9, height: 0.05 },
+      },
+      {
+        name: 'signatureBlock',
+        page: 1,
+        bounds: { x: 0, y: 0.85, width: 1, height: 0.15 },
+        fields: ['engineerSignOff', 'customerSignature'],
+      },
     ],
   };
 }

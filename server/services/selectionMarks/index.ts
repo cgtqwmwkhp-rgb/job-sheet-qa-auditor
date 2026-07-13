@@ -80,6 +80,10 @@ export interface SelectionMarksResult {
    * Undefined when layout returned no usable text.
    */
   layoutText?: string;
+  /** Layout lines with percent geometry — for ROI spatial extraction. */
+  lines?: AzureTextLine[];
+  /** Raw selection marks — for ROI spatial filtering. */
+  selectionMarks?: AzureSelectionMark[];
 }
 
 /** Default on when Azure DI is configured; explicit false/0 disables. */
@@ -360,7 +364,11 @@ export function buildSelectionMarksArtifact(
 
 export function artifactToResult(
   artifact: SelectionMarksArtifact,
-  options?: { layoutText?: string }
+  options?: {
+    layoutText?: string;
+    lines?: AzureTextLine[];
+    selectionMarks?: AzureSelectionMark[];
+  }
 ): SelectionMarksResult {
   const hintsBlock = formatSelectionMarksHints(artifact.rows);
   const preExtractedFields: SelectionMarksResult["preExtractedFields"] = {};
@@ -388,6 +396,10 @@ export function artifactToResult(
     hintsBlock,
     preExtractedFields,
     ...(options?.layoutText ? { layoutText: options.layoutText } : {}),
+    ...(options?.lines?.length ? { lines: options.lines } : {}),
+    ...(options?.selectionMarks?.length
+      ? { selectionMarks: options.selectionMarks }
+      : {}),
   };
 }
 
@@ -545,7 +557,11 @@ export async function runSelectionMarkDetection(
       lines: layout.lines,
       error: layout.success ? undefined : layout.error,
     });
-    return artifactToResult(artifact, { layoutText: layout.layoutText });
+    return artifactToResult(artifact, {
+      layoutText: layout.layoutText,
+      lines: layout.lines,
+      selectionMarks: layout.selectionMarks,
+    });
   } catch (error) {
     console.warn("[SelectionMarks] fail-soft:", error);
     return artifactToResult(
