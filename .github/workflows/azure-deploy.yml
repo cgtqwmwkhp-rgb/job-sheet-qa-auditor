@@ -747,6 +747,12 @@ jobs:
               AZURE_STORAGE_CONTAINER_NAME="${{ vars.AZURE_STORAGE_CONTAINER_NAME || 'jobsheets' }}" \
               ENABLE_PURGE_EXECUTION="${{ vars.ENABLE_PURGE_EXECUTION || 'false' }}" \
               ENABLE_SCHEDULER="${{ vars.ENABLE_SCHEDULER || 'false' }}" \
+              FEATURE_OVERTURN_METRICS=true \
+              FEATURE_PHOTO_PAIR_COMPARE=true \
+              FEATURE_VLM_VERIFICATION=true \
+              FEATURE_IMAGE_QA_INTAKE=true \
+              FEATURE_GEMINI_MULTIMODAL=true \
+              VLM_PROVIDER=anthropic \
               TEMPLATE_REGISTRY_MYSQL_PERSISTENCE_ENABLED=true
 
       - name: Set secrets as environment variables
@@ -845,6 +851,23 @@ jobs:
               --set-env-vars "JWT_SECRET=secretref:jwt-secret"
           else
             echo "::warning::JWT_SECRET secret missing — production may crash-loop on boot"
+          fi
+
+          # Azure Document Intelligence (selectionMarks / layout pass) — parity with staging
+          if [ -n "${{ secrets.AZURE_DI_KEY }}" ] && [ -n "${{ vars.AZURE_DI_ENDPOINT }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "azure-di-key=${{ secrets.AZURE_DI_KEY }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars \
+                "AZURE_DI_ENDPOINT=${{ vars.AZURE_DI_ENDPOINT }}" \
+                "AZURE_DI_KEY=secretref:azure-di-key" \
+                "AZURE_DI_MODEL=prebuilt-read" \
+                "FEATURE_SELECTION_MARKS=true"
           fi
 
       - name: Get production URL
