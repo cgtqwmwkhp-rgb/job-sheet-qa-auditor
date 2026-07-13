@@ -76,10 +76,47 @@
       "featureFlags": {
         "FEATURE_OVERTURN_METRICS": {
           "type": "env",
-          "description": "Enables the server-side overturn-metrics analytics endpoint. Not set in production until validated in staging.",
+          "description": "Enables the server-side overturn-metrics analytics endpoint.",
           "required": false,
           "default": "false",
-          "value": "false"
+          "value": "true",
+          "addedIn": "#249"
+        },
+        "FEATURE_PHOTO_PAIR_COMPARE": {
+          "type": "env",
+          "description": "Enables before/after photo pair compare stage.",
+          "required": false,
+          "default": "false",
+          "value": "true",
+          "addedIn": "#259"
+        },
+        "FEATURE_SELECTION_MARKS": {
+          "type": "env",
+          "description": "Azure Document Intelligence selection marks pass.",
+          "required": false,
+          "default": "false",
+          "value": "true"
+        },
+        "FEATURE_VLM_VERIFICATION": {
+          "type": "env",
+          "description": "Anthropic VLM ink/signature verification.",
+          "required": false,
+          "default": "false",
+          "value": "true"
+        },
+        "FEATURE_IMAGE_QA_INTAKE": {
+          "type": "env",
+          "description": "Image QA intake pipeline stage.",
+          "required": false,
+          "default": "false",
+          "value": "true"
+        },
+        "FEATURE_GEMINI_MULTIMODAL": {
+          "type": "env",
+          "description": "Gemini multimodal enrichment.",
+          "required": false,
+          "default": "false",
+          "value": "true"
         }
       }
     }
