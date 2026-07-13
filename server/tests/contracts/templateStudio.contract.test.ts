@@ -10,6 +10,10 @@ import {
 } from "../../services/templateRegistry";
 import { resetPromoteStore } from "../../services/templateStudio/promoteStore";
 import { resetStudioSampleStore } from "../../services/templateStudio/sampleStore";
+import {
+  resetDryRunStore,
+  seedAcknowledgedDryRunForTests,
+} from "../../services/templateStudio/dryRunAudit";
 import { router } from "../../_core/trpc";
 import type { User } from "../../../drizzle/schema";
 
@@ -48,6 +52,7 @@ describe("Template Studio contracts", () => {
     resetRegistry();
     resetPromoteStore();
     resetStudioSampleStore();
+    resetDryRunStore();
   });
 
   it("allows qa_lead to createDraft with starter critical fields", async () => {
@@ -101,7 +106,7 @@ describe("Template Studio contracts", () => {
 
   it("activationReport reflects gates; activateStaging succeeds for starter draft", async () => {
     const caller = createCaller("admin");
-    const { version } = await caller.templates.studio.createDraft({
+    const { template, version } = await caller.templates.studio.createDraft({
       name: "Activate Me",
       selectionTokens: ["plantexpand-unique-activate"],
     });
@@ -110,10 +115,29 @@ describe("Template Studio contracts", () => {
       sampleText:
         "Job Reference JOB-1 Asset ID A-1 Date 01/01/2026 Engineer Sign-Off Jane",
     });
+    const reportBefore = await caller.templates.studio.activationReport({
+      versionId: version.id,
+    });
+    expect(reportBefore.preconditions.allowed).toBe(true);
+    expect(reportBefore.dryRun.blocking).toBe(true);
+    expect(reportBefore.allowed).toBe(false);
+
+    await expect(
+      caller.templates.studio.activateStaging({ versionId: version.id })
+    ).rejects.toThrow(/DRY_RUN/);
+
+    await seedAcknowledgedDryRunForTests({
+      versionId: version.id,
+      hashSha256: version.hashSha256,
+      templateId: template.id,
+      userId: 1,
+    });
+
     const report = await caller.templates.studio.activationReport({
       versionId: version.id,
     });
     expect(report.preconditions.allowed).toBe(true);
+    expect(report.dryRun.allowed).toBe(true);
     expect(report.allowed).toBe(true);
 
     const activated = await caller.templates.studio.activateStaging({
@@ -121,6 +145,34 @@ describe("Template Studio contracts", () => {
     });
     expect(activated.version.isActive).toBe(true);
     expect(getTemplateVersion(version.id)?.isActive).toBe(true);
+  });
+
+  it("acknowledgeDryRun rejects stale hash after draft change", async () => {
+    const caller = createCaller("qa_lead");
+    const { template, version } = await caller.templates.studio.createDraft({
+      name: "Stale Dry",
+      selectionTokens: ["stale-dry-token"],
+    });
+    await seedAcknowledgedDryRunForTests({
+      versionId: version.id,
+      hashSha256: version.hashSha256,
+      templateId: template.id,
+    });
+    const saved = await caller.templates.studio.saveDraft({
+      versionId: version.id,
+      changeNotes: "change hash",
+      selectionConfigJson: {
+        requiredTokensAll: [],
+        requiredTokensAny: ["stale-dry-token", "changed"],
+        optionalTokens: [],
+      },
+    });
+    await expect(
+      caller.templates.studio.acknowledgeDryRun({
+        versionId: saved.version.id,
+        hashSha256: version.hashSha256,
+      })
+    ).rejects.toThrow(/DRY_RUN_STALE|DRY_RUN_REQUIRED/);
   });
 
   it("blocks direct activation on production APP_ENV", async () => {
@@ -180,11 +232,17 @@ describe("Template Studio contracts", () => {
 
   it("dual-control promote blocks self-approve", async () => {
     const author = createCaller("qa_lead", 10);
-    const { version } = await author.templates.studio.createDraft({
+    const { template, version } = await author.templates.studio.createDraft({
       name: "Promote Me",
       selectionTokens: ["promote-unique-token"],
     });
     await author.templates.studio.scaffoldFixtures({ versionId: version.id });
+    await seedAcknowledgedDryRunForTests({
+      versionId: version.id,
+      hashSha256: version.hashSha256,
+      templateId: template.id,
+      userId: 10,
+    });
     await author.templates.studio.activateStaging({ versionId: version.id });
     const req = await author.templates.studio.requestPromote({
       versionId: version.id,

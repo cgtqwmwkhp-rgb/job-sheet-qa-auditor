@@ -53,6 +53,10 @@ import {
   packIntegrityHash,
   assertPackIntegrity,
   diffVersions,
+  runStudioDryRun,
+  acknowledgeDryRun,
+  loadDryRunReport,
+  getDryRunGateStatus,
 } from "../services/templateStudio";
 import { assertStagingActivationAllowed } from "../services/templateStudio/envGuards";
 import { resolveStudioSample } from "../services/templateStudio/sampleStore";
@@ -758,6 +762,93 @@ export const templateRouter = router({
       .input(z.object({ versionId: z.number() }))
       .query(({ input }) => buildActivationReport(input.versionId)),
 
+    dryRun: qaLeadProcedure
+      .input(
+        z.object({
+          versionId: z.number(),
+          jobSheetIds: z.array(z.number()).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          const report = await runStudioDryRun({
+            versionId: input.versionId,
+            userId: ctx.user.id,
+            jobSheetIds: input.jobSheetIds,
+          });
+          logAuditEvent(
+            "TEMPLATE_STUDIO_DRY_RUN",
+            "template_version",
+            input.versionId,
+            ctx.user.id,
+            {
+              hashSha256: report.hashSha256,
+              pipelineOk: report.pipelineOk,
+              assessmentMode: report.assessmentMode,
+              durationMs: report.durationMs,
+            }
+          );
+          return report;
+        } catch (err) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: err instanceof Error ? err.message : "Dry-run failed",
+          });
+        }
+      }),
+
+    getDryRun: qaLeadProcedure
+      .input(z.object({ versionId: z.number() }))
+      .query(async ({ input }) => {
+        const version = getTemplateVersion(input.versionId);
+        if (!version) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: `Version not found: ${input.versionId}`,
+          });
+        }
+        const report = await loadDryRunReport(
+          input.versionId,
+          version.hashSha256
+        );
+        const gate = await getDryRunGateStatus(input.versionId);
+        return { report, gate };
+      }),
+
+    acknowledgeDryRun: qaLeadProcedure
+      .input(
+        z.object({
+          versionId: z.number(),
+          hashSha256: z.string().min(8),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          const report = await acknowledgeDryRun({
+            versionId: input.versionId,
+            hashSha256: input.hashSha256,
+            userId: ctx.user.id,
+          });
+          logAuditEvent(
+            "TEMPLATE_STUDIO_DRY_RUN_ACK",
+            "template_version",
+            input.versionId,
+            ctx.user.id,
+            { hashSha256: report.hashSha256 }
+          );
+          return report;
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "Acknowledge failed";
+          throw new TRPCError({
+            code: message.startsWith("DRY_RUN_")
+              ? "BAD_REQUEST"
+              : "BAD_REQUEST",
+            message,
+          });
+        }
+      }),
+
     activateStaging: qaLeadProcedure
       .input(z.object({ versionId: z.number() }))
       .mutation(async ({ ctx, input }) => {
@@ -769,15 +860,18 @@ export const templateRouter = router({
             message: err instanceof Error ? err.message : "Activation blocked",
           });
         }
-        const report = buildActivationReport(input.versionId);
+        const report = await buildActivationReport(input.versionId);
         if (!report.allowed) {
+          const dryPart = report.dryRun.blocking
+            ? `; ${report.dryRun.code}`
+            : "";
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: `Activation gates failed: ${report.preconditions.blockingIssues
               .map(i => i.code)
               .join(", ")}${
               report.fixtures.blocking ? "; FIXTURES_FAILED" : ""
-            }${!report.collision.allowed ? "; COLLISION" : ""}`,
+            }${!report.collision.allowed ? "; COLLISION" : ""}${dryPart}`,
           });
         }
         if (!report.fixtures.hasFixtures) {
@@ -785,6 +879,13 @@ export const templateRouter = router({
             code: "BAD_REQUEST",
             message:
               "Fixtures required before staging activate — run Propose apply or Scaffold fixtures first",
+          });
+        }
+        const dryGate = await getDryRunGateStatus(input.versionId);
+        if (!dryGate.allowed) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `${dryGate.code}: ${dryGate.message}`,
           });
         }
         const version = activateVersion(input.versionId);
@@ -926,8 +1027,8 @@ export const templateRouter = router({
 
     collisionPreview: qaLeadProcedure
       .input(z.object({ versionId: z.number() }))
-      .query(({ input }) => {
-        const report = buildActivationReport(input.versionId);
+      .query(async ({ input }) => {
+        const report = await buildActivationReport(input.versionId);
         return report.collision;
       }),
 

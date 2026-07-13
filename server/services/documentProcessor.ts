@@ -179,6 +179,18 @@ export interface ProcessingOptions {
    * This option is ignored; templates are always used.
    */
   useLegacyPath?: boolean;
+  /**
+   * When false, run the full audit pipeline but skip all DB writes
+   * (job sheet status, audit_results, findings, technician attribution).
+   * Used by Template Studio dry-run so results never enter live stats.
+   * Default: true.
+   */
+  persistResults?: boolean;
+  /**
+   * When true, skip processing-progress snapshots. Implied when
+   * persistResults is false. Default: false.
+   */
+  skipProgress?: boolean;
 }
 
 export interface OrchestrateJobSheetProcessingRequest
@@ -190,7 +202,12 @@ export interface OrchestrateJobSheetProcessingRequest
    */
   documentUrl?: string;
   /** Names the external entrypoint for logs/tests; do not branch pipeline logic on it. */
-  source?: "primary" | "reprocess" | "template-reprocess" | "dlq-retry";
+  source?:
+    | "primary"
+    | "reprocess"
+    | "template-reprocess"
+    | "dlq-retry"
+    | "studio-dry-run";
 }
 
 /**
@@ -459,13 +476,19 @@ export async function orchestrateJobSheetProcessing(
         templateVersionId: request.templateVersionId,
         userId: request.userId,
         useLegacyPath: request.useLegacyPath,
+        persistResults: request.persistResults,
+        skipProgress: request.skipProgress,
       }),
       TIMEOUT_CONFIG.DOCUMENT_PROCESSING,
       `Job sheet ${request.jobSheetId} processing`
     );
   } catch (error) {
-    // If timeout, mark job as failed and log
-    if (error instanceof TimeoutError) {
+    // If timeout, mark job as failed and log (never for dry-run / non-persist)
+    if (
+      error instanceof TimeoutError &&
+      request.persistResults !== false &&
+      request.jobSheetId > 0
+    ) {
       console.error(
         `[DocumentProcessor] Job ${request.jobSheetId} timed out after ${error.timeoutMs}ms`
       );
@@ -496,6 +519,8 @@ async function processJobSheetWithOptions(
   const stages: ProcessingResult["processingStages"] = [];
   const runId = uuidv4();
   let selectionResult: SelectionResult | undefined;
+  const persistResults = options.persistResults !== false;
+  const skipProgress = options.skipProgress === true || !persistResults;
 
   /** PR-11: push stage + sync live poll snapshot (non-fatal). */
   const recordStage = (
@@ -503,6 +528,7 @@ async function processJobSheetWithOptions(
     nextRunning?: string
   ) => {
     stages.push(stage);
+    if (skipProgress || jobSheetId <= 0) return;
     try {
       syncStagesFromProcessor(jobSheetId, stages, nextRunning);
     } catch (err) {
@@ -511,6 +537,7 @@ async function processJobSheetWithOptions(
   };
 
   const finishProgress = (finalStatus: JobSheetProcessStatus) => {
+    if (skipProgress || jobSheetId <= 0) return;
     try {
       finishProcessingProgress(jobSheetId, finalStatus, stages);
     } catch (err) {
@@ -518,18 +545,25 @@ async function processJobSheetWithOptions(
     }
   };
 
+  const persistStatus = async (status: string) => {
+    if (!persistResults || jobSheetId <= 0) return;
+    try {
+      await db.updateJobSheetStatus(jobSheetId, status);
+    } catch (error) {
+      console.warn(
+        "[DocumentProcessor] Could not update job sheet status:",
+        error
+      );
+    }
+  };
+
   // Update job sheet status to processing
-  try {
-    await db.updateJobSheetStatus(jobSheetId, "processing");
-  } catch (error) {
-    console.warn(
-      "[DocumentProcessor] Could not update job sheet status:",
-      error
-    );
-  }
+  await persistStatus("processing");
 
   try {
-    beginProcessingProgress(jobSheetId);
+    if (!skipProgress && jobSheetId > 0) {
+      beginProcessingProgress(jobSheetId);
+    }
   } catch (err) {
     console.warn("[DocumentProcessor] progress begin failed:", err);
   }
@@ -568,7 +602,7 @@ async function processJobSheetWithOptions(
   // If OCR failed, mark as failed and return
   if (!ocrResult.success || ocrResult.pages.length === 0) {
     try {
-      await db.updateJobSheetStatus(jobSheetId, "failed");
+      await persistStatus("failed");
     } catch (error) {
       console.warn(
         "[DocumentProcessor] Could not update job sheet status:",
@@ -700,12 +734,25 @@ async function processJobSheetWithOptions(
     });
 
     try {
-      await db.updateJobSheetStatus(jobSheetId, "review_queue");
+      await persistStatus("review_queue");
     } catch (error) {
       console.warn(
         "[DocumentProcessor] Could not update job sheet status:",
         error
       );
+    }
+
+    if (!persistResults) {
+      finishProgress("review_queue");
+      return {
+        success: hybridResult.success,
+        jobSheetId,
+        ocrResult,
+        hybridAssessment: hybridResult,
+        assessmentMode: "HYBRID",
+        processingStages: stages,
+        totalDurationMs: Date.now() - startTime,
+      };
     }
 
     try {
@@ -787,7 +834,7 @@ async function processJobSheetWithOptions(
     console.error(`[DocumentProcessor] SSOT violation: ${errorMsg}`);
 
     try {
-      await db.updateJobSheetStatus(jobSheetId, "failed");
+      await persistStatus("failed");
     } catch (dbError) {
       console.warn(
         "[DocumentProcessor] Could not update job sheet status:",
@@ -859,7 +906,7 @@ async function processJobSheetWithOptions(
       console.error(`[DocumentProcessor] ${errorMsg}`);
 
       try {
-        await db.updateJobSheetStatus(jobSheetId, "failed");
+        await persistStatus("failed");
       } catch (dbError) {
         console.warn(
           "[DocumentProcessor] Could not update job sheet status:",
@@ -939,12 +986,26 @@ async function processJobSheetWithOptions(
 
       // Update status to review_queue
       try {
-        await db.updateJobSheetStatus(jobSheetId, "review_queue");
+        await persistStatus("review_queue");
       } catch (error) {
         console.warn(
           "[DocumentProcessor] Could not update job sheet status:",
           error
         );
+      }
+
+      if (!persistResults) {
+        finishProgress("review_queue");
+        return {
+          success: hybridResult.success,
+          jobSheetId,
+          ocrResult,
+          selectionResult,
+          hybridAssessment: hybridResult,
+          assessmentMode: "HYBRID",
+          processingStages: stages,
+          totalDurationMs: Date.now() - startTime,
+        };
       }
 
       // Store partial audit result with hybrid data
@@ -1059,7 +1120,7 @@ async function processJobSheetWithOptions(
       console.error(`[DocumentProcessor] ${errorMsg}`);
 
       try {
-        await db.updateJobSheetStatus(jobSheetId, "failed");
+        await persistStatus("failed");
       } catch (dbError) {
         console.warn(
           "[DocumentProcessor] Could not update job sheet status:",
@@ -2220,6 +2281,28 @@ async function processJobSheetWithOptions(
           ensembleResult.ensembleExtractedFields
         )
       : analysisResult.extractedFields;
+
+    if (!persistResults) {
+      recordStage({
+        stage: "Store Results",
+        status: "skipped",
+        durationMs: Date.now() - storageStartTime,
+      });
+      const terminalStatus: JobSheetProcessStatus =
+        mapAnalyzerOverallToJobSheetStatus(analysisResult.overallResult);
+      finishProgress(terminalStatus);
+      return {
+        success: analysisResult.success,
+        jobSheetId,
+        ocrResult,
+        analysisResult,
+        selectionResult,
+        assessmentMode: "FULL",
+        processingStages: stages,
+        totalDurationMs: Date.now() - startTime,
+      };
+    }
+
     try {
       const sheetRow = await db.getJobSheetById(jobSheetId);
       if (sheetRow && sheetRow.technicianId == null) {
@@ -2260,7 +2343,7 @@ async function processJobSheetWithOptions(
     }
 
     // Update job sheet status
-    await db.updateJobSheetStatus(jobSheetId, finalStatus);
+    await persistStatus(finalStatus);
 
     // Create audit result with correct schema fields
     const auditResult = await db.createAuditResult({

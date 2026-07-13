@@ -136,6 +136,8 @@ export default function TemplateStudio() {
   const saveDraft = trpc.templates.studio.saveDraft.useMutation();
   const updateRoi = trpc.templates.updateRoi.useMutation();
   const activateStaging = trpc.templates.studio.activateStaging.useMutation();
+  const dryRunMut = trpc.templates.studio.dryRun.useMutation();
+  const ackDryRun = trpc.templates.studio.acknowledgeDryRun.useMutation();
   const scaffoldFixtures = trpc.templates.studio.scaffoldFixtures.useMutation();
   const requestPromote = trpc.templates.studio.requestPromote.useMutation();
   const approvePromote = trpc.templates.studio.approvePromote.useMutation();
@@ -1110,8 +1112,8 @@ export default function TemplateStudio() {
             <CardHeader>
               <CardTitle>Activation gates</CardTitle>
               <CardDescription>
-                Preconditions, fixtures, and fingerprint collision must pass
-                before staging activate.
+                Dry-run mimics a live audit without writing stats. Review
+                findings, confirm it looks correct, then activate on staging.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1183,6 +1185,182 @@ export default function TemplateStudio() {
                       {activationReport.collision.message}
                     </p>
                   </div>
+
+                  <div className="rounded-md border border-[#BEDA41]/40 bg-[#F7F9EC] p-3 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h4 className="font-medium text-[#333030]">
+                          Dry-run audit
+                        </h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Dress rehearsal under this draft. Does not enter live
+                          stats or scorecards.
+                        </p>
+                      </div>
+                      {activationReport.dryRun.allowed ? (
+                        <Badge className="bg-[#BEDA41] text-[#1a1f0a]">
+                          Confirmed
+                        </Badge>
+                      ) : activationReport.dryRun.report?.pipelineOk ? (
+                        <Badge variant="secondary">Needs confirm</Badge>
+                      ) : (
+                        <Badge variant="outline">
+                          {activationReport.dryRun.code}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-[#333030]">
+                      {activationReport.dryRun.message}
+                    </p>
+                    {activationReport.dryRun.report && (
+                      <div className="space-y-2 text-xs">
+                        <p>
+                          Mode{" "}
+                          <strong>
+                            {activationReport.dryRun.report.assessmentMode}
+                          </strong>
+                          {" · "}
+                          Result{" "}
+                          <strong>
+                            {activationReport.dryRun.report.overallResult}
+                          </strong>
+                          {activationReport.dryRun.report.score != null && (
+                            <>
+                              {" · "}Score{" "}
+                              <strong>
+                                {activationReport.dryRun.report.score}
+                              </strong>
+                            </>
+                          )}
+                          {" · "}
+                          {activationReport.dryRun.report.durationMs}ms
+                        </p>
+                        {activationReport.dryRun.report.blockingIssues.length >
+                          0 && (
+                          <ul className="list-disc pl-4 text-destructive">
+                            {activationReport.dryRun.report.blockingIssues.map(
+                              (code, idx) => (
+                                <li key={idx}>{code}</li>
+                              )
+                            )}
+                          </ul>
+                        )}
+                        {activationReport.dryRun.report.findings.length > 0 && (
+                          <div className="max-h-48 overflow-auto rounded border bg-white p-2 space-y-1">
+                            <p className="font-medium text-[#333030]">
+                              Findings to finesse (
+                              {activationReport.dryRun.report.findings.length})
+                            </p>
+                            {activationReport.dryRun.report.findings.map(
+                              (f, idx) => (
+                                <div
+                                  key={idx}
+                                  className="border-b border-[#EBE8E8] pb-1 last:border-0"
+                                >
+                                  <span className="font-medium">
+                                    {f.fieldName || f.ruleId || "finding"}
+                                  </span>
+                                  {f.severity ? ` · ${f.severity}` : ""}
+                                  {f.reasonCode ? ` · ${f.reasonCode}` : ""}
+                                  {f.whyItMatters ? (
+                                    <p className="text-muted-foreground">
+                                      {f.whyItMatters}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        className="bg-[#BEDA41] text-[#1a1f0a] hover:bg-[#a8c238]"
+                        disabled={dryRunMut.isPending || !sampleUrl}
+                        onClick={async () => {
+                          try {
+                            const report = await dryRunMut.mutateAsync({
+                              versionId,
+                              jobSheetIds: smokeIdsText
+                                .split(",")
+                                .map(s => Number(s.trim()))
+                                .filter(n => Number.isFinite(n) && n > 0),
+                            });
+                            await refetchReport();
+                            showSuccessToast(
+                              report.pipelineOk
+                                ? "Dry-run complete"
+                                : "Dry-run finished with blockers",
+                              report.pipelineOk
+                                ? "Review findings, then confirm"
+                                : report.blockingIssues.join(", ")
+                            );
+                          } catch (err) {
+                            showErrorToast(
+                              "Dry-run failed",
+                              err instanceof Error ? err.message : "Error"
+                            );
+                          }
+                        }}
+                      >
+                        {dryRunMut.isPending && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Run dry-run audit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={
+                          ackDryRun.isPending ||
+                          !activationReport.dryRun.report?.pipelineOk ||
+                          activationReport.dryRun.allowed
+                        }
+                        onClick={async () => {
+                          try {
+                            await ackDryRun.mutateAsync({
+                              versionId,
+                              hashSha256: activationReport.hashSha256,
+                            });
+                            await refetchReport();
+                            showSuccessToast(
+                              "Dry-run confirmed",
+                              "You can activate on staging"
+                            );
+                          } catch (err) {
+                            showErrorToast(
+                              "Confirm failed",
+                              err instanceof Error ? err.message : "Error"
+                            );
+                          }
+                        }}
+                      >
+                        {ackDryRun.isPending && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Confirm dry-run looks correct
+                      </Button>
+                    </div>
+                    {!sampleUrl && (
+                      <p className="text-xs text-amber-700">
+                        Attach a sample PDF first — dry-run needs the Studio
+                        sample.
+                      </p>
+                    )}
+                    <div className="space-y-1 pt-1">
+                      <Label className="text-xs">
+                        Optional filled job sheet IDs (comma-separated)
+                      </Label>
+                      <Input
+                        className="h-8 text-xs"
+                        value={smokeIdsText}
+                        onChange={e => setSmokeIdsText(e.target.value)}
+                        placeholder="101, 102"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
               <div className="flex gap-2">
@@ -1192,7 +1370,11 @@ export default function TemplateStudio() {
                 </Button>
                 <Button
                   onClick={() => void handleActivate()}
-                  disabled={activateStaging.isPending}
+                  disabled={
+                    activateStaging.isPending ||
+                    !activationReport?.allowed ||
+                    !activationReport?.dryRun.allowed
+                  }
                 >
                   {activateStaging.isPending && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
