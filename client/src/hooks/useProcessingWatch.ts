@@ -1,11 +1,14 @@
 /**
  * Poll job sheet processing status and surface completion toasts (PR-11).
  * Watched IDs persist in sessionStorage so navigating away keeps polling.
+ * QA leads/admins get a Template Studio deep-link when a first-seen form
+ * needs authoring.
  */
 
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   completionToastCopy,
   isActiveJobSheetStatus,
@@ -66,18 +69,39 @@ export function unwatchJobSheet(id: number): void {
 function notifyCompletion(
   status: JobSheetProcessStatus,
   fileName: string | undefined,
-  jobSheetId: number
+  jobSheetId: number,
+  opts?: { needsTemplateAuthoring?: boolean; canAuthorTemplates?: boolean }
 ): void {
   const copy = completionToastCopy(status, fileName);
+  const teachAction =
+    opts?.needsTemplateAuthoring && opts?.canAuthorTemplates
+      ? {
+          label: "Teach in Studio",
+          onClick: () => {
+            window.location.href = `/template-studio?fromJobSheet=${jobSheetId}`;
+          },
+        }
+      : undefined;
   const action =
-    status === "failed"
+    teachAction ??
+    (status === "failed"
       ? undefined
       : {
           label: "View",
           onClick: () => {
             window.location.href = `/audits?id=${jobSheetId}`;
           },
-        };
+        });
+
+  if (opts?.needsTemplateAuthoring && opts?.canAuthorTemplates) {
+    toast.warning("New form type detected", {
+      description:
+        "This upload didn't match a known template. Teach it in Template Studio.",
+      action: teachAction,
+      duration: 12_000,
+    });
+    return;
+  }
 
   if (copy.type === "error") {
     toast.error(copy.title, { description: copy.description, action });
@@ -93,6 +117,8 @@ function notifyCompletion(
  */
 export function useProcessingWatchdog(): void {
   const utils = trpc.useUtils();
+  const { hasRole } = useAuth();
+  const canAuthorTemplates = hasRole(["admin", "qa_lead"]);
   const notifiedRef = useRef<Set<number>>(new Set());
   const watchVersion = useRef(0);
 
@@ -125,7 +151,32 @@ export function useProcessingWatchdog(): void {
             if (isTerminalJobSheetStatus(status.status)) {
               if (!notifiedRef.current.has(item.id)) {
                 notifiedRef.current.add(item.id);
-                notifyCompletion(status.status, item.fileName, item.id);
+                let needsTemplateAuthoring = false;
+                if (
+                  canAuthorTemplates &&
+                  (status.status === "review_queue" ||
+                    status.status === "completed")
+                ) {
+                  try {
+                    const audit = await utils.audits.getByJobSheet.fetch({
+                      jobSheetId: item.id,
+                    });
+                    needsTemplateAuthoring = Boolean(
+                      (
+                        audit?.reportJson as
+                          | { needsTemplateAuthoring?: boolean }
+                          | null
+                          | undefined
+                      )?.needsTemplateAuthoring
+                    );
+                  } catch {
+                    /* ignore */
+                  }
+                }
+                notifyCompletion(status.status, item.fileName, item.id, {
+                  needsTemplateAuthoring,
+                  canAuthorTemplates,
+                });
               }
               unwatchJobSheet(item.id);
               void utils.jobSheets.list.invalidate();
@@ -155,7 +206,7 @@ export function useProcessingWatchdog(): void {
       window.removeEventListener("jsqa:processing-watch", bump);
       window.removeEventListener("storage", bump);
     };
-  }, [utils]);
+  }, [utils, canAuthorTemplates]);
 }
 
 /**

@@ -49,11 +49,11 @@ const PAGE_CONTEXT: Record<string, { title: string; subtitle: string }> = {
     title: "Search",
     subtitle: "Find job sheets & audits",
   },
-  "/specs": {
+  "/template-studio": {
     title: "Template Studio",
     subtitle: "Author & activate form templates",
   },
-  "/template-studio": {
+  "/specs": {
     title: "Template Studio",
     subtitle: "Author & activate form templates",
   },

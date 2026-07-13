@@ -28,14 +28,21 @@ import {
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useReviewQueueKeyboard } from "@/hooks/useReviewQueueKeyboard";
 import { usePersistFn } from "@/hooks/usePersistFn";
 import { deriveReasonChips } from "@/components/review/holdQueueReasons";
 import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
 import { cn } from "@/lib/utils";
 
-type FilterChip = "all" | "critical";
+type FilterChip = "all" | "critical" | "new_form";
+
+function reportNeedsTemplateAuthoring(reportJson: unknown): boolean {
+  if (!reportJson || typeof reportJson !== "object") return false;
+  return Boolean(
+    (reportJson as { needsTemplateAuthoring?: boolean }).needsTemplateAuthoring
+  );
+}
 
 type HoldItem = {
   id: number;
@@ -68,6 +75,8 @@ function HoldItemReasonChips({
     { enabled: enabled && !!auditResult?.id, staleTime: 60_000 }
   );
 
+  const needsAuthoring = reportNeedsTemplateAuthoring(auditResult?.reportJson);
+
   const chips = useMemo(() => {
     if (!findings || findings.length === 0) {
       return deriveReasonChips([], {
@@ -75,6 +84,7 @@ function HoldItemReasonChips({
           ? mapHasMajorFailsFromReport(auditResult.reportJson)
           : false,
         auditResult: auditResult?.result ?? null,
+        needsTemplateAuthoring: needsAuthoring,
       });
     }
     return deriveReasonChips(findings, {
@@ -82,8 +92,9 @@ function HoldItemReasonChips({
         ? mapHasMajorFailsFromReport(auditResult.reportJson)
         : false,
       auditResult: auditResult?.result ?? null,
+      needsTemplateAuthoring: needsAuthoring,
     });
-  }, [findings, auditResult]);
+  }, [findings, auditResult, needsAuthoring]);
 
   return (
     <div className="flex flex-wrap items-center gap-1 min-w-0">
@@ -96,6 +107,16 @@ function HoldItemReasonChips({
           {chip.label}
         </Badge>
       ))}
+      {needsAuthoring && (
+        <Link
+          href={`/template-studio?fromJobSheet=${jobSheetId}`}
+          onClick={e => e.stopPropagation()}
+        >
+          <Badge className="text-[10px] px-1.5 py-0 leading-4 bg-[#BEDA41] text-[#1a1f0a] hover:bg-[#a8c238] cursor-pointer">
+            Teach in Studio
+          </Badge>
+        </Link>
+      )}
     </div>
   );
 }
@@ -192,6 +213,42 @@ export default function HoldQueue() {
     [jobSheets, slaById]
   );
 
+  const holdIdsKey = useMemo(
+    () => holdItems.map(i => i.id).join(","),
+    [holdItems]
+  );
+
+  const [authoringById, setAuthoringById] = useState<Map<number, boolean>>(
+    () => new Map()
+  );
+
+  useEffect(() => {
+    const ids = holdItems.map(i => i.id);
+    if (ids.length === 0) {
+      setAuthoringById(new Map());
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(
+      ids.map(async id => {
+        try {
+          const audit = await utils.audits.getByJobSheet.fetch({
+            jobSheetId: id,
+          });
+          return [id, reportNeedsTemplateAuthoring(audit?.reportJson)] as const;
+        } catch {
+          return [id, false] as const;
+        }
+      })
+    ).then(pairs => {
+      if (!cancelled) setAuthoringById(new Map(pairs));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when hold set changes
+  }, [holdIdsKey, utils.audits.getByJobSheet]);
+
   const filteredItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return holdItems.filter(item => {
@@ -203,9 +260,20 @@ export default function HoldQueue() {
       if (filterChip === "critical") {
         return item.severity === "critical" || item.slaBreached;
       }
+      if (filterChip === "new_form") {
+        return authoringById.get(item.id) === true;
+      }
       return true;
     });
-  }, [holdItems, searchQuery, filterChip]);
+  }, [holdItems, searchQuery, filterChip, authoringById]);
+
+  const newFormCount = useMemo(() => {
+    let n = 0;
+    for (const item of holdItems) {
+      if (authoringById.get(item.id)) n += 1;
+    }
+    return n;
+  }, [holdItems, authoringById]);
 
   const sortedFilteredItems = useMemo(
     () => sortByPriority(filteredItems),
@@ -514,6 +582,19 @@ export default function HoldQueue() {
               )}
             >
               Critical
+            </button>
+            <button
+              type="button"
+              aria-pressed={filterChip === "new_form"}
+              onClick={() => setFilterChip("new_form")}
+              className={cn(
+                "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors duration-[var(--duration-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                filterChip === "new_form"
+                  ? "border-transparent bg-primary text-[#333030] hover:bg-primary/90"
+                  : "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              )}
+            >
+              New form type{newFormCount > 0 ? ` (${newFormCount})` : ""}
             </button>
             {slaSummary && slaSummary.breachedCount > 0 && (
               <Badge variant="destructive" className="gap-1">

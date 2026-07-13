@@ -1,5 +1,8 @@
 /**
- * @deprecated Spec Management authoring is retired.
- * Re-exports Template Studio for any leftover imports/bookmarks.
+ * @deprecated Spec Management is retired. Bookmarks hit Template Studio.
  */
-export { default } from "./TemplateStudio";
+import { Redirect } from "wouter";
+
+export default function SpecManagementRedirect() {
+  return <Redirect to="/template-studio" />;
+}

@@ -36,7 +36,6 @@ import {
   ensureTemplatesReady,
   getDefaultTemplateVersion,
   type SelectionResult,
-  FALLBACK_TEMPLATE_ID,
   isFallbackTemplate,
 } from "./templateRegistry";
 import {
@@ -983,6 +982,20 @@ async function processJobSheetWithOptions(
             hybridAssessment: hybridResult,
             selectionResult,
             selectionCohort: buildSelectionCohortMeta(selectionResult),
+            // First-seen / unknown forms → teach in Template Studio
+            needsTemplateAuthoring:
+              reviewReason === "TEMPLATE_NOT_MATCHED" ||
+              reviewReason === "LOW_TEMPLATE_CONFIDENCE" ||
+              (selectionResult.candidates[0]?.templateSlug != null &&
+                isFallbackTemplate(selectionResult.candidates[0].templateSlug)),
+            templateAuthoringReason: reviewReason,
+            templateAuthoringCandidates: selectionResult.candidates
+              .slice(0, 5)
+              .map(c => ({
+                templateId: c.templateId,
+                templateSlug: c.templateSlug,
+                score: c.score,
+              })),
           },
           processingTimeMs: Date.now() - startTime,
         });

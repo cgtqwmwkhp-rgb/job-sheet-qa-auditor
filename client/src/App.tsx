@@ -31,7 +31,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const UploadPage = lazy(() => import("./pages/Upload"));
 const AuditResults = lazy(() => import("./pages/AuditResults"));
 const HoldQueue = lazy(() => import("./pages/HoldQueue"));
-const SpecManagement = lazy(() => import("./pages/TemplateStudio"));
+const TemplateStudio = lazy(() => import("./pages/TemplateStudio"));
 const SearchPage = lazy(() => import("./pages/Search"));
 const UserManagement = lazy(() => import("./pages/UserManagement"));
 const ExecutiveDashboard = lazy(
@@ -149,14 +149,11 @@ function Router() {
           </RequireStaff>
         </Route>
         <Route path="/specs">
-          <ProtectedRoute
-            component={SpecManagement}
-            allowedRoles={["admin", "qa_lead"]}
-          />
+          <Redirect to="/template-studio" />
         </Route>
         <Route path="/template-studio">
           <ProtectedRoute
-            component={SpecManagement}
+            component={TemplateStudio}
             allowedRoles={["admin", "qa_lead"]}
           />
         </Route>

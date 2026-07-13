@@ -490,6 +490,221 @@ export const templateRouter = router({
         };
       }),
 
+    /**
+     * One-shot: create draft + attach sample + propose + scaffold fixtures.
+     */
+    quickStartFromSample: qaLeadProcedure
+      .input(
+        z.object({
+          name: z.string().min(1).max(255).optional(),
+          fileName: z.string().min(1).max(255),
+          fileType: z.string().min(1).max(128),
+          fileBase64: z.string().min(1),
+          client: z.string().max(128).optional(),
+          selectionTokens: z.array(z.string()).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const derivedName =
+          input.name?.trim() ||
+          input.fileName
+            .replace(/\.[^.]+$/, "")
+            .replace(/[_-]+/g, " ")
+            .trim() ||
+          "New form type";
+        const slug = `studio-${slugify(derivedName)}-${Date.now().toString(36)}`;
+        const template = createTemplate({
+          templateId: slug,
+          name: derivedName,
+          client: input.client,
+          description: "Quick-started from sample upload in Template Studio",
+          createdBy: ctx.user.id,
+        });
+        const version = uploadTemplateVersion({
+          templateId: template.id,
+          version: "0.1.0",
+          specJson: createStudioStarterSpec(derivedName),
+          selectionConfigJson: createStudioStarterSelection(
+            input.selectionTokens
+          ),
+          roiJson: createStudioStarterRoi(),
+          changeNotes: "Quick-start draft",
+          createdBy: ctx.user.id,
+        });
+        const { meta } = await attachStudioSample({
+          versionId: version.id,
+          fileName: input.fileName,
+          fileType: input.fileType,
+          fileBase64: input.fileBase64,
+          uploadedBy: ctx.user.id,
+        });
+        const proposal = await proposeFromSample({
+          versionId: version.id,
+          templateName: derivedName,
+        });
+        const appliedVersion = updateDraftVersion(version.id, {
+          specJson: proposal.proposedSpec,
+          selectionConfigJson: proposal.proposedSelection,
+          roiJson: proposal.proposedRoi,
+          changeNotes: "Quick-start proposal applied",
+        });
+        scaffoldFixturesFromSample({
+          versionId: version.id,
+          sampleText: proposal.layoutTextPreview,
+          specJson: proposal.proposedSpec,
+          createdBy: ctx.user.id,
+        });
+        logAuditEvent(
+          "TEMPLATE_STUDIO_QUICK_START",
+          "template",
+          template.id,
+          ctx.user.id,
+          { versionId: version.id, fileHash: meta.fileHash }
+        );
+        await db.logAction({
+          userId: ctx.user.id,
+          action: "TEMPLATE_STUDIO_QUICK_START",
+          entityType: "template",
+          entityId: template.id,
+          details: { versionId: version.id },
+        });
+        return {
+          template,
+          version: appliedVersion,
+          proposal,
+          sampleUrl: `/api/template-samples/${version.id}`,
+          meta,
+        };
+      }),
+
+    /**
+     * Bootstrap Studio from an existing job sheet (first-seen divert).
+     */
+    bootstrapFromJobSheet: qaLeadProcedure
+      .input(
+        z.object({
+          jobSheetId: z.number(),
+          name: z.string().min(1).max(255).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const jobSheet = await db.getJobSheetById(input.jobSheetId);
+        if (!jobSheet) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Job sheet not found",
+          });
+        }
+        const { enforceJobSheetAccess } = await import(
+          "../utils/authorization"
+        );
+        enforceJobSheetAccess(jobSheet, ctx.user);
+
+        const storage = (await import("../storage")).getStorageAdapter();
+        if (!jobSheet.fileKey && !jobSheet.fileUrl) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Job sheet has no attached file to teach from",
+          });
+        }
+        let fileUrl = jobSheet.fileUrl;
+        if (jobSheet.fileKey) {
+          const got = await storage.get(jobSheet.fileKey);
+          fileUrl = got.url;
+        }
+        let buffer: Buffer;
+        if (fileUrl!.startsWith("file://")) {
+          const { readFile } = await import("fs/promises");
+          buffer = await readFile(fileUrl!.replace("file://", ""));
+        } else {
+          const res = await fetch(fileUrl!, {
+            signal: AbortSignal.timeout(60_000),
+          });
+          if (!res.ok) {
+            throw new TRPCError({
+              code: "BAD_GATEWAY",
+              message: "Failed to fetch job sheet PDF for bootstrap",
+            });
+          }
+          buffer = Buffer.from(await res.arrayBuffer());
+        }
+        const fileBase64 = buffer.toString("base64");
+        const fileName =
+          jobSheet.fileName || `job-sheet-${input.jobSheetId}.pdf`;
+        const fileType = fileName.toLowerCase().endsWith(".png")
+          ? "image/png"
+          : fileName.toLowerCase().endsWith(".jpg") ||
+              fileName.toLowerCase().endsWith(".jpeg")
+            ? "image/jpeg"
+            : "application/pdf";
+
+        const derivedName =
+          input.name?.trim() || `Form from job #${input.jobSheetId}`;
+
+        // Inline quick-start with this buffer
+        const slug = `studio-${slugify(derivedName)}-${Date.now().toString(36)}`;
+        const template = createTemplate({
+          templateId: slug,
+          name: derivedName,
+          description: `Bootstrapped from job sheet ${input.jobSheetId}`,
+          createdBy: ctx.user.id,
+        });
+        const version = uploadTemplateVersion({
+          templateId: template.id,
+          version: "0.1.0",
+          specJson: createStudioStarterSpec(derivedName),
+          selectionConfigJson: createStudioStarterSelection(),
+          roiJson: createStudioStarterRoi(),
+          changeNotes: `Bootstrap from jobSheet ${input.jobSheetId}`,
+          createdBy: ctx.user.id,
+        });
+        const { meta } = await attachStudioSample({
+          versionId: version.id,
+          fileName,
+          fileType,
+          fileBase64,
+          uploadedBy: ctx.user.id,
+        });
+        const proposal = await proposeFromSample({
+          versionId: version.id,
+          templateName: derivedName,
+        });
+        const appliedVersion = updateDraftVersion(version.id, {
+          specJson: proposal.proposedSpec,
+          selectionConfigJson: proposal.proposedSelection,
+          roiJson: proposal.proposedRoi,
+          changeNotes: "Bootstrap proposal applied",
+        });
+        scaffoldFixturesFromSample({
+          versionId: version.id,
+          sampleText: proposal.layoutTextPreview,
+          specJson: proposal.proposedSpec,
+          createdBy: ctx.user.id,
+        });
+        logAuditEvent(
+          "TEMPLATE_STUDIO_BOOTSTRAP_JOB_SHEET",
+          "job_sheet",
+          input.jobSheetId,
+          ctx.user.id,
+          { templateId: template.id, versionId: version.id }
+        );
+        await db.logAction({
+          userId: ctx.user.id,
+          action: "TEMPLATE_STUDIO_BOOTSTRAP_JOB_SHEET",
+          entityType: "job_sheet",
+          entityId: input.jobSheetId,
+          details: { templateId: template.id, versionId: version.id },
+        });
+        return {
+          template,
+          version: appliedVersion,
+          proposal,
+          sampleUrl: `/api/template-samples/${version.id}`,
+          meta,
+          sourceJobSheetId: input.jobSheetId,
+        };
+      }),
+
     saveDraft: qaLeadProcedure
       .input(
         z.object({

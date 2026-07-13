@@ -153,6 +153,31 @@ describe("Template Studio contracts", () => {
     expect(result.appliedVersion).toBeTruthy();
   });
 
+  it("quickStartFromSample creates draft, attaches sample, and proposes", async () => {
+    const caller = createCaller("qa_lead");
+    // Minimal PDF header bytes — sample store validates magic bytes for PDF
+    const pdfBase64 = Buffer.from(
+      "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n",
+      "utf8"
+    ).toString("base64");
+    const result = await caller.templates.studio.quickStartFromSample({
+      fileName: "new-form.pdf",
+      fileType: "application/pdf",
+      fileBase64: pdfBase64,
+      name: "Quick Start Form",
+      selectionTokens: ["quickstart", "form"],
+    });
+    expect(result.template.name).toBe("Quick Start Form");
+    expect(result.version.id).toBeGreaterThan(0);
+    expect(result.proposal.proposedSpec.fields.map(f => f.field)).toEqual(
+      expect.arrayContaining(["jobReference", "assetId"])
+    );
+    expect(result.sampleUrl).toContain(
+      `/api/template-samples/${result.version.id}`
+    );
+    expect(result.meta.fileHash).toBeTruthy();
+  });
+
   it("dual-control promote blocks self-approve", async () => {
     const author = createCaller("qa_lead", 10);
     const { version } = await author.templates.studio.createDraft({
