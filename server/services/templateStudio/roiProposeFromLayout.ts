@@ -1,6 +1,11 @@
 /**
- * Place ROI boxes from Azure DI layout geometry (OCR evidence), not generic scaffolds.
- * Bounds are normalized 0–1 for Template Studio / registry.
+ * Place ROI boxes from Azure DI layout geometry — precision-first.
+ *
+ * Rules:
+ * - Match field LABELS only (reject section headers like "Asset Details")
+ * - Prefer short label lines; expand tightly on the SAME ROW (label + value)
+ * - Hard-cap box size — never paint a quarter-page blob
+ * - Fewer accurate boxes beat many wrong ones
  */
 
 import type { AzureTextLine } from "../ocrAdapter/parseAzureDiResponse";
@@ -28,78 +33,101 @@ export type LayoutLineForRoi = Pick<
   | "heightPercent"
 >;
 
+const SECTION_HEADER_RE =
+  /\b(details|summary|section|checklist|report|completion|requirements)\b/i;
+
+/** Max normalized height for a single field row capture */
+const MAX_ROW_H = 0.038;
+/** Max normalized width for label+value on one row */
+const MAX_ROW_W = 0.42;
+/** Max height for multi-line blocks (work description / address block) */
+const MAX_BLOCK_H = 0.11;
+const MAX_BLOCK_W = 0.48;
+
 const FIELD_LABEL_MATCHERS: Array<{
   name: string;
   fields: string[];
+  /** Must match the label line */
   re: RegExp;
-  /** How to expand the OCR line into a capture box */
-  expand: "labelValueRight" | "labelValueBelow" | "signature" | "block";
+  /** Lines matching this are rejected even if `re` hits */
+  reject?: RegExp;
+  expand: "rowRight" | "blockBelow" | "signature";
 }> = [
   {
     name: "jobReference",
     fields: ["jobReference"],
-    re: /job\s*(id|no|number|ref|reference)|work\s*order|\bwo\b/i,
-    expand: "labelValueRight",
+    re: /^(job\s*(id|no\.?|number|ref\.?|reference)|work\s*order|w\.?o\.?\s*#?)\b\s*:?\s*.{0,40}$/i,
+    reject: SECTION_HEADER_RE,
+    expand: "rowRight",
   },
   {
     name: "assetId",
     fields: ["assetId"],
-    re: /asset(\s*(id|no|number))?|serial\s*(no|number)?|plant\s*no|equipment/i,
-    expand: "labelValueRight",
+    // Require No/ID/Number — do NOT match "Asset Details"
+    re: /^(asset\s*(no\.?|id|number)|plant\s*no\.?|equipment\s*(no\.?|id)|serial\s*(no\.?|number)|s\/?n)\b\s*:?\s*.{0,40}$/i,
+    reject: SECTION_HEADER_RE,
+    expand: "rowRight",
   },
   {
     name: "date",
     fields: ["date"],
-    // Prefer job/service date labels; avoid matching "valid until" etc.
-    re: /^(?!.*expir).*(\bdate\b|service\s*date|visit\s*date|completed\s*on)/i,
-    expand: "labelValueRight",
+    re: /^(date|service\s*date|visit\s*date|job\s*date)\b\s*:?\s*.{0,40}$/i,
+    reject: /next\s*service|expir|due|retest/i,
+    expand: "rowRight",
   },
   {
     name: "expiryDate",
     fields: ["expiryDate"],
-    re: /expir|valid\s*until|next\s*due|retest/i,
-    expand: "labelValueRight",
+    re: /^(expir(y|es|ation)?(\s*date)?|valid\s*until|next\s*(due|service\s*date)|retest(\s*due)?)\b\s*:?\s*.{0,40}$/i,
+    expand: "rowRight",
+  },
+  {
+    name: "makeModel",
+    fields: ["makeModel"],
+    re: /^(make\s*\/?\s*model|make\s*and\s*model)\b\s*:?\s*.{0,50}$/i,
+    reject: SECTION_HEADER_RE,
+    expand: "rowRight",
+  },
+  {
+    name: "customerName",
+    fields: ["customerName"],
+    re: /^(customer|customer\s*name|client|client\s*name|account\s*name)\b\s*:?\s*.{0,50}$/i,
+    reject: /sign|signature|details/i,
+    expand: "rowRight",
+  },
+  {
+    name: "siteAddress",
+    fields: ["siteAddress"],
+    re: /^(site\s*address|site\s*location|address)\b\s*:?\s*.{0,80}$/i,
+    reject: SECTION_HEADER_RE,
+    expand: "rowRight",
   },
   {
     name: "engineerSignature",
     fields: ["engineerSignOff"],
-    re: /engineer\s*(sign|sig|name)|technician\s*(sign|sig)|operative/i,
+    re: /^(engineer|technician|operative)(\s*(sign(ature)?|name|sign\s*-?\s*off))?\b\s*:?\s*.{0,40}$/i,
     expand: "signature",
   },
   {
     name: "customerSignature",
     fields: ["customerSignature"],
-    re: /customer\s*(sign|sig|name)|client\s*(sign|sig)/i,
+    re: /^(customer|client)(\s*(sign(ature)?|name|sign\s*-?\s*off))\b\s*:?\s*.{0,40}$/i,
     expand: "signature",
   },
   {
     name: "workDescription",
     fields: ["workDescription"],
-    re: /work\s*description|comments|findings|details\s*of\s*work|scope/i,
-    expand: "labelValueBelow",
-  },
-  {
-    name: "makeModel",
-    fields: ["makeModel"],
-    re: /make\s*\/?\s*model|\bmake\b|\bmodel\b/i,
-    expand: "labelValueRight",
-  },
-  {
-    name: "customerName",
-    fields: ["customerName"],
-    re: /^customer$|customer\s*name|client\s*name|account\s*name/i,
-    expand: "labelValueRight",
-  },
-  {
-    name: "siteAddress",
-    fields: ["siteAddress"],
-    re: /site\s*address|site\s*location|\baddress\b/i,
-    expand: "labelValueBelow",
+    re: /^(work\s*description|comments|findings|details\s*of\s*work|scope\s*of\s*work)\b\s*:?\s*.{0,40}$/i,
+    expand: "blockBelow",
   },
 ];
 
 function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n));
+}
+
+function normalizeLabel(content: string): string {
+  return content.replace(/\s+/g, " ").trim();
 }
 
 function lineBox01(line: LayoutLineForRoi): {
@@ -109,55 +137,62 @@ function lineBox01(line: LayoutLineForRoi): {
   height: number;
   page: number;
 } {
-  const wPct = line.widthPercent ?? 18;
-  const hPct = line.heightPercent ?? 1.8;
+  const wPct = line.widthPercent ?? 12;
+  const hPct = line.heightPercent ?? 1.4;
   const x = clamp01(line.xPercent / 100);
-  const height = clamp01(Math.max(0.012, hPct / 100));
-  // yPercent is vertical center → convert to top
+  const height = clamp01(Math.max(0.01, Math.min(MAX_ROW_H, hPct / 100)));
   const yCenter = line.yPercent / 100;
   const y = clamp01(yCenter - height / 2);
-  const width = clamp01(Math.max(0.04, wPct / 100));
+  const width = clamp01(Math.max(0.03, Math.min(0.35, wPct / 100)));
   return { x, y, width, height, page: line.pageNumber || 1 };
 }
 
+/**
+ * Tight capture: printed label + value on the same row.
+ * Width extends right of the label but stays within one table cell band.
+ */
 function expandCapture(
   line: LayoutLineForRoi,
   mode: (typeof FIELD_LABEL_MATCHERS)[number]["expand"]
 ): { x: number; y: number; width: number; height: number; page: number } {
   const base = lineBox01(line);
-  if (mode === "labelValueRight") {
-    // Printed label + value to the right (typical Job ID: … layout)
+
+  if (mode === "rowRight") {
+    // Typical 2-col table: label ~left half of cell group, value to the right
+    const valuePad = 0.22;
     const width = clamp01(
-      Math.max(base.width + 0.2, Math.min(0.48, 1 - base.x - 0.02))
+      Math.min(MAX_ROW_W, Math.max(base.width + valuePad, 0.2), 1 - base.x - 0.02)
     );
-    const height = clamp01(Math.max(base.height * 1.6, 0.028));
+    const height = clamp01(
+      Math.min(MAX_ROW_H, Math.max(base.height * 1.35, 0.018))
+    );
     return {
       page: base.page,
       x: base.x,
-      y: clamp01(base.y - height * 0.15),
+      y: clamp01(base.y - (height - base.height) * 0.25),
       width,
       height,
     };
   }
-  if (mode === "labelValueBelow") {
+
+  if (mode === "blockBelow") {
     return {
       page: base.page,
-      x: clamp01(Math.max(0.04, base.x - 0.01)),
+      x: base.x,
       y: base.y,
-      width: clamp01(Math.max(0.55, Math.min(0.92, 1 - base.x - 0.04))),
-      height: clamp01(Math.max(0.08, base.height * 6)),
+      width: clamp01(Math.min(MAX_BLOCK_W, Math.max(0.4, 0.92 - base.x))),
+      height: clamp01(Math.min(MAX_BLOCK_H, Math.max(0.06, base.height * 4))),
     };
   }
-  if (mode === "signature") {
-    return {
-      page: base.page,
-      x: clamp01(Math.max(0.02, base.x - 0.02)),
-      y: base.y,
-      width: clamp01(Math.max(0.35, Math.min(0.48, base.width + 0.28))),
-      height: clamp01(Math.max(0.07, base.height * 4)),
-    };
-  }
-  return base;
+
+  // signature
+  return {
+    page: base.page,
+    x: clamp01(Math.max(0.02, base.x - 0.01)),
+    y: base.y,
+    width: clamp01(Math.min(0.4, Math.max(0.28, base.width + 0.2))),
+    height: clamp01(Math.min(0.09, Math.max(0.05, base.height * 3))),
+  };
 }
 
 function unionBoxes(
@@ -182,15 +217,66 @@ function unionBoxes(
   };
 }
 
+function overlapRatio(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number }
+): number {
+  const x1 = Math.max(a.x, b.x);
+  const y1 = Math.max(a.y, b.y);
+  const x2 = Math.min(a.x + a.width, b.x + b.width);
+  const y2 = Math.min(a.y + a.height, b.y + b.height);
+  if (x2 <= x1 || y2 <= y1) return 0;
+  const inter = (x2 - x1) * (y2 - y1);
+  const areaA = a.width * a.height;
+  return areaA > 0 ? inter / areaA : 0;
+}
+
+/**
+ * Score label-line candidates. Higher = better field label.
+ * Rejects section headers and long prose.
+ */
+function scoreLabelLine(
+  line: LayoutLineForRoi,
+  re: RegExp,
+  reject?: RegExp
+): number {
+  const text = normalizeLabel(line.content);
+  if (!re.test(text)) return -1;
+  if (reject?.test(text)) return -1;
+  if (SECTION_HEADER_RE.test(text) && text.split(/\s+/).length <= 3) {
+    // "Asset Details", "Completion Details"
+    return -1;
+  }
+  if (text.length > 48) return -1;
+
+  let score = 100;
+  // Prefer short labels
+  score -= text.length;
+  // Prefer lines that look like form labels (optional trailing colon)
+  if (/:\s*$/.test(text)) score += 15;
+  // Prefer mid-page field rows over header chrome
+  if (line.yPercent < 8) score -= 25;
+  if (line.yPercent > 92) score -= 10;
+  // Prefer left-column labels (common on this form)
+  if (line.xPercent < 45) score += 8;
+  return score;
+}
+
 function pickBestLine(
   lines: LayoutLineForRoi[],
-  re: RegExp
+  re: RegExp,
+  reject?: RegExp
 ): LayoutLineForRoi | null {
-  const hits = lines.filter(l => re.test(l.content));
-  if (hits.length === 0) return null;
-  // Prefer shorter lines (field labels) over long paragraph hits
-  hits.sort((a, b) => a.content.length - b.content.length);
-  return hits[0];
+  let best: LayoutLineForRoi | null = null;
+  let bestScore = -1;
+  for (const line of lines) {
+    const score = scoreLabelLine(line, re, reject);
+    if (score > bestScore) {
+      bestScore = score;
+      best = line;
+    }
+  }
+  return bestScore >= 0 ? best : null;
 }
 
 export function fieldsForRoiName(name: string): string[] {
@@ -205,7 +291,7 @@ export function fieldsForRoiName(name: string): string[] {
 
 /**
  * Build ROI regions from OCR line geometry + selection marks.
- * When layout evidence exists, does NOT dump the generic starter grid.
+ * Precision over coverage: skip a field rather than paint a wrong blob.
  */
 export function suggestRoiFromLayoutEvidence(input: {
   lines: LayoutLineForRoi[];
@@ -215,11 +301,10 @@ export function suggestRoiFromLayoutEvidence(input: {
 }): ProposedRoiRegion[] {
   const { lines, selectionRows, hasChecklist, layoutAvailable } = input;
   const regions: ProposedRoiRegion[] = [];
-  const usedNames = new Set<string>();
 
   if (layoutAvailable && lines.length > 0) {
-    // Header: union of top-of-page lines (branding / title band)
-    const topLines = lines.filter(l => l.yPercent <= 12);
+    // Header: tight top band from lines in the top ~10% only
+    const topLines = lines.filter(l => l.yPercent <= 10);
     if (topLines.length > 0) {
       const boxes = topLines.map(l => {
         const b = lineBox01(l);
@@ -231,25 +316,30 @@ export function suggestRoiFromLayoutEvidence(input: {
           name: "header",
           page: topLines[0].pageNumber || 1,
           bounds: {
-            x: 0.02,
-            y: clamp01(union.y - 0.005),
-            width: 0.96,
-            height: clamp01(Math.max(0.06, union.height + 0.02)),
+            x: 0.03,
+            y: clamp01(Math.max(0, union.y - 0.005)),
+            width: 0.94,
+            height: clamp01(Math.min(0.12, Math.max(0.05, union.height + 0.015))),
           },
-          confidence: 0.8,
+          confidence: 0.85,
           source: "ocr-layout",
-          why: `OCR top-of-page band (${topLines.length} lines)`,
+          why: `OCR header band from ${topLines.length} top-of-page lines`,
           accepted: true,
         });
-        usedNames.add("header");
       }
     }
 
     for (const matcher of FIELD_LABEL_MATCHERS) {
-      if (usedNames.has(matcher.name)) continue;
-      const line = pickBestLine(lines, matcher.re);
+      const line = pickBestLine(lines, matcher.re, matcher.reject);
       if (!line) continue;
       const bounds = expandCapture(line, matcher.expand);
+
+      // Skip if this box heavily overlaps an already-accepted region
+      const heavyOverlap = regions.some(
+        r => overlapRatio(bounds, r.bounds) > 0.45 || overlapRatio(r.bounds, bounds) > 0.45
+      );
+      if (heavyOverlap) continue;
+
       regions.push({
         name: matcher.name,
         page: bounds.page,
@@ -260,12 +350,11 @@ export function suggestRoiFromLayoutEvidence(input: {
           height: bounds.height,
         },
         fields: matcher.fields,
-        confidence: 0.88,
+        confidence: 0.9,
         source: "ocr-layout",
-        why: `OCR line matched /${matcher.re.source}/ at ~${line.yPercent.toFixed(0)}% page: “${line.content.slice(0, 60)}”`,
+        why: `Tight OCR match on “${normalizeLabel(line.content).slice(0, 40)}” @ ${line.yPercent.toFixed(0)}% page`,
         accepted: true,
       });
-      usedNames.add(matcher.name);
     }
 
     if (hasChecklist) {
@@ -275,35 +364,32 @@ export function suggestRoiFromLayoutEvidence(input: {
         .map(b => ({
           x: b.x / 100,
           y: b.y / 100,
-          width: b.width / 100,
-          height: b.height / 100,
+          width: Math.max(0.01, b.width / 100),
+          height: Math.max(0.01, b.height / 100),
         }));
       const headerLine = pickBestLine(
         lines,
-        /\bok\b.*\badv\b|\bok\b[\s|/]+adv[\s|/]+fail/i
+        /^(ok|adv|fail|n\/?a)(\s+[|/]?\s*(ok|adv|fail|n\/?a)){2,}\s*$/i
       );
       let tickBounds = unionBoxes(markBoxes);
       if (headerLine) {
-        const hb = expandCapture(headerLine, "labelValueBelow");
+        const hb = lineBox01(headerLine);
         const headerBox = {
-          x: 0.04,
+          x: clamp01(Math.min(0.05, hb.x)),
           y: hb.y,
-          width: 0.92,
-          height: clamp01(Math.max(0.25, hb.height + 0.2)),
+          width: clamp01(Math.max(0.55, 0.9 - hb.x)),
+          height: clamp01(Math.min(0.35, Math.max(0.12, markBoxes.length * 0.025 + 0.04))),
         };
         tickBounds = unionBoxes(
           tickBounds ? [tickBounds, headerBox] : [headerBox]
         );
       }
-      if (tickBounds) {
-        // Pad to include requirement text column on the left
+      if (tickBounds && tickBounds.height <= 0.45) {
         const padded = {
-          x: clamp01(Math.min(0.04, tickBounds.x - 0.12)),
-          y: clamp01(tickBounds.y - 0.02),
-          width: clamp01(
-            Math.max(0.7, tickBounds.width + (tickBounds.x - 0.04) + 0.04)
-          ),
-          height: clamp01(Math.max(0.2, tickBounds.height + 0.04)),
+          x: clamp01(Math.max(0.03, tickBounds.x - 0.2)),
+          y: clamp01(tickBounds.y - 0.015),
+          width: clamp01(Math.min(0.94, tickBounds.width + 0.22)),
+          height: clamp01(Math.min(0.42, tickBounds.height + 0.03)),
         };
         regions.push({
           name: "tickboxBlock",
@@ -314,28 +400,26 @@ export function suggestRoiFromLayoutEvidence(input: {
           source: "ocr-layout",
           why:
             markBoxes.length > 0
-              ? `Checklist geometry from ${markBoxes.length} selection marks + OCR headers`
-              : "Checklist headers detected in OCR layout",
+              ? `Checklist from ${markBoxes.length} selection marks (capped height)`
+              : "Checklist column headers in OCR",
           accepted: true,
         });
-        usedNames.add("tickboxBlock");
       }
     }
 
-    // Combined signature block if both parties found close together
     const eng = regions.find(r => r.name === "engineerSignature");
     const cust = regions.find(r => r.name === "customerSignature");
     if (eng && cust) {
       const union = unionBoxes([eng.bounds, cust.bounds]);
-      if (union) {
+      if (union && union.height <= 0.14) {
         regions.push({
           name: "signatureBlock",
           page: eng.page,
           bounds: {
             x: clamp01(union.x - 0.01),
             y: clamp01(union.y - 0.01),
-            width: clamp01(union.width + 0.02),
-            height: clamp01(union.height + 0.02),
+            width: clamp01(Math.min(0.94, union.width + 0.02)),
+            height: clamp01(Math.min(0.12, union.height + 0.02)),
           },
           fields: ["engineerSignOff", "customerSignature"],
           confidence: 0.85,
@@ -343,14 +427,12 @@ export function suggestRoiFromLayoutEvidence(input: {
           why: "Union of engineer + customer signature OCR hits",
           accepted: true,
         });
-        usedNames.add("signatureBlock");
       }
     }
 
     return regions;
   }
 
-  // No layout geometry — explicit generic fallback (must be announced loudly in UI)
   const starter = createStudioStarterRoi();
   return starter.regions.map(r => ({
     ...r,

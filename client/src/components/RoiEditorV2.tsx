@@ -1449,10 +1449,12 @@ export function RoiEditorV2({
               >
                 {roiProvenance?.mode === "ocr-layout" ? (
                   <>
-                    <strong>OCR-placed regions (evidence-based).</strong> Boxes
-                    were proposed from Azure DI layout geometry on this sample —
-                    still verify each one sits on the printed label + value.
-                    Select → drag to move → hover edge/corner to resize.
+                    <strong>OCR-placed (tight row boxes).</strong> Each box
+                    should cover one printed label + its value on the same row —
+                    not a section header, not half the page. If any box is off,
+                    select it → drag / edge-resize until it hugs the field.
+                    Re-run Suggest fields after this update if boxes still look
+                    like the old oversized blobs.
                   </>
                 ) : roiProvenance?.mode === "starter-fallback" ? (
                   <>
