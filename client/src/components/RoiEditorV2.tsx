@@ -169,6 +169,8 @@ export function RoiEditorV2({
   >([]);
   const [customLabelDraft, setCustomLabelDraft] = useState("");
   const [customLabelCritical, setCustomLabelCritical] = useState(false);
+  /** Natural PDF page size at current zoom — drives overlay coordinate space */
+  const [pageSize, setPageSize] = useState({ width: 595, height: 842 });
 
   const allRoiTypes = useMemo(
     () => [...STANDARD_ROI_TYPES, ...customTypes],
@@ -737,9 +739,9 @@ export function RoiEditorV2({
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             style={{
-              width: `${595 * (zoom / 100)}px`,
-              maxWidth: '100%',
-              aspectRatio: '595 / 842',
+              // Size from real PDF bitmap — never maxWidth+aspectRatio squash
+              width: pageSize.width,
+              height: pageSize.height,
               backgroundColor: '#ffffff',
               border: '2px solid #e2e8f0',
               borderRadius: '8px',
@@ -748,6 +750,7 @@ export function RoiEditorV2({
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
               overflow: 'hidden',
               margin: '0 auto',
+              flexShrink: 0,
               transition: 'border-color 0.2s',
             }}
           >
@@ -762,10 +765,11 @@ export function RoiEditorV2({
                 `,
                 backgroundSize: `${gridSize * 100}% ${gridSize * 100}%`,
                 pointerEvents: 'none',
+                zIndex: 1,
               }} />
             )}
 
-            {/* PDF Preview using PDF.js */}
+            {/* PDF Preview using PDF.js — natural aspect, overlays share this box */}
             {showPdfPreview && effectivePdfSource && (
               <PdfPreview
                 pdfSource={effectivePdfSource}
@@ -773,9 +777,17 @@ export function RoiEditorV2({
                 zoom={zoom}
                 onPageChange={setCurrentPage}
                 onPagesLoaded={setTotalPages}
+                onDimensionsChange={(width, height) => {
+                  if (width <= 0 || height <= 0) return;
+                  setPageSize(prev =>
+                    prev.width === width && prev.height === height
+                      ? prev
+                      : { width, height }
+                  );
+                }}
                 showPageControls={false}
                 embedInParent
-                className="absolute inset-0"
+                className="absolute left-0 top-0"
               />
             )}
 

@@ -302,7 +302,12 @@ export function PdfPreview({
       className={className}
       style={
         embedInParent
-          ? { width: "100%", height: "100%", overflow: "hidden" }
+          ? {
+              width: "fit-content",
+              height: "fit-content",
+              overflow: "visible",
+              lineHeight: 0,
+            }
           : undefined
       }
     >
@@ -357,10 +362,11 @@ export function PdfPreview({
         style={
           embedInParent
             ? {
-                width: "100%",
-                height: "100%",
-                overflow: "hidden",
+                width: "fit-content",
+                height: "fit-content",
+                overflow: "visible",
                 backgroundColor: "#ffffff",
+                lineHeight: 0,
               }
             : {
                 overflow: "auto",
@@ -377,9 +383,9 @@ export function PdfPreview({
           style={
             embedInParent
               ? {
+                  // Intrinsic PDF.js bitmap size — never CSS-stretch (that squashes the page)
                   display: "block",
-                  width: "100%",
-                  height: "100%",
+                  maxWidth: "none",
                 }
               : {
                   display: "block",
