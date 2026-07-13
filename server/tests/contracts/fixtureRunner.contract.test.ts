@@ -21,6 +21,7 @@ import {
   type SelectionConfig,
   type FixtureCase,
 } from '../../services/templateRegistry';
+import { createStandardJobSheetRoi } from '../../services/templateRegistry/roiValidator';
 
 // Valid spec with all critical fields
 const validSpecJson: SpecJson = {
@@ -118,6 +119,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
@@ -141,6 +143,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
@@ -164,6 +167,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
@@ -194,6 +198,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
@@ -220,6 +225,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
@@ -245,6 +251,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
@@ -268,6 +275,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
@@ -292,6 +300,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
@@ -320,6 +329,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
@@ -342,6 +352,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
@@ -366,6 +377,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
@@ -389,6 +401,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
@@ -412,6 +425,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
@@ -436,6 +450,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
@@ -466,6 +481,7 @@ describe('Fixture Runner - PR-E Contract Tests', () => {
         version: '1.0.0',
         specJson: validSpecJson,
         selectionConfigJson: validSelectionConfig,
+        roiJson: createStandardJobSheetRoi(),
         createdBy: 1,
       });
       
