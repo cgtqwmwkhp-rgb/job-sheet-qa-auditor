@@ -25,7 +25,7 @@ jobs:
           node-version: 22
 
       - name: Install mysql2
-        run: npm install mysql2@3.11.5
+        run: npm install mysql2@3.11.5 --legacy-peer-deps --no-save
 
       - name: Promote legacy viewer users to qa_lead
         env:
