@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { OverturnMetricsCard } from "@/components/OverturnMetricsCard";
+import OverturnMetricsCard from "@/components/OverturnMetricsCard";
 import { useAnalyticsFilters } from "@/hooks/useAnalyticsFilters";
 import { cn } from "@/lib/utils";
 
