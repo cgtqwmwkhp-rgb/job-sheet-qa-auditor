@@ -1,11 +1,17 @@
 /**
  * Place ROI boxes from Azure DI layout geometry — precision-first.
  *
+ * Live-engine unity: geometry always comes from Azure DI lines/polygons.
+ * When `textTruth` is supplied (production live OCR, typically Mistral), only
+ * place field ROIs that are also evidenced in that text — so authors do not
+ * tune boxes for Azure-only labels that production never sees.
+ *
  * Rules:
  * - Match field LABELS only (reject section headers like "Asset Details")
  * - Prefer short label lines; expand tightly on the SAME ROW (label + value)
  * - Hard-cap box size — never paint a quarter-page blob
  * - Fewer accurate boxes beat many wrong ones
+ * - Gate field placement on live text truth when provided
  */
 
 import type { AzureTextLine } from "../ocrAdapter/parseAzureDiResponse";
@@ -261,7 +267,11 @@ function expandCapture(
     // Typical 2-col table: label ~left half of cell group, value to the right
     const valuePad = 0.22;
     const width = clamp01(
-      Math.min(MAX_ROW_W, Math.max(base.width + valuePad, 0.2), 1 - base.x - 0.02)
+      Math.min(
+        MAX_ROW_W,
+        Math.max(base.width + valuePad, 0.2),
+        1 - base.x - 0.02
+      )
     );
     const height = clamp01(
       Math.min(MAX_ROW_H, Math.max(base.height * 1.35, 0.018))
@@ -379,6 +389,25 @@ function pickBestLine(
   return bestScore >= 0 ? best : null;
 }
 
+/**
+ * Document-wide evidence check against live OCR text truth.
+ * Matcher regexes are often line-anchored (^…$); strip anchors for full-text search.
+ */
+export function textTruthSupportsMatcher(
+  textTruth: string | undefined,
+  re: RegExp
+): boolean {
+  if (!textTruth || !textTruth.trim()) return true;
+  const source = re.source.replace(/^\^/, "").replace(/\$$/, "");
+  try {
+    return new RegExp(source, re.flags.includes("i") ? "i" : "").test(
+      textTruth
+    );
+  } catch {
+    return true;
+  }
+}
+
 export function fieldsForRoiName(name: string): string[] {
   if (name === "tickboxBlock") return ["complianceTickboxes"];
   if (name === "signatureBlock") {
@@ -390,7 +419,8 @@ export function fieldsForRoiName(name: string): string[] {
 }
 
 /**
- * Build ROI regions from OCR line geometry + selection marks.
+ * Build ROI regions from Azure DI line geometry + selection marks.
+ * When `textTruth` is set (live OCR), skip field ROIs not evidenced there.
  * Precision over coverage: skip a field rather than paint a wrong blob.
  * NEVER returns the generic starter scaffold — empty array if no geometry.
  */
@@ -399,141 +429,155 @@ export function suggestRoiFromLayoutEvidence(input: {
   selectionRows: SelectionMarkRow[];
   hasChecklist: boolean;
   layoutAvailable: boolean;
+  /**
+   * Production text truth (Mistral/primary OCR). When provided, field ROI
+   * matchers must also find evidence here — Azure geometry alone is not enough.
+   */
+  textTruth?: string;
 }): ProposedRoiRegion[] {
-  const { lines, selectionRows, hasChecklist, layoutAvailable } = input;
+  const { lines, selectionRows, hasChecklist, layoutAvailable, textTruth } =
+    input;
   const regions: ProposedRoiRegion[] = [];
+  const truthNote = textTruth?.trim() ? " · live text truth confirmed" : "";
 
   if (!layoutAvailable || lines.length === 0) {
     // Callers must surface layoutError — do not invent positions.
     return [];
   }
 
-  // Header: tight top band from lines in the top ~10% only
+  // Header: tight top band from lines in the top ~10% only (geometry-only; always OK)
   const topLines = lines.filter(l => l.yPercent <= 10);
-    if (topLines.length > 0) {
-      const boxes = topLines.map(l => {
-        const b = lineBox01(l);
-        return { x: b.x, y: b.y, width: b.width, height: b.height };
-      });
-      const union = unionBoxes(boxes);
-      if (union) {
-        regions.push({
-          name: "header",
-          page: topLines[0].pageNumber || 1,
-          bounds: {
-            x: 0.03,
-            y: clamp01(Math.max(0, union.y - 0.005)),
-            width: 0.94,
-            height: clamp01(Math.min(0.12, Math.max(0.05, union.height + 0.015))),
-          },
-          confidence: 0.85,
-          source: "ocr-layout",
-          why: `OCR header band from ${topLines.length} top-of-page lines`,
-          accepted: true,
-        });
-      }
-    }
-
-    for (const matcher of FIELD_LABEL_MATCHERS) {
-      const line = pickBestLine(lines, matcher.re, matcher.reject);
-      if (!line) continue;
-      const bounds = expandCapture(line, matcher.expand);
-
-      // Skip if this box heavily overlaps an already-accepted region
-      const heavyOverlap = regions.some(
-        r => overlapRatio(bounds, r.bounds) > 0.45 || overlapRatio(r.bounds, bounds) > 0.45
-      );
-      if (heavyOverlap) continue;
-
+  if (topLines.length > 0) {
+    const boxes = topLines.map(l => {
+      const b = lineBox01(l);
+      return { x: b.x, y: b.y, width: b.width, height: b.height };
+    });
+    const union = unionBoxes(boxes);
+    if (union) {
       regions.push({
-        name: matcher.name,
-        page: bounds.page,
+        name: "header",
+        page: topLines[0].pageNumber || 1,
         bounds: {
-          x: bounds.x,
-          y: bounds.y,
-          width: bounds.width,
-          height: bounds.height,
+          x: 0.03,
+          y: clamp01(Math.max(0, union.y - 0.005)),
+          width: 0.94,
+          height: clamp01(Math.min(0.12, Math.max(0.05, union.height + 0.015))),
         },
-        fields: matcher.fields,
-        confidence: 0.9,
+        confidence: 0.85,
         source: "ocr-layout",
-        why: `Tight OCR match on “${normalizeLabel(line.content).slice(0, 40)}” @ ${line.yPercent.toFixed(0)}% page`,
+        why: `Azure geometry header band from ${topLines.length} top-of-page lines${truthNote}`,
         accepted: true,
       });
     }
+  }
 
-    if (hasChecklist) {
-      const markBoxes = selectionRows
-        .map(r => r.bbox)
-        .filter((b): b is NonNullable<typeof b> => Boolean(b))
-        .map(b => ({
-          x: b.x / 100,
-          y: b.y / 100,
-          width: Math.max(0.01, b.width / 100),
-          height: Math.max(0.01, b.height / 100),
-        }));
-      const headerLine = pickBestLine(
-        lines,
-        /^(ok|adv|fail|n\/?a)(\s+[|/]?\s*(ok|adv|fail|n\/?a)){2,}\s*$/i
+  for (const matcher of FIELD_LABEL_MATCHERS) {
+    if (!textTruthSupportsMatcher(textTruth, matcher.re)) {
+      continue;
+    }
+    const line = pickBestLine(lines, matcher.re, matcher.reject);
+    if (!line) continue;
+    const bounds = expandCapture(line, matcher.expand);
+
+    // Skip if this box heavily overlaps an already-accepted region
+    const heavyOverlap = regions.some(
+      r =>
+        overlapRatio(bounds, r.bounds) > 0.45 ||
+        overlapRatio(r.bounds, bounds) > 0.45
+    );
+    if (heavyOverlap) continue;
+
+    regions.push({
+      name: matcher.name,
+      page: bounds.page,
+      bounds: {
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+      },
+      fields: matcher.fields,
+      confidence: textTruth?.trim() ? 0.92 : 0.9,
+      source: "ocr-layout",
+      why: `Azure geometry on “${normalizeLabel(line.content).slice(0, 40)}” @ ${line.yPercent.toFixed(0)}% page${truthNote}`,
+      accepted: true,
+    });
+  }
+
+  if (hasChecklist) {
+    const markBoxes = selectionRows
+      .map(r => r.bbox)
+      .filter((b): b is NonNullable<typeof b> => Boolean(b))
+      .map(b => ({
+        x: b.x / 100,
+        y: b.y / 100,
+        width: Math.max(0.01, b.width / 100),
+        height: Math.max(0.01, b.height / 100),
+      }));
+    const headerLine = pickBestLine(
+      lines,
+      /^(ok|adv|fail|n\/?a)(\s+[|/]?\s*(ok|adv|fail|n\/?a)){2,}\s*$/i
+    );
+    let tickBounds = unionBoxes(markBoxes);
+    if (headerLine) {
+      const hb = lineBox01(headerLine);
+      const headerBox = {
+        x: clamp01(Math.min(0.05, hb.x)),
+        y: hb.y,
+        width: clamp01(Math.max(0.55, 0.9 - hb.x)),
+        height: clamp01(
+          Math.min(0.35, Math.max(0.12, markBoxes.length * 0.025 + 0.04))
+        ),
+      };
+      tickBounds = unionBoxes(
+        tickBounds ? [tickBounds, headerBox] : [headerBox]
       );
-      let tickBounds = unionBoxes(markBoxes);
-      if (headerLine) {
-        const hb = lineBox01(headerLine);
-        const headerBox = {
-          x: clamp01(Math.min(0.05, hb.x)),
-          y: hb.y,
-          width: clamp01(Math.max(0.55, 0.9 - hb.x)),
-          height: clamp01(Math.min(0.35, Math.max(0.12, markBoxes.length * 0.025 + 0.04))),
-        };
-        tickBounds = unionBoxes(
-          tickBounds ? [tickBounds, headerBox] : [headerBox]
-        );
-      }
-      if (tickBounds && tickBounds.height <= 0.45) {
-        const padded = {
-          x: clamp01(Math.max(0.03, tickBounds.x - 0.2)),
-          y: clamp01(tickBounds.y - 0.015),
-          width: clamp01(Math.min(0.94, tickBounds.width + 0.22)),
-          height: clamp01(Math.min(0.42, tickBounds.height + 0.03)),
-        };
-        regions.push({
-          name: "tickboxBlock",
-          page: selectionRows[0]?.pageNumber || headerLine?.pageNumber || 1,
-          bounds: padded,
-          fields: ["complianceTickboxes"],
-          confidence: 0.9,
-          source: "ocr-layout",
-          why:
-            markBoxes.length > 0
-              ? `Checklist from ${markBoxes.length} selection marks (capped height)`
-              : "Checklist column headers in OCR",
-          accepted: true,
-        });
-      }
     }
+    if (tickBounds && tickBounds.height <= 0.45) {
+      const padded = {
+        x: clamp01(Math.max(0.03, tickBounds.x - 0.2)),
+        y: clamp01(tickBounds.y - 0.015),
+        width: clamp01(Math.min(0.94, tickBounds.width + 0.22)),
+        height: clamp01(Math.min(0.42, tickBounds.height + 0.03)),
+      };
+      regions.push({
+        name: "tickboxBlock",
+        page: selectionRows[0]?.pageNumber || headerLine?.pageNumber || 1,
+        bounds: padded,
+        fields: ["complianceTickboxes"],
+        confidence: 0.9,
+        source: "ocr-layout",
+        why:
+          markBoxes.length > 0
+            ? `Checklist from ${markBoxes.length} selection marks (capped height)${truthNote}`
+            : `Checklist column headers in Azure geometry${truthNote}`,
+        accepted: true,
+      });
+    }
+  }
 
-    const eng = regions.find(r => r.name === "engineerSignature");
-    const cust = regions.find(r => r.name === "customerSignature");
-    if (eng && cust) {
-      const union = unionBoxes([eng.bounds, cust.bounds]);
-      if (union && union.height <= 0.14) {
-        regions.push({
-          name: "signatureBlock",
-          page: eng.page,
-          bounds: {
-            x: clamp01(union.x - 0.01),
-            y: clamp01(union.y - 0.01),
-            width: clamp01(Math.min(0.94, union.width + 0.02)),
-            height: clamp01(Math.min(0.12, union.height + 0.02)),
-          },
-          fields: ["engineerSignOff", "customerSignature"],
-          confidence: 0.85,
-          source: "ocr-layout",
-          why: "Union of engineer + customer signature OCR hits",
-          accepted: true,
-        });
-      }
+  const eng = regions.find(r => r.name === "engineerSignature");
+  const cust = regions.find(r => r.name === "customerSignature");
+  if (eng && cust) {
+    const union = unionBoxes([eng.bounds, cust.bounds]);
+    if (union && union.height <= 0.14) {
+      regions.push({
+        name: "signatureBlock",
+        page: eng.page,
+        bounds: {
+          x: clamp01(union.x - 0.01),
+          y: clamp01(union.y - 0.01),
+          width: clamp01(Math.min(0.94, union.width + 0.02)),
+          height: clamp01(Math.min(0.12, union.height + 0.02)),
+        },
+        fields: ["engineerSignOff", "customerSignature"],
+        confidence: 0.85,
+        source: "ocr-layout",
+        why: `Union of engineer + customer signature Azure geometry hits${truthNote}`,
+        accepted: true,
+      });
     }
+  }
 
   return regions;
 }
