@@ -404,6 +404,7 @@ describe("Audit Actions Contract (PR-10)", () => {
         originalValue: "Acme Site",
         correctedValue: "ACME Industrial Site",
         userId: 7,
+        trainingReasonCode: "ocr_misread",
       });
 
       expect(result.success).toBe(true);
@@ -412,7 +413,10 @@ describe("Audit Actions Contract (PR-10)", () => {
       expect(mem.findings.get(1)?.normalisedSnippet).toBe(
         "ACME Industrial Site"
       );
-      expect(mem.logs.some(l => l.action === "FIELD_CORRECTION")).toBe(true);
+      const fcLog = mem.logs.find(l => l.action === "FIELD_CORRECTION");
+      expect(fcLog).toBeTruthy();
+      const details = fcLog!.details as Record<string, unknown>;
+      expect(details.trainingSignal).toBeTruthy();
     });
 
     it("undoes a field correction", async () => {

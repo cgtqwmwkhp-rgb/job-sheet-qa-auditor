@@ -25,6 +25,10 @@ import {
 } from "../services/auditActions";
 import { FINDING_ACTIONS } from "../services/auditActions/types";
 import {
+  TRAINING_REASON_CODES,
+  resolveJobSheetsForFindings,
+} from "../services/trainingSignals";
+import {
   enforceRateLimit,
   RateLimitError,
   RATE_LIMITS,
@@ -80,6 +84,8 @@ function createDbDeps(): AuditActionDeps {
         fieldName: row.fieldName,
         rawSnippet: row.rawSnippet,
         normalisedSnippet: row.normalisedSnippet,
+        ruleId: row.ruleId,
+        reasonCode: row.reasonCode,
       };
     },
     updateFindingResolution: (id, data) => db.updateFindingResolution(id, data),
@@ -110,6 +116,12 @@ const findingActionInput = z.object({
   reason: z.string().min(1).max(2000),
 });
 
+const trainingReasonCodeInput = z.enum(TRAINING_REASON_CODES).optional();
+
+const overrideActionInput = findingActionInput.extend({
+  trainingReasonCode: trainingReasonCodeInput,
+});
+
 export const auditActionsRouter = router({
   /**
    * Waive a finding (creates waiver row + marks finding waived).
@@ -136,7 +148,7 @@ export const auditActionsRouter = router({
 
   /** Override a finding (reviewer overturns the automated result). */
   override: qaLeadProcedure
-    .input(findingActionInput)
+    .input(overrideActionInput)
     .mutation(async ({ ctx, input }) => {
       await enforceReviewLimit(ctx.user.id);
       try {
@@ -145,6 +157,7 @@ export const auditActionsRouter = router({
           action: "override",
           reason: input.reason,
           userId: ctx.user.id,
+          trainingReasonCode: input.trainingReasonCode,
         });
       } catch (err) {
         throw new TRPCError({
@@ -286,6 +299,7 @@ export const auditActionsRouter = router({
         fieldName: z.string().min(1).max(200).optional(),
         originalValue: z.string().max(4000).optional(),
         correctedValue: z.string().min(1).max(4000),
+        trainingReasonCode: trainingReasonCodeInput,
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -296,6 +310,7 @@ export const auditActionsRouter = router({
           originalValue: input.originalValue,
           correctedValue: input.correctedValue,
           userId: ctx.user.id,
+          trainingReasonCode: input.trainingReasonCode,
         });
       } catch (err) {
         throw new TRPCError({
@@ -330,12 +345,29 @@ export const auditActionsRouter = router({
       }
     }),
 
+  /** Resolve sample finding ids → job sheet ids (Exceptions CTAs). */
+  resolveSampleAudits: protectedProcedure
+    .input(
+      z.object({
+        findingIds: z.array(z.number().int().positive()).min(1).max(25),
+      })
+    )
+    .query(async ({ input }) => {
+      const deps = createDbDeps();
+      const samples = await resolveJobSheetsForFindings(deps, input.findingIds);
+      return {
+        samples,
+        jobSheetIds: samples.map(s => s.jobSheetId),
+      };
+    }),
+
   /** List supported actions (for UI / contract tests). */
   supportedActions: protectedProcedure.query(() => ({
     findingActions: [...FINDING_ACTIONS],
     undoSupported: true,
     bulkApproveSupported: true,
     fieldCorrectionSupported: true,
+    trainingReasonCodes: [...TRAINING_REASON_CODES],
   })),
 });
 
