@@ -7,6 +7,10 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DocOutcomeBadge } from "@/components/DocOutcomeBadge";
 import {
+  ExportButton,
+  type ExportOptions,
+} from "@/components/audit/ExportButton";
+import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
@@ -18,7 +22,7 @@ import {
   Search,
   XCircle,
 } from "lucide-react";
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/lib/trpc";
@@ -41,6 +45,20 @@ import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
 import { perfMark, PERF_MARKS, perfClear } from "@/lib/perf";
 import { useReviewQueueKeyboard } from "@/hooks/useReviewQueueKeyboard";
 import { usePersistFn } from "@/hooks/usePersistFn";
+
+function downloadTextFile(
+  content: string,
+  filename: string,
+  mimeType: string
+): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
 interface AuditOutcomeSummary {
   result: string;
@@ -251,6 +269,46 @@ export default function AuditResults() {
   const { data: findingsData } = trpc.audits.getFindings.useQuery(
     { auditResultId: auditResult?.id || 0 },
     { enabled: !!auditResult?.id }
+  );
+
+  const trpcUtils = trpc.useUtils();
+
+  const handleAuditExport = useCallback(
+    async (options: ExportOptions) => {
+      try {
+        if (options.format === "csv") {
+          const result = await trpcUtils.exports.validatedFieldsCSV.fetch({
+            auditId: options.auditId,
+            redacted: options.redacted,
+            tab: options.tab,
+          });
+          downloadTextFile(
+            result.content,
+            result.filename,
+            "text/csv;charset=utf-8"
+          );
+        } else {
+          const result = await trpcUtils.exports.bundle.fetch({
+            auditId: options.auditId,
+            redacted: options.redacted,
+          });
+          downloadTextFile(
+            JSON.stringify(result.content, null, 2),
+            result.filename,
+            "application/json;charset=utf-8"
+          );
+        }
+        toast.success(
+          options.redacted
+            ? "Redacted export downloaded"
+            : "Unredacted export downloaded"
+        );
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Export failed");
+        throw error;
+      }
+    },
+    [trpcUtils]
   );
 
   const statusCounts = useMemo(() => {
@@ -850,22 +908,35 @@ export default function AuditResults() {
 
   return (
     <DashboardLayout>
-      <div className="-m-6 h-[calc(100vh-3.5rem)] min-h-0 overflow-hidden">
-        <ReviewWorkstationPane
-          jobSheetId={numericId}
-          auditData={auditData}
-          documentUrl={pdfProxyUrl}
-          onBack={goBackToList}
-          showJobSheetActions={canSheetApprove}
-          onApproveJobSheet={
-            canSheetApprove ? () => handleApprove(numericId) : undefined
-          }
-          onRejectJobSheet={
-            canSheetApprove ? () => handleReject(numericId) : undefined
-          }
-          approvePending={approveJobSheet.isPending}
-          rejectPending={updateStatus.isPending}
-        />
+      <div className="-m-6 h-[calc(100vh-3.5rem)] min-h-0 overflow-hidden flex flex-col">
+        {auditResult?.id ? (
+          <div
+            className="shrink-0 flex items-center justify-end gap-2 border-b border-[#EBE8E8] bg-white px-4 py-2"
+            data-testid="audit-export-toolbar"
+          >
+            <ExportButton
+              auditId={auditResult.id}
+              onExport={handleAuditExport}
+            />
+          </div>
+        ) : null}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ReviewWorkstationPane
+            jobSheetId={numericId}
+            auditData={auditData}
+            documentUrl={pdfProxyUrl}
+            onBack={goBackToList}
+            showJobSheetActions={canSheetApprove}
+            onApproveJobSheet={
+              canSheetApprove ? () => handleApprove(numericId) : undefined
+            }
+            onRejectJobSheet={
+              canSheetApprove ? () => handleReject(numericId) : undefined
+            }
+            approvePending={approveJobSheet.isPending}
+            rejectPending={updateStatus.isPending}
+          />
+        </div>
       </div>
     </DashboardLayout>
   );
