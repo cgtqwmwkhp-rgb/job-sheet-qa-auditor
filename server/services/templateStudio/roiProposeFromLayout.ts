@@ -10,7 +10,7 @@
 
 import type { AzureTextLine } from "../ocrAdapter/parseAzureDiResponse";
 import type { SelectionMarkRow } from "../selectionMarks";
-import { createStudioStarterRoi } from "./starterDraft";
+// createStudioStarterRoi intentionally NOT used — never invent scaffold positions
 
 export interface ProposedRoiRegion {
   name: string;
@@ -292,6 +292,7 @@ export function fieldsForRoiName(name: string): string[] {
 /**
  * Build ROI regions from OCR line geometry + selection marks.
  * Precision over coverage: skip a field rather than paint a wrong blob.
+ * NEVER returns the generic starter scaffold — empty array if no geometry.
  */
 export function suggestRoiFromLayoutEvidence(input: {
   lines: LayoutLineForRoi[];
@@ -302,9 +303,13 @@ export function suggestRoiFromLayoutEvidence(input: {
   const { lines, selectionRows, hasChecklist, layoutAvailable } = input;
   const regions: ProposedRoiRegion[] = [];
 
-  if (layoutAvailable && lines.length > 0) {
-    // Header: tight top band from lines in the top ~10% only
-    const topLines = lines.filter(l => l.yPercent <= 10);
+  if (!layoutAvailable || lines.length === 0) {
+    // Callers must surface layoutError — do not invent positions.
+    return [];
+  }
+
+  // Header: tight top band from lines in the top ~10% only
+  const topLines = lines.filter(l => l.yPercent <= 10);
     if (topLines.length > 0) {
       const boxes = topLines.map(l => {
         const b = lineBox01(l);
@@ -430,16 +435,5 @@ export function suggestRoiFromLayoutEvidence(input: {
       }
     }
 
-    return regions;
-  }
-
-  const starter = createStudioStarterRoi();
-  return starter.regions.map(r => ({
-    ...r,
-    fields: r.fields ?? fieldsForRoiName(r.name),
-    confidence: 0.25,
-    source: "starter-roi-fallback",
-    why: "NO OCR GEOMETRY — generic scaffold only. Draw/resize onto the real printed fields before Save.",
-    accepted: true,
-  }));
+  return regions;
 }

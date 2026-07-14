@@ -460,10 +460,13 @@ export default function TemplateStudio() {
               ? "OCR heuristics"
               : "Starter scaffold (no sample OCR)";
           if (ocrN > 0) return `${base} · ${ocrN} OCR-placed ROI boxes`;
-          if (!result.proposal.layoutAvailable) {
-            return `${base} · ROI is GENERIC ONLY — place manually`;
+          if (result.proposal.layoutError) {
+            return `ROI not placed — ${result.proposal.layoutError.slice(0, 120)}`;
           }
-          return base;
+          if (!result.proposal.layoutAvailable) {
+            return `${base} · ROI empty until OCR geometry works`;
+          }
+          return `${base} · ROI empty (draw manually)`;
         })()
       );
       return result.proposal;
@@ -1160,13 +1163,24 @@ export default function TemplateStudio() {
                 proposalPreview?.roiProvenance?.mode === "unknown" ||
                 !proposalPreview?.roiProvenance) && (
                 <div
-                  className="rounded-md border-2 border-amber-500 bg-amber-50 px-3 py-2 text-xs text-amber-950"
+                  className="rounded-md border-2 border-red-500 bg-red-50 px-3 py-2 text-sm text-red-950"
                   data-testid="studio-roi-generic-warning"
                 >
-                  <strong>Generic ROI is not a template review.</strong> Run
-                  Suggest fields with the sample attached so regions are placed
-                  from OCR geometry. Rough starters delay accurate authoring —
-                  treat them as last resort only.
+                  <strong>Why accuracy is poor right now:</strong> these boxes
+                  are <em>not</em> from OCR on this PDF. They are a generic
+                  scaffold (or leftovers).{" "}
+                  {proposeMut.data?.proposal?.layoutError ? (
+                    <>
+                      Layout error:{" "}
+                      <code className="text-xs">
+                        {proposeMut.data.proposal.layoutError}
+                      </code>
+                      .{" "}
+                    </>
+                  ) : null}
+                  Fix: open <strong>Suggest fields</strong>, ensure the sample is
+                  attached, click Accept — only then open ROI. If OCR still fails,
+                  Clear All and draw manually.
                 </div>
               )}
               {proposalPreview?.roiProvenance?.mode === "ocr-layout" && (

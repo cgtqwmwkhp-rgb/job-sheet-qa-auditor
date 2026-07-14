@@ -38,7 +38,6 @@ import {
 import {
   createStudioStarterSpec,
   createStudioStarterSelection,
-  createStudioStarterRoi,
   attachStudioSample,
   buildActivationReport,
   proposeFromSample,
@@ -449,7 +448,7 @@ export const templateRouter = router({
           selectionConfigJson: createStudioStarterSelection(
             input.selectionTokens
           ),
-          roiJson: createStudioStarterRoi(),
+          roiJson: { regions: [] },
           changeNotes: "Studio draft created",
           createdBy: ctx.user.id,
         });
@@ -546,7 +545,7 @@ export const templateRouter = router({
           selectionConfigJson: createStudioStarterSelection(
             input.selectionTokens
           ),
-          roiJson: createStudioStarterRoi(),
+          roiJson: { regions: [] },
           changeNotes: "Quick-start draft",
           createdBy: ctx.user.id,
         });
@@ -561,11 +560,16 @@ export const templateRouter = router({
           versionId: version.id,
           templateName: derivedName,
         });
+        const ocrRoi = proposal.roiRegions.some(r => r.source === "ocr-layout");
         const appliedVersion = updateDraftVersion(version.id, {
           specJson: proposal.proposedSpec,
           selectionConfigJson: proposal.proposedSelection,
-          roiJson: proposal.proposedRoi,
-          changeNotes: "Quick-start proposal applied",
+          ...(ocrRoi
+            ? { roiJson: proposal.proposedRoi }
+            : { roiJson: { regions: [] } }),
+          changeNotes: ocrRoi
+            ? "Quick-start proposal applied (OCR-placed ROIs)"
+            : "Quick-start proposal applied (no OCR ROI geometry — draw manually)",
         });
         scaffoldFixturesFromSample({
           versionId: version.id,
@@ -673,7 +677,7 @@ export const templateRouter = router({
           version: "0.1.0",
           specJson: createStudioStarterSpec(derivedName),
           selectionConfigJson: createStudioStarterSelection(),
-          roiJson: createStudioStarterRoi(),
+          roiJson: { regions: [] },
           changeNotes: `Bootstrap from jobSheet ${input.jobSheetId}`,
           createdBy: ctx.user.id,
         });
@@ -688,11 +692,16 @@ export const templateRouter = router({
           versionId: version.id,
           templateName: derivedName,
         });
+        const ocrRoi = proposal.roiRegions.some(r => r.source === "ocr-layout");
         const appliedVersion = updateDraftVersion(version.id, {
           specJson: proposal.proposedSpec,
           selectionConfigJson: proposal.proposedSelection,
-          roiJson: proposal.proposedRoi,
-          changeNotes: "Bootstrap proposal applied",
+          ...(ocrRoi
+            ? { roiJson: proposal.proposedRoi }
+            : { roiJson: { regions: [] } }),
+          changeNotes: ocrRoi
+            ? "Bootstrap proposal applied (OCR-placed ROIs)"
+            : "Bootstrap proposal applied (no OCR ROI geometry — draw manually)",
         });
         scaffoldFixturesFromSample({
           versionId: version.id,
@@ -989,8 +998,13 @@ export const templateRouter = router({
           appliedVersion = updateDraftVersion(input.versionId, {
             specJson: filteredSpec,
             selectionConfigJson: proposal.proposedSelection,
-            roiJson: proposal.proposedRoi,
-            changeNotes: "Applied AI/OCR proposal (with rejects filtered)",
+            // Only write ROI when OCR placed real boxes — never save generic scaffold
+            ...(proposal.roiRegions.some(r => r.source === "ocr-layout")
+              ? { roiJson: proposal.proposedRoi }
+              : {}),
+            changeNotes: proposal.roiRegions.some(r => r.source === "ocr-layout")
+              ? "Applied AI/OCR proposal (OCR-placed ROIs)"
+              : "Applied AI/OCR proposal (fields/tokens only — ROI left empty pending OCR geometry)",
           });
           scaffoldFixturesFromSample({
             versionId: input.versionId,

@@ -136,13 +136,13 @@ describe("suggestRoiFromLayoutEvidence (precision-first)", () => {
     expect(regions.find(r => r.name === "assetId")).toBeUndefined();
   });
 
-  it("announces generic fallback when OCR layout is unavailable", () => {
+  it("returns empty ROI (not a generic scaffold) when OCR layout is unavailable", () => {
     const regions = suggestRoiFromLayoutEvidence({
       layoutAvailable: false,
       hasChecklist: true,
       selectionRows: [],
       lines: [],
     });
-    expect(regions.every(r => r.source === "starter-roi-fallback")).toBe(true);
+    expect(regions).toEqual([]);
   });
 });

@@ -799,15 +799,18 @@ export function RoiEditorV2({
   };
 
   /**
-   * Apply rough starter layout — NEVER form-accurate; author must place on real fields.
+   * Rough starters intentionally disabled as a default path.
+   * They produce inaccurate boxes and train authors to trust garbage.
+   * Use Suggest fields (OCR) or draw manually.
    */
   const applyTemplate = (templateType: string) => {
     const template = ROI_TEMPLATES[templateType];
     if (!template) return;
     const ok = window.confirm(
-      `“${templateType}” places ROUGH starter boxes only — they are NOT aligned to this PDF.\n\n` +
-        `You must drag and resize every box onto the real printed field (label + value) before Save ROI.\n\n` +
-        `Continue and replace current regions?`
+      `WARNING: “${templateType}” is a GENERIC scaffold — it is NOT based on this PDF’s OCR.\n\n` +
+        `These boxes will be WRONG on almost every form (Date on logos, Job Reference in the wrong table, etc.).\n\n` +
+        `Prefer: Suggest fields (with sample attached) for OCR-placed boxes, or draw each field yourself.\n\n` +
+        `Only continue if you will immediately move/resize every box onto the real printed field.`
     );
     if (!ok) return;
     setRegions(
@@ -1459,13 +1462,14 @@ export function RoiEditorV2({
                 ) : roiProvenance?.mode === "starter-fallback" ? (
                   <>
                     <strong>
-                      GENERIC STARTER ONLY — not form-accurate. Do not trust these
-                      boxes.
+                      No OCR-placed boxes — do not trust anything on this page.
                     </strong>{" "}
-                    OCR layout was unavailable, so positions are a scaffold.
-                    Run <em>Suggest fields</em> with a sample PDF for OCR-placed
-                    regions, or draw/resize every box onto the real printed field
-                    before Save ROI.
+                    Azure DI layout did not return usable field geometry (or
+                    Suggest fields was not applied). Clear these boxes and either
+                    re-run <em>Suggest fields</em> with the sample attached, or
+                    draw each field yourself using Draw labels + edge resize.
+                    Generic Maintenance/Inspection scaffolds will always look like
+                    this mess.
                   </>
                 ) : (
                   <>

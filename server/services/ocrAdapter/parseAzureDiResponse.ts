@@ -228,6 +228,7 @@ export function parseAzureDiResponse(raw: unknown): ParsedAzureDiResult {
 
       // Capture line geometry for checklist row label association
       if (width && height) {
+        let pageLineCount = 0;
         for (const line of lines) {
           if (!line || typeof line !== "object") continue;
           const lo = line as Record<string, unknown>;
@@ -254,6 +255,39 @@ export function parseAzureDiResponse(raw: unknown): ParsedAzureDiResult {
             widthPercent: clampPercent(((xMax - xMin) / width) * 100),
             heightPercent: clampPercent(((yMax - yMin) / height) * 100),
           });
+          pageLineCount += 1;
+        }
+
+        // Fallback: word polygons when lines lack geometry (common on some DI responses)
+        if (pageLineCount === 0) {
+          const words = Array.isArray(pageObj.words) ? pageObj.words : [];
+          for (const word of words) {
+            if (!word || typeof word !== "object") continue;
+            const wo = word as Record<string, unknown>;
+            const wordContent = asString(wo.content);
+            if (!wordContent?.trim()) continue;
+            const poly = Array.isArray(wo.polygon)
+              ? wo.polygon
+                  .map(asNumber)
+                  .filter((n): n is number => n !== undefined)
+              : [];
+            if (poly.length < 8) continue;
+            const ys = [poly[1], poly[3], poly[5], poly[7]];
+            const xs = [poly[0], poly[2], poly[4], poly[6]];
+            const yMin = Math.min(...ys);
+            const yMax = Math.max(...ys);
+            const xMin = Math.min(...xs);
+            const xMax = Math.max(...xs);
+            const yMid = (yMin + yMax) / 2;
+            linesOut.push({
+              pageNumber,
+              content: wordContent.trim(),
+              yPercent: clampPercent((yMid / height) * 100),
+              xPercent: clampPercent((xMin / width) * 100),
+              widthPercent: clampPercent(((xMax - xMin) / width) * 100),
+              heightPercent: clampPercent(((yMax - yMin) / height) * 100),
+            });
+          }
         }
       }
 

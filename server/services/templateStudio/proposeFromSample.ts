@@ -300,6 +300,11 @@ export async function proposeFromSample(input: {
       selectionMarkRows = mapSelectionMarksToRows(layout.selectionMarks ?? [], {
         lines: layout.lines,
       });
+      if (layoutLines.length === 0) {
+        layoutError =
+          "Azure DI layout returned no text geometry (0 lines/words with polygons). Cannot place accurate ROIs — draw manually or re-attach sample and retry Suggest fields.";
+        // Keep layoutAvailable for field/token heuristics from layoutText, but ROI path needs geometry
+      }
     }
   }
 
@@ -434,12 +439,22 @@ export async function proposeFromSample(input: {
     "compliance",
   ].filter((t, i, arr) => arr.indexOf(t) === i);
 
+  const roiGeometryAvailable = layoutAvailable && layoutLines.length > 0;
   const roiRegions = suggestRoiFromLayoutEvidence({
     lines: layoutLines,
     selectionRows: selectionMarkRows,
     hasChecklist: hasChecklistGrid,
-    layoutAvailable,
+    layoutAvailable: roiGeometryAvailable,
   });
+  if (layoutAvailable && !roiGeometryAvailable && !layoutError) {
+    layoutError =
+      "OCR layout had no usable line geometry for ROI placement";
+  }
+  if (roiGeometryAvailable && roiRegions.length === 0) {
+    layoutError =
+      (layoutError ? `${layoutError} · ` : "") +
+      "OCR geometry present but no field labels matched — draw ROIs manually using Draw labels tooltips.";
+  }
 
   const acceptedFields = proposedFields
     .filter(f => f.accepted !== false)
