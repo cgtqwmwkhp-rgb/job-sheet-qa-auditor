@@ -28,10 +28,25 @@ function isInsideReviewWorkstation(target: EventTarget | null): boolean {
 }
 
 /**
+ * Finding shortcuts stay live when focus is inside the workstation, or when
+ * focus has fallen back to <body>/<html> after clicking a non-focusable finding
+ * card (so o/n/p keep working without an extra Enter).
+ * Skips when focus is clearly elsewhere (queue row, search, other chrome).
+ */
+function isFindingKeyboardContext(target: EventTarget | null): boolean {
+  if (isInsideReviewWorkstation(target)) return true;
+  if (!(target instanceof HTMLElement)) return false;
+  if (target !== document.body && target !== document.documentElement) {
+    return false;
+  }
+  return Boolean(document.querySelector("[data-review-workstation]"));
+}
+
+/**
  * Finding-level shortcuts for the review workstation (Phase 1.7):
  * n/p navigate findings, o override, c correct, v view on document.
- * Only active when focus is inside the workstation pane (avoids colliding
- * with Hold Queue j/k/a/r shortcuts).
+ * Scoped so Hold Queue j/k/a/r still own queue navigation when focus is
+ * on queue chrome; body fallback keeps the override path one keystroke.
  */
 export function useReviewFindingKeyboard(
   handlers: ReviewFindingKeyboardHandlers,
@@ -43,7 +58,7 @@ export function useReviewFindingKeyboard(
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (isEditableTarget(e.target)) return;
-      if (!isInsideReviewWorkstation(e.target)) return;
+      if (!isFindingKeyboardContext(e.target)) return;
 
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
 

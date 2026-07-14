@@ -16,6 +16,7 @@ const FINDING_SHORTCUTS: ShortcutEntry[] = [
   { keys: ["o"], label: "override" },
   { keys: ["c"], label: "correct" },
   { keys: ["v"], label: "view on PDF" },
+  { keys: ["⌘", "Enter"], label: "confirm override" },
 ];
 
 const META_SHORTCUTS: ShortcutEntry[] = [
@@ -24,11 +25,13 @@ const META_SHORTCUTS: ShortcutEntry[] = [
 ];
 
 function ShortcutItem({ entry }: { entry: ShortcutEntry }) {
+  const joiner =
+    entry.keys.length > 1 && entry.keys.includes("Enter") ? " + " : " / ";
   return (
     <span>
       {entry.keys.map((k, i) => (
         <span key={k}>
-          {i > 0 && " / "}
+          {i > 0 && joiner}
           <kbd className="font-mono text-foreground">{k}</kbd>
         </span>
       ))}{" "}
@@ -71,7 +74,7 @@ export function ReviewShortcutsLegend({
 
   return (
     <Card className={className ?? "bg-muted/40"}>
-      <CardContent className="py-3 text-sm text-muted-foreground flex flex-wrap gap-x-6 gap-y-1">
+      <CardContent className="py-2 px-3 text-xs text-muted-foreground flex flex-wrap gap-x-5 gap-y-0.5">
         {entries.map(entry => (
           <ShortcutItem key={entry.keys.join(",")} entry={entry} />
         ))}
