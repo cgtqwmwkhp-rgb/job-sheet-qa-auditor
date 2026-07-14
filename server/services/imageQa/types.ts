@@ -200,5 +200,13 @@ export interface IntakeGateResult {
   requiresReview: boolean;
   reviewReasons: string[];
   pageMetrics?: PageQualityMetrics[];
+  /**
+   * How quality was measured.
+   * - `pixel`: real JPEG/PNG blur/skew/contrast (no OCR)
+   * - `unsupported`: non-raster upload (e.g. PDF) — gate skipped without OCR
+   */
+  analysisMethod?: "pixel" | "unsupported";
+  /** Always false on the production intake path — garbage is rejected pre-OCR. */
+  ocrInvoked?: boolean;
   error?: string;
 }

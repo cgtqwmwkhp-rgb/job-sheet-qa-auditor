@@ -1,15 +1,15 @@
 /**
  * Image QA Intake Gate Contract Tests
  *
- * Verifies upload-time quality scoring + retake feedback.
- * Production path OCRs the real buffer (mocked here); fixture proxy
- * remains covered as a test-only helper.
+ * Verifies upload-time pixel blur/skew scoring + retake feedback.
+ * Production path analyzes JPEG/PNG buffers directly — never OCRs for quality.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
-import type { OCRResult } from "../../services/ocr";
+import { PNG } from "pngjs";
+import jpeg from "jpeg-js";
 
 const { extractTextFromBase64Mock } = vi.hoisted(() => ({
   extractTextFromBase64Mock: vi.fn(),
@@ -29,6 +29,7 @@ import {
   isImageQaIntakeEnabled,
   buildRetakeFeedback,
   getDefaultImageQaConfig,
+  analyzeImageBuffer,
   type PageQualityMetrics,
 } from "../../services/imageQa";
 
@@ -38,17 +39,55 @@ function loadFixture(name: string): Buffer {
   return readFileSync(join(FIXTURE_DIR, name));
 }
 
-function loadFixtureText(name: string): string {
-  return readFileSync(join(FIXTURE_DIR, name), "utf8");
+/** Sharp text-like scan: dark ink strokes on white — high Laplacian energy. */
+function makeSharpScanPng(width = 240, height = 320): Buffer {
+  const png = new PNG({ width, height });
+  png.data.fill(255);
+  for (let row = 24; row < height - 24; row += 14) {
+    for (let x = 16; x < width - 16; x++) {
+      if ((x + row) % 3 === 0) {
+        const i = (row * width + x) * 4;
+        png.data[i] = png.data[i + 1] = png.data[i + 2] = 18;
+        png.data[i + 3] = 255;
+      }
+    }
+  }
+  return PNG.sync.write(png);
 }
 
-function mockOcrSuccess(markdown: string): OCRResult {
-  return {
-    success: true,
-    pages: [{ pageNumber: 1, markdown }],
-    totalPages: 1,
-    model: "mock-ocr",
-  };
+/** Soft gradient — near-zero edge energy (garbage blur). */
+function makeBlurryScanPng(width = 200, height = 260): Buffer {
+  const png = new PNG({ width, height });
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const v = (90 + (x / width) * 35 + (y / height) * 35) | 0;
+      png.data[i] = png.data[i + 1] = png.data[i + 2] = v;
+      png.data[i + 3] = 255;
+    }
+  }
+  return PNG.sync.write(png);
+}
+
+/** Near-blank washout. */
+function makeOverexposedPng(width = 160, height = 160): Buffer {
+  const png = new PNG({ width, height });
+  for (let i = 0; i < width * height; i++) {
+    const o = i * 4;
+    png.data[o] = png.data[o + 1] = png.data[o + 2] = 252;
+    png.data[o + 3] = 255;
+  }
+  return PNG.sync.write(png);
+}
+
+function makeSharpScanJpeg(): Buffer {
+  const pngBuf = makeSharpScanPng(180, 220);
+  const png = PNG.sync.read(pngBuf);
+  const encoded = jpeg.encode(
+    { data: png.data, width: png.width, height: png.height },
+    90
+  );
+  return Buffer.from(encoded.data);
 }
 
 describe("Image QA Intake Gate Contract Tests", () => {
@@ -57,6 +96,9 @@ describe("Image QA Intake Gate Contract Tests", () => {
   beforeEach(() => {
     process.env.FEATURE_IMAGE_QA_INTAKE = "true";
     extractTextFromBase64Mock.mockReset();
+    extractTextFromBase64Mock.mockRejectedValue(
+      new Error("OCR must not be called from intake gate")
+    );
   });
 
   afterEach(() => {
@@ -109,24 +151,51 @@ describe("Image QA Intake Gate Contract Tests", () => {
     });
   });
 
-  describe("runIntakeGate (OCR path)", () => {
-    it("passes good OCR markdown with score >= threshold and empty retakeFeedback", async () => {
-      const markdown = loadFixtureText("good-scan.md");
-      extractTextFromBase64Mock.mockResolvedValue(mockOcrSuccess(markdown));
-
-      const buffer = Buffer.from("fake-pdf-bytes");
-      const result = await runIntakeGate({
-        buffer,
-        fileName: "good-scan.pdf",
-        mimeType: "application/pdf",
+  describe("pixel detectors (pre-OCR)", () => {
+    it("scores sharp scan high and blurry scan low", () => {
+      const sharp = analyzeImageBuffer(makeSharpScanPng(), {
+        mimeType: "image/png",
+      });
+      const blurry = analyzeImageBuffer(makeBlurryScanPng(), {
+        mimeType: "image/png",
       });
 
-      expect(extractTextFromBase64Mock).toHaveBeenCalledWith(
-        buffer.toString("base64"),
-        "application/pdf"
-      );
+      expect(sharp).not.toBeNull();
+      expect(blurry).not.toBeNull();
+      expect(sharp!.blurScore).toBeGreaterThan(blurry!.blurScore);
+      expect(sharp!.overallScore).toBeGreaterThan(blurry!.overallScore);
+      expect(blurry!.isBlurry).toBe(true);
+      expect(sharp!.isBlurry).toBe(false);
+    });
+
+    it("returns null for PDF bytes (unsupported raster)", () => {
+      const metrics = analyzeImageBuffer(Buffer.from("%PDF-1.4 fake"), {
+        mimeType: "application/pdf",
+      });
+      expect(metrics).toBeNull();
+    });
+
+    it("is deterministic for the same PNG bytes", () => {
+      const buf = makeSharpScanPng();
+      const a = analyzeImageBuffer(buf, { mimeType: "image/png" });
+      const b = analyzeImageBuffer(buf, { mimeType: "image/png" });
+      expect(a).toEqual(b);
+    });
+  });
+
+  describe("runIntakeGate (pixel path — no OCR)", () => {
+    it("passes sharp PNG with score >= threshold and empty retakeFeedback", async () => {
+      const buffer = makeSharpScanPng();
+      const result = await runIntakeGate({
+        buffer,
+        fileName: "good-scan.png",
+        mimeType: "image/png",
+      });
 
       const threshold = getDefaultImageQaConfig().reviewQualityThreshold;
+      expect(extractTextFromBase64Mock).not.toHaveBeenCalled();
+      expect(result.ocrInvoked).toBe(false);
+      expect(result.analysisMethod).toBe("pixel");
       expect(result.skipped).toBe(false);
       expect(result.passed).toBe(true);
       expect(result.qualityScore).not.toBeNull();
@@ -135,17 +204,32 @@ describe("Image QA Intake Gate Contract Tests", () => {
       expect(result.grade).toMatch(/^[ABCDF]$/);
     });
 
-    it("rejects blurry OCR markdown with score < threshold and actionable retakeFeedback", async () => {
-      const markdown = loadFixtureText("blurry-scan.md");
-      extractTextFromBase64Mock.mockResolvedValue(mockOcrSuccess(markdown));
-
+    it("passes sharp JPEG without invoking OCR", async () => {
+      const buffer = makeSharpScanJpeg();
       const result = await runIntakeGate({
-        buffer: Buffer.from("fake-image-bytes"),
-        fileName: "blurry-scan.jpg",
+        buffer,
+        fileName: "good-scan.jpg",
         mimeType: "image/jpeg",
       });
 
+      expect(extractTextFromBase64Mock).not.toHaveBeenCalled();
+      expect(result.passed).toBe(true);
+      expect(result.skipped).toBe(false);
+      expect(result.analysisMethod).toBe("pixel");
+      expect(result.ocrInvoked).toBe(false);
+    });
+
+    it("rejects blurry PNG with score < threshold and actionable retakeFeedback", async () => {
+      const result = await runIntakeGate({
+        buffer: makeBlurryScanPng(),
+        fileName: "blurry-scan.png",
+        mimeType: "image/png",
+      });
+
       const threshold = getDefaultImageQaConfig().reviewQualityThreshold;
+      expect(extractTextFromBase64Mock).not.toHaveBeenCalled();
+      expect(result.ocrInvoked).toBe(false);
+      expect(result.analysisMethod).toBe("pixel");
       expect(result.skipped).toBe(false);
       expect(result.passed).toBe(false);
       expect(result.qualityScore).not.toBeNull();
@@ -156,7 +240,20 @@ describe("Image QA Intake Gate Contract Tests", () => {
       ).toBe(true);
     });
 
-    it("fail-opens on empty buffer (skipped:true, passed:true)", async () => {
+    it("rejects overexposed washout without OCR", async () => {
+      const result = await runIntakeGate({
+        buffer: makeOverexposedPng(),
+        fileName: "washout.png",
+        mimeType: "image/png",
+      });
+
+      expect(extractTextFromBase64Mock).not.toHaveBeenCalled();
+      expect(result.passed).toBe(false);
+      expect(result.skipped).toBe(false);
+      expect(result.retakeFeedback.length).toBeGreaterThan(0);
+    });
+
+    it("fail-opens on empty buffer (skipped:true, passed:true) without OCR", async () => {
       const result = await runIntakeGate({
         buffer: Buffer.alloc(0),
         fileName: "empty.pdf",
@@ -167,49 +264,28 @@ describe("Image QA Intake Gate Contract Tests", () => {
       expect(result.qualityScore).toBeNull();
       expect(result.retakeFeedback).toEqual([]);
       expect(result.error).toBeDefined();
+      expect(result.ocrInvoked).toBe(false);
       expect(extractTextFromBase64Mock).not.toHaveBeenCalled();
     });
 
-    it("fail-opens when OCR throws", async () => {
-      extractTextFromBase64Mock.mockRejectedValue(new Error("OCR unavailable"));
-
+    it("fail-opens on PDF without invoking OCR", async () => {
       const result = await runIntakeGate({
-        buffer: Buffer.from("bytes"),
-        fileName: "upload.pdf",
+        buffer: Buffer.from("%PDF-1.4 binary-ish"),
+        fileName: "sheet.pdf",
         mimeType: "application/pdf",
       });
 
+      expect(extractTextFromBase64Mock).not.toHaveBeenCalled();
       expect(result.passed).toBe(true);
       expect(result.skipped).toBe(true);
-      expect(result.qualityScore).toBeNull();
-      expect(result.error).toMatch(/OCR unavailable/);
+      expect(result.analysisMethod).toBe("unsupported");
+      expect(result.ocrInvoked).toBe(false);
+      expect(result.error).toMatch(/no OCR|unsupported/i);
     });
 
-    it("fail-opens when OCR returns success:false", async () => {
-      extractTextFromBase64Mock.mockResolvedValue({
-        success: false,
-        pages: [],
-        totalPages: 0,
-        model: "mock-ocr",
-        error: "provider timeout",
-      });
-
-      const result = await runIntakeGate({
-        buffer: Buffer.from("bytes"),
-        fileName: "upload.pdf",
-      });
-
-      expect(result.passed).toBe(true);
-      expect(result.skipped).toBe(true);
-      expect(result.error).toMatch(/provider timeout|OCR extraction failed/);
-    });
-
-    it("is deterministic for the same OCR output", async () => {
-      const markdown = loadFixtureText("blurry-scan.md");
-      extractTextFromBase64Mock.mockResolvedValue(mockOcrSuccess(markdown));
-
+    it("is deterministic for the same PNG buffer", async () => {
       const input = {
-        buffer: Buffer.from("same-bytes"),
+        buffer: makeBlurryScanPng(),
         fileName: "blurry-scan.png",
         mimeType: "image/png",
       };
@@ -221,6 +297,7 @@ describe("Image QA Intake Gate Contract Tests", () => {
       expect(a.grade).toBe(b.grade);
       expect(a.passed).toBe(b.passed);
       expect(a.retakeFeedback).toEqual(b.retakeFeedback);
+      expect(extractTextFromBase64Mock).not.toHaveBeenCalled();
     });
   });
 

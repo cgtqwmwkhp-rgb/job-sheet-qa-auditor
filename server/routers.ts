@@ -255,7 +255,7 @@ export const appRouter = router({
         }
 
         // Feature-flagged Image QA intake gate (default off). Fail-open on errors.
-        // Runs AFTER rate limit, BEFORE storage — OCRs the real upload buffer when enabled.
+        // Runs AFTER rate limit, BEFORE storage — pixel blur/skew on JPEG/PNG (no OCR).
         let intake: IntakeGateResult | undefined;
         if (isImageQaIntakeEnabled()) {
           intake = await runIntakeGate({
