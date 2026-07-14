@@ -8,9 +8,7 @@
 import fs from "fs";
 import path from "path";
 import { describe, expect, it } from "vitest";
-import {
-  computeEce,
-} from "../../services/calibration";
+import { computeEce } from "../../services/calibration";
 import {
   buildFusionInputMapsFromStages,
   processWithIntegration,
@@ -37,7 +35,9 @@ describe("Pipeline honesty contract (R1)", () => {
       const documentProcessor = readRepoFile(
         "server/services/documentProcessor.ts"
       );
-      expect(documentProcessor).toContain("measurementReady: eceResult.measurementReady");
+      expect(documentProcessor).toContain(
+        "measurementReady: eceResult.measurementReady"
+      );
       expect(documentProcessor).toContain("ece: eceResult.ece");
     });
   });
