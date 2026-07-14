@@ -21,8 +21,10 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { EmailTemplateManager } from "@/components/EmailTemplateManager";
+import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
-/** Illustrative defaults only — no notification / FCM / email prefs API. */
+/** Preference toggles remain preview-only until a prefs persistence API lands. */
 const PREVIEW_DEFAULTS = {
   criticalDefects: true,
   majorDefects: true,
@@ -32,25 +34,40 @@ const PREVIEW_DEFAULTS = {
 } as const;
 
 export function NotificationSettings() {
+  const utils = trpc.useUtils();
+  const emailStatus = trpc.comms.emailStatus.useQuery();
+  const sendTestEmail = trpc.comms.sendTestEmail.useMutation({
+    onSuccess: result => {
+      void utils.comms.listNotifications.invalidate();
+      toast.success(
+        `Test email sent via ${result.provider} to ${result.toEmail}`
+      );
+    },
+    onError: err => {
+      toast.error(err.message || "Failed to send test email");
+    },
+  });
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
           <Bell className="h-5 w-5" />
           Notification Preferences
-          <Badge variant="secondary">Preview — not saved</Badge>
+          <Badge variant="secondary">Prefs preview — not saved</Badge>
         </CardTitle>
         <CardDescription>
-          Shows the intended alert categories. Toggles are disabled until a
-          notification delivery API exists — changes would not reach email or
-          push today.
+          Category toggles are preview-only. Test summary email uses the live
+          email provider ({emailStatus.data?.provider ?? "…"}) and writes a
+          bell inbox event when sent.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <Alert>
           <AlertDescription>
-            Preview layout only. Preferences are not persisted and do not
-            control live alerts.
+            Preference toggles are not persisted yet. Use{" "}
+            <strong>Send Test Summary Email</strong> to exercise the real send
+            path (outbox + provider) and confirm the header bell inbox.
           </AlertDescription>
         </Alert>
 
@@ -167,11 +184,13 @@ export function NotificationSettings() {
           variant="outline"
           size="sm"
           className="w-full"
-          disabled
-          title="Test email is not wired — no message would be sent"
+          onClick={() => sendTestEmail.mutate()}
+          disabled={sendTestEmail.isPending}
         >
           <Mail className="h-4 w-4 mr-2" />
-          Send Test Summary Email (not wired)
+          {sendTestEmail.isPending
+            ? "Sending…"
+            : "Send Test Summary Email"}
         </Button>
 
         <Dialog>

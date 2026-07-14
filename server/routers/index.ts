@@ -52,3 +52,5 @@ export {
   type FixPacksRouter,
   resetFixPackWorkflowStore,
 } from "./fixPacksRouter";
+
+export { commsRouter, type CommsRouter } from "./commsRouter";

@@ -488,3 +488,71 @@ export const apiCostEvents = mysqlTable("api_cost_events", {
 
 export type ApiCostEventRow = typeof apiCostEvents.$inferSelect;
 export type InsertApiCostEvent = typeof apiCostEvents.$inferInsert;
+
+// ============================================================================
+// COMMS — email outbox, FCM device tokens, notification inbox (PR-IO-COMMS)
+// ============================================================================
+
+/**
+ * Email outbox — durable send ledger for ACS / Graph / SMTP / log providers.
+ */
+export const emailOutbox = mysqlTable("email_outbox", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  userId: int("userId").references(() => users.id),
+  toEmail: varchar("toEmail", { length: 320 }).notNull(),
+  subject: varchar("subject", { length: 512 }).notNull(),
+  bodyHtml: text("bodyHtml"),
+  bodyText: text("bodyText"),
+  provider: varchar("provider", { length: 32 }).notNull(),
+  status: mysqlEnum("status", ["queued", "sent", "failed"]).notNull(),
+  error: text("error"),
+  providerMessageId: varchar("providerMessageId", { length: 256 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  sentAt: timestamp("sentAt"),
+});
+
+export type EmailOutboxRow = typeof emailOutbox.$inferSelect;
+export type InsertEmailOutbox = typeof emailOutbox.$inferInsert;
+
+/**
+ * Device tokens — FCM registration for web/native push (J-TECH-03).
+ */
+export const deviceTokens = mysqlTable("device_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId")
+    .notNull()
+    .references(() => users.id),
+  token: varchar("token", { length: 512 }).notNull().unique(),
+  platform: mysqlEnum("platform", ["web", "ios", "android"])
+    .default("web")
+    .notNull(),
+  userAgent: varchar("userAgent", { length: 512 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+});
+
+export type DeviceTokenRow = typeof deviceTokens.$inferSelect;
+export type InsertDeviceToken = typeof deviceTokens.$inferInsert;
+
+/**
+ * User notifications — DB-backed inbox for the header bell (J-NOTIF-01).
+ */
+export const userNotifications = mysqlTable("user_notifications", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  userId: int("userId")
+    .notNull()
+    .references(() => users.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  type: mysqlEnum("type", ["info", "success", "warning", "error"])
+    .default("info")
+    .notNull(),
+  readAt: timestamp("readAt"),
+  dismissedAt: timestamp("dismissedAt"),
+  meta: json("meta"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type UserNotificationRow = typeof userNotifications.$inferSelect;
+export type InsertUserNotification = typeof userNotifications.$inferInsert;

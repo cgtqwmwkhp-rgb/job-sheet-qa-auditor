@@ -9,8 +9,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Bell, CheckCircle2, AlertTriangle, Info, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { trpc } from "@/lib/trpc";
 
 export interface Notification {
   id: string;
@@ -21,29 +21,23 @@ export interface Notification {
   read: boolean;
 }
 
-// TODO: Wire to real notification API when backend is ready
-// Empty array prevents misleading fake alerts on first login
-const mockNotifications: Notification[] = [];
-
 export function NotificationsDropdown() {
-  const [notifications, setNotifications] =
-    useState<Notification[]>(mockNotifications);
+  const utils = trpc.useUtils();
+  const { data: notifications = [] } = trpc.comms.listNotifications.useQuery(
+    { limit: 50 },
+    { refetchInterval: 60_000 }
+  );
+  const markRead = trpc.comms.markNotificationRead.useMutation({
+    onSuccess: () => utils.comms.listNotifications.invalidate(),
+  });
+  const markAllRead = trpc.comms.markAllNotificationsRead.useMutation({
+    onSuccess: () => utils.comms.listNotifications.invalidate(),
+  });
+  const dismiss = trpc.comms.dismissNotification.useMutation({
+    onSuccess: () => utils.comms.listNotifications.invalidate(),
+  });
+
   const unreadCount = notifications.filter(n => !n.read).length;
-
-  const markAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(n => (n.id === id ? { ...n, read: true } : n))
-    );
-  };
-
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  };
-
-  const clearNotification = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    setNotifications(prev => prev.filter(n => n.id !== id));
-  };
 
   return (
     <DropdownMenu>
@@ -75,7 +69,7 @@ export function NotificationsDropdown() {
               variant="ghost"
               size="sm"
               className="h-auto p-0 text-xs text-muted-foreground hover:text-primary"
-              onClick={markAllAsRead}
+              onClick={() => markAllRead.mutate()}
             >
               Mark all read
             </Button>
@@ -92,10 +86,14 @@ export function NotificationsDropdown() {
               {notifications.map(notification => (
                 <DropdownMenuItem
                   key={notification.id}
-                  className={`flex flex-col items-start gap-1 p-4 cursor-pointer ${
+                  className={`flex flex-col items-start gap-1 p-4 cursor-pointer relative ${
                     !notification.read ? "bg-muted/50" : ""
                   }`}
-                  onClick={() => markAsRead(notification.id)}
+                  onClick={() => {
+                    if (!notification.read) {
+                      markRead.mutate({ id: notification.id });
+                    }
+                  }}
                 >
                   <div className="flex items-start justify-between w-full gap-2">
                     <div className="flex items-center gap-2">
@@ -124,7 +122,10 @@ export function NotificationsDropdown() {
                         size="icon"
                         aria-label="Dismiss notification"
                         className="h-4 w-4 hover:bg-transparent hover:text-destructive"
-                        onClick={e => clearNotification(e, notification.id)}
+                        onClick={e => {
+                          e.stopPropagation();
+                          dismiss.mutate({ id: notification.id });
+                        }}
                       >
                         <X className="h-3 w-3" />
                       </Button>
