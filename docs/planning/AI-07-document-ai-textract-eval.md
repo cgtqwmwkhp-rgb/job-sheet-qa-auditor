@@ -10,11 +10,11 @@ Keep **Azure DI custom neural** (AI-06, this PR) as the form-specific step-chang
 
 ## Why not integrate now
 
-| Provider | Fit for PlantExpand Ok/Adv/Fail/N/A grids | Effort | Gap vs current stack |
-| --- | --- | --- | --- |
-| Azure DI custom neural (AI-06) | Best: train on our sheets; selection marks + labeled fields | L (labeling) / S (this scaffold) | Direct insert at `ocrAdapter` + `selectionMarks` voter |
-| Google Document AI Custom Extractor | Strong on messy scans + handwriting entities | M–L | New GCP project, billing, IAM; parallel leaf |
-| AWS Textract Queries | Query-per-field (“Job Number?”, “Safe to use?”) + `SELECT_MARK` | M | New AWS account path; query schema maintenance |
+| Provider                            | Fit for PlantExpand Ok/Adv/Fail/N/A grids                       | Effort                           | Gap vs current stack                                   |
+| ----------------------------------- | --------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------ |
+| Azure DI custom neural (AI-06)      | Best: train on our sheets; selection marks + labeled fields     | L (labeling) / S (this scaffold) | Direct insert at `ocrAdapter` + `selectionMarks` voter |
+| Google Document AI Custom Extractor | Strong on messy scans + handwriting entities                    | M–L                              | New GCP project, billing, IAM; parallel leaf           |
+| AWS Textract Queries                | Query-per-field (“Job Number?”, “Safe to use?”) + `SELECT_MARK` | M                                | New AWS account path; query schema maintenance         |
 
 Dual-cloud OCR without a proven Azure custom baseline adds FinOps + failure modes without a clear pp gain story.
 

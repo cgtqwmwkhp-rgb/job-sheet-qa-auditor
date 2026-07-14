@@ -107,10 +107,7 @@ export class AzureCustomFormAdapter implements OCRAdapter {
   private readonly config: OCRConfig;
   private readonly modelOverride?: string;
 
-  constructor(
-    config?: Partial<OCRConfig>,
-    options?: { modelId?: string }
-  ) {
+  constructor(config?: Partial<OCRConfig>, options?: { modelId?: string }) {
     this.config = { ...getOCRConfig(), ...config };
     this.modelOverride = options?.modelId;
   }
@@ -184,7 +181,9 @@ export class AzureCustomFormAdapter implements OCRAdapter {
       usageInfo: parsed.usageInfo,
       error:
         error ||
-        (parsed.pages.length === 0 ? "Azure DI custom returned no pages" : undefined),
+        (parsed.pages.length === 0
+          ? "Azure DI custom returned no pages"
+          : undefined),
       errorCode:
         errorCode ||
         (parsed.pages.length === 0 ? "AZURE_DI_CUSTOM_EMPTY" : undefined),
@@ -275,10 +274,7 @@ export class AzureCustomFormAdapter implements OCRAdapter {
         };
       }
 
-      const analyzeResult = await this.pollResult(
-        operationLocation,
-        creds.key
-      );
+      const analyzeResult = await this.pollResult(operationLocation, creds.key);
       if (!analyzeResult) {
         return {
           success: false,
@@ -391,7 +387,10 @@ function parsedToExtractResult(
     .join("\n\n");
   return {
     success: !error && (parsed.fields.length > 0 || parsed.pages.length > 0),
-    model: parsed.model || getAzureCustomJsrModelId() || PLANTEXPAND_JSR_MODEL_ID_PLACEHOLDER,
+    model:
+      parsed.model ||
+      getAzureCustomJsrModelId() ||
+      PLANTEXPAND_JSR_MODEL_ID_PLACEHOLDER,
     docType: parsed.docType,
     documentConfidence: parsed.documentConfidence,
     fields: parsed.fields,
@@ -560,7 +559,10 @@ export async function extractCustomJsrForm(
         };
       }
 
-      return parsedToExtractResult(parseAzureDiCustomForm(analyzeResult), startTime);
+      return parsedToExtractResult(
+        parseAzureDiCustomForm(analyzeResult),
+        startTime
+      );
     } catch (error) {
       logger.warn("Azure DI custom JSR form pass failed", {
         correlationId,
@@ -602,5 +604,8 @@ export async function extractCustomJsrForm(
 export function extractCustomJsrFormFromAnalyzeResult(
   analyzeResult: unknown
 ): AzureCustomFormExtractResult {
-  return parsedToExtractResult(parseAzureDiCustomForm(analyzeResult), Date.now());
+  return parsedToExtractResult(
+    parseAzureDiCustomForm(analyzeResult),
+    Date.now()
+  );
 }

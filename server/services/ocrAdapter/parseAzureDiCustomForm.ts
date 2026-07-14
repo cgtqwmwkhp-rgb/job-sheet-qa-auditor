@@ -152,7 +152,9 @@ export function extractCustomFieldValue(
   );
 }
 
-function pageNumberFromField(field: Record<string, unknown>): number | undefined {
+function pageNumberFromField(
+  field: Record<string, unknown>
+): number | undefined {
   const regions = Array.isArray(field.boundingRegions)
     ? field.boundingRegions
     : [];
@@ -315,7 +317,7 @@ export function customFieldsToPreExtracted(
         valueStr =
           typeof field.value === "string"
             ? field.value
-            : field.content ?? String(field.value ?? "");
+            : (field.content ?? String(field.value ?? ""));
       }
     } else if (field.value != null && field.value !== "") {
       valueStr = String(field.value);
@@ -359,7 +361,7 @@ export function customChecklistFieldsToChoices(
     const raw =
       typeof field.value === "string"
         ? field.value
-        : field.content ?? String(field.value ?? "");
+        : (field.content ?? String(field.value ?? ""));
     const choice = normalizeChecklistChoice(raw) ?? "UNREADABLE";
     const label = field.name
       .replace(/^checklist[_:]/i, "")

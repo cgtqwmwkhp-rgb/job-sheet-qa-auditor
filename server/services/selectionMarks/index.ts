@@ -715,7 +715,8 @@ export async function runSelectionMarkDetection(
       lines,
       error: layout.success
         ? undefined
-        : layout.error || (custom && !custom.success ? custom.error : undefined),
+        : layout.error ||
+          (custom && !custom.success ? custom.error : undefined),
       engineVersion,
       customVoter,
       preferredRows,

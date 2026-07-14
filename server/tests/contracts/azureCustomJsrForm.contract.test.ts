@@ -117,9 +117,11 @@ describe("AzureCustomFormAdapter gating", () => {
   const prevKey = process.env.AZURE_DI_KEY;
 
   afterEach(() => {
-    if (prevFeature === undefined) delete process.env[FEATURE_AZURE_DI_CUSTOM_JSR];
+    if (prevFeature === undefined)
+      delete process.env[FEATURE_AZURE_DI_CUSTOM_JSR];
     else process.env[FEATURE_AZURE_DI_CUSTOM_JSR] = prevFeature;
-    if (prevModel === undefined) delete process.env[ENV_AZURE_DI_CUSTOM_JSR_MODEL_ID];
+    if (prevModel === undefined)
+      delete process.env[ENV_AZURE_DI_CUSTOM_JSR_MODEL_ID];
     else process.env[ENV_AZURE_DI_CUSTOM_JSR_MODEL_ID] = prevModel;
     if (prevEndpoint === undefined) delete process.env.AZURE_DI_ENDPOINT;
     else process.env.AZURE_DI_ENDPOINT = prevEndpoint;
