@@ -1,7 +1,11 @@
 /**
- * Router Index - Stage 5 + PR-C Template Router
+ * Router Index — Stage 5 + Template / Analytics
  *
- * Exports all routers for integration with the main app router.
+ * PR-PLAT-STAGE5: audit / pipeline / reviewQueue routers are QUARANTINED
+ * (in-memory + simulated). They must NOT be mounted on appRouter.
+ * Production processing: jobSheets.process → documentProcessor.
+ *
+ * exportsRouter / batchOperations: owned by ApiSurface (left alone here).
  */
 
 export {
@@ -14,7 +18,7 @@ export {
   type ReviewQueueReasonCode,
   createMockAuditResult,
   resetAuditStore,
-} from "./auditRouter";
+} from "./_quarantine/auditRouter";
 
 export {
   pipelineRouter,
@@ -23,7 +27,7 @@ export {
   type PipelineRunState,
   createMockPipelineRun,
   resetPipelineStore,
-} from "./pipelineRouter";
+} from "./_quarantine/pipelineRouter";
 
 export {
   reviewQueueRouter,
@@ -32,7 +36,7 @@ export {
   type ReviewQueueStatus,
   createMockReviewQueueItem,
   resetReviewQueueStore,
-} from "./reviewQueueRouter";
+} from "./_quarantine/reviewQueueRouter";
 
 export {
   exportsRouter,

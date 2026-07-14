@@ -1,11 +1,11 @@
 /**
- * Pipeline Orchestrator - Stage 7
- * 
- * Orchestrates the full document processing pipeline with:
- * - Idempotency (same inputs return existing run)
- * - State machine lifecycle
- * - Replay from any state
- * - Mock-friendly execution
+ * QUARANTINED — Stage 7 simulated pipeline orchestrator (PR-PLAT-STAGE5).
+ *
+ * Every step is `simulateDelay` + fake success data. NOT wired to appRouter
+ * or documentProcessor. Production orchestration is
+ * `orchestrateJobSheetProcessing` in server/services/documentProcessor.ts.
+ *
+ * Kept for contract/scaffold tests only — do not present as a live pipeline.
  */
 
 import type { 
@@ -14,9 +14,9 @@ import type {
   CreateRunOptions, 
   ReplayOptions, 
   RunResult 
-} from './types';
-import { isTerminalState } from './types';
-import { runStore } from './runStore';
+} from '../types';
+import { isTerminalState } from '../types';
+import { runStore } from '../runStore';
 
 /**
  * Pipeline step result
@@ -196,16 +196,14 @@ export class PipelineOrchestrator {
     }
   }
 
-  // Step executors (mock implementations for Stage 7)
-  
+  // Quarantined step executors — simulated delays only (not production OCR/extract)
+
   private async executeOcrStart(_run: PipelineRun): Promise<StepResult> {
-    // In production, this would start OCR processing
     await this.simulateDelay(10);
     return { success: true };
   }
 
   private async executeOcrComplete(_run: PipelineRun): Promise<StepResult> {
-    // In production, this would verify OCR completion
     await this.simulateDelay(10);
     return { success: true, data: { text: 'Extracted text content' } };
   }
@@ -249,7 +247,7 @@ export class PipelineOrchestrator {
 }
 
 /**
- * Create orchestrator instance
+ * Create quarantined orchestrator (scaffold / contract tests only).
  */
 export function createOrchestrator(options?: { 
   mockOcr?: boolean; 
@@ -258,7 +256,7 @@ export function createOrchestrator(options?: {
   return new PipelineOrchestrator(options);
 }
 
-// Default instance for production
+/** Quarantined default — simulated pipeline, not production documentProcessor. */
 export const orchestrator = new PipelineOrchestrator({
   mockOcr: process.env.USE_MOCK_OCR === 'true',
   mockInterpreter: process.env.USE_MOCK_INTERPRETER === 'true',
