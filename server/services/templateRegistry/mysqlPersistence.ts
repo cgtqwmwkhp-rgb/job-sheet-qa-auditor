@@ -7,10 +7,11 @@ import {
 } from "../../../drizzle/schema";
 import { getDb } from "../../db";
 import { webhookEvents } from "../webhooks";
+import { isFailClosedEnvironment } from "./defaultTemplate";
 import type { SelectionTraceArtifact } from "./selectionTraceWriter";
 import type { SelectionResult } from "./types";
 
-type TemplateLike = {
+export type TemplateLike = {
   id: number;
   templateId: string;
   name: string;
@@ -24,7 +25,7 @@ type TemplateLike = {
   updatedAt: Date;
 };
 
-type VersionLike = {
+export type VersionLike = {
   id: number;
   templateId: number;
   version: string;
@@ -38,12 +39,73 @@ type VersionLike = {
   createdAt: Date;
 };
 
+/** Durable registry snapshot loaded from MySQL (boot hydrate). */
+export type TemplateRegistrySnapshot = {
+  templates: TemplateLike[];
+  versions: VersionLike[];
+};
+
 export type PersistenceWriteResult =
   | { status: "stored"; id?: number }
   | { status: "skipped"; reason: string };
 
+/**
+ * MySQL write-through / load-path gate.
+ *
+ * Prod contract (fail-closed = production|staging):
+ * - Persistence is ALWAYS on (TEMPLATE_REGISTRY_MYSQL_PERSISTENCE_ENABLED=false ignored).
+ * - Boot must hydrate from DB when available so custom activations survive pod recycle.
+ *
+ * Other envs: opt-in via TEMPLATE_REGISTRY_MYSQL_PERSISTENCE_ENABLED=true.
+ */
 export function isTemplateMysqlPersistenceEnabled(): boolean {
+  if (isFailClosedEnvironment()) {
+    const explicit = process.env.TEMPLATE_REGISTRY_MYSQL_PERSISTENCE_ENABLED;
+    if (explicit === "false") {
+      console.warn(
+        "[TemplateRegistry] TEMPLATE_REGISTRY_MYSQL_PERSISTENCE_ENABLED=false " +
+          "ignored in fail-closed environment. DB-backed registry is mandatory."
+      );
+    }
+    return true;
+  }
   return process.env.TEMPLATE_REGISTRY_MYSQL_PERSISTENCE_ENABLED === "true";
+}
+
+/**
+ * Assert prod contract: fail-closed envs require DB-backed registry.
+ * Soft-fails with a loud warning when DATABASE_URL is missing (boot still continues).
+ */
+export function assertTemplateRegistryMysqlProdContract(): {
+  ok: boolean;
+  reason?: string;
+} {
+  if (!isFailClosedEnvironment()) {
+    return { ok: true };
+  }
+  if (!isTemplateMysqlPersistenceEnabled()) {
+    const reason =
+      "SSOT_VIOLATION: template registry MySQL persistence disabled in fail-closed env";
+    console.error(`[TemplateRegistry] ${reason}`);
+    return { ok: false, reason };
+  }
+  if (!process.env.DATABASE_URL) {
+    const reason =
+      "TEMPLATE_REGISTRY_WARNING: fail-closed env without DATABASE_URL — " +
+      "custom activations cannot survive pod recycle (JSON seed-only)";
+    console.warn(`[TemplateRegistry] ${reason}`);
+    return { ok: false, reason };
+  }
+  return { ok: true };
+}
+
+function asDate(value: Date | string | null | undefined): Date {
+  if (value instanceof Date) return value;
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date();
 }
 
 export function isSelectionTraceMysqlPersistenceEnabled(): boolean {
@@ -387,4 +449,58 @@ export function persistSelectionTraceArtifactToMysqlBestEffort(
   void persistSelectionTraceArtifactToMysql(trace, result).catch(error =>
     logPersistenceFailure("selection trace", error)
   );
+}
+
+/**
+ * Load the full template registry from MySQL for boot hydrate.
+ * Returns null when persistence is off or DB unavailable (caller falls back to JSON seed).
+ * Fail-safe: never throws.
+ */
+export async function loadTemplateRegistrySnapshotFromMysql(): Promise<TemplateRegistrySnapshot | null> {
+  if (!isTemplateMysqlPersistenceEnabled()) {
+    return null;
+  }
+
+  try {
+    const db = await getDb();
+    if (!db) return null;
+
+    const templateRows = await db.select().from(templates);
+    const versionRows = await db.select().from(templateVersions);
+
+    return {
+      templates: templateRows.map(row => ({
+        id: row.id,
+        templateId: row.templateId,
+        name: row.name,
+        client: row.client ?? null,
+        assetType: row.assetType ?? null,
+        workType: row.workType ?? null,
+        status: row.status,
+        description: row.description ?? null,
+        createdBy: row.createdBy,
+        createdAt: asDate(row.createdAt),
+        updatedAt: asDate(row.updatedAt),
+      })),
+      versions: versionRows.map(row => ({
+        id: row.id,
+        templateId: row.templateId,
+        version: row.version,
+        hashSha256: row.hashSha256,
+        specJson: row.specJson,
+        selectionConfigJson: row.selectionConfigJson,
+        roiJson: row.roiJson ?? null,
+        isActive: Boolean(row.isActive),
+        changeNotes: row.changeNotes ?? null,
+        createdBy: row.createdBy,
+        createdAt: asDate(row.createdAt),
+      })),
+    };
+  } catch (error) {
+    console.warn(
+      "[TemplateRegistry] Failed to load registry snapshot from MySQL (falling back to seed):",
+      error
+    );
+    return null;
+  }
 }
