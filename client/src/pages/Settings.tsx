@@ -32,6 +32,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link, useSearch } from "wouter";
@@ -213,11 +215,15 @@ export default function Settings() {
             <div className="flex-1">
               <TabsContent value="notifications" className="mt-0 space-y-6">
                 <div className="mb-4">
-                  <h2 className="text-lg font-medium">
-                    Notification Preferences
-                  </h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-medium">
+                      Notification Preferences
+                    </h2>
+                    <Badge variant="secondary">Preview</Badge>
+                  </div>
                   <p className="text-sm text-muted-foreground">
-                    Configure how and when you receive system alerts.
+                    Layout preview only — alert delivery is not configured yet
+                    and preferences are not saved.
                   </p>
                 </div>
                 <NotificationSettings />
@@ -237,12 +243,15 @@ export default function Settings() {
 
               <TabsContent value="ai-persona" className="mt-0 space-y-6">
                 <div className="mb-4">
-                  <h2 className="text-lg font-medium">
-                    AI Auditor Configuration
-                  </h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-medium">
+                      AI Auditor Configuration
+                    </h2>
+                    <Badge variant="secondary">Preview</Badge>
+                  </div>
                   <p className="text-sm text-muted-foreground">
-                    Configure the behavior, tone, and strictness of the AI
-                    analysis engine.
+                    UI mock only — persona controls do not change the live
+                    analysis engine and are not saved.
                   </p>
                 </div>
                 <AIPersonaSettings />
@@ -292,34 +301,69 @@ export default function Settings() {
               <TabsContent value="general" className="mt-0 space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>General Settings</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <CardTitle>General Settings</CardTitle>
+                      <Badge variant="secondary">Preview — not saved</Badge>
+                    </div>
                     <CardDescription>
-                      Manage core application configuration.
+                      Display-only placeholders. Instance name, support email,
+                      and maintenance mode are not wired to a backend.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    <Alert>
+                      <AlertDescription>
+                        These fields do not change production configuration.
+                      </AlertDescription>
+                    </Alert>
                     <div className="grid gap-2">
                       <Label htmlFor="site-name">Instance Name</Label>
                       <Input
                         id="site-name"
-                        defaultValue="Job Sheet QA - Production"
+                        defaultValue="Job Sheet QA"
+                        readOnly
+                        disabled
+                        aria-describedby="site-name-hint"
                       />
+                      <p
+                        id="site-name-hint"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Not editable — no settings API for instance branding.
+                      </p>
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="support-email">Support Email</Label>
                       <Input
                         id="support-email"
                         defaultValue="support@jobsheetqa.com"
+                        readOnly
+                        disabled
+                        aria-describedby="support-email-hint"
                       />
+                      <p
+                        id="support-email-hint"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Placeholder only — not used for outbound mail.
+                      </p>
                     </div>
                     <div className="flex items-center justify-between py-2">
                       <div className="space-y-0.5">
-                        <Label>Maintenance Mode</Label>
+                        <Label htmlFor="maintenance-mode">
+                          Maintenance Mode
+                        </Label>
                         <p className="text-sm text-muted-foreground">
-                          Disable access for non-admin users.
+                          Would disable access for non-admin users when
+                          implemented. Not enforced today.
                         </p>
                       </div>
-                      <Switch />
+                      <Switch
+                        id="maintenance-mode"
+                        disabled
+                        checked={false}
+                        aria-label="Maintenance mode (not available)"
+                      />
                     </div>
                   </CardContent>
                 </Card>
@@ -328,20 +372,20 @@ export default function Settings() {
                   <CardHeader>
                     <CardTitle className="text-destructive flex items-center gap-2">
                       <Database className="h-5 w-5" />
-                      Demo Data Management
+                      Browser Data Reset
                     </CardTitle>
                     <CardDescription>
-                      Manage the sample data used in this demo environment.
+                      Clears this browser&apos;s localStorage only — does not
+                      reset server or shared demo data.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-4">
                       <div className="space-y-0.5">
-                        <Label>Reset Demo Data</Label>
+                        <Label>Clear local browser storage</Label>
                         <p className="text-sm text-muted-foreground">
-                          Clear all local changes and restore the original "Gold
-                          Standard" dataset. Useful if you want to restart the
-                          demo experience.
+                          Removes locally cached preferences and client state,
+                          then reloads the page.
                         </p>
                       </div>
                       <Button
@@ -349,7 +393,7 @@ export default function Settings() {
                         onClick={() => {
                           if (
                             confirm(
-                              "Are you sure? This will reload the page and reset all data."
+                              "Clear this browser's localStorage and reload? Server data is unaffected."
                             )
                           ) {
                             localStorage.clear();
@@ -357,7 +401,7 @@ export default function Settings() {
                           }
                         }}
                       >
-                        Reset Data
+                        Clear localStorage
                       </Button>
                     </div>
                   </CardContent>
@@ -391,37 +435,65 @@ export default function Settings() {
               <TabsContent value="security" className="mt-0 space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Security Policies</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <CardTitle>Security Policies</CardTitle>
+                      <Badge variant="secondary">Preview — not enforced</Badge>
+                    </div>
                     <CardDescription>
-                      Manage access controls and session policies.
+                      Policy toggles below are illustrative only. They do not
+                      change authentication or session behaviour.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    <Alert>
+                      <AlertDescription>
+                        No security-policy API is connected — switches are
+                        disabled so they cannot imply a live effect.
+                      </AlertDescription>
+                    </Alert>
                     <div className="flex items-center justify-between py-2">
                       <div className="space-y-0.5">
-                        <Label>Enforce 2FA</Label>
+                        <Label htmlFor="enforce-2fa">Enforce 2FA</Label>
                         <p className="text-sm text-muted-foreground">
-                          Require two-factor authentication for all admin users.
+                          Would require two-factor authentication for admin
+                          users when implemented.
                         </p>
                       </div>
-                      <Switch defaultChecked />
+                      <Switch
+                        id="enforce-2fa"
+                        disabled
+                        checked={false}
+                        aria-label="Enforce 2FA (not available)"
+                      />
                     </div>
                     <div className="flex items-center justify-between py-2">
                       <div className="space-y-0.5">
-                        <Label>Session Timeout</Label>
+                        <Label htmlFor="session-timeout">Session Timeout</Label>
                         <p className="text-sm text-muted-foreground">
-                          Automatically log out inactive users after 30 minutes.
+                          Would log out inactive users after a timeout when
+                          implemented. Session length is controlled by auth
+                          today, not this switch.
                         </p>
                       </div>
-                      <Switch defaultChecked />
+                      <Switch
+                        id="session-timeout"
+                        disabled
+                        checked={false}
+                        aria-label="Session timeout (not available)"
+                      />
                     </div>
                     <div className="pt-4">
                       <Button
                         variant="outline"
-                        className="text-destructive hover:text-destructive"
+                        className="text-muted-foreground"
+                        disabled
+                        title="Not available — no security settings API"
                       >
                         Reset All Security Settings
                       </Button>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Reset is unavailable until policies can be persisted.
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
