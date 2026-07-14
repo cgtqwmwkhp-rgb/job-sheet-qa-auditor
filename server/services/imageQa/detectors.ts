@@ -51,7 +51,10 @@ export function decodeRasterToGray(
 
   try {
     if (kind === "jpeg") {
-      const decoded = jpeg.decode(buffer, { useTArray: true, formatAsRGBA: true });
+      const decoded = jpeg.decode(buffer, {
+        useTArray: true,
+        formatAsRGBA: true,
+      });
       if (!decoded?.width || !decoded?.height || !decoded.data) return null;
       return rgbaToGray(decoded.data, decoded.width, decoded.height);
     }
@@ -73,7 +76,12 @@ function detectRasterKind(
   if (mime.includes("png")) return "png";
 
   // Magic-byte fallback when mime is missing/wrong
-  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+  if (
+    buffer.length >= 3 &&
+    buffer[0] === 0xff &&
+    buffer[1] === 0xd8 &&
+    buffer[2] === 0xff
+  ) {
     return "jpeg";
   }
   if (
@@ -97,7 +105,8 @@ function rgbaToGray(
   for (let i = 0; i < width * height; i++) {
     const o = i * 4;
     // Rec. 601 luma
-    pixels[i] = (data[o]! * 0.299 + data[o + 1]! * 0.587 + data[o + 2]! * 0.114) | 0;
+    pixels[i] =
+      (data[o]! * 0.299 + data[o + 1]! * 0.587 + data[o + 2]! * 0.114) | 0;
   }
   return { width, height, pixels };
 }
@@ -105,7 +114,10 @@ function rgbaToGray(
 /**
  * Downsample so the longest edge is <= maxEdge (nearest-neighbour, deterministic).
  */
-export function downsampleGray(image: GrayImage, maxEdge = MAX_ANALYSIS_EDGE): GrayImage {
+export function downsampleGray(
+  image: GrayImage,
+  maxEdge = MAX_ANALYSIS_EDGE
+): GrayImage {
   const longest = Math.max(image.width, image.height);
   if (longest <= maxEdge) return image;
 
@@ -138,8 +150,7 @@ export function computeLaplacianVariance(image: GrayImage): number {
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const i = y * w + x;
-      const L =
-        -4 * g[i]! + g[i - 1]! + g[i + 1]! + g[i - w]! + g[i + w]!;
+      const L = -4 * g[i]! + g[i - 1]! + g[i + 1]! + g[i - w]! + g[i + w]!;
       sum += L;
       sumSq += L * L;
       n++;
@@ -163,7 +174,10 @@ export function laplacianVarianceToBlurScore(variance: number): number {
 /**
  * Mean + population stddev of grayscale values.
  */
-export function computeLumaStats(image: GrayImage): { mean: number; stddev: number } {
+export function computeLumaStats(image: GrayImage): {
+  mean: number;
+  stddev: number;
+} {
   const { pixels } = image;
   if (pixels.length === 0) return { mean: 0, stddev: 0 };
 
@@ -356,7 +370,11 @@ export function analyzePageQuality(
 
   // Calculate individual scores
   const blurScore = calculateBlurScore(textLength, wordCount, ocrArtifacts);
-  const contrastScore = calculateContrastScore(textLength, lineCount, ocrArtifacts);
+  const contrastScore = calculateContrastScore(
+    textLength,
+    lineCount,
+    ocrArtifacts
+  );
   const skewAngle = estimateSkewAngle(markdown);
   const brightnessScore = calculateBrightnessScore(markdown);
 
@@ -596,7 +614,10 @@ export function detectSignatures(
     { regex: /signed[:\s]*([^\n]{0,30})/gi, type: "handwritten" as const },
     { regex: /customer\s*signature/gi, type: "handwritten" as const },
     { regex: /technician\s*signature/gi, type: "handwritten" as const },
-    { regex: /authorized\s*by[:\s]*([^\n]{0,30})/gi, type: "handwritten" as const },
+    {
+      regex: /authorized\s*by[:\s]*([^\n]{0,30})/gi,
+      type: "handwritten" as const,
+    },
     { regex: /digital\s*signature/gi, type: "digital" as const },
     { regex: /e-?sign/gi, type: "digital" as const },
   ];
@@ -695,7 +716,9 @@ export function detectStamps(
 /**
  * Calculate quality grade from score
  */
-export function calculateQualityGrade(score: number): "A" | "B" | "C" | "D" | "F" {
+export function calculateQualityGrade(
+  score: number
+): "A" | "B" | "C" | "D" | "F" {
   if (score >= 90) return "A";
   if (score >= 80) return "B";
   if (score >= 70) return "C";

@@ -156,7 +156,9 @@ export async function runIntakeGate(
     if (metrics.isOverexposed) reviewReasons.push("Overexposed");
     if (metrics.isUnderexposed) reviewReasons.push("Underexposed");
     if (!passed && reviewReasons.length === 0) {
-      reviewReasons.push(`Quality score ${qualityScore} below threshold ${threshold}`);
+      reviewReasons.push(
+        `Quality score ${qualityScore} below threshold ${threshold}`
+      );
     }
 
     return {
