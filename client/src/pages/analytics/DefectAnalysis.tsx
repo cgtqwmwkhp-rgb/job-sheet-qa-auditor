@@ -158,8 +158,10 @@ export default function DefectAnalysis() {
     () =>
       summary
         ? [
-            ...new Set(
-              summary.overturns.worstRules.flatMap(r => r.sampleFindingIds)
+            ...Array.from(
+              new Set(
+                summary.overturns.worstRules.flatMap(r => r.sampleFindingIds)
+              )
             ),
           ]
         : [],
