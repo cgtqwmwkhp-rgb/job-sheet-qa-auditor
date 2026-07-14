@@ -68,9 +68,7 @@ export function enqueueInMemoryJobSheetProcessing(
 
   const job: JobSheetQueueJob = {
     id: createJobId(payload.jobSheetId),
-    payload: contentHash
-      ? { ...payload, contentHash }
-      : payload,
+    payload: contentHash ? { ...payload, contentHash } : payload,
     status: "queued",
     enqueuedAt: new Date(),
     attempts: 0,

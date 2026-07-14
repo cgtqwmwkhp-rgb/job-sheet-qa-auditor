@@ -133,7 +133,8 @@ describe("Process OCR idempotency (PR-OPS-IDEMPOTENT)", () => {
 
   describe("enqueue content-hash contract", () => {
     it("dedupes primary enqueue by contentHash across different jobSheetIds", async () => {
-      const hash = "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899";
+      const hash =
+        "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899";
       const key = buildProcessOcrIdempotencyKey(hash);
 
       const first = enqueueJobSheetProcessing({
@@ -166,7 +167,8 @@ describe("Process OCR idempotency (PR-OPS-IDEMPOTENT)", () => {
     });
 
     it("does not content-hash dedupe reprocess against primary", async () => {
-      const hash = "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff";
+      const hash =
+        "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff";
 
       const primary = enqueueJobSheetProcessing({
         source: "primary",

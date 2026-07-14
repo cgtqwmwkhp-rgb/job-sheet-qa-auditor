@@ -423,7 +423,10 @@ export async function listInFlightJobSheetsByContentHash(
     })
     .from(jobSheets)
     .where(
-      and(eq(jobSheets.fileHash, normalized), eq(jobSheets.status, "processing"))
+      and(
+        eq(jobSheets.fileHash, normalized),
+        eq(jobSheets.status, "processing")
+      )
     )
     .orderBy(jobSheets.id);
 }
