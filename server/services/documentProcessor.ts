@@ -134,10 +134,16 @@ import {
 import { getVlmConfig, isVlmVerificationEnabled } from "./vlmAdapter";
 import {
   isGeminiMultimodalEnabled,
+  pdfBufferToVlmDocument,
   verifySignatureInk,
   VLM_PDF_MAX_BYTES,
   type SignatureInkVerificationResult,
 } from "./vlmInkVerification";
+import {
+  extractMultimodalRoiFields,
+  isMultimodalRoiExtractEnabled,
+  type MultimodalRoiExtractArtifact,
+} from "./multimodalRoiExtract";
 import * as db from "../db";
 import {
   extractTechnicianNameFromReport,
@@ -1271,11 +1277,13 @@ async function processJobSheetWithOptions(
   // =========================================================================
   const roiSpatialStartTime = Date.now();
   let roiSpatialFields: PreExtractedFieldMap = {};
+  const pinnedVersionForRoi = usedTemplateVersionId
+    ? getTemplateVersion(usedTemplateVersionId)
+    : null;
+  const pinnedRoiConfig = pinnedVersionForRoi?.roiJson ?? null;
   try {
-    const pinnedVersion = usedTemplateVersionId
-      ? getTemplateVersion(usedTemplateVersionId)
-      : null;
-    const roiConfig = pinnedVersion?.roiJson;
+    const pinnedVersion = pinnedVersionForRoi;
+    const roiConfig = pinnedRoiConfig;
     if (roiConfig?.regions?.length) {
       const spatial = extractFieldsFromRoiSpatial({
         roiConfig,
@@ -1408,7 +1416,7 @@ async function processJobSheetWithOptions(
     });
   }
 
-  // Stage 1.95: Anthropic VLM signature ink verification (fail-soft)
+  // Stage 1.95: Anthropic VLM signature ink verification on cropped ROIs (fail-soft)
   let vlmInkResult: SignatureInkVerificationResult | null = null;
   const vlmStart = Date.now();
   if (isVlmVerificationEnabled()) {
@@ -1418,8 +1426,9 @@ async function processJobSheetWithOptions(
         pdfBuffer: sharedPdfBuffer,
         disputed: true,
         disputeReason:
-          "OCR cannot see handwritten ink; verify Technician/Customer Signature area",
+          "OCR cannot see handwritten ink; verify cropped Technician/Customer Signature ROI",
         extractionConfidence: 0.4,
+        roiConfig: pinnedRoiConfig,
       });
       recordStage({
         stage: "VLM Ink Verification",
@@ -1442,6 +1451,44 @@ async function processJobSheetWithOptions(
   } else {
     recordStage({
       stage: "VLM Ink Verification",
+      status: "skipped",
+      durationMs: 0,
+    });
+  }
+
+  // Stage 1.96: Multimodal ROI field extract — structured JSON per crop (AI-08)
+  let multimodalRoiResult: MultimodalRoiExtractArtifact | null = null;
+  const multimodalRoiStart = Date.now();
+  if (isMultimodalRoiExtractEnabled() && pinnedRoiConfig?.regions?.length) {
+    try {
+      multimodalRoiResult = await extractMultimodalRoiFields({
+        documentId: jobSheetId,
+        roiConfig: pinnedRoiConfig,
+        documentPdf: sharedPdfBuffer
+          ? pdfBufferToVlmDocument(sharedPdfBuffer)
+          : null,
+      });
+      recordStage({
+        stage: "Multimodal ROI Extract",
+        status: multimodalRoiResult.ran ? "success" : "skipped",
+        durationMs: Date.now() - multimodalRoiStart,
+        error: multimodalRoiResult.skippedReason,
+      });
+    } catch (mmErr) {
+      console.warn(
+        "[DocumentProcessor] Multimodal ROI extract failed (non-fatal):",
+        mmErr
+      );
+      recordStage({
+        stage: "Multimodal ROI Extract",
+        status: "failed",
+        durationMs: Date.now() - multimodalRoiStart,
+        error: mmErr instanceof Error ? mmErr.message : "multimodal roi failed",
+      });
+    }
+  } else {
+    recordStage({
+      stage: "Multimodal ROI Extract",
       status: "skipped",
       durationMs: 0,
     });
@@ -1477,6 +1524,7 @@ async function processJobSheetWithOptions(
           const base = aliasCanonicalExtractedFields({
             ...(ensembleResult?.ensembleExtractedFields ?? {}),
             ...(selectionMarksResult?.preExtractedFields ?? {}),
+            ...(multimodalRoiResult?.preExtractedFields ?? {}),
           });
           const withRoi = mergeRoiSpatialFields(base, roiSpatialFields, {
             preferRoiFor: new Set(
@@ -1523,6 +1571,7 @@ async function processJobSheetWithOptions(
             aliasCanonicalExtractedFields({
               ...(ensembleResult?.ensembleExtractedFields ?? {}),
               ...(selectionMarksResult?.preExtractedFields ?? {}),
+              ...(multimodalRoiResult?.preExtractedFields ?? {}),
             }),
             roiSpatialFields,
             {
@@ -1574,7 +1623,11 @@ async function processJobSheetWithOptions(
             : "\n\nNote: Do not emit MISSING_FIELD for optional Work Notes / Engineer Comments on Job Summary forms.";
           const vlmNote =
             vlmInkResult?.ran && vlmInkResult.imageQa?.vlmUsed
-              ? `\n\nNote: Anthropic VLM ink verification → ${vlmInkResult.preExtractedHint?.value ?? "inconclusive"} @ ${Math.round((vlmInkResult.imageQa.confidence || 0) * 100)}% (${vlmInkResult.imageQa.details || ""}). Prefer this over OCR absence for signatures.`
+              ? `\n\nNote: Anthropic VLM ink verification → ${vlmInkResult.preExtractedHint?.value ?? "inconclusive"} @ ${Math.round((vlmInkResult.imageQa.confidence || 0) * 100)}% (${vlmInkResult.imageQa.details || ""})${vlmInkResult.artifact?.mediaMode === "crop" ? " [signature crop]" : ""}. Prefer this over OCR absence for signatures.`
+              : "";
+          const roiMmNote =
+            multimodalRoiResult?.ran && multimodalRoiResult.crops.length > 0
+              ? `\n\nNote: Multimodal ROI crop extract returned structured JSON for ${multimodalRoiResult.crops.length} crop(s) — prefer high-confidence crop values for job/asset/date/make-model when text OCR is weak.`
               : "";
           const marksNote = selectionMarksResult?.hintsBlock
             ? `\n\n${selectionMarksResult.hintsBlock}`
@@ -1584,7 +1637,7 @@ async function processJobSheetWithOptions(
               ? "\n\nNote: The original PDF is attached for multimodal review — verify handwritten signatures and visual marks against the page image."
               : "";
           const combined =
-            `${block || ""}${sigNote}${vorNote}${vlmNote}${marksNote}${multimodalNote}`.trim();
+            `${block || ""}${sigNote}${vorNote}${vlmNote}${roiMmNote}${marksNote}${multimodalNote}`.trim();
           return combined || undefined;
         })(),
       }
@@ -1858,6 +1911,7 @@ async function processJobSheetWithOptions(
       preExtractedFields: aliasCanonicalExtractedFields({
         ...(ensembleResult?.ensembleExtractedFields ?? {}),
         ...(selectionMarksResult?.preExtractedFields ?? {}),
+        ...(multimodalRoiResult?.preExtractedFields ?? {}),
         ...(vlmInkResult?.preExtractedHint
           ? {
               customerSignature: vlmInkResult.preExtractedHint,
@@ -2603,6 +2657,27 @@ async function processJobSheetWithOptions(
           : {}),
         ...(evidenceCoherenceSummary ? { evidenceCoherenceSummary } : {}),
         ...(vlmInkResult ? { vlmInkVerification: vlmInkResult.artifact } : {}),
+        ...(multimodalRoiResult
+          ? {
+              multimodalRoiExtract: {
+                enabled: multimodalRoiResult.enabled,
+                ran: multimodalRoiResult.ran,
+                cropCount: multimodalRoiResult.crops.length,
+                crops: multimodalRoiResult.crops.map(c => ({
+                  roiId: c.roiId,
+                  page: c.page,
+                  media: c.media,
+                  cropHash: c.cropHash,
+                  provider: c.provider,
+                  fieldCount: c.fields.length,
+                  fields: c.fields,
+                  error: c.error,
+                })),
+                processingTimeMs: multimodalRoiResult.processingTimeMs,
+                skippedReason: multimodalRoiResult.skippedReason,
+              },
+            }
+          : {}),
         geminiMultimodal: {
           enabled: isGeminiMultimodalEnabled(),
           attached:
