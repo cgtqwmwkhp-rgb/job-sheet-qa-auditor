@@ -360,9 +360,7 @@ export function ReviewWorkstationPane({
           needsTemplateAuthoring: Boolean(
             (
               auditResult?.reportJson as
-                | { needsTemplateAuthoring?: boolean }
-                | null
-                | undefined
+                { needsTemplateAuthoring?: boolean } | null | undefined
             )?.needsTemplateAuthoring
           ),
           ...(() => {
@@ -430,9 +428,7 @@ export function ReviewWorkstationPane({
           Boolean(
             (
               auditResult?.reportJson as
-                | { needsTemplateAuthoring?: boolean }
-                | null
-                | undefined
+                { needsTemplateAuthoring?: boolean } | null | undefined
             )?.needsTemplateAuthoring
           ),
       }
@@ -612,26 +608,11 @@ function ReviewWorkstationContent({
   const displayFindings = useMemo(() => {
     if (optimisticPassedIds.size === 0) return auditData.findings;
     return auditData.findings.map(f =>
-      optimisticPassedIds.has(f.id) ? { ...f, status: "passed" as const } : f
+      optimisticPassedIds.has(f.id) && f.status !== "passed"
+        ? { ...f, status: "passed" as const }
+        : f
     );
   }, [auditData.findings, optimisticPassedIds]);
-
-  // Drop optimistic marks once the server reflects the override/waive.
-  useEffect(() => {
-    setOptimisticPassedIds(prev => {
-      if (prev.size === 0) return prev;
-      let changed = false;
-      const next = new Set(prev);
-      for (const id of prev) {
-        const server = auditData.findings.find(f => f.id === id);
-        if (!server || server.status === "passed") {
-          next.delete(id);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [auditData.findings]);
 
   const invalidateFindings = () => {
     utils.audits.getFindings.invalidate();
@@ -1030,10 +1011,9 @@ function ReviewWorkstationContent({
     });
   };
 
-  const navigationFindings = useMemo(() => {
-    const issues = displayFindings.filter(f => f.status !== "passed");
-    return issues.length > 0 ? issues : displayFindings;
-  }, [displayFindings]);
+  const navigationIssues = displayFindings.filter(f => f.status !== "passed");
+  const navigationFindings =
+    navigationIssues.length > 0 ? navigationIssues : displayFindings;
 
   const selectFindingByOffset = usePersistFn((delta: number) => {
     if (navigationFindings.length === 0) return;
