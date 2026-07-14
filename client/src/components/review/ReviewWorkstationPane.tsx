@@ -43,8 +43,10 @@ import {
   useState,
   useRef,
   useMemo,
+  useEffect,
   type RefObject,
   type MouseEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import {
   Dialog,
@@ -76,6 +78,10 @@ import {
   syncSelectionFromBox,
   syncSelectionFromFinding,
 } from "@/lib/pdfFindingSync";
+import {
+  nextOpenFindingId,
+  scrollFindingIntoView,
+} from "@/lib/reviewActionFeel";
 import { isTerminalJobSheetStatus } from "@shared/processingProgress";
 import { type SelectionTrace } from "@/components/audit/SelectionTracePanel";
 import { mapSelectionTraceFromReport } from "@/components/review/mapSelectionTrace";
@@ -562,8 +568,24 @@ function ReviewWorkstationContent({
   // Default true = auto-load PDF. Remount via key={jobSheetId} on parent resets state.
   const [showPdfViewer, setShowPdfViewer] = useState(true);
   const [showLegend, setShowLegend] = useState(false);
+  /** Instant UI: treat these ids as passed while override/waive is in flight. */
+  const [optimisticPassedIds, setOptimisticPassedIds] = useState(
+    () => new Set<string | number>()
+  );
+  const [pendingActionIds, setPendingActionIds] = useState(
+    () => new Set<number>()
+  );
   const localPaneRef = useRef<HTMLDivElement>(null);
   const resolvedPaneRef = paneRef ?? localPaneRef;
+
+  const focusWorkstationPane = usePersistFn(() => {
+    resolvedPaneRef.current?.focus({ preventScroll: true });
+  });
+
+  // Arm keyboard path as soon as the workstation mounts (J-AUD-02/03).
+  useEffect(() => {
+    focusWorkstationPane();
+  }, [focusWorkstationPane, jobSheetId]);
 
   const createDispute = trpc.disputes.create.useMutation();
   const flagMutation = trpc.auditActions.flag.useMutation();
@@ -586,6 +608,15 @@ function ReviewWorkstationContent({
   const { hasRole } = useAuth();
   const canOverrideTemplate = hasRole(["admin", "qa_lead"]);
   const utils = trpc.useUtils();
+
+  const displayFindings = useMemo(() => {
+    if (optimisticPassedIds.size === 0) return auditData.findings;
+    return auditData.findings.map(f =>
+      optimisticPassedIds.has(f.id) && f.status !== "passed"
+        ? { ...f, status: "passed" as const }
+        : f
+    );
+  }, [auditData.findings, optimisticPassedIds]);
 
   const invalidateFindings = () => {
     utils.audits.getFindings.invalidate();
@@ -645,10 +676,10 @@ function ReviewWorkstationContent({
   const handleFlagForReview = () => {
     const target =
       (activeBoxId != null
-        ? auditData.findings.find(f => f.id === activeBoxId)
+        ? displayFindings.find(f => f.id === activeBoxId)
         : null) ??
-      auditData.findings.find(f => f.status !== "passed") ??
-      auditData.findings[0];
+      displayFindings.find(f => f.status !== "passed") ??
+      displayFindings[0];
     const findingId = target ? resolveFindingId(target) : null;
     if (!findingId) {
       toast.error("No finding available to flag");
@@ -669,6 +700,10 @@ function ReviewWorkstationContent({
   const openOverrideForFinding = (finding: Finding) => {
     setActionDialog({ finding, action: "override" });
     setActionReason("");
+    // Focus reason on next paint so o → type → ⌘↵ is one continuous keyboard path.
+    requestAnimationFrame(() => {
+      document.getElementById("override-reason")?.focus();
+    });
   };
 
   const openCorrectForFinding = (finding: Finding) => {
@@ -709,6 +744,7 @@ function ReviewWorkstationContent({
           invalidateFindings();
           setCorrectionDialog(null);
           setCorrectedValue("");
+          focusWorkstationPane();
           toast.success("Correction saved", {
             action: {
               label: "Undo",
@@ -737,7 +773,7 @@ function ReviewWorkstationContent({
   };
 
   const handleBulkApproveFindings = () => {
-    const openIds = auditData.findings
+    const openIds = displayFindings
       .filter(f => f.status !== "passed")
       .map(f => resolveFindingId(f))
       .filter((id): id is number => id != null);
@@ -767,7 +803,8 @@ function ReviewWorkstationContent({
 
   const submitActionDialog = () => {
     if (!actionDialog) return;
-    const findingId = resolveFindingId(actionDialog.finding);
+    const finding = actionDialog.finding;
+    const findingId = resolveFindingId(finding);
     if (!findingId) {
       toast.error("Invalid finding id");
       return;
@@ -780,18 +817,73 @@ function ReviewWorkstationContent({
       actionDialog.action === "waive" ? waiveMutation : overrideMutation;
     const label =
       actionDialog.action === "waive" ? "Finding waived" : "Finding overridden";
+    const reason = actionReason.trim();
+    const actionKind = actionDialog.action;
+
+    // Close + optimistic pass immediately so p95 action feel is not network-bound.
+    setActionDialog(null);
+    setActionReason("");
+    const nextOptimistic = new Set(optimisticPassedIds);
+    nextOptimistic.add(finding.id);
+    setOptimisticPassedIds(nextOptimistic);
+    setPendingActionIds(prev => {
+      const next = new Set(prev);
+      next.add(findingId);
+      return next;
+    });
+
+    const advanceId = nextOpenFindingId(
+      navigationFindings,
+      finding.id,
+      nextOptimistic
+    );
+    if (advanceId != null) {
+      handleFindingClick(advanceId);
+    } else {
+      focusWorkstationPane();
+    }
+
     mutation.mutate(
-      { findingId, reason: actionReason.trim() },
+      { findingId, reason },
       {
         onSuccess: () => {
+          setPendingActionIds(prev => {
+            const next = new Set(prev);
+            next.delete(findingId);
+            return next;
+          });
           invalidateFindings();
-          setActionDialog(null);
-          setActionReason("");
           showUndoToast(findingId, label);
+          focusWorkstationPane();
         },
-        onError: err => toast.error(err.message || "Action failed"),
+        onError: err => {
+          setOptimisticPassedIds(prev => {
+            const next = new Set(prev);
+            next.delete(finding.id);
+            return next;
+          });
+          setPendingActionIds(prev => {
+            const next = new Set(prev);
+            next.delete(findingId);
+            return next;
+          });
+          toast.error(err.message || "Action failed");
+          setActionDialog({ finding, action: actionKind });
+          setActionReason(reason);
+        },
       }
     );
+  };
+
+  const onActionReasonKeyDown = (
+    e: ReactKeyboardEvent<HTMLTextAreaElement>
+  ) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      if (actionReason.trim()) {
+        submitActionDialog();
+      }
+    }
   };
 
   const applyBeforeAfterPairAction = (
@@ -859,7 +951,7 @@ function ReviewWorkstationContent({
     applyBeforeAfterPairAction(pairIndex, "override");
 
   const boxes: ViewerBoundingBox[] = findingsToViewerBoxes(
-    auditData.findings.map(f => ({
+    displayFindings.map(f => ({
       id: f.id,
       pageNumber: f.pageNumber ?? f.box?.page,
       box: f.box,
@@ -873,21 +965,19 @@ function ReviewWorkstationContent({
   const handleBoxClick = (id: string | number) => {
     const { activeBoxId: nextId } = syncSelectionFromBox(id);
     setActiveBoxId(nextId);
-    const finding = auditData.findings.find(f => f.id === id);
+    const finding = displayFindings.find(f => f.id === id);
     const page = finding?.box?.page ?? finding?.pageNumber ?? 1;
     setFocusPage(page);
     setFocusLabel(finding?.field || finding?.box?.label || null);
     setFocusNonce(n => n + 1);
     requestAnimationFrame(() => {
-      const element = document.getElementById(`finding-${id}`);
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
+      scrollFindingIntoView(id);
+      focusWorkstationPane();
     });
   };
 
   const handleFindingClick = (id: string | number) => {
-    const finding = auditData.findings.find(f => f.id === id) ?? null;
+    const finding = displayFindings.find(f => f.id === id) ?? null;
     const sync = syncSelectionFromFinding(
       finding
         ? {
@@ -920,17 +1010,14 @@ function ReviewWorkstationContent({
       setShowPdfViewer(true);
     }
     requestAnimationFrame(() => {
-      const element = document.getElementById(`finding-${id}`);
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
+      scrollFindingIntoView(id);
+      focusWorkstationPane();
     });
   };
 
-  const navigationFindings = useMemo(() => {
-    const issues = auditData.findings.filter(f => f.status !== "passed");
-    return issues.length > 0 ? issues : auditData.findings;
-  }, [auditData.findings]);
+  const navigationIssues = displayFindings.filter(f => f.status !== "passed");
+  const navigationFindings =
+    navigationIssues.length > 0 ? navigationIssues : displayFindings;
 
   const selectFindingByOffset = usePersistFn((delta: number) => {
     if (navigationFindings.length === 0) return;
@@ -952,13 +1039,13 @@ function ReviewWorkstationContent({
 
   const getActiveFinding = usePersistFn((): Finding | null => {
     if (activeBoxId != null) {
-      const active = auditData.findings.find(f => f.id === activeBoxId);
+      const active = displayFindings.find(f => f.id === activeBoxId);
       if (active) return active;
     }
     return (
       navigationFindings[0] ??
-      auditData.findings.find(f => f.status !== "passed") ??
-      auditData.findings[0] ??
+      displayFindings.find(f => f.status !== "passed") ??
+      displayFindings[0] ??
       null
     );
   });
@@ -992,7 +1079,6 @@ function ReviewWorkstationContent({
       return;
     }
     handleFindingClick(finding.id);
-    resolvedPaneRef.current?.focus();
   });
 
   const findingKeyboardHandlers = useMemo(
@@ -1012,10 +1098,7 @@ function ReviewWorkstationContent({
     ]
   );
 
-  useReviewFindingKeyboard(
-    findingKeyboardHandlers,
-    auditData.findings.length > 0
-  );
+  useReviewFindingKeyboard(findingKeyboardHandlers, displayFindings.length > 0);
 
   const handleReportIssue = (finding: Finding, e: MouseEvent) => {
     e.stopPropagation();
@@ -1044,14 +1127,12 @@ function ReviewWorkstationContent({
     );
   };
 
-  const passedFindings = auditData.findings.filter(f => f.status === "passed");
-  const failedFindings = auditData.findings.filter(f => f.status !== "passed");
+  const passedFindings = displayFindings.filter(f => f.status === "passed");
+  const failedFindings = displayFindings.filter(f => f.status !== "passed");
 
   const hasMajor =
     Boolean(auditData.hasMajorFails) ||
-    auditData.findings.some(
-      f => f.failClass === "major" && f.status !== "passed"
-    );
+    displayFindings.some(f => f.failClass === "major" && f.status !== "passed");
   const outcome: {
     label: "Pass" | "Needs review" | "Fail";
     variant: "default" | "secondary" | "destructive";
@@ -1335,6 +1416,7 @@ function ReviewWorkstationContent({
                 <IssuesTabContent
                   findings={failedFindings}
                   activeBoxId={activeBoxId}
+                  pendingActionIds={pendingActionIds}
                   onFindingClick={handleFindingClick}
                   onReportIssue={handleReportIssue}
                   onOverride={handleOverrideClick}
@@ -1347,8 +1429,9 @@ function ReviewWorkstationContent({
                 className="flex-1 min-h-0 m-0 overflow-hidden data-[state=inactive]:hidden"
               >
                 <FindingsList
-                  findings={auditData.findings}
+                  findings={displayFindings}
                   activeBoxId={activeBoxId}
+                  pendingActionIds={pendingActionIds}
                   onFindingClick={handleFindingClick}
                   onReportIssue={handleReportIssue}
                   onOverride={handleOverrideClick}
@@ -1363,6 +1446,7 @@ function ReviewWorkstationContent({
                 <FindingsList
                   findings={passedFindings}
                   activeBoxId={activeBoxId}
+                  pendingActionIds={pendingActionIds}
                   onFindingClick={handleFindingClick}
                   onReportIssue={handleReportIssue}
                   onOverride={handleOverrideClick}
@@ -1564,6 +1648,7 @@ function ReviewWorkstationContent({
           if (!open) {
             setActionDialog(null);
             setActionReason("");
+            focusWorkstationPane();
           }
         }}
       >
@@ -1575,7 +1660,7 @@ function ReviewWorkstationContent({
                 : "Override Finding"}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-3 py-3">
             <p className="text-sm text-muted-foreground">
               {actionDialog?.finding.field}
               {actionDialog?.finding.message
@@ -1583,12 +1668,21 @@ function ReviewWorkstationContent({
                 : ""}
             </p>
             <div className="space-y-2">
-              <Label>Reason</Label>
+              <Label htmlFor="override-reason">Reason</Label>
               <Textarea
+                id="override-reason"
+                autoFocus
                 placeholder="Explain why this action is justified..."
                 value={actionReason}
                 onChange={e => setActionReason(e.target.value)}
+                onKeyDown={onActionReasonKeyDown}
+                aria-keyshortcuts="Meta+Enter Control+Enter"
               />
+              <p className="text-[11px] text-muted-foreground">
+                Press <kbd className="font-mono text-foreground">⌘</kbd>
+                <kbd className="font-mono text-foreground">Enter</kbd> to
+                confirm
+              </p>
             </div>
             {actionDialog?.action === "override" && (
               <Button
@@ -1612,6 +1706,7 @@ function ReviewWorkstationContent({
               onClick={() => {
                 setActionDialog(null);
                 setActionReason("");
+                focusWorkstationPane();
               }}
             >
               Cancel
@@ -1700,15 +1795,26 @@ function ReviewWorkstationContent({
 interface FindingsListProps {
   findings: Finding[];
   activeBoxId: string | number | null;
+  pendingActionIds?: ReadonlySet<number>;
   onFindingClick: (id: string | number) => void;
   onReportIssue: (finding: Finding, e: MouseEvent) => void;
   onOverride: (finding: Finding, e: MouseEvent) => void;
   onCorrect: (finding: Finding, e: MouseEvent) => void;
 }
 
+function findingPending(
+  finding: Finding,
+  pendingActionIds?: ReadonlySet<number>
+): boolean {
+  return (
+    typeof finding.id === "number" && Boolean(pendingActionIds?.has(finding.id))
+  );
+}
+
 function FindingsList({
   findings,
   activeBoxId,
+  pendingActionIds,
   onFindingClick,
   onReportIssue,
   onOverride,
@@ -1724,135 +1830,150 @@ function FindingsList({
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 space-y-3">
-        {findings.map(finding => (
-          <div
-            key={finding.id}
-            id={`finding-${finding.id}`}
-            className={`p-4 rounded-lg border cursor-pointer transition-all ${
-              activeBoxId === finding.id
-                ? "ring-2 ring-primary border-primary bg-primary/5"
-                : "hover:bg-muted/50"
-            } ${
-              finding.status === "missing"
-                ? "bg-red-50/50 border-red-200"
-                : finding.status === "warning"
-                  ? "bg-orange-50/50 border-orange-200"
-                  : "bg-green-50/50 border-green-200"
-            }`}
-            onClick={() => onFindingClick(finding.id)}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                {finding.status === "missing" ? (
-                  <AlertCircle className="w-5 h-5 text-red-600" />
-                ) : finding.status === "warning" ? (
-                  <AlertCircle className="w-5 h-5 text-orange-600" />
-                ) : (
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                )}
-                <h3 className="font-semibold text-sm">{finding.field}</h3>
-                {finding.failClass === "major" && (
-                  <Badge variant="destructive" className="text-[10px] px-1.5">
-                    Major
-                  </Badge>
-                )}
-                {finding.failClass === "minor" && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5">
-                    Minor
-                  </Badge>
-                )}
+      <div className="p-2 space-y-1.5">
+        {findings.map(finding => {
+          const pending = findingPending(finding, pendingActionIds);
+          return (
+            <div
+              key={finding.id}
+              id={`finding-${finding.id}`}
+              data-finding-pending={pending ? "true" : undefined}
+              className={`p-2.5 rounded-md border cursor-pointer transition-colors ${
+                activeBoxId === finding.id
+                  ? "ring-2 ring-primary border-primary bg-primary/5"
+                  : "hover:bg-muted/50"
+              } ${
+                finding.status === "missing"
+                  ? "bg-red-50/50 border-red-200"
+                  : finding.status === "warning"
+                    ? "bg-orange-50/50 border-orange-200"
+                    : "bg-green-50/50 border-green-200"
+              } ${pending ? "opacity-70" : ""}`}
+              onClick={() => onFindingClick(finding.id)}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {pending ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
+                  ) : finding.status === "missing" ? (
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  ) : finding.status === "warning" ? (
+                    <AlertCircle className="w-4 h-4 text-orange-600 shrink-0" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                  )}
+                  <h3 className="font-semibold text-xs truncate">
+                    {finding.field}
+                  </h3>
+                  {finding.failClass === "major" && (
+                    <Badge variant="destructive" className="text-[10px] px-1.5">
+                      Major
+                    </Badge>
+                  )}
+                  {finding.failClass === "minor" && (
+                    <Badge variant="secondary" className="text-[10px] px-1.5">
+                      Minor
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {finding.ruleId && (
+                    <Badge
+                      variant="outline"
+                      className="font-mono text-[10px] px-1.5 bg-slate-50 text-slate-600 border-slate-300"
+                      title={`Rule: ${finding.ruleId}${finding.reasonCode ? ` — ${finding.reasonCode}` : ""}`}
+                    >
+                      {finding.ruleId}
+                    </Badge>
+                  )}
+                  <span className="text-[10px] text-muted-foreground tabular-nums">
+                    {(finding.confidence * 100).toFixed(0)}%
+                    {finding.reasonCode ? ` · ${finding.reasonCode}` : ""}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                {finding.ruleId && (
-                  <Badge
-                    variant="outline"
-                    className="font-mono text-[10px] px-1.5 bg-slate-50 text-slate-600 border-slate-300"
-                    title={`Rule: ${finding.ruleId}${finding.reasonCode ? ` — ${finding.reasonCode}` : ""}`}
-                  >
-                    {finding.ruleId}
-                  </Badge>
-                )}
-                <span className="text-[10px] text-muted-foreground tabular-nums">
-                  {(finding.confidence * 100).toFixed(0)}%
-                  {finding.reasonCode ? ` · ${finding.reasonCode}` : ""}
-                </span>
-              </div>
-            </div>
 
-            {finding.value && (
-              <div className="mb-2 p-2 bg-white/60 rounded border border-black/5 font-mono text-sm">
-                {finding.value}
-              </div>
-            )}
+              {finding.value && (
+                <div className="mb-1 px-1.5 py-1 bg-white/60 rounded border border-black/5 font-mono text-xs truncate">
+                  {finding.value}
+                </div>
+              )}
 
-            {finding.message && (
-              <p
-                className={`text-sm ${
-                  finding.status === "missing"
-                    ? "text-red-700"
-                    : finding.status === "warning"
-                      ? "text-orange-700"
-                      : "text-emerald-800"
-                }`}
-              >
-                {finding.message}
-              </p>
-            )}
+              {finding.message && (
+                <p
+                  className={`text-xs leading-snug ${
+                    finding.status === "missing"
+                      ? "text-red-700"
+                      : finding.status === "warning"
+                        ? "text-orange-700"
+                        : "text-emerald-800"
+                  }`}
+                >
+                  {finding.message}
+                </p>
+              )}
 
-            {finding.whyItMatters && (
-              <p className="mt-1.5 text-xs text-muted-foreground leading-snug">
-                {finding.whyItMatters}
-              </p>
-            )}
+              {finding.whyItMatters && (
+                <p className="mt-1 text-[11px] text-muted-foreground leading-snug line-clamp-2">
+                  {finding.whyItMatters}
+                </p>
+              )}
 
-            {finding.suggestedFix && finding.status !== "passed" && (
-              <p className="mt-1 text-xs text-slate-700">
-                Suggested fix: {finding.suggestedFix}
-              </p>
-            )}
+              {finding.suggestedFix && finding.status !== "passed" && (
+                <p className="mt-0.5 text-[11px] text-slate-700 line-clamp-1">
+                  Suggested fix: {finding.suggestedFix}
+                </p>
+              )}
 
-            <div className="mt-3 flex items-center gap-2 flex-wrap">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={e => {
-                  e.stopPropagation();
-                  onFindingClick(finding.id);
-                }}
-              >
-                <Eye className="w-3 h-3 mr-1" /> View on Doc
-              </Button>
-              {finding.status !== "passed" && (
+              <div className="mt-1.5 flex items-center gap-1 flex-wrap">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs hover:text-destructive"
-                  onClick={e => onOverride(finding, e)}
+                  className="h-6 text-[11px] px-1.5"
+                  onClick={e => {
+                    e.stopPropagation();
+                    onFindingClick(finding.id);
+                  }}
                 >
-                  Override
+                  <Eye className="w-3 h-3 mr-1" /> View
                 </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={e => onCorrect(finding, e)}
-              >
-                <Pencil className="w-3 h-3 mr-1" /> Correct value
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-muted-foreground hover:text-primary ml-auto"
-                onClick={e => onReportIssue(finding, e)}
-              >
-                <MessageSquare className="w-3 h-3 mr-1" /> Report Issue
-              </Button>
+                {finding.status !== "passed" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[11px] px-1.5 hover:text-destructive"
+                    title="Override (o)"
+                    aria-keyshortcuts="o"
+                    onClick={e => onOverride(finding, e)}
+                  >
+                    Override
+                    <kbd className="ml-1 font-mono text-[10px] text-muted-foreground">
+                      o
+                    </kbd>
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[11px] px-1.5"
+                  title="Correct value (c)"
+                  aria-keyshortcuts="c"
+                  onClick={e => onCorrect(finding, e)}
+                >
+                  <Pencil className="w-3 h-3 mr-1" /> Correct
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[11px] px-1.5 text-muted-foreground hover:text-primary ml-auto"
+                  onClick={e => onReportIssue(finding, e)}
+                >
+                  <MessageSquare className="w-3 h-3 mr-1" /> Report
+                </Button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </ScrollArea>
   );
@@ -1861,6 +1982,7 @@ function FindingsList({
 function IssuesTabContent({
   findings,
   activeBoxId,
+  pendingActionIds,
   onFindingClick,
   onReportIssue,
   onOverride,
@@ -1901,7 +2023,7 @@ function IssuesTabContent({
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 space-y-3">
+      <div className="p-2 space-y-1.5">
         {relationshipFindings.length > 0 && (
           <RelationshipFindingsGroup
             findings={relationshipFindings}
@@ -1939,134 +2061,149 @@ function IssuesTabContent({
             onFindingClick={onFindingClick}
           />
         )}
-        {otherFindings.map(finding => (
-          <div
-            key={finding.id}
-            id={`finding-${finding.id}`}
-            className={`p-4 rounded-lg border cursor-pointer transition-all ${
-              activeBoxId === finding.id
-                ? "ring-2 ring-primary border-primary bg-primary/5"
-                : "hover:bg-muted/50"
-            } ${
-              finding.status === "missing"
-                ? "bg-red-50/50 border-red-200"
-                : finding.status === "warning"
-                  ? "bg-orange-50/50 border-orange-200"
-                  : "bg-green-50/50 border-green-200"
-            }`}
-            onClick={() => onFindingClick(finding.id)}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                {finding.status === "missing" ? (
-                  <AlertCircle className="w-5 h-5 text-red-600" />
-                ) : finding.status === "warning" ? (
-                  <AlertCircle className="w-5 h-5 text-orange-600" />
-                ) : (
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                )}
-                <h3 className="font-semibold text-sm">{finding.field}</h3>
-                {finding.failClass === "major" && (
-                  <Badge variant="destructive" className="text-[10px] px-1.5">
-                    Major
-                  </Badge>
-                )}
-                {finding.failClass === "minor" && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5">
-                    Minor
-                  </Badge>
-                )}
+        {otherFindings.map(finding => {
+          const pending = findingPending(finding, pendingActionIds);
+          return (
+            <div
+              key={finding.id}
+              id={`finding-${finding.id}`}
+              data-finding-pending={pending ? "true" : undefined}
+              className={`p-2.5 rounded-md border cursor-pointer transition-colors ${
+                activeBoxId === finding.id
+                  ? "ring-2 ring-primary border-primary bg-primary/5"
+                  : "hover:bg-muted/50"
+              } ${
+                finding.status === "missing"
+                  ? "bg-red-50/50 border-red-200"
+                  : finding.status === "warning"
+                    ? "bg-orange-50/50 border-orange-200"
+                    : "bg-green-50/50 border-green-200"
+              } ${pending ? "opacity-70" : ""}`}
+              onClick={() => onFindingClick(finding.id)}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {pending ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
+                  ) : finding.status === "missing" ? (
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                  ) : finding.status === "warning" ? (
+                    <AlertCircle className="w-4 h-4 text-orange-600 shrink-0" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                  )}
+                  <h3 className="font-semibold text-xs truncate">
+                    {finding.field}
+                  </h3>
+                  {finding.failClass === "major" && (
+                    <Badge variant="destructive" className="text-[10px] px-1.5">
+                      Major
+                    </Badge>
+                  )}
+                  {finding.failClass === "minor" && (
+                    <Badge variant="secondary" className="text-[10px] px-1.5">
+                      Minor
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {finding.ruleId && (
+                    <Badge
+                      variant="outline"
+                      className="font-mono text-[10px] px-1.5 bg-slate-50 text-slate-600 border-slate-300"
+                      title={`Rule: ${finding.ruleId}${finding.reasonCode ? ` — ${finding.reasonCode}` : ""}`}
+                    >
+                      {finding.ruleId}
+                    </Badge>
+                  )}
+                  <span className="text-[10px] text-muted-foreground tabular-nums">
+                    {(finding.confidence * 100).toFixed(0)}%
+                    {finding.reasonCode ? ` · ${finding.reasonCode}` : ""}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                {finding.ruleId && (
-                  <Badge
-                    variant="outline"
-                    className="font-mono text-[10px] px-1.5 bg-slate-50 text-slate-600 border-slate-300"
-                    title={`Rule: ${finding.ruleId}${finding.reasonCode ? ` — ${finding.reasonCode}` : ""}`}
-                  >
-                    {finding.ruleId}
-                  </Badge>
-                )}
-                <span className="text-[10px] text-muted-foreground tabular-nums">
-                  {(finding.confidence * 100).toFixed(0)}%
-                  {finding.reasonCode ? ` · ${finding.reasonCode}` : ""}
-                </span>
-              </div>
-            </div>
 
-            {finding.value && (
-              <div className="mb-2 p-2 bg-white/60 rounded border border-black/5 font-mono text-sm">
-                {finding.value}
-              </div>
-            )}
+              {finding.value && (
+                <div className="mb-1 px-1.5 py-1 bg-white/60 rounded border border-black/5 font-mono text-xs truncate">
+                  {finding.value}
+                </div>
+              )}
 
-            {finding.message && (
-              <p
-                className={`text-sm ${
-                  finding.status === "missing"
-                    ? "text-red-700"
-                    : finding.status === "warning"
-                      ? "text-orange-700"
-                      : "text-emerald-800"
-                }`}
-              >
-                {finding.message}
-              </p>
-            )}
+              {finding.message && (
+                <p
+                  className={`text-xs leading-snug ${
+                    finding.status === "missing"
+                      ? "text-red-700"
+                      : finding.status === "warning"
+                        ? "text-orange-700"
+                        : "text-emerald-800"
+                  }`}
+                >
+                  {finding.message}
+                </p>
+              )}
 
-            {finding.whyItMatters && (
-              <p className="mt-1.5 text-xs text-muted-foreground leading-snug">
-                {finding.whyItMatters}
-              </p>
-            )}
+              {finding.whyItMatters && (
+                <p className="mt-1 text-[11px] text-muted-foreground leading-snug line-clamp-2">
+                  {finding.whyItMatters}
+                </p>
+              )}
 
-            {finding.suggestedFix && finding.status !== "passed" && (
-              <p className="mt-1 text-xs text-slate-700">
-                Suggested fix: {finding.suggestedFix}
-              </p>
-            )}
+              {finding.suggestedFix && finding.status !== "passed" && (
+                <p className="mt-0.5 text-[11px] text-slate-700 line-clamp-1">
+                  Suggested fix: {finding.suggestedFix}
+                </p>
+              )}
 
-            <div className="mt-3 flex items-center gap-2 flex-wrap">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={e => {
-                  e.stopPropagation();
-                  onFindingClick(finding.id);
-                }}
-              >
-                <Eye className="w-3 h-3 mr-1" /> View on Doc
-              </Button>
-              {finding.status !== "passed" && (
+              <div className="mt-1.5 flex items-center gap-1 flex-wrap">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs hover:text-destructive"
-                  onClick={e => onOverride(finding, e)}
+                  className="h-6 text-[11px] px-1.5"
+                  onClick={e => {
+                    e.stopPropagation();
+                    onFindingClick(finding.id);
+                  }}
                 >
-                  Override
+                  <Eye className="w-3 h-3 mr-1" /> View
                 </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={e => onCorrect(finding, e)}
-              >
-                <Pencil className="w-3 h-3 mr-1" /> Correct value
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-muted-foreground hover:text-primary ml-auto"
-                onClick={e => onReportIssue(finding, e)}
-              >
-                <MessageSquare className="w-3 h-3 mr-1" /> Report Issue
-              </Button>
+                {finding.status !== "passed" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[11px] px-1.5 hover:text-destructive"
+                    title="Override (o)"
+                    aria-keyshortcuts="o"
+                    onClick={e => onOverride(finding, e)}
+                  >
+                    Override
+                    <kbd className="ml-1 font-mono text-[10px] text-muted-foreground">
+                      o
+                    </kbd>
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[11px] px-1.5"
+                  title="Correct value (c)"
+                  aria-keyshortcuts="c"
+                  onClick={e => onCorrect(finding, e)}
+                >
+                  <Pencil className="w-3 h-3 mr-1" /> Correct
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[11px] px-1.5 text-muted-foreground hover:text-primary ml-auto"
+                  onClick={e => onReportIssue(finding, e)}
+                >
+                  <MessageSquare className="w-3 h-3 mr-1" /> Report
+                </Button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </ScrollArea>
   );

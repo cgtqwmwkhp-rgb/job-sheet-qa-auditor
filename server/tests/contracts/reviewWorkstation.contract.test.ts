@@ -130,6 +130,18 @@ describe("Review Workstation Contract (PR-13)", () => {
       expect(pane).toContain('value="context"');
       expect(pane).toContain("hasActionableClinicalContext");
     });
+
+    it("keeps override on a keyboard path with optimistic action feel", () => {
+      expect(pane).toContain("@/lib/reviewActionFeel");
+      expect(pane).toContain("nextOpenFindingId");
+      expect(pane).toContain("scrollFindingIntoView");
+      expect(pane).toContain("optimisticPassedIds");
+      expect(pane).toContain("onActionReasonKeyDown");
+      expect(pane).toContain("autoFocus");
+      expect(pane).toContain('aria-keyshortcuts="Meta+Enter Control+Enter"');
+      expect(pane).toContain('title="Override (o)"');
+      expect(pane).toContain("focusWorkstationPane");
+    });
   });
 
   describe("captureFieldCorrection API", () => {
