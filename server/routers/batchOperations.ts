@@ -315,3 +315,5 @@ function convertAuditsToCSV(audits: any[]): string {
 
   return [headers, ...rows].map(row => row.join(",")).join("\n");
 }
+
+export type BatchOperationsRouter = typeof batchOperationsRouter;

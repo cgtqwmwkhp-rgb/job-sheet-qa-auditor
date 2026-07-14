@@ -86,7 +86,17 @@ vi.mock("./db", () => ({
   getAuditResultById: vi.fn().mockResolvedValue({
     id: 1,
     jobSheetId: 1,
+    goldSpecId: 1,
     result: "fail",
+    pipelineVersion: "1.0.0",
+    ocrEngineVersion: "test",
+    processingTimeMs: 100,
+    reportJson: {
+      extractedFields: {
+        signature: { value: "absent", confidence: 0.9 },
+      },
+    },
+    createdAt: new Date("2024-01-01T00:00:00.000Z"),
   }),
   updateAuditResultStatus: vi.fn().mockResolvedValue(undefined),
   getAllUsers: vi.fn().mockResolvedValue([
@@ -955,5 +965,60 @@ describe("auditLog", () => {
     const caller = appRouter.createCaller(ctx);
 
     await expect(caller.auditLog.list()).rejects.toThrow();
+  });
+});
+
+describe("exports + batchOperations mounts (PR-IO-EXPORTS)", () => {
+  it("mounts exports router on appRouter", () => {
+    expect(appRouter._def.procedures).toBeDefined();
+    expect(
+      Object.keys(appRouter._def.record).includes("exports")
+    ).toBe(true);
+    expect(
+      Object.keys(appRouter._def.record).includes("batchOperations")
+    ).toBe(true);
+  });
+
+  it("exports CSV + JSON bundle from real audit result id", async () => {
+    const { ctx } = createAuthContext("admin");
+    const caller = appRouter.createCaller(ctx);
+
+    const csv = await caller.exports.validatedFieldsCSV({
+      auditId: 1,
+      redacted: true,
+      tab: "all",
+    });
+    expect(csv.success).toBe(true);
+    expect(csv.content).toContain("Rule ID");
+    expect(csv.filename).toContain("validated-fields");
+
+    const findings = await caller.exports.findingsCSV({
+      auditId: 1,
+      redacted: true,
+    });
+    expect(findings.success).toBe(true);
+    expect(findings.content).toContain("Severity");
+
+    const bundle = await caller.exports.bundle({
+      auditId: 1,
+      redacted: true,
+    });
+    expect(bundle.success).toBe(true);
+    expect(bundle.filename).toContain("bundle.json");
+    expect(bundle.content).toHaveProperty("validatedFields");
+    expect(bundle.content).toHaveProperty("findings");
+  });
+
+  it("batch exportAuditsBatch returns CSV for audit ids", async () => {
+    const { ctx } = createAuthContext("qa_lead");
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.batchOperations.exportAuditsBatch({
+      auditResultIds: [1],
+      format: "csv",
+    });
+    expect(result.format).toBe("csv");
+    expect(result.count).toBe(1);
+    expect(String(result.data)).toContain("Audit ID");
   });
 });
