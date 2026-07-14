@@ -1,11 +1,17 @@
 /**
  * Pipeline Integration Types
- * 
+ *
  * PR-6: Types for the integrated pipeline with enhancement modules.
  */
 
-import type { FieldExtractionResult, ValidationTrace } from '../extraction/criticalFieldExtractor';
-import type { FusedFieldResult, FusionEvidence } from '../imageQaFusion/fusionService';
+import type {
+  FieldExtractionResult,
+  ValidationTrace,
+} from "../extraction/criticalFieldExtractor";
+import type {
+  FusedFieldResult,
+  FusionEvidence,
+} from "../imageQaFusion/fusionService";
 
 /**
  * Feature flags for pipeline enhancements
@@ -50,13 +56,24 @@ export interface PipelineInput {
 }
 
 /**
+ * Image QA fusion execution status (honest skip when maps incomplete).
+ */
+export interface ImageQaFusionStatus {
+  attempted: boolean;
+  ran: boolean;
+  skipReason?: string;
+  readyFieldIds: string[];
+  fusedFieldCount: number;
+}
+
+/**
  * Pipeline output from processing
  */
 export interface PipelineOutput {
   /** Document ID */
   documentId: string;
   /** Overall status */
-  status: 'PASS' | 'FAIL' | 'REVIEW_QUEUE';
+  status: "PASS" | "FAIL" | "REVIEW_QUEUE";
   /** Critical field extraction results */
   criticalFields: FieldExtractionResult[];
   /** Validation trace artifact */
@@ -65,6 +82,8 @@ export interface PipelineOutput {
   fusionResults: FusedFieldResult[];
   /** Full fusion evidence artifact */
   fusionEvidence: FusionEvidence | null;
+  /** Fusion flag honesty — ran vs skipped with reason */
+  imageQaFusionStatus?: ImageQaFusionStatus;
   /** Whether result was from cache */
   fromCache: boolean;
   /** Cache key if cached */
