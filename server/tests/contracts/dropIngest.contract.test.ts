@@ -47,7 +47,7 @@ describe("dropIngest contract (PR-IO-SHAREPOINT)", () => {
     // Smoke the handler via a minimal mock req/res
     let payload: Record<string, unknown> | null = null;
     const handler = layer.route.stack[0].handle;
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       handler(
         {},
         {

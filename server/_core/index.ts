@@ -209,7 +209,9 @@ async function startServer() {
     console.log(`  Health:    http://localhost:${port}/healthz`);
     console.log(`  Readiness: http://localhost:${port}/readyz`);
     console.log(`  Metrics:   http://localhost:${port}/metrics`);
-    console.log(`  DropIngest: http://localhost:${port}/api/drop-ingest/health`);
+    console.log(
+      `  DropIngest: http://localhost:${port}/api/drop-ingest/health`
+    );
     // Library drop → signed ingest (fail-safe; no-op unless DROP_INGEST_ENABLED=true)
     void startDropIngestPoller();
   });

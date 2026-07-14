@@ -7,7 +7,9 @@ import { DropIngestPoller } from "../poller";
 import { BlobDropSource, FolderDropSource } from "../sources";
 import { MemoryDropStateStore } from "../stateStore";
 
-function baseConfig(overrides: Partial<DropIngestConfig> = {}): DropIngestConfig {
+function baseConfig(
+  overrides: Partial<DropIngestConfig> = {}
+): DropIngestConfig {
   return {
     enabled: true,
     mode: "folder",
@@ -41,7 +43,10 @@ describe("DropIngestPoller", () => {
   it("submits a new folder drop via signed ingest (no manual /upload)", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "drop-ingest-"));
     tmpDirs.push(dir);
-    await fs.writeFile(path.join(dir, "job-sheet.pdf"), Buffer.from("%PDF-1.4 drop"));
+    await fs.writeFile(
+      path.join(dir, "job-sheet.pdf"),
+      Buffer.from("%PDF-1.4 drop")
+    );
 
     const postUpload = vi.fn(async () => ({
       httpStatus: 201,
@@ -86,9 +91,7 @@ describe("DropIngestPoller", () => {
     const source = new BlobDropSource({
       prefix: "incoming/",
       maxFileBytes: 10_000_000,
-      list: async () => [
-        { name: "incoming/sheet.pdf", contentLength: 4 },
-      ],
+      list: async () => [{ name: "incoming/sheet.pdf", contentLength: 4 }],
       download: async () => Buffer.from("%PDF"),
     });
 
@@ -135,7 +138,9 @@ describe("DropIngestPoller", () => {
 
     await poller.tick();
     await expect(fs.access(filePath)).rejects.toBeTruthy();
-    await expect(fs.access(path.join(archive, "done.pdf"))).resolves.toBeUndefined();
+    await expect(
+      fs.access(path.join(archive, "done.pdf"))
+    ).resolves.toBeUndefined();
   });
 
   it("records ingest HTTP errors without marking state", async () => {

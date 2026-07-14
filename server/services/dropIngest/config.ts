@@ -50,7 +50,8 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
 export function loadDropIngestConfig(
   env: NodeJS.ProcessEnv = process.env
 ): DropIngestConfig {
-  const enabled = (env.DROP_INGEST_ENABLED ?? "").trim().toLowerCase() === "true";
+  const enabled =
+    (env.DROP_INGEST_ENABLED ?? "").trim().toLowerCase() === "true";
   const modeRaw = (env.DROP_INGEST_MODE ?? "auto").trim().toLowerCase();
   const mode: DropIngestMode =
     modeRaw === "folder" || modeRaw === "blob" || modeRaw === "auto"
@@ -85,7 +86,10 @@ export function loadDropIngestConfig(
     baseUrl: baseUrl.replace(/\/+$/, ""),
     archiveDir: (env.DROP_INGEST_ARCHIVE_DIR ?? "").trim() || null,
     statePath: (env.DROP_INGEST_STATE_PATH ?? "").trim() || null,
-    maxFileBytes: parsePositiveInt(env.DROP_INGEST_MAX_FILE_BYTES, 45 * 1024 * 1024),
+    maxFileBytes: parsePositiveInt(
+      env.DROP_INGEST_MAX_FILE_BYTES,
+      45 * 1024 * 1024
+    ),
     apiKey,
     hmacSecret,
     ingestPath: "/api/ingest/v1/job-sheets",

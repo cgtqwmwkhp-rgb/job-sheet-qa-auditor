@@ -104,7 +104,9 @@ export async function startDropIngestPoller(
 
   const config = loadDropIngestConfig(env);
   if (!config.enabled) {
-    console.log("[DropIngest] Disabled (set DROP_INGEST_ENABLED=true to start)");
+    console.log(
+      "[DropIngest] Disabled (set DROP_INGEST_ENABLED=true to start)"
+    );
     return null;
   }
 
