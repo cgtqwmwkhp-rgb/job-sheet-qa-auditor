@@ -250,7 +250,10 @@ describe("FinOps Contract (Phase 3.x)", () => {
 
     it("mistralAdapter records OCR spend into the FinOps ledger", () => {
       const content = fs.readFileSync(
-        path.join(process.cwd(), "server/services/ocrAdapter/mistralAdapter.ts"),
+        path.join(
+          process.cwd(),
+          "server/services/ocrAdapter/mistralAdapter.ts"
+        ),
         "utf-8"
       );
       expect(content).toContain('tool: "mistral_ocr"');
