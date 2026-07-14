@@ -18,17 +18,69 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { TableSkeleton } from "@/components/ui/loading-skeleton";
-import {
-  ShieldAlert,
-  Search,
-  Filter,
-  Download,
-  User,
-  Clock,
-} from "lucide-react";
+import { ShieldAlert, Search, Download, User, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
+
+function escapeCsvCell(value: unknown): string {
+  const raw = value == null ? "" : String(value);
+  if (/[",\n\r]/.test(raw)) {
+    return `"${raw.replace(/"/g, '""')}"`;
+  }
+  return raw;
+}
+
+function downloadAuditLogCsv(
+  rows: Array<{
+    id: number;
+    createdAt: Date | string;
+    userId: number | null;
+    action: string;
+    entityType: string | null;
+    entityId: number | string | null;
+    details: unknown;
+  }>
+) {
+  const header = [
+    "id",
+    "timestamp",
+    "userId",
+    "action",
+    "entityType",
+    "entityId",
+    "details",
+  ];
+  const lines = [
+    header.join(","),
+    ...rows.map(log =>
+      [
+        log.id,
+        new Date(log.createdAt).toISOString(),
+        log.userId ?? "",
+        log.action,
+        log.entityType ?? "",
+        log.entityId ?? "",
+        log.details ? JSON.stringify(log.details) : "",
+      ]
+        .map(escapeCsvCell)
+        .join(",")
+    ),
+  ];
+  const blob = new Blob([lines.join("\n")], {
+    type: "text/csv;charset=utf-8;",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  anchor.href = url;
+  anchor.download = `audit-log-${stamp}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
 
 export default function AuditLog() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -43,6 +95,17 @@ export default function AuditLog() {
         log.entityType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         String(log.entityId).includes(searchTerm)
     ) || [];
+
+  const handleExportCsv = () => {
+    if (filteredLogs.length === 0) {
+      toast.info("No audit events to export");
+      return;
+    }
+    downloadAuditLogCsv(filteredLogs);
+    toast.success(
+      `Exported ${filteredLogs.length} ${filteredLogs.length === 1 ? "event" : "events"}`
+    );
+  };
 
   const getStatusBadge = (action: string) => {
     if (action.includes("DELETE") || action.includes("REJECT")) {
@@ -70,7 +133,12 @@ export default function AuditLog() {
               Security events and access history.
             </p>
           </div>
-          <Button variant="outline" className="shrink-0">
+          <Button
+            variant="outline"
+            className="shrink-0"
+            onClick={handleExportCsv}
+            disabled={isLoading || filteredLogs.length === 0}
+          >
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
@@ -83,24 +151,14 @@ export default function AuditLog() {
                 <ShieldAlert className="h-5 w-5 text-primary" />
                 Security Events
               </CardTitle>
-              <div className="flex gap-2 w-full sm:max-w-sm">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search action, entity, or ID..."
-                    className="pl-9 h-9"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Filter events"
-                  className="shrink-0 h-9 w-9"
-                >
-                  <Filter className="h-4 w-4" />
-                </Button>
+              <div className="relative w-full sm:max-w-sm">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search action, entity, or ID..."
+                  className="pl-9 h-9"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
               </div>
             </div>
             <CardDescription>

@@ -24,7 +24,7 @@ interface AnalyticsLayoutProps {
   description: string;
 }
 
-/** Live analytics routes only — Coming Soon pages stay out of nav (Phase 0). */
+/** Live analytics routes shown in the analytics sub-nav. */
 const navItems = [
   { href: "/analytics", label: "Overview", icon: LayoutDashboard },
   { href: "/analytics/defects", label: "Exceptions", icon: AlertTriangle },

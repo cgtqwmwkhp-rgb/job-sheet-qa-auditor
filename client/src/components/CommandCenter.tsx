@@ -192,12 +192,6 @@ export function CommandCenter() {
               <AlertTriangle className="mr-2 h-4 w-4" />
               <span>Defect Analysis</span>
             </CommandItem>
-            <CommandItem
-              onSelect={() => runCommand(() => setLocation("/analytics/ai"))}
-            >
-              <BarChart2 className="mr-2 h-4 w-4" />
-              <span>AI Analyst</span>
-            </CommandItem>
           </CommandGroup>
         </CommandList>
       </CommandDialog>
