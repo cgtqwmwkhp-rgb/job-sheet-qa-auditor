@@ -303,7 +303,11 @@ describe("buildSelectionMarkFindings confidence gate", () => {
     expect(s2).toHaveLength(1);
     expect(s2[0].reasonCode).toBe("LOW_CONFIDENCE");
     expect(s2[0].normalisedSnippet).toBe("UNREADABLE");
-    expect(findings.some(f => f.reasonCode === "LOW_CONFIDENCE" && f.normalisedSnippet === "Ok")).toBe(false);
+    expect(
+      findings.some(
+        f => f.reasonCode === "LOW_CONFIDENCE" && f.normalisedSnippet === "Ok"
+      )
+    ).toBe(false);
   });
 
   it("does not emit findings for passed Ok/Adv/N/A marks", () => {

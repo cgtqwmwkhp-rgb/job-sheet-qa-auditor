@@ -136,7 +136,13 @@ describe("selectionMarks edge cases", () => {
     expect(findings.some(f => f.normalisedSnippet === "Fail")).toBe(true);
     expect(findings.some(f => f.normalisedSnippet === "UNREADABLE")).toBe(true);
     expect(findings.some(f => f.normalisedSnippet === "Ok")).toBe(false);
-    expect(findings.every(f => f.reasonCode !== "LOW_CONFIDENCE" || f.normalisedSnippet === "UNREADABLE")).toBe(true);
+    expect(
+      findings.every(
+        f =>
+          f.reasonCode !== "LOW_CONFIDENCE" ||
+          f.normalisedSnippet === "UNREADABLE"
+      )
+    ).toBe(true);
     expect(hasBlockingFailMarks(artifact)).toBe(true);
     const reconciled = reconcileSelectionMarksWithJudgment([], artifact);
     expect(reconciled.length).toBe(findings.length);
