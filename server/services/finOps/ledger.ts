@@ -11,10 +11,7 @@
  */
 
 import { desc } from "drizzle-orm";
-import {
-  apiCostEvents,
-  type ApiCostEventRow,
-} from "../../../drizzle/schema";
+import { apiCostEvents, type ApiCostEventRow } from "../../../drizzle/schema";
 import { getDb } from "../../db";
 import { estimateTokenCostUsd } from "./pricing";
 import { deriveToolId, toolDisplayLabel } from "./toolLabels";

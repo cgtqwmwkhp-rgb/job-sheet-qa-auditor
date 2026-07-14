@@ -116,7 +116,9 @@ async function startServer() {
   try {
     const costHydrated = await hydrateApiCostLedgerFromDb();
     if (costHydrated > 0) {
-      console.log(`[FinOps] Boot hydrate restored ${costHydrated} cost event(s)`);
+      console.log(
+        `[FinOps] Boot hydrate restored ${costHydrated} cost event(s)`
+      );
     }
   } catch (error) {
     console.warn("[FinOps] Boot hydrate skipped:", error);
