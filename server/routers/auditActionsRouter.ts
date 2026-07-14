@@ -92,8 +92,7 @@ function createDbDeps(tx?: DbClient): AuditActionDeps {
     },
     updateFindingResolution: (id, data) =>
       db.updateFindingResolution(id, data, tx),
-    updateFindingSnippet: (id, data) =>
-      db.updateFindingSnippet(id, data, tx),
+    updateFindingSnippet: (id, data) => db.updateFindingSnippet(id, data, tx),
     getAuditResult: async id => {
       const row = await db.getAuditResultById(id);
       if (!row) return undefined;
