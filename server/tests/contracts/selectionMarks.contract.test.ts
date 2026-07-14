@@ -287,7 +287,7 @@ describe("buildSelectionMarkFindings confidence gate", () => {
     expect(findings).toHaveLength(0);
   });
 
-  it("mixed: only high-confidence Fails produce S1", () => {
+  it("mixed: only high-confidence Fails produce S1; UNREADABLE gets LOW_CONFIDENCE", () => {
     const rows = [
       makeRow({ rowIndex: 0, choice: "Fail", confidence: 40 }),
       makeRow({ rowIndex: 1, choice: "Fail", confidence: 90 }),
@@ -297,12 +297,36 @@ describe("buildSelectionMarkFindings confidence gate", () => {
     const findings = buildSelectionMarkFindings(rows);
     const s1 = findings.filter(f => f.severity === "S1");
     const s2 = findings.filter(f => f.severity === "S2");
-    const s3 = findings.filter(f => f.severity === "S3");
     expect(s1).toHaveLength(1);
     expect(s1[0].normalisedSnippet).toBe("Fail");
     expect(s1[0].confidence).toBe(90);
     expect(s2).toHaveLength(1);
-    expect(s3).toHaveLength(1);
+    expect(s2[0].reasonCode).toBe("LOW_CONFIDENCE");
+    expect(s2[0].normalisedSnippet).toBe("UNREADABLE");
+    expect(findings.some(f => f.reasonCode === "LOW_CONFIDENCE" && f.normalisedSnippet === "Ok")).toBe(false);
+  });
+
+  it("does not emit findings for passed Ok/Adv/N/A marks", () => {
+    for (const choice of ["Ok", "Adv", "N/A"] as const) {
+      const findings = buildSelectionMarkFindings([
+        makeRow({ choice, confidence: 99 }),
+      ]);
+      expect(findings).toHaveLength(0);
+    }
+  });
+
+  it("never stamps Ok/Adv/N/A with LOW_CONFIDENCE", () => {
+    const rows = [
+      makeRow({ rowIndex: 0, choice: "Ok", confidence: 95 }),
+      makeRow({ rowIndex: 1, choice: "Adv", confidence: 92 }),
+      makeRow({ rowIndex: 2, choice: "N/A", confidence: 88 }),
+      makeRow({ rowIndex: 3, choice: "Fail", confidence: 90 }),
+      makeRow({ rowIndex: 4, choice: "UNREADABLE", confidence: 30 }),
+    ];
+    const findings = buildSelectionMarkFindings(rows);
+    const lowConf = findings.filter(f => f.reasonCode === "LOW_CONFIDENCE");
+    expect(lowConf).toHaveLength(1);
+    expect(lowConf[0].normalisedSnippet).toBe("UNREADABLE");
   });
 
   it("threshold constant matches countHighConfidenceFailMarks default", () => {
