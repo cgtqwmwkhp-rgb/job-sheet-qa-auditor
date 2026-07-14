@@ -140,6 +140,20 @@ describe("Audit Actions Contract (PR-10)", () => {
       expect(content).toContain("previousResolutionStatus");
     });
 
+    it("auditActionsRouter wraps compliance mutations in DB transactions", () => {
+      const routerPath = path.resolve(
+        __dirname,
+        "../../routers/auditActionsRouter.ts"
+      );
+      const dbPath = path.resolve(__dirname, "../../db.ts");
+      const router = fs.readFileSync(routerPath, "utf-8");
+      const dbSource = fs.readFileSync(dbPath, "utf-8");
+      expect(router).toContain("runAuditAction");
+      expect(router).toContain("withTransaction");
+      expect(router).toContain("required: true");
+      expect(dbSource).toContain("export async function runTransaction");
+    });
+
     it("AuditResults wires Flag and Override handlers", () => {
       const pagePath = path.resolve(
         __dirname,

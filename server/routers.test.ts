@@ -112,6 +112,11 @@ vi.mock("./db", () => ({
     .fn()
     .mockResolvedValue([{ id: 1, action: "LOGIN", userId: 1 }]),
   logAction: vi.fn().mockResolvedValue(undefined),
+  runTransaction: vi
+    .fn()
+    .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({})
+    ),
   getEngineerAnalyticsDocuments: vi.fn().mockResolvedValue([
     {
       technicianId: 1,
