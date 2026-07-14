@@ -14,10 +14,7 @@ export const TRAINING_REASON_CODES = [
 
 export type TrainingReasonCode = (typeof TRAINING_REASON_CODES)[number];
 
-export const TRAINING_SIGNAL_TYPES = [
-  "field_correction",
-  "override",
-] as const;
+export const TRAINING_SIGNAL_TYPES = ["field_correction", "override"] as const;
 
 export type TrainingSignalType = (typeof TRAINING_SIGNAL_TYPES)[number];
 
