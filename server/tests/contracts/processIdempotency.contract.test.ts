@@ -6,6 +6,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import {
   PROCESS_OCR_SCOPE,
   buildProcessOcrIdempotencyKey,
@@ -90,6 +92,46 @@ describe("Process OCR idempotency (PR-OPS-IDEMPOTENT)", () => {
         action: "dedupe",
         reason: "already_processed",
         reusedFromJobSheetId: 11,
+      });
+    });
+
+    it("rejects primary process when the same sheet is already completed", async () => {
+      const decision = await resolveProcessIdempotency({
+        jobSheetId: 24,
+        status: "completed",
+        contentHash: "00112233",
+        lookup: {
+          findInFlightByContentHash: async () => {
+            throw new Error("should not lookup when sheet already processed");
+          },
+          findProcessedByContentHash: async () => {
+            throw new Error("should not lookup when sheet already processed");
+          },
+        },
+      });
+
+      expect(decision).toMatchObject({
+        action: "dedupe",
+        reason: "same_sheet_already_processed",
+        reusedFromJobSheetId: 24,
+      });
+    });
+
+    it("rejects primary process when the same sheet is in review_queue", async () => {
+      const decision = await resolveProcessIdempotency({
+        jobSheetId: 25,
+        status: "review_queue",
+        contentHash: "44556677",
+        lookup: {
+          findInFlightByContentHash: async () => null,
+          findProcessedByContentHash: async () => null,
+        },
+      });
+
+      expect(decision).toMatchObject({
+        action: "dedupe",
+        reason: "same_sheet_already_processed",
+        reusedFromJobSheetId: 25,
       });
     });
 
@@ -217,6 +259,17 @@ describe("Process OCR idempotency (PR-OPS-IDEMPOTENT)", () => {
         jobId: undefined,
         status: "processing",
       });
+    });
+  });
+
+  describe("router wiring", () => {
+    it("surfaces CONFLICT when the same sheet was already processed", () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), "server/routers.ts"),
+        "utf-8"
+      );
+      expect(content).toContain("same_sheet_already_processed");
+      expect(content).toContain("Use Reprocess on the audit page");
     });
   });
 });

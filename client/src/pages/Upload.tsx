@@ -42,6 +42,7 @@ import {
 } from "@/hooks/useProcessingWatch";
 import { isActiveJobSheetStatus } from "@shared/processingProgress";
 import { cn } from "@/lib/utils";
+import { handleProcessJobSheetOutcome } from "@/lib/processJobSheetFeedback";
 
 interface IntakeFeedback {
   fileName: string;
@@ -184,10 +185,21 @@ export default function UploadPage() {
       void (async () => {
         for (const item of uploaded) {
           try {
-            await processMutation.mutateAsync({ id: item.id });
+            const result = await processMutation.mutateAsync({ id: item.id });
+            handleProcessJobSheetOutcome({
+              result,
+              fileName: item.fileName,
+              onDeduped: message => toast.info(message),
+              onError: message => toast.error(message),
+            });
           } catch (error) {
             console.error(`Failed to process job sheet ${item.id}:`, error);
-            toast.error(`Failed to process ${item.fileName}`);
+            handleProcessJobSheetOutcome({
+              error,
+              fileName: item.fileName,
+              onDeduped: message => toast.info(message),
+              onError: message => toast.error(message),
+            });
           }
         }
         setProcessingIds([]);
@@ -207,12 +219,25 @@ export default function UploadPage() {
     setProcessingIds(prev => [...prev, id]);
     watchJobSheetsProcessing([{ id, fileName }]);
     try {
-      await processMutation.mutateAsync({ id });
-      refetch();
-      utils.stats.dashboard.invalidate();
+      const result = await processMutation.mutateAsync({ id });
+      const outcome = handleProcessJobSheetOutcome({
+        result,
+        fileName,
+        onDeduped: message => toast.info(message),
+        onError: message => toast.error(message),
+      });
+      if (outcome !== "error") {
+        refetch();
+        utils.stats.dashboard.invalidate();
+      }
     } catch (error) {
       console.error("Processing error:", error);
-      toast.error("Failed to process document. Please try again.");
+      handleProcessJobSheetOutcome({
+        error,
+        fileName,
+        onDeduped: message => toast.info(message),
+        onError: message => toast.error(message),
+      });
     } finally {
       setProcessingIds(prev => prev.filter(i => i !== id));
     }
