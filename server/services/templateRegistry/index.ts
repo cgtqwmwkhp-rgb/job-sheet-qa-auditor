@@ -9,6 +9,7 @@
 export * from "./types";
 export * from "./registryService";
 export * from "./activationGates";
+export * from "./syncRoiFieldsIntoSpec";
 export * from "./selectionTraceWriter";
 export * from "./fixtureRunner";
 export * from "./importPack";

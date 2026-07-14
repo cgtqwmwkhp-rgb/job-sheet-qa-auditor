@@ -21,6 +21,7 @@ import type {
   FieldSpec,
   RuleSpec,
 } from "../templateRegistry/types";
+import { syncRoiFieldsIntoSpec } from "../templateRegistry/syncRoiFieldsIntoSpec";
 import {
   createStudioStarterSelection,
   createStudioStarterSpec,
@@ -585,18 +586,21 @@ export async function proposeFromSample(input: {
       })),
   };
 
-  const proposedSpec: SpecJson = {
-    name,
-    version: "0.1.0",
-    fields: acceptedFields,
-    rules: acceptedRules,
-    metadata: {
-      source: "template-studio-propose",
-      layoutAvailable,
-      geminiUsed,
-      hasChecklistGrid,
+  const proposedSpec: SpecJson = syncRoiFieldsIntoSpec(
+    {
+      name,
+      version: "0.1.0",
+      fields: acceptedFields,
+      rules: acceptedRules,
+      metadata: {
+        source: "template-studio-propose",
+        layoutAvailable,
+        geminiUsed,
+        hasChecklistGrid,
+      },
     },
-  };
+    acceptedRoi
+  );
 
   const proposedSelection = createStudioStarterSelection(requiredTokensAny);
   proposedSelection.optionalTokens = optionalTokens;

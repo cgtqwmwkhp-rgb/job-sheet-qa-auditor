@@ -27,6 +27,10 @@ const RULES: Array<{ title: string; body: string }> = [
     body: "When you + Add a custom label, it is saved for the next template and added to this template's Fields list under the same field id — reuse it so extraction and thresholds stay consistent.",
   },
   {
+    title: "Drawing a label creates the Field",
+    body: "Selecting or drawing a standard Draw label (Customer Name, Asset Safe To Use?, etc.) also adds that field to Fields & rules. You should not see ORPHAN_ROI for correctly named boxes after Save / opening Activation gates.",
+  },
+  {
     title: "One field id — never invent a parallel label",
     body: "Draw labels must use the exact field id from Suggest fields / Fields & rules (e.g. serialNumber, not Serial_Number). Duplicates break extraction and thresholds.",
   },

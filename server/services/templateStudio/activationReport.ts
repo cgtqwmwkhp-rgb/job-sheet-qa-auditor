@@ -17,6 +17,8 @@ import {
   hasFixturePack,
   listTemplateFingerprints,
   runFixtureMatrix,
+  syncRoiFieldsIntoSpec,
+  updateDraftVersion,
   type FixtureRunReport,
 } from "../templateRegistry";
 import { getDryRunGateStatus, type DryRunReport } from "./dryRunAudit";
@@ -48,10 +50,27 @@ export interface ActivationReport {
 export async function buildActivationReport(
   versionId: number
 ): Promise<ActivationReport> {
-  const version = getTemplateVersion(versionId);
+  let version = getTemplateVersion(versionId);
   if (!version) {
     throw new Error(`Version not found: ${versionId}`);
   }
+
+  // Heal drafts where boxes were drawn with correct label ids but Fields
+  // were never created (root cause of false ORPHAN_ROI warnings).
+  if (!version.isActive) {
+    const synced = syncRoiFieldsIntoSpec(version.specJson, version.roiJson);
+    if (synced !== version.specJson) {
+      try {
+        version = updateDraftVersion(versionId, {
+          specJson: synced,
+          changeNotes: "Auto-sync Fields from ROI labels",
+        });
+      } catch {
+        /* leave report on unsynced snapshot */
+      }
+    }
+  }
+
   const template = getTemplate(version.templateId);
   const templateSlug = template?.templateId ?? `template-${version.templateId}`;
 

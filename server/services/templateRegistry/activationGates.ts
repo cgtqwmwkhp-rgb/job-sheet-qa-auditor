@@ -91,6 +91,23 @@ export function regionCoversField(region: RoiRegion, fieldId: string): boolean {
   if (fieldId === 'complianceTickboxes') {
     return region.name === 'tickboxBlock' || region.fields?.includes('complianceTickboxes') === true;
   }
+  // Next Service Date on JSR is the usual stand-in for expiryDate
+  if (fieldId === 'expiryDate') {
+    return (
+      region.name === 'expiryDate' ||
+      region.name === 'nextServiceDate' ||
+      region.fields?.includes('expiryDate') === true ||
+      region.fields?.includes('nextServiceDate') === true
+    );
+  }
+  if (fieldId === 'nextServiceDate') {
+    return (
+      region.name === 'nextServiceDate' ||
+      region.name === 'expiryDate' ||
+      region.fields?.includes('nextServiceDate') === true ||
+      region.fields?.includes('expiryDate') === true
+    );
+  }
   return false;
 }
 
@@ -230,18 +247,25 @@ export function checkActivationPreconditions(
       }
     }
 
-    // Orphan ROIs (warn)
+    // Orphan ROIs (warn) — structural bands + field-linked names are fine
     for (const region of regions) {
       const covered =
         specFieldIds.has(region.name) ||
         (region.fields ?? []).some(f => specFieldIds.has(f)) ||
         region.name === 'header' ||
         region.name === 'tickboxBlock' ||
+        region.name === 'complianceTickboxes' ||
         region.name === 'signatureBlock' ||
+        region.name === 'completionDetails' ||
         region.name === 'workDescription' ||
         region.name === 'partsUsed' ||
+        region.name === 'partsRequired' ||
         region.name === 'engineerSignature' ||
-        region.name === 'customerSignature';
+        region.name === 'customerSignature' ||
+        // Alias: next service covers recommended expiryDate linkage
+        (region.name === 'nextServiceDate' &&
+          (specFieldIds.has('nextServiceDate') ||
+            specFieldIds.has('expiryDate')));
       if (!covered) {
         warnings.push({
           code: 'ORPHAN_ROI',

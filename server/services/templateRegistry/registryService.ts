@@ -20,6 +20,7 @@ import {
   checkActivationPreconditions,
   formatActivationError,
 } from "./activationGates";
+import { syncRoiFieldsIntoSpec } from "./syncRoiFieldsIntoSpec";
 import { checkFixturesForActivation, hasFixturePack } from "./fixtureRunner";
 import {
   detectTemplateCollisions,
@@ -486,6 +487,8 @@ export function updateVersionRoi(
   }
 
   version.roiJson = roiJson;
+  // Standard Draw labels must create matching spec fields (GIGO parity)
+  version.specJson = syncRoiFieldsIntoSpec(version.specJson, roiJson);
   version.hashSha256 = computeVersionHash(
     version.specJson,
     version.selectionConfigJson,
@@ -529,6 +532,9 @@ export function updateDraftVersion(
   }
   if (input.roiJson !== undefined) version.roiJson = input.roiJson;
   if (input.changeNotes !== undefined) version.changeNotes = input.changeNotes;
+
+  // Whenever ROI is present, keep Fields list aligned with drawn labels
+  version.specJson = syncRoiFieldsIntoSpec(version.specJson, version.roiJson);
 
   version.hashSha256 = computeVersionHash(
     version.specJson,

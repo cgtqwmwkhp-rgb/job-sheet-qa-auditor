@@ -205,12 +205,17 @@ function slugifyLabel(label: string): string {
 }
 
 function fieldsForTool(tool: string): string[] {
-  if (tool === "tickboxBlock") return ["complianceTickboxes"];
+  if (tool === "tickboxBlock" || tool === "complianceTickboxes") {
+    return ["complianceTickboxes"];
+  }
   if (tool === "engineerSignature") return ["engineerSignOff"];
   if (tool === "customerSignature") return ["customerSignature"];
   if (tool === "signatureBlock") {
     return ["engineerSignOff", "customerSignature"];
   }
+  if (tool === "nextServiceDate") return ["nextServiceDate", "expiryDate"];
+  if (tool === "expiryDate") return ["expiryDate", "nextServiceDate"];
+  if (tool === "header" || tool === "completionDetails") return [];
   return [tool];
 }
 
@@ -459,27 +464,69 @@ export function RoiEditorV2({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Persist label to memory + current template fields (GIGO consistency). */
-  const integrateCustomLabel = useCallback(
+  /**
+   * Bind a Draw label into the live template Fields list.
+   * Standard and custom labels both need this — otherwise activation reports
+   * ORPHAN_ROI even when the box was drawn with the correct tool id.
+   */
+  const bindLabelToTemplate = useCallback(
     (entry: {
       id: string;
       label: string;
       color: string;
       critical: boolean;
       type?: string;
+      /** Persist to cross-template memory (custom labels) */
+      remember?: boolean;
     }) => {
-      rememberRoiLabel(entry);
+      if (entry.remember !== false && !STANDARD_ROI_TYPES.some(t => t.id === entry.id)) {
+        rememberRoiLabel(entry);
+      }
       if (!onSpecJsonChange) return;
-      const next = ensureSpecField(specJsonText, {
-        field: entry.id,
-        label: entry.label,
-        type: entry.type ?? "string",
-        required: entry.critical,
-      });
-      if (next) onSpecJsonChange(next);
+      let text = specJsonText;
+      const fieldIds = fieldsForTool(entry.id);
+      let changed: string | null = null;
+      for (const fieldId of fieldIds) {
+        const meta =
+          allRoiTypes.find(t => t.id === fieldId) ??
+          (fieldId === entry.id ? entry : null);
+        const next = ensureSpecField(text, {
+          field: fieldId,
+          label: meta?.label ?? fieldId,
+          type: entry.type ?? "string",
+          required:
+            "critical" in (meta ?? {})
+              ? Boolean((meta as { critical?: boolean }).critical)
+              : entry.critical,
+        });
+        if (next) {
+          text = next;
+          changed = next;
+        }
+      }
+      // Also ensure the tool id itself when it is a real field (not structural)
+      if (
+        entry.id !== "header" &&
+        entry.id !== "signatureBlock" &&
+        entry.id !== "tickboxBlock" &&
+        entry.id !== "completionDetails" &&
+        !fieldIds.includes(entry.id)
+      ) {
+        const next = ensureSpecField(text, {
+          field: entry.id,
+          label: entry.label,
+          type: entry.type ?? "string",
+          required: entry.critical,
+        });
+        if (next) changed = next;
+      }
+      if (changed) onSpecJsonChange(changed);
     },
-    [onSpecJsonChange, specJsonText]
+    [onSpecJsonChange, specJsonText, allRoiTypes]
   );
+
+  /** @deprecated name kept for call sites — always binds into spec fields */
+  const integrateCustomLabel = bindLabelToTemplate;
   // Use provided PDF data or local upload
   const effectivePdfSource = pdfData ?? localPdfData ?? pdfUrl ?? undefined;
 
@@ -688,19 +735,19 @@ export function RoiEditorV2({
       // Keep labels panel open after first successful draw so next labels are obvious
       setDrawPaletteOpen(true);
 
-      // Drawing a remembered/custom label keeps field id in the live template spec
+      // Any successful draw must add matching Fields entries (standard + custom)
       const toolMeta = allRoiTypes.find(t => t.id === tool);
-      const isStandard = STANDARD_ROI_TYPES.some(t => t.id === tool);
-      if (toolMeta && !isStandard) {
-        integrateCustomLabel({
+      if (toolMeta) {
+        bindLabelToTemplate({
           id: toolMeta.id,
           label: toolMeta.label,
           color: toolMeta.color,
           critical: toolMeta.critical,
+          remember: !STANDARD_ROI_TYPES.some(t => t.id === tool),
         });
       }
     },
-    [clientToNorm, currentPage, allRoiTypes, integrateCustomLabel]
+    [clientToNorm, currentPage, allRoiTypes, bindLabelToTemplate]
   );
 
   /**
@@ -1201,21 +1248,20 @@ export function RoiEditorV2({
                     <TooltipTrigger asChild>
                       <button
                         type="button"
-                        onClick={() => {
-                          setCurrentTool(type.id);
-                          // Selecting a remembered/custom label binds it into this template
-                          if (
-                            !STANDARD_ROI_TYPES.some(t => t.id === type.id)
-                          ) {
-                            integrateCustomLabel({
+                          onClick={() => {
+                            setCurrentTool(type.id);
+                            // Selecting any label (standard or custom) binds Fields
+                            bindLabelToTemplate({
                               id: type.id,
                               label: type.label,
                               color: type.color,
                               critical: type.critical,
                               type: specMeta?.type ?? "string",
+                              remember: !STANDARD_ROI_TYPES.some(
+                                t => t.id === type.id
+                              ),
                             });
-                          }
-                        }}
+                          }}
                         disabled={readOnly}
                         aria-label={`${type.label}. ${guidance.summary} How to draw: ${guidance.howToDraw}`}
                         data-testid={`roi-draw-tool-${type.id}`}
