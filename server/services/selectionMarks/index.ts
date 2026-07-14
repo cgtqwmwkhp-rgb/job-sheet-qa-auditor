@@ -494,7 +494,9 @@ export function voteChecklistRows(
 
 /**
  * Convert visual checklist rows into first-class audit findings.
- * Fail → S1 OUT_OF_POLICY; UNREADABLE → S2 LOW_CONFIDENCE; Ok/Adv/N/A → S3 passed.
+ * Fail → S1 OUT_OF_POLICY; UNREADABLE → S2 LOW_CONFIDENCE.
+ * Ok/Adv/N/A are passed/advisory — captured on the artifact only (no finding;
+ * reasonCode stays absent so confidence analytics are not polluted).
  */
 export function buildSelectionMarkFindings(
   rows: SelectionMarkRow[]
@@ -549,20 +551,7 @@ export function buildSelectionMarkFindings(
       continue;
     }
 
-    findings.push({
-      ruleId: "SELECTION_MARKS",
-      fieldName,
-      severity: "S3",
-      reasonCode: "LOW_CONFIDENCE",
-      rawSnippet: label,
-      normalisedSnippet: row.choice,
-      confidence: row.confidence,
-      pageNumber: row.pageNumber,
-      boundingBox: bbox,
-      whyItMatters: `Visual checklist marked ${row.choice} for "${label}" (Azure DI selectionMarks).`,
-      suggestedFix:
-        "No action required unless the mark looks incorrect on the PDF.",
-    });
+    // Ok / Adv / N/A — healthy marks; omit findings (no defect reason code).
   }
   return findings;
 }
