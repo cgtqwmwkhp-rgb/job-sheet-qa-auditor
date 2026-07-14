@@ -1,9 +1,9 @@
 /**
- * Shadow / champion-challenger Contract Tests (PR-21)
+ * Shadow / champion-challenger Contract Tests (PR-21 / PR-AI-11)
  *
  * Fixtures/mocks only — no live OCR, LLM, or DB.
  * Verifies feature flags, comparison metrics, canary sampling,
- * fail-soft evaluation, and disagreement reporting.
+ * fail-soft evaluation, disagreement reporting, and pass-rate pp deltas.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -13,13 +13,17 @@ import {
   REAL_MODEL_FEATURE_FLAG,
   isShadowChallengerEnabled,
   isShadowRealModelEnabled,
+  isShadowAdvisoryMode,
   getShadowChallengerConfig,
   shouldApplyCanary,
   DEFAULT_SHADOW_CONFIG,
+  FLAGOPS_SHADOW_MEASUREMENT_ENV,
   evaluateShadowChallenger,
   buildShadowComparison,
   buildDisagreementReport,
   buildShadowChallengerSummary,
+  buildPassRateMeasurement,
+  DEFAULT_MEASUREMENT_MIN_SAMPLES,
   toJudgmentSnapshot,
   compareExtractedFields,
   extractShadowComparisonsFromReports,
@@ -109,6 +113,7 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
   const prevRealModelId = process.env.SHADOW_REAL_MODEL_ID;
   const prevLlmProvider = process.env.LLM_PROVIDER;
   const prevGeminiApiKey = process.env.GEMINI_API_KEY;
+  const prevMinSamples = process.env.SHADOW_MEASUREMENT_MIN_SAMPLES;
 
   beforeEach(() => {
     delete process.env[FEATURE_FLAG];
@@ -119,6 +124,7 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
     delete process.env.SHADOW_REAL_MODEL_ID;
     delete process.env.LLM_PROVIDER;
     delete process.env.GEMINI_API_KEY;
+    delete process.env.SHADOW_MEASUREMENT_MIN_SAMPLES;
   });
 
   afterEach(() => {
@@ -140,6 +146,9 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
     else process.env.LLM_PROVIDER = prevLlmProvider;
     if (prevGeminiApiKey === undefined) delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = prevGeminiApiKey;
+    if (prevMinSamples === undefined)
+      delete process.env.SHADOW_MEASUREMENT_MIN_SAMPLES;
+    else process.env.SHADOW_MEASUREMENT_MIN_SAMPLES = prevMinSamples;
   });
 
   describe("feature flag", () => {
@@ -185,6 +194,23 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
       const cfg = getShadowChallengerConfig();
       expect(cfg.enabled).toBe(false);
       expect(cfg.mode).toBe("off");
+    });
+
+    it("exposes FlagOps measurement env constants for advisory rollout", () => {
+      expect(FLAGOPS_SHADOW_MEASUREMENT_ENV).toEqual({
+        FEATURE_SHADOW_CHALLENGER: "true",
+        SHADOW_MODE: "shadow",
+        SHADOW_CANARY_PERCENT: "0",
+      });
+    });
+
+    it("reports advisory mode only when enabled in shadow", () => {
+      expect(isShadowAdvisoryMode()).toBe(false);
+      process.env[FEATURE_FLAG] = "true";
+      process.env.SHADOW_MODE = "shadow";
+      expect(isShadowAdvisoryMode()).toBe(true);
+      process.env.SHADOW_MODE = "canary";
+      expect(isShadowAdvisoryMode()).toBe(false);
     });
   });
 
@@ -287,6 +313,72 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
       expect(report.resultDisagreementCount).toBe(2);
       expect(report.byOutcomePair["PASS->FAIL"]).toBe(2);
       expect(report.byOutcomePair["PASS->PASS"]).toBe(1);
+      expect(report.passRate.championPassRate).toBe(100);
+      expect(report.passRate.challengerPassRate).toBeCloseTo(33.33, 2);
+      expect(report.passRate.passRatePpDelta).toBeCloseTo(-66.67, 2);
+      expect(report.passRate.advisoryOnly).toBe(true);
+    });
+  });
+
+  describe("pass-rate pp delta measurement", () => {
+    function mkOutcome(
+      champion: "PASS" | "FAIL" | "REVIEW_QUEUE",
+      challenger: "PASS" | "FAIL" | "REVIEW_QUEUE",
+      createdAt: string
+    ): ShadowComparison {
+      return buildShadowComparison({
+        mode: "shadow",
+        strategy: "rule_based",
+        champion: toJudgmentSnapshot({
+          overallResult: champion,
+          score: champion === "PASS" ? 90 : 20,
+          model: "c",
+          findings: [],
+          extractedFields: {},
+        }),
+        challenger: toJudgmentSnapshot({
+          overallResult: challenger,
+          score: challenger === "PASS" ? 90 : 20,
+          model: "t",
+          findings: [],
+          extractedFields: {},
+        }),
+        latencyMs: 1,
+        canaryApplied: false,
+        sampled: true,
+        createdAt,
+      });
+    }
+
+    it("computes champion vs challenger pass-rate pp deltas", () => {
+      process.env.SHADOW_MEASUREMENT_MIN_SAMPLES = "4";
+      const comparisons = [
+        mkOutcome("PASS", "PASS", "2026-07-01T00:00:00.000Z"),
+        mkOutcome("PASS", "FAIL", "2026-07-02T00:00:00.000Z"),
+        mkOutcome("FAIL", "PASS", "2026-07-03T00:00:00.000Z"),
+        mkOutcome("FAIL", "PASS", "2026-07-04T00:00:00.000Z"),
+      ];
+      const passRate = buildPassRateMeasurement(comparisons);
+      expect(passRate.sampleSize).toBe(4);
+      expect(passRate.minSamplesRequired).toBe(4);
+      expect(passRate.measurementReady).toBe(true);
+      expect(passRate.championPassRate).toBe(50);
+      expect(passRate.challengerPassRate).toBe(75);
+      expect(passRate.passRatePpDelta).toBe(25);
+      expect(passRate.championFailRate).toBe(50);
+      expect(passRate.challengerFailRate).toBe(25);
+      expect(passRate.failRatePpDelta).toBe(-25);
+      expect(passRate.advisoryOnly).toBe(true);
+    });
+
+    it("marks measurement not ready below min sample size", () => {
+      const comparisons = [
+        mkOutcome("PASS", "PASS", "2026-07-01T00:00:00.000Z"),
+      ];
+      const passRate = buildPassRateMeasurement(comparisons);
+      expect(passRate.minSamplesRequired).toBe(DEFAULT_MEASUREMENT_MIN_SAMPLES);
+      expect(passRate.measurementReady).toBe(false);
+      expect(passRate.passRatePpDelta).toBe(0);
     });
   });
 
@@ -384,8 +476,9 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
       expect(champion.overallResult).toBe("FAIL");
     });
 
-    it("fails soft when real-model flag is enabled without model credentials", async () => {
+    it("falls back to rule_based in shadow mode when real model has no credentials", async () => {
       process.env[FEATURE_FLAG] = "true";
+      process.env.SHADOW_MODE = "shadow";
       process.env[REAL_MODEL_FEATURE_FLAG] = "true";
       const champion = championPass();
       const result = await evaluateShadowChallenger({
@@ -394,6 +487,29 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
         pageCount: 1,
         champion,
         jobSheetId: 27,
+      });
+      expect(result.comparison).not.toBeNull();
+      expect(result.comparison!.strategy).toBe("rule_based");
+      expect(result.comparison!.challenger.model).toBe(
+        "shadow-challenger-rule-based"
+      );
+      expect(result.servedAnalysis).toBeNull();
+      expect(result.canaryApplied).toBe(false);
+      expect(champion.overallResult).toBe("PASS");
+    });
+
+    it("fail-softs (no comparison) in canary mode when real model has no credentials", async () => {
+      process.env[FEATURE_FLAG] = "true";
+      process.env.SHADOW_MODE = "canary";
+      process.env.SHADOW_CANARY_PERCENT = "100";
+      process.env[REAL_MODEL_FEATURE_FLAG] = "true";
+      const champion = championPass();
+      const result = await evaluateShadowChallenger({
+        extractedText: RICH_TEXT,
+        goldSpec: SAMPLE_SPEC,
+        pageCount: 1,
+        champion,
+        jobSheetId: 28,
       });
       expect(result.comparison).toBeNull();
       expect(result.servedAnalysis).toBeNull();
@@ -445,6 +561,11 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
       expect(summary.report.totalComparisons).toBe(1);
       expect(summary.report.disagreementCount).toBe(1);
       expect(summary.asOf).toBe("2026-07-09T02:00:00.000Z");
+      expect(summary.passRate).toEqual(summary.report.passRate);
+      expect(summary.passRate.championPassRate).toBe(100);
+      expect(summary.passRate.challengerPassRate).toBe(0);
+      expect(summary.passRate.passRatePpDelta).toBe(-100);
+      expect(summary.strategy).toBe("rule_based");
     });
   });
 });

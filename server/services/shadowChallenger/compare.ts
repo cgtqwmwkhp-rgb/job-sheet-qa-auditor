@@ -1,5 +1,5 @@
 /**
- * Shadow comparison + disagreement reporting (PR-21)
+ * Shadow comparison + disagreement reporting (PR-21 / PR-AI-11)
  */
 
 import type {
@@ -11,6 +11,7 @@ import type {
   ChallengerStrategy,
 } from "./types";
 import { SHADOW_COMPARISON_SCHEMA_VERSION } from "./types";
+import { buildPassRateMeasurement } from "./measurement";
 
 export function fingerprintFinding(f: {
   ruleId: string;
@@ -223,6 +224,7 @@ export function buildDisagreementReport(
     byOutcomePair,
     topFieldDisagreements,
     recentDisagreements,
+    passRate: buildPassRateMeasurement(comparisons),
   };
 }
 

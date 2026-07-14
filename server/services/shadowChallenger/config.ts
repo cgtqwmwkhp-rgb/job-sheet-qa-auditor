@@ -1,5 +1,5 @@
 /**
- * Shadow / champion-challenger config (PR-21)
+ * Shadow / champion-challenger config (PR-21 / PR-AI-11)
  *
  * Feature flags (default OFF for safe rollout):
  * - FEATURE_SHADOW_CHALLENGER=true → enable shadow or canary
@@ -7,6 +7,17 @@
  * - SHADOW_MODE=shadow|canary|off (default shadow when flag on)
  * - SHADOW_CANARY_PERCENT=0–100 (default 0; only used in canary mode)
  * - SHADOW_REAL_MODEL_ID=gemini-2.0-flash (alternate model id)
+ * - SHADOW_MEASUREMENT_MIN_SAMPLES=30 (pp-delta readiness threshold)
+ *
+ * FlagOps measurement path (advisory only — do NOT edit azure-deploy from
+ * this lane; set on Container App / env):
+ *   FEATURE_SHADOW_CHALLENGER=true
+ *   SHADOW_MODE=shadow
+ *   SHADOW_CANARY_PERCENT=0
+ * Optional Gemini Flash challenger:
+ *   FEATURE_SHADOW_REAL_MODEL=true
+ *   SHADOW_REAL_MODEL_ID=gemini-2.0-flash
+ *   (requires GEMINI_API_KEY; falls back to rule_based in shadow mode)
  */
 
 import type { ChallengerStrategy, ShadowMode } from "./types";
@@ -14,6 +25,13 @@ import type { ChallengerStrategy, ShadowMode } from "./types";
 export const FEATURE_FLAG = "FEATURE_SHADOW_CHALLENGER";
 export const REAL_MODEL_FEATURE_FLAG = "FEATURE_SHADOW_REAL_MODEL";
 export const DEFAULT_SHADOW_REAL_MODEL_ID = "gemini-2.0-flash";
+
+/** Env values FlagOps should set for advisory pp-delta measurement. */
+export const FLAGOPS_SHADOW_MEASUREMENT_ENV = {
+  FEATURE_SHADOW_CHALLENGER: "true",
+  SHADOW_MODE: "shadow",
+  SHADOW_CANARY_PERCENT: "0",
+} as const;
 
 export interface ShadowChallengerConfig {
   enabled: boolean;
@@ -102,6 +120,15 @@ export function getShadowChallengerConfig(): ShadowChallengerConfig {
     realModelEnabled,
     realModelId,
   };
+}
+
+/**
+ * True when enabled in shadow (compare-only) mode — never serves challenger.
+ * This is the safe path for measuring pp deltas before canary.
+ */
+export function isShadowAdvisoryMode(config?: ShadowChallengerConfig): boolean {
+  const cfg = config ?? getShadowChallengerConfig();
+  return cfg.enabled && cfg.mode === "shadow";
 }
 
 /**
