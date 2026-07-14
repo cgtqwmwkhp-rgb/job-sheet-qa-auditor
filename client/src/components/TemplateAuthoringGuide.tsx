@@ -31,6 +31,14 @@ const RULES: Array<{ title: string; body: string }> = [
     body: "Draw labels must use the exact field id from Suggest fields / Fields & rules (e.g. serialNumber, not Serial_Number). Duplicates break extraction and thresholds.",
   },
   {
+    title: "Completion Details: one label per cell",
+    body: "For the Completion Details panel, use the standard labels (Service Completed?, All Works Completed?, Return Visit Needed?, Asset Safe To Use?, Compliance Type/Title, Job Duration, Overtime, Travel, Next Service Date). Box each question/label with its Yes/No or value — do not rely on one giant panel box alone.",
+  },
+  {
+    title: "Checklist columns = one Tickbox Block",
+    body: "Ok / Adv / Fail / N/A are columns inside one audit area, not separate labels. Select “Checklist grid (Ok/Adv/Fail/N/A)” and draw ONE box covering Task Description + all four columns + headers + ticks. Live audit reads selection marks from that full grid.",
+  },
+  {
     title: "Tickboxes: one block for the whole grid",
     body: "Draw a single tickboxBlock covering row requirement text + all four columns (Ok / Adv / Fail / N/A) and the column headers. Do not draw one ROI per column or per tick.",
   },

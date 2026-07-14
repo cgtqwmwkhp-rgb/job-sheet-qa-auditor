@@ -146,6 +146,72 @@ describe("suggestRoiFromLayoutEvidence (precision-first)", () => {
     expect(regions).toEqual([]);
   });
 
+  it("places Completion Details Yes/No and checklist-related labels from OCR lines", () => {
+    const regions = suggestRoiFromLayoutEvidence({
+      layoutAvailable: true,
+      hasChecklist: true,
+      selectionRows: [],
+      lines: [
+        {
+          pageNumber: 1,
+          content: "All Works Completed? No",
+          xPercent: 8,
+          yPercent: 30,
+          widthPercent: 28,
+          heightPercent: 1.4,
+        },
+        {
+          pageNumber: 1,
+          content: "Return Visit Needed? Yes",
+          xPercent: 50,
+          yPercent: 34,
+          widthPercent: 28,
+          heightPercent: 1.4,
+        },
+        {
+          pageNumber: 1,
+          content: "Asset Safe To Use? No",
+          xPercent: 50,
+          yPercent: 38,
+          widthPercent: 26,
+          heightPercent: 1.4,
+        },
+        {
+          pageNumber: 1,
+          content: "Compliance Type: Service - SB",
+          xPercent: 50,
+          yPercent: 22,
+          widthPercent: 30,
+          heightPercent: 1.4,
+        },
+        {
+          pageNumber: 1,
+          content: "Job Duration: 2.3",
+          xPercent: 8,
+          yPercent: 50,
+          widthPercent: 18,
+          heightPercent: 1.4,
+        },
+      ],
+    });
+
+    expect(regions.find(r => r.name === "allWorksCompleted")?.source).toBe(
+      "ocr-layout"
+    );
+    expect(regions.find(r => r.name === "returnVisitNeeded")?.source).toBe(
+      "ocr-layout"
+    );
+    expect(regions.find(r => r.name === "assetSafeToUse")?.source).toBe(
+      "ocr-layout"
+    );
+    expect(regions.find(r => r.name === "complianceType")?.source).toBe(
+      "ocr-layout"
+    );
+    expect(regions.find(r => r.name === "jobDuration")?.source).toBe(
+      "ocr-layout"
+    );
+  });
+
   it("places tyre tread, wheel pressure, and nut torque measurement ROIs", () => {
     const regions = suggestRoiFromLayoutEvidence({
       layoutAvailable: true,

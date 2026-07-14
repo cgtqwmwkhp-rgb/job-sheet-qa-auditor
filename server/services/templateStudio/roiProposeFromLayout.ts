@@ -147,6 +147,79 @@ const FIELD_LABEL_MATCHERS: Array<{
     re: /^hub\s*nut\s*torque\b/i,
     expand: "rowRight",
   },
+  {
+    name: "nextServiceDate",
+    fields: ["nextServiceDate", "expiryDate"],
+    re: /^next\s*service\s*date\b/i,
+    expand: "rowRight",
+  },
+  {
+    name: "complianceType",
+    fields: ["complianceType"],
+    re: /^compliance\s*type\b/i,
+    expand: "rowRight",
+  },
+  {
+    name: "complianceTitle",
+    fields: ["complianceTitle"],
+    re: /^compliance\s*title\b/i,
+    expand: "rowRight",
+  },
+  {
+    name: "serviceCompleted",
+    fields: ["serviceCompleted"],
+    re: /^service\s*completed\??\b/i,
+    expand: "rowRight",
+  },
+  {
+    name: "allWorksCompleted",
+    fields: ["allWorksCompleted"],
+    re: /^all\s*works?\s*completed\??\b/i,
+    expand: "rowRight",
+  },
+  {
+    name: "consumablesUsed",
+    fields: ["consumablesUsed"],
+    re: /^consumables?\s*used\??\b/i,
+    expand: "rowRight",
+  },
+  {
+    name: "additionalTasksComplete",
+    fields: ["additionalTasksComplete"],
+    re: /^additional\s*tasks?\s*complete\??\b/i,
+    expand: "rowRight",
+  },
+  {
+    name: "returnVisitNeeded",
+    fields: ["returnVisitNeeded"],
+    re: /^return\s*visit\s*(needed|required)\??\b/i,
+    expand: "rowRight",
+  },
+  {
+    name: "assetSafeToUse",
+    fields: ["assetSafeToUse"],
+    re: /^asset\s*safe\s*to\s*use\??\b/i,
+    expand: "rowRight",
+  },
+  {
+    name: "jobDuration",
+    fields: ["jobDuration"],
+    re: /^job\s*duration\b/i,
+    expand: "rowRight",
+  },
+  {
+    name: "overtime",
+    fields: ["overtime"],
+    re: /^overtime\b/i,
+    expand: "rowRight",
+  },
+  {
+    name: "travel",
+    fields: ["travel"],
+    re: /^travel\b/i,
+    reject: /travel\s*to|travelling/i,
+    expand: "rowRight",
+  },
 ];
 
 function clamp01(n: number): number {

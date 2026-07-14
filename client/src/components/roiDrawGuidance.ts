@@ -58,17 +58,18 @@ export const ROI_DRAW_GUIDANCE: Record<string, RoiDrawGuidance> = {
       "Box Expiry (or equivalent) label + date value together. Keep separate from the job Date ROI.",
   },
   tickboxBlock: {
-    summary: "Compliance checklist grid (Ok / Adv / Fail / N/A style).",
+    summary:
+      "Full compliance checklist grid: Task Description + Ok / Adv / Fail / N/A columns and ticks.",
     lookFor:
-      "Requirement rows on the left and four tick columns with headers Ok / Adv / Fail / N/A (or similar).",
+      'Header row "Task Description | Ok | Adv. | Fail | N/A" and requirement rows with radio/tick circles.',
     howToDraw:
-      "One block for the whole grid: row requirement text + all four columns + column headers. Never one ROI per column or per tick.",
+      "ONE region for the whole grid — task text + all four columns + column headers + ticks. Never one ROI per column or per tick; Azure selection-marks need the full grid.",
   },
   complianceTickboxes: {
-    summary: "Same as Tickbox Block — the compliance grid evidence.",
+    summary: "Same as Checklist grid — compliance Ok/Adv/Fail/N/A evidence.",
     lookFor: "Full checklist grid with row text and outcome columns.",
     howToDraw:
-      "Draw a single tickboxBlock covering row text + all columns + headers.",
+      "Draw the same way as Checklist grid (Ok/Adv/Fail/N/A): one block for the entire table.",
   },
   signatureBlock: {
     summary: "Whole sign-off area when engineer and customer share one band.",
@@ -196,6 +197,73 @@ export const ROI_DRAW_GUIDANCE: Record<string, RoiDrawGuidance> = {
   hubNutTorque: {
     summary: "Hub nut torque reading in NM.",
     lookFor: '"Hub Nut Torque (NM)", handwritten or typed NM value.',
+    ...MEASUREMENT,
+  },
+  nextServiceDate: {
+    summary: "Next service / retest due date in Completion Details.",
+    lookFor: '"Next Service Date", "Next Due", retest date in Completion Details.',
+    howToDraw:
+      "Box Next Service Date label + date value together. Keep separate from the job Date ROI.",
+  },
+  completionDetails: {
+    summary: "Whole Completion Details panel when you want one capture zone.",
+    lookFor: 'Section titled "Completion Details" with Date, Compliance, Yes/No rows.',
+    howToDraw:
+      "Prefer individual field ROIs inside the panel. Only use this for a single overview band if needed — never instead of critical Date / Job ID.",
+  },
+  complianceType: {
+    summary: "Compliance / service type (e.g. Service - SB).",
+    lookFor: '"Compliance Type" in Completion Details.',
+    ...IDENTITY_VALUE,
+  },
+  complianceTitle: {
+    summary: "Compliance title / scheme name (e.g. General Trailer).",
+    lookFor: '"Compliance Title" in Completion Details.',
+    ...IDENTITY_VALUE,
+  },
+  serviceCompleted: {
+    summary: "Service Completed? Yes/No in Completion Details.",
+    lookFor: '"Service Completed?" with Yes or No.',
+    howToDraw: "Box the question label and the Yes/No answer together.",
+  },
+  allWorksCompleted: {
+    summary: "All Works Completed? Yes/No — critical for outcome consistency.",
+    lookFor: '"All Works Completed?" with Yes or No.',
+    howToDraw: "Box the question label and the Yes/No answer together.",
+  },
+  consumablesUsed: {
+    summary: "Consumables Used? Yes/No.",
+    lookFor: '"Consumables Used?" with Yes or No.',
+    howToDraw: "Box the question label and the Yes/No answer together.",
+  },
+  additionalTasksComplete: {
+    summary: "Additional Tasks Complete? Yes/No.",
+    lookFor: '"Additional Tasks Complete?" with Yes or No.',
+    howToDraw: "Box the question label and the Yes/No answer together.",
+  },
+  returnVisitNeeded: {
+    summary: "Return Visit Needed? Yes/No — critical for incomplete / VOR paths.",
+    lookFor: '"Return Visit Needed?" with Yes or No.',
+    howToDraw: "Box the question label and the Yes/No answer together.",
+  },
+  assetSafeToUse: {
+    summary: "Asset Safe To Use? Yes/No — safety outcome.",
+    lookFor: '"Asset Safe To Use?" with Yes or No.',
+    howToDraw: "Box the question label and the Yes/No answer together.",
+  },
+  jobDuration: {
+    summary: "Job duration hours/value.",
+    lookFor: '"Job Duration" with a numeric value.',
+    ...MEASUREMENT,
+  },
+  overtime: {
+    summary: "Overtime Yes/No or hours.",
+    lookFor: '"Overtime" with Yes/No or a number.',
+    howToDraw: "Box the Overtime label and answer together.",
+  },
+  travel: {
+    summary: "Travel time / distance value.",
+    lookFor: '"Travel" with a numeric value.',
     ...MEASUREMENT,
   },
 };
