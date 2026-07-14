@@ -1,16 +1,16 @@
 /**
- * Durable DLQ retry worker (PR-17 + Phase 1.10)
+ * Durable DLQ retry worker (PR-17 + Phase 1.10 + PR-PLAT-DLQ)
  *
- * PR-3 persists failed_jobs. This worker walks recoverable in-memory DLQ
- * entries (and optionally DB rows when provided), and by default retries via
- * documentProcessor's orchestration entry. Callers can still inject a custom
- * handler for tests / dry-runs.
+ * Prefers recoverable rows from `failed_jobs` (SSOT) via
+ * listRecoverableFailedJobs; falls back to the in-memory cache when DB
+ * is unavailable. Default retries go through retryDeadLetterJob which
+ * claims with a multi-instance-safe conditional UPDATE.
  */
 
 import {
   getFailedJob,
-  getRecoverableJobs,
   incrementAttempts,
+  listRecoverableFailedJobs,
   markAsRecovered,
   retryDeadLetterJob,
   type FailedJob,
@@ -40,9 +40,9 @@ export type DlqRetryHandler = (
 ) => Promise<"recovered" | "retry" | "skip"> | "recovered" | "retry" | "skip";
 
 /**
- * Default handler: reprocess the job sheet via retryDeadLetterJob.
+ * Default handler: reprocess via retryDeadLetterJob (DB-claim + orchestrate).
  * Returns "recovered" on success, "retry" when reprocess fails (attempts
- * already incremented inside retryDeadLetterJob — pass must not double-count).
+ * already incremented inside the claim — pass must not double-count).
  */
 export const defaultDlqRetryHandler: DlqRetryHandler = async job => {
   const ok = await retryDeadLetterJob(job.id);
@@ -51,10 +51,13 @@ export const defaultDlqRetryHandler: DlqRetryHandler = async job => {
 
 /**
  * Process recoverable DLQ jobs with an optional custom handler.
- * Side-effects against the in-memory DLQ (+ write-through via markAsRecovered).
+ *
+ * Job list defaults to DB SSOT (listRecoverableFailedJobs). Side-effects
+ * resolve/attempt updates go through deadLetterQueue helpers so the Map
+ * stays a cache and DB wins after every write.
  *
  * When using the default handler, failed reprocess attempts are already
- * incremented inside retryDeadLetterJob — we only re-read state for status.
+ * incremented by the claim inside retryDeadLetterJob.
  */
 export async function runDlqRetryPass(options?: {
   limit?: number;
@@ -64,7 +67,9 @@ export async function runDlqRetryPass(options?: {
   const limit = options?.limit ?? 25;
   const handler = options?.handler ?? defaultDlqRetryHandler;
   const usingDefaultHandler = options?.handler == null;
-  const jobs = (options?.jobs ?? getRecoverableJobs()).slice(0, limit);
+  const jobs = (
+    options?.jobs ?? (await listRecoverableFailedJobs(limit))
+  ).slice(0, limit);
 
   const results: DlqRetryAttemptResult[] = [];
   let recovered = 0;
@@ -120,7 +125,7 @@ export async function runDlqRetryPass(options?: {
       continue;
     }
 
-    // retry — default handler already incremented attempts inside retryDeadLetterJob
+    // retry — default handler already claimed/incremented inside retryDeadLetterJob
     const updated = usingDefaultHandler
       ? getFailedJob(job.id)
       : incrementAttempts(job.id);
