@@ -6,6 +6,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import {
   FEATURE_FLAG,
   isFinOpsEnabled,
@@ -217,6 +219,43 @@ describe("FinOps Contract (Phase 3.x)", () => {
       ]);
       expect(summary.recentEvents).toHaveLength(2);
       expect(summary.retentionNote.length).toBeGreaterThan(20);
+    });
+
+    it("tracks Mistral OCR under ocr stage and mistral_ocr tool", () => {
+      clearApiCostLedger();
+      recordApiCost({
+        provider: "mistral",
+        model: "mistral-ocr-latest",
+        stage: "ocr",
+        tool: "mistral_ocr",
+        jobSheetId: 42,
+        inputTokens: 12_000,
+        outputTokens: 0,
+        latencyMs: 1800,
+      });
+
+      const summary = summarizeApiCosts({ windowHours: 24, recentLimit: 5 });
+      expect(summary.byTool).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            key: "mistral_ocr",
+            label: "Mistral OCR",
+          }),
+        ])
+      );
+      expect(summary.byStage).toEqual(
+        expect.arrayContaining([expect.objectContaining({ key: "ocr" })])
+      );
+    });
+
+    it("mistralAdapter records OCR spend into the FinOps ledger", () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), "server/services/ocrAdapter/mistralAdapter.ts"),
+        "utf-8"
+      );
+      expect(content).toContain('tool: "mistral_ocr"');
+      expect(content).toContain('stage: "ocr"');
+      expect(content).toContain("recordApiCost");
     });
 
     it("rolls up cost by day and month with tool breakdown", () => {

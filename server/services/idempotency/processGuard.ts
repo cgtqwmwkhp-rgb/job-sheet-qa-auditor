@@ -17,7 +17,8 @@ export const PROCESS_OCR_SCOPE = "process-ocr";
 export type ProcessIdempotencyReason =
   | "in_flight"
   | "already_processed"
-  | "same_sheet_processing";
+  | "same_sheet_processing"
+  | "same_sheet_already_processed";
 
 export interface ContentHashSibling {
   id: number;
@@ -89,6 +90,23 @@ export async function resolveProcessIdempotency(input: {
             `job-sheet:${input.jobSheetId}`,
           ]),
       reason: "same_sheet_processing",
+      reusedFromJobSheetId: input.jobSheetId,
+    };
+  }
+
+  // Primary process must not re-bill OCR on an already-finished sheet.
+  // Reprocess is the explicit, auditable path for intentional re-runs.
+  if (isProcessedJobSheetStatus(input.status)) {
+    const contentHash = (input.contentHash ?? "").trim().toLowerCase();
+    return {
+      action: "dedupe",
+      contentHash,
+      idempotencyKey: contentHash
+        ? buildProcessOcrIdempotencyKey(contentHash)
+        : buildIdempotencyKey(PROCESS_OCR_SCOPE, [
+            `job-sheet:${input.jobSheetId}`,
+          ]),
+      reason: "same_sheet_already_processed",
       reusedFromJobSheetId: input.jobSheetId,
     };
   }
