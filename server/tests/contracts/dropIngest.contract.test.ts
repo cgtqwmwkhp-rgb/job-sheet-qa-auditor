@@ -73,7 +73,12 @@ describe("dropIngest contract (PR-IO-SHAREPOINT)", () => {
     );
     expect(indexSrc).toContain('app.use("/api/drop-ingest", dropIngestRouter)');
     expect(indexSrc).toContain("startDropIngestPoller");
-    // Ownership: do not claim ingest HMAC router
-    expect(indexSrc).not.toContain('app.use("/api/ingest"');
+    const dropBootSrc = readFileSync(
+      path.join(repoRoot, "server/services/dropIngest/boot.ts"),
+      "utf8"
+    );
+    // Ownership: drop-ingest posts to signed ingest via HTTP client, not ingestRouter
+    expect(dropBootSrc).not.toMatch(/from ["']\.\.\/ingest/);
+    expect(dropBootSrc).not.toContain("ingestRouter");
   });
 });
