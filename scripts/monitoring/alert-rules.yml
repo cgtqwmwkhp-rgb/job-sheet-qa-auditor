@@ -1,6 +1,6 @@
 # Parity and Integrity Alert Rules
 # Vendor-neutral format compatible with Prometheus Alertmanager
-# 
+#
 # CANONICAL SEVERITY LABELS: S0, S1, S2, S3
 # - S0: Critical (must be 100%)
 # - S1: High (must be >= 95%)
@@ -157,3 +157,63 @@ groups:
           summary: "Parity metrics endpoint is down"
           description: "The parity metrics endpoint has been unavailable for 5 minutes."
           runbook_url: "docs/observability/OBSERVABILITY.md#runbooks"
+
+  - name: pipeline_alerts
+    rules:
+      # OCR failure rate spike — on-call can page without reading code
+      - alert: OcrFailureRateHigh
+        expr: |
+          (
+            rate(ocr_requests_total{status="failed"}[15m])
+            /
+            (rate(ocr_requests_total{status="success"}[15m]) + rate(ocr_requests_total{status="failed"}[15m]))
+          ) > 0.2
+          and
+          (rate(ocr_requests_total{status="failed"}[15m]) + rate(ocr_requests_total{status="success"}[15m])) > 0
+        for: 10m
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "OCR failure rate above 20%"
+          description: "More than 20% of OCR requests failed in the last 15 minutes. Check Mistral/Azure DI health and circuit breakers."
+          runbook_url: "docs/observability/OBSERVABILITY.md#ocr-failure-rate"
+
+      # Pipeline job failure spike
+      - alert: PipelineJobFailureSpike
+        expr: increase(pipeline_jobs_total{status="failed"}[1h]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "Pipeline job failures spiking"
+          description: "More than 5 pipeline jobs failed in the last hour."
+          runbook_url: "docs/observability/OBSERVABILITY.md#pipeline-failures"
+
+      # DLQ depth growing
+      - alert: PipelineDlqDepthHigh
+        expr: pipeline_dlq_depth > 10
+        for: 15m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "Dead-letter queue depth high"
+          description: "{{ $value }} unresolved jobs in DLQ. Review failed_jobs and retry worker."
+          runbook_url: "docs/observability/OBSERVABILITY.md#dlq-depth"
+
+      # OCR stage p95 latency SLO breach
+      - alert: OcrStageLatencyHigh
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(pipeline_stage_duration_seconds_bucket{stage="ocr_text_extraction",status="success"}[15m]))
+          ) > 120
+        for: 15m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "OCR stage p95 latency above 120s"
+          description: "OCR text extraction p95 is {{ $value }}s over 15m window."
+          runbook_url: "docs/observability/OBSERVABILITY.md#stage-latency"
