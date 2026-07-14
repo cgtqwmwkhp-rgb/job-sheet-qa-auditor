@@ -9,6 +9,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Bell,
   AlertTriangle,
@@ -17,60 +19,41 @@ import {
   Mail,
   PenTool,
 } from "lucide-react";
-import { toast } from "sonner";
-import { useState } from "react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { EmailTemplateManager } from "@/components/EmailTemplateManager";
 
-interface NotificationSettingsState {
-  criticalDefects: boolean;
-  majorDefects: boolean;
-  minorDefects: boolean;
-  auditCompleted: boolean;
-  dailySummary: boolean;
-}
+/** Illustrative defaults only — no notification / FCM / email prefs API. */
+const PREVIEW_DEFAULTS = {
+  criticalDefects: true,
+  majorDefects: true,
+  minorDefects: false,
+  auditCompleted: true,
+  dailySummary: false,
+} as const;
 
 export function NotificationSettings() {
-  // Local state for notification settings (would be persisted to backend in real app)
-  const [localSettings, setLocalSettings] = useState<NotificationSettingsState>(
-    {
-      criticalDefects: true,
-      majorDefects: true,
-      minorDefects: false,
-      auditCompleted: true,
-      dailySummary: false,
-    }
-  );
-  const [isSending, setIsSending] = useState(false);
-
-  const handleToggle = (key: keyof NotificationSettingsState) => {
-    const newSettings = { ...localSettings, [key]: !localSettings[key] };
-    setLocalSettings(newSettings);
-    toast.message("Preview only — preferences are not saved yet");
-  };
-
-  const handleSendTestEmail = async () => {
-    setIsSending(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      toast.message("Test email is not wired yet — no message was sent");
-    } finally {
-      setIsSending(false);
-    }
-  };
-
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex flex-wrap items-center gap-2">
           <Bell className="h-5 w-5" />
           Notification Preferences
+          <Badge variant="secondary">Preview — not saved</Badge>
         </CardTitle>
         <CardDescription>
-          Manage which alerts you receive on your device.
+          Shows the intended alert categories. Toggles are disabled until a
+          notification delivery API exists — changes would not reach email or
+          push today.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        <Alert>
+          <AlertDescription>
+            Preview layout only. Preferences are not persisted and do not
+            control live alerts.
+          </AlertDescription>
+        </Alert>
+
         <div className="space-y-4">
           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
             Defect Alerts
@@ -88,8 +71,9 @@ export function NotificationSettings() {
             </div>
             <Switch
               id="critical"
-              checked={localSettings.criticalDefects}
-              onCheckedChange={() => handleToggle("criticalDefects")}
+              checked={PREVIEW_DEFAULTS.criticalDefects}
+              disabled
+              aria-label="Critical defects (preview only)"
             />
           </div>
 
@@ -105,8 +89,9 @@ export function NotificationSettings() {
             </div>
             <Switch
               id="major"
-              checked={localSettings.majorDefects}
-              onCheckedChange={() => handleToggle("majorDefects")}
+              checked={PREVIEW_DEFAULTS.majorDefects}
+              disabled
+              aria-label="Major defects (preview only)"
             />
           </div>
 
@@ -122,8 +107,9 @@ export function NotificationSettings() {
             </div>
             <Switch
               id="minor"
-              checked={localSettings.minorDefects}
-              onCheckedChange={() => handleToggle("minorDefects")}
+              checked={PREVIEW_DEFAULTS.minorDefects}
+              disabled
+              aria-label="Minor defects (preview only)"
             />
           </div>
         </div>
@@ -148,8 +134,9 @@ export function NotificationSettings() {
             </div>
             <Switch
               id="audit-complete"
-              checked={localSettings.auditCompleted}
-              onCheckedChange={() => handleToggle("auditCompleted")}
+              checked={PREVIEW_DEFAULTS.auditCompleted}
+              disabled
+              aria-label="Audit completed (preview only)"
             />
           </div>
 
@@ -168,8 +155,9 @@ export function NotificationSettings() {
             </div>
             <Switch
               id="daily-summary"
-              checked={localSettings.dailySummary}
-              onCheckedChange={() => handleToggle("dailySummary")}
+              checked={PREVIEW_DEFAULTS.dailySummary}
+              disabled
+              aria-label="Daily summary (preview only)"
             />
           </div>
         </div>
@@ -179,11 +167,11 @@ export function NotificationSettings() {
           variant="outline"
           size="sm"
           className="w-full"
-          onClick={handleSendTestEmail}
-          disabled={!localSettings.dailySummary || isSending}
+          disabled
+          title="Test email is not wired — no message would be sent"
         >
           <Mail className="h-4 w-4 mr-2" />
-          {isSending ? "Sending..." : "Send Test Summary Email"}
+          Send Test Summary Email (not wired)
         </Button>
 
         <Dialog>
