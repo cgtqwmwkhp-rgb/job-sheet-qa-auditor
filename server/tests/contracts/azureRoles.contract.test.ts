@@ -58,23 +58,23 @@ describe("azureRoles", () => {
       ).toBe("technician");
     });
 
-    it("defaults new users without claims to qa_lead (Entra-gated staff app)", () => {
+    it("defaults new users without claims to least-privilege user", () => {
       expect(
         resolveAzureAuthRole({
           roleClaims: [],
           isNewUser: true,
         })
-      ).toBe("qa_lead");
+      ).toBe("user");
     });
 
-    it("promotes existing viewer users without claims to qa_lead on sign-in", () => {
+    it("does not promote existing users without claims on sign-in", () => {
       expect(
         resolveAzureAuthRole({
           roleClaims: [],
           existingRole: "user",
           isNewUser: false,
         })
-      ).toBe("qa_lead");
+      ).toBeUndefined();
     });
 
     it("leaves admin/qa_lead/technician unchanged when no claims", () => {

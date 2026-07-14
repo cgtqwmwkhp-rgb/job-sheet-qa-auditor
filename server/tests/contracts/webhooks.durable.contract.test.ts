@@ -50,6 +50,30 @@ describe("Durable Webhooks Contract (PR-IO-WEBHOOKS)", () => {
     expect(listWebhooks()[0]?.events).toContain("audit.completed");
   });
 
+  it("redacts PII from webhook payloads by default", async () => {
+    registerWebhook("https://example.test/hooks", ["dispute.created"], {
+      secret: "whsec_test_secret_for_signing_123456",
+    });
+
+    let capturedBody = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        capturedBody = String(init?.body ?? "");
+        return new Response("ok", { status: 200 });
+      })
+    );
+
+    await emitWebhookEvent("dispute.created", {
+      disputeId: 7,
+      auditId: 42,
+      reason: "Contact engineer@example.com about site visit",
+    });
+
+    expect(capturedBody).toContain("[EMAIL_REDACTED]");
+    expect(capturedBody).not.toContain("engineer@example.com");
+  });
+
   it("signed delivery log retains signature + payloadHash after restart import", async () => {
     registerWebhook("https://example.test/hooks", ["audit.completed"], {
       secret: "whsec_test_secret_for_signing_123456",

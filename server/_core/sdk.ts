@@ -371,8 +371,9 @@ class SDKServer {
           roleClaims,
         });
 
-        // Find or create user from Azure auth. Default staff role is qa_lead
-        // so Hold Queue / review actions work (error 10003 otherwise).
+        // Find or create user from Azure auth. Role comes from Entra app-role
+        // claims only; claimless sign-ins default new users to least-privilege
+        // `user` (see resolveAzureAuthRole).
         const openId = `azure-${userId}`;
         let user = await db.getUserByOpenId(openId);
         const role = resolveAzureAuthRole({
