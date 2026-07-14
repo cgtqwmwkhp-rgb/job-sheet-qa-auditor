@@ -121,6 +121,10 @@ export default function TemplateStudio() {
   const [smokeIdsText, setSmokeIdsText] = useState("");
   const [diffFromId, setDiffFromId] = useState<string>("");
   const [diffToId, setDiffToId] = useState<string>("");
+  const [ocrMapping, setOcrMapping] = useState(false);
+  const [roiLayoutError, setRoiLayoutError] = useState<string | null>(null);
+  const [roiEditorEpoch, setRoiEditorEpoch] = useState(0);
+  const ocrAutoMappedForRef = useRef<string | null>(null);
 
   const { data: templates, isLoading } = trpc.templates.list.useQuery();
   const { data: version } = trpc.templates.getVersion.useQuery(
@@ -418,6 +422,11 @@ export default function TemplateStudio() {
         loadVersionIntoEditors(result.appliedVersion);
         await utils.templates.getVersion.invalidate({ versionId });
       }
+      const rois = result.proposal.roiRegions ?? [];
+      const ocrPlacedCount = rois.filter(r => r.source === "ocr-layout").length;
+      const fallbackCount = rois.filter(
+        r => r.source === "starter-roi-fallback"
+      ).length;
       setProposalPreview({
         confidence:
           result.proposal.fields.length > 0
@@ -430,36 +439,31 @@ export default function TemplateStudio() {
             ? "OCR heuristics"
             : "Starter scaffold (no sample OCR)",
         fieldCount: result.proposal.proposedSpec.fields.length,
-        roiProvenance: (() => {
-          const rois = result.proposal.roiRegions ?? [];
-          const ocrPlacedCount = rois.filter(r => r.source === "ocr-layout")
-            .length;
-          const fallbackCount = rois.filter(
-            r => r.source === "starter-roi-fallback"
-          ).length;
-          return {
-            mode:
-              ocrPlacedCount > 0
-                ? ("ocr-layout" as const)
-                : fallbackCount > 0
-                  ? ("starter-fallback" as const)
-                  : ("unknown" as const),
-            ocrPlacedCount,
-            fallbackCount,
-          };
-        })(),
+        roiProvenance: {
+          mode:
+            ocrPlacedCount > 0
+              ? ("ocr-layout" as const)
+              : fallbackCount > 0
+                ? ("starter-fallback" as const)
+                : ("unknown" as const),
+          ocrPlacedCount,
+          fallbackCount,
+        },
       });
+      if (result.proposal.layoutError) {
+        setRoiLayoutError(result.proposal.layoutError);
+      } else if (ocrPlacedCount > 0) {
+        setRoiLayoutError(null);
+      }
       showSuccessToast(
         applyAccepted ? "Accepted fields saved to draft" : "Field preview ready",
         (() => {
-          const rois = result.proposal.roiRegions ?? [];
-          const ocrN = rois.filter(r => r.source === "ocr-layout").length;
           const base = result.proposal.geminiUsed
             ? "Gemini + OCR"
             : result.proposal.layoutAvailable
               ? "OCR heuristics"
               : "Starter scaffold (no sample OCR)";
-          if (ocrN > 0) return `${base} · ${ocrN} OCR-placed ROI boxes`;
+          if (ocrPlacedCount > 0) return `${base} · ${ocrPlacedCount} OCR-placed ROI boxes`;
           if (result.proposal.layoutError) {
             return `ROI not placed — ${result.proposal.layoutError.slice(0, 120)}`;
           }
@@ -478,6 +482,125 @@ export default function TemplateStudio() {
       return null;
     }
   };
+
+  /** Run Azure DI layout and paint OCR boxes on the Draw regions canvas. */
+  const mapRoiFromOcr = useCallback(
+    async (opts?: { force?: boolean }) => {
+      if (!versionId || !sampleUrl) {
+        setRoiLayoutError(
+          "Attach a sample PDF first — OCR needs the document to place boxes."
+        );
+        return null;
+      }
+      if (ocrMapping) return null;
+      setOcrMapping(true);
+      try {
+        const result = await proposeMut.mutateAsync({
+          versionId,
+          templateName: name || undefined,
+          applyAccepted: true,
+          rejectedFieldIds: Array.from(rejectedFields),
+        });
+        const rois = result.proposal.roiRegions ?? [];
+        const ocrPlacedCount = rois.filter(r => r.source === "ocr-layout")
+          .length;
+        const fallbackCount = rois.filter(
+          r => r.source === "starter-roi-fallback"
+        ).length;
+
+        if (result.appliedVersion) {
+          loadVersionIntoEditors(result.appliedVersion);
+          await utils.templates.getVersion.invalidate({ versionId });
+        } else if (ocrPlacedCount > 0 && result.proposal.proposedRoi) {
+          setRoiDraft(result.proposal.proposedRoi);
+        }
+
+        setProposalPreview(prev => ({
+          confidence:
+            result.proposal.fields.length > 0
+              ? result.proposal.fields.reduce((a, f) => a + f.confidence, 0) /
+                result.proposal.fields.length
+              : (prev?.confidence ?? result.proposal.selectionTokens.confidence),
+          source: result.proposal.geminiUsed
+            ? "Gemini + OCR"
+            : result.proposal.layoutAvailable
+              ? "OCR heuristics"
+              : (prev?.source ?? "OCR map"),
+          fieldCount: result.proposal.proposedSpec.fields.length,
+          roiProvenance: {
+            mode:
+              ocrPlacedCount > 0
+                ? ("ocr-layout" as const)
+                : fallbackCount > 0
+                  ? ("starter-fallback" as const)
+                  : ("unknown" as const),
+            ocrPlacedCount,
+            fallbackCount,
+          },
+        }));
+
+        if (result.proposal.layoutError) {
+          setRoiLayoutError(result.proposal.layoutError);
+        } else if (ocrPlacedCount === 0) {
+          setRoiLayoutError(
+            "OCR ran but could not match field labels on this PDF. Draw boxes manually with Draw labels, or re-attach a clearer sample."
+          );
+        } else {
+          setRoiLayoutError(null);
+        }
+
+        // Remount editor so OCR boxes replace empty initial state
+        setRoiEditorEpoch(e => e + 1);
+        ocrAutoMappedForRef.current = `${versionId}:${opts?.force ? Date.now() : "auto"}`;
+
+        if (ocrPlacedCount > 0) {
+          showSuccessToast(
+            "OCR mapped regions",
+            `${ocrPlacedCount} boxes placed from this sample — adjust any that miss`
+          );
+        } else {
+          showErrorToast(
+            "OCR could not place regions",
+            result.proposal.layoutError?.slice(0, 160) ||
+              "Draw boxes manually with Draw labels"
+          );
+        }
+        return result.proposal;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "OCR mapping failed";
+        setRoiLayoutError(msg);
+        showErrorToast("OCR mapping failed", msg);
+        return null;
+      } finally {
+        setOcrMapping(false);
+      }
+    },
+    // proposeMut / loadVersionIntoEditors / utils are stable enough for Studio session
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [versionId, sampleUrl, ocrMapping, name, rejectedFields]
+  );
+
+  // When Draw regions opens with a sample and no boxes, auto-run OCR mapping
+  useEffect(() => {
+    if (step !== "roi" || !versionId || !sampleUrl) return;
+    const regions =
+      roiDraft?.regions ?? version?.roiJson?.regions ?? [];
+    const empty = regions.length === 0;
+    const already =
+      ocrAutoMappedForRef.current?.startsWith(`${versionId}:`) ?? false;
+    if (!empty || already || ocrMapping || proposeMut.isPending) return;
+    ocrAutoMappedForRef.current = `${versionId}:pending`;
+    void mapRoiFromOcr();
+  }, [
+    step,
+    versionId,
+    sampleUrl,
+    roiDraft?.regions?.length,
+    version?.roiJson?.regions?.length,
+    ocrMapping,
+    proposeMut.isPending,
+    mapRoiFromOcr,
+  ]);
 
   const handleSaveFields = async () => {
     if (!versionId) return;
@@ -1130,15 +1253,20 @@ export default function TemplateStudio() {
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button onClick={() => setStep("roi")}>
+                      <Button
+                        onClick={() => {
+                          setStep("roi");
+                          // Auto-effect maps when empty; force if they already have boxes
+                          // from a prior failed scaffold and want a fresh OCR pass on entry
+                        }}
+                      >
                         Next: draw regions
                         <ChevronRight className="ml-1 h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs text-xs">
-                      Go to the ROI editor to click-and-drag boxes on the PDF
-                      (Job Reference, Asset ID, signatures, torque fields,
-                      etc.). Does not re-run AI.
+                      Opens the ROI editor. If no boxes exist yet, OCR maps this
+                      sample automatically.
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -1152,38 +1280,61 @@ export default function TemplateStudio() {
             <CardHeader>
               <CardTitle>ROI editor</CardTitle>
               <CardDescription>
-                ROI = Region of Interest. Boxes must come from OCR layout on
-                this sample (Suggest fields), not from generic Maintenance /
-                Inspection / Installation guesses. Verify every box sits on the
-                printed label + value, then Save.
+                OCR reads this sample and places Region of Interest boxes on
+                printed fields. Adjust anything that misses, then Save.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {(proposalPreview?.roiProvenance?.mode === "starter-fallback" ||
-                proposalPreview?.roiProvenance?.mode === "unknown" ||
-                !proposalPreview?.roiProvenance) && (
-                <div
-                  className="rounded-md border-2 border-red-500 bg-red-50 px-3 py-2 text-sm text-red-950"
-                  data-testid="studio-roi-generic-warning"
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="default"
+                  disabled={ocrMapping || proposeMut.isPending || !sampleUrl}
+                  onClick={() => {
+                    ocrAutoMappedForRef.current = null;
+                    void mapRoiFromOcr({ force: true });
+                  }}
+                  data-testid="studio-ocr-map-roi"
                 >
-                  <strong>Why accuracy is poor right now:</strong> these boxes
-                  are <em>not</em> from OCR on this PDF. They are a generic
-                  scaffold (or leftovers).{" "}
-                  {proposeMut.data?.proposal?.layoutError ? (
-                    <>
-                      Layout error:{" "}
-                      <code className="text-xs">
-                        {proposeMut.data.proposal.layoutError}
-                      </code>
-                      .{" "}
-                    </>
-                  ) : null}
-                  Fix: open <strong>Suggest fields</strong>, ensure the sample is
-                  attached, click Accept — only then open ROI. If OCR still fails,
-                  Clear All and draw manually.
+                  {(ocrMapping || proposeMut.isPending) && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {ocrMapping || proposeMut.isPending
+                    ? "OCR mapping this PDF…"
+                    : "OCR map this PDF"}
+                </Button>
+                {!sampleUrl && (
+                  <span className="text-xs text-amber-800">
+                    Attach a sample on Upload first.
+                  </span>
+                )}
+              </div>
+
+              {(ocrMapping || proposeMut.isPending) && (
+                <div
+                  className="rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-950"
+                  data-testid="studio-ocr-mapping-banner"
+                >
+                  <strong>Reading the sample with OCR…</strong> Placing boxes on
+                  Job Reference, Asset ID, dates, signatures, and other matched
+                  labels.
                 </div>
               )}
-              {proposalPreview?.roiProvenance?.mode === "ocr-layout" && (
+
+              {roiLayoutError && !ocrMapping && (
+                <div
+                  className="rounded-md border-2 border-amber-500 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+                  data-testid="studio-roi-layout-error"
+                >
+                  <strong>OCR could not place boxes automatically.</strong>{" "}
+                  {roiLayoutError} Use Draw labels to box fields manually, or
+                  re-attach a clearer sample and click{" "}
+                  <em>OCR map this PDF</em>.
+                </div>
+              )}
+
+              {proposalPreview?.roiProvenance?.mode === "ocr-layout" &&
+                (proposalPreview.roiProvenance.ocrPlacedCount ?? 0) > 0 && (
                 <div
                   className="rounded-md border-2 border-emerald-500 bg-emerald-50 px-3 py-2 text-xs text-emerald-950"
                   data-testid="studio-roi-ocr-banner"
@@ -1194,8 +1345,25 @@ export default function TemplateStudio() {
                   field.
                 </div>
               )}
+
+              {!ocrMapping &&
+                !roiLayoutError &&
+                (roiDraft?.regions?.length ??
+                  version?.roiJson?.regions?.length ??
+                  0) === 0 &&
+                sampleUrl && (
+                  <div
+                    className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-800"
+                    data-testid="studio-roi-empty-hint"
+                  >
+                    No regions yet. Click <strong>OCR map this PDF</strong> to
+                    let Azure DI place boxes, or draw them with Draw labels.
+                  </div>
+                )}
+
               <TemplateAuthoringGuide compact />
               <RoiEditorV2
+                key={`roi-editor-${versionId}-${roiEditorEpoch}`}
                 initialRoi={roiDraft ?? version?.roiJson ?? undefined}
                 pdfUrl={sampleUrl ?? undefined}
                 onChange={handleRoiChange}

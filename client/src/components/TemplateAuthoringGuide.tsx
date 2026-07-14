@@ -15,8 +15,8 @@ import {
 
 const RULES: Array<{ title: string; body: string }> = [
   {
-    title: "ROI boxes must be OCR-placed, not generic",
-    body: "Suggest fields runs Azure DI layout and places TIGHT boxes on real printed labels (e.g. Job ID, Asset No). If a box misses the value, select it and resize from the edges — never accept overlapping page-tall blobs.",
+    title: "OCR map places the boxes — then you fine-tune",
+    body: "On Draw regions, click “OCR map this PDF” (or let it auto-run when the canvas is empty). Azure DI places tight boxes on printed labels. Resize any that miss — never accept page-tall blobs.",
   },
   {
     title: "Hover Draw labels for how-to",
