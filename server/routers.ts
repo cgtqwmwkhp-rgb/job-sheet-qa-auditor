@@ -412,6 +412,14 @@ export const appRouter = router({
             });
           }
 
+          if (idempotency.reason === "same_sheet_already_processed") {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message:
+                "This job sheet was already processed. Use Reprocess on the audit page to run OCR and analysis again.",
+            });
+          }
+
           await db.logAction({
             userId: ctx.user.id,
             action: "PROCESS_JOB_SHEET_DEDUPED",

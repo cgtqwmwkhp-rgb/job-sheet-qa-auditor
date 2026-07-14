@@ -183,6 +183,28 @@ export class MistralOCRAdapter implements OCRAdapter {
     addContextMetadata("ocrPages", pages.length);
     addContextMetadata("ocrProcessingMs", processingTimeMs);
 
+    const ocrModel = parsed.model || this.config.model;
+    const docSizeTokens =
+      parsed.usageInfo?.tokensGenerated ??
+      result.usage_info?.doc_size_tokens ??
+      0;
+    void import("../finOps")
+      .then(({ recordApiCost }) => {
+        recordApiCost({
+          provider: "mistral",
+          model: ocrModel,
+          stage: "ocr",
+          tool: "mistral_ocr",
+          jobSheetId: options.jobSheetId,
+          inputTokens: Math.max(0, Math.floor(docSizeTokens)),
+          outputTokens: 0,
+          latencyMs: processingTimeMs,
+        });
+      })
+      .catch(() => {
+        /* FinOps must never block OCR */
+      });
+
     return {
       success: true,
       pages,
