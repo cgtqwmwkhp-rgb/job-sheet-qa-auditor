@@ -35,9 +35,7 @@ describe("PR-PLAT-STAGE5: mount-or-retire (retire)", () => {
 
   it("does not wire the simulated Stage-7 orchestrator into appRouter", () => {
     expect(routersTs).not.toMatch(/services\/orchestration/);
-    expect(routersTs).not.toMatch(
-      /from\s+["'].*orchestration.*["']/
-    );
+    expect(routersTs).not.toMatch(/from\s+["'].*orchestration.*["']/);
     expect(routersTs).not.toMatch(/\bcreateOrchestrator\b/);
   });
 
@@ -74,9 +72,7 @@ describe("PR-PLAT-STAGE5: mount-or-retire (retire)", () => {
   });
 
   it("keeps documentProcessor as the sole live job-sheet orchestrator entry", () => {
-    expect(routersTs).toContain(
-      'from "./services/documentProcessor"'
-    );
+    expect(routersTs).toContain('from "./services/documentProcessor"');
     expect(routersTs).toContain("orchestrateJobSheetProcessing");
   });
 });

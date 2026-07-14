@@ -7,22 +7,25 @@
  * Do not mount until backed by real persistence and the live audit path.
  */
 
-import { z } from 'zod';
-import { protectedProcedure, router } from '../../_core/trpc';
-import type { ValidatedField } from '../../services/validation/types';
-import type { RuleStatus, RuleSeverity } from '../../services/specResolver/types';
+import { z } from "zod";
+import { protectedProcedure, router } from "../../_core/trpc";
+import type { ValidatedField } from "../../services/validation/types";
+import type {
+  RuleStatus,
+  RuleSeverity,
+} from "../../services/specResolver/types";
 
 /**
  * Canonical reason codes for review queue
  * Per requirements: LOW_CONFIDENCE, UNREADABLE_FIELD, CONFLICT only
  */
 export const REVIEW_QUEUE_REASON_CODES = [
-  'LOW_CONFIDENCE',
-  'UNREADABLE_FIELD', 
-  'CONFLICT',
+  "LOW_CONFIDENCE",
+  "UNREADABLE_FIELD",
+  "CONFLICT",
 ] as const;
 
-export type ReviewQueueReasonCode = typeof REVIEW_QUEUE_REASON_CODES[number];
+export type ReviewQueueReasonCode = (typeof REVIEW_QUEUE_REASON_CODES)[number];
 
 /**
  * Audit result with deterministic ordering
@@ -31,7 +34,7 @@ export interface AuditResultResponse {
   id: number;
   jobSheetId: number;
   goldSpecId: number;
-  overallResult: 'pass' | 'fail';
+  overallResult: "pass" | "fail";
   passedCount: number;
   failedCount: number;
   skippedCount: number;
@@ -85,7 +88,9 @@ const auditStore = {
 /**
  * Sort validated fields deterministically by ruleId
  */
-function sortValidatedFields(fields: ValidatedFieldResponse[]): ValidatedFieldResponse[] {
+function sortValidatedFields(
+  fields: ValidatedFieldResponse[]
+): ValidatedFieldResponse[] {
   return [...fields].sort((a, b) => a.ruleId.localeCompare(b.ruleId));
 }
 
@@ -99,7 +104,7 @@ function sortFindings(findings: FindingResponse[]): FindingResponse[] {
     minor: 2,
     info: 3,
   };
-  
+
   return [...findings].sort((a, b) => {
     const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
     if (severityDiff !== 0) return severityDiff;
@@ -111,9 +116,8 @@ function sortFindings(findings: FindingResponse[]): FindingResponse[] {
  * Filter review queue reasons to canonical codes only
  */
 function filterReviewQueueReasons(reasons: string[]): ReviewQueueReasonCode[] {
-  return reasons.filter(
-    (r): r is ReviewQueueReasonCode => 
-      REVIEW_QUEUE_REASON_CODES.includes(r as ReviewQueueReasonCode)
+  return reasons.filter((r): r is ReviewQueueReasonCode =>
+    REVIEW_QUEUE_REASON_CODES.includes(r as ReviewQueueReasonCode)
   );
 }
 
@@ -128,15 +132,19 @@ export function createMockAuditResult(
   reviewQueueReasons: string[] = []
 ): AuditResultResponse {
   const id = auditStore.nextId++;
-  const passedCount = validatedFields.filter(f => f.status === 'passed').length;
-  const failedCount = validatedFields.filter(f => f.status === 'failed' || f.status === 'error').length;
-  const skippedCount = validatedFields.filter(f => f.status === 'skipped').length;
-  
+  const passedCount = validatedFields.filter(f => f.status === "passed").length;
+  const failedCount = validatedFields.filter(
+    f => f.status === "failed" || f.status === "error"
+  ).length;
+  const skippedCount = validatedFields.filter(
+    f => f.status === "skipped"
+  ).length;
+
   const result: AuditResultResponse = {
     id,
     jobSheetId,
     goldSpecId,
-    overallResult: failedCount === 0 ? 'pass' : 'fail',
+    overallResult: failedCount === 0 ? "pass" : "fail",
     passedCount,
     failedCount,
     skippedCount,
@@ -145,12 +153,12 @@ export function createMockAuditResult(
     reviewQueueReasons: filterReviewQueueReasons(reviewQueueReasons),
     metadata: {
       processingTimeMs: 100,
-      specVersion: '1.0.0',
-      extractionVersion: '1.0.0',
+      specVersion: "1.0.0",
+      extractionVersion: "1.0.0",
     },
     createdAt: new Date().toISOString(),
   };
-  
+
   auditStore.results.set(id, result);
   return result;
 }
@@ -171,26 +179,31 @@ export const auditRouter = router({
    * List all audit results with deterministic ordering
    */
   list: protectedProcedure
-    .input(z.object({
-      limit: z.number().min(1).max(100).default(50),
-      offset: z.number().min(0).default(0),
-      result: z.enum(['pass', 'fail']).optional(),
-    }).optional())
+    .input(
+      z
+        .object({
+          limit: z.number().min(1).max(100).default(50),
+          offset: z.number().min(0).default(0),
+          result: z.enum(["pass", "fail"]).optional(),
+        })
+        .optional()
+    )
     .query(async ({ input }) => {
       const opts = input ?? { limit: 50, offset: 0 };
-      
+
       // Get all results and sort by ID (deterministic)
-      let results = Array.from(auditStore.results.values())
-        .sort((a, b) => a.id - b.id);
-      
+      let results = Array.from(auditStore.results.values()).sort(
+        (a, b) => a.id - b.id
+      );
+
       // Filter by result if specified
       if (opts.result) {
         results = results.filter(r => r.overallResult === opts.result);
       }
-      
+
       // Apply pagination
       const paginated = results.slice(opts.offset, opts.offset + opts.limit);
-      
+
       return {
         items: paginated,
         total: results.length,
@@ -209,7 +222,7 @@ export const auditRouter = router({
       if (!result) {
         return null;
       }
-      
+
       // Ensure deterministic ordering on retrieval
       return {
         ...result,
@@ -227,11 +240,11 @@ export const auditRouter = router({
       const results = Array.from(auditStore.results.values())
         .filter(r => r.jobSheetId === input.jobSheetId)
         .sort((a, b) => a.id - b.id);
-      
+
       if (results.length === 0) {
         return null;
       }
-      
+
       // Return most recent result
       const result = results[results.length - 1];
       return {
@@ -245,25 +258,29 @@ export const auditRouter = router({
    * Get validated fields for an audit (with tab filtering)
    */
   getValidatedFields: protectedProcedure
-    .input(z.object({
-      auditId: z.number(),
-      tab: z.enum(['all', 'passed', 'failed']).default('all'),
-    }))
+    .input(
+      z.object({
+        auditId: z.number(),
+        tab: z.enum(["all", "passed", "failed"]).default("all"),
+      })
+    )
     .query(async ({ input }) => {
       const result = auditStore.results.get(input.auditId);
       if (!result) {
         return { items: [], total: 0 };
       }
-      
+
       let fields = sortValidatedFields(result.validatedFields);
-      
+
       // Filter by tab
-      if (input.tab === 'passed') {
-        fields = fields.filter(f => f.status === 'passed');
-      } else if (input.tab === 'failed') {
-        fields = fields.filter(f => f.status === 'failed' || f.status === 'error');
+      if (input.tab === "passed") {
+        fields = fields.filter(f => f.status === "passed");
+      } else if (input.tab === "failed") {
+        fields = fields.filter(
+          f => f.status === "failed" || f.status === "error"
+        );
       }
-      
+
       return {
         items: fields,
         total: fields.length,
@@ -280,7 +297,7 @@ export const auditRouter = router({
       if (!result) {
         return { items: [], total: 0 };
       }
-      
+
       return {
         items: sortFindings(result.findings),
         total: result.findings.length,

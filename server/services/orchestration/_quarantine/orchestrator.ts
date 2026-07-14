@@ -8,15 +8,15 @@
  * Kept for contract/scaffold tests only — do not present as a live pipeline.
  */
 
-import type { 
-  PipelineRun, 
-  RunState, 
-  CreateRunOptions, 
-  ReplayOptions, 
-  RunResult 
-} from '../types';
-import { isTerminalState } from '../types';
-import { runStore } from '../runStore';
+import type {
+  PipelineRun,
+  RunState,
+  CreateRunOptions,
+  ReplayOptions,
+  RunResult,
+} from "../types";
+import { isTerminalState } from "../types";
+import { runStore } from "../runStore";
 
 /**
  * Pipeline step result
@@ -34,7 +34,7 @@ type StepExecutor<T = unknown> = (run: PipelineRun) => Promise<StepResult<T>>;
 
 /**
  * Pipeline Orchestrator
- * 
+ *
  * Manages the full lifecycle of document processing runs.
  */
 export class PipelineOrchestrator {
@@ -52,9 +52,12 @@ export class PipelineOrchestrator {
   async startRun(options: CreateRunOptions): Promise<RunResult> {
     // Check for existing run (idempotency)
     if (!options.forceRerun) {
-      const inputHash = runStore.generateInputHash(options.jobSheetId, options.specVersion);
+      const inputHash = runStore.generateInputHash(
+        options.jobSheetId,
+        options.specVersion
+      );
       const existingRun = runStore.findByInputHash(inputHash);
-      
+
       if (existingRun) {
         return {
           run: existingRun,
@@ -96,11 +99,12 @@ export class PipelineOrchestrator {
       specVersion: run.specVersion,
       forceRerun: true,
       useMockOcr: options.useMockOcr ?? run.metadata.usedMockOcr,
-      useMockInterpreter: options.useMockInterpreter ?? run.metadata.usedMockInterpreter,
+      useMockInterpreter:
+        options.useMockInterpreter ?? run.metadata.usedMockInterpreter,
     });
 
     // Execute from the specified state
-    const fromState = options.fromState ?? 'CREATED';
+    const fromState = options.fromState ?? "CREATED";
     await this.executePipelineFrom(newRun, fromState);
 
     return {
@@ -114,18 +118,25 @@ export class PipelineOrchestrator {
    * Execute the full pipeline
    */
   private async executePipeline(run: PipelineRun): Promise<void> {
-    await this.executePipelineFrom(run, 'CREATED');
+    await this.executePipelineFrom(run, "CREATED");
   }
 
   /**
    * Execute pipeline from a specific state
    */
-  private async executePipelineFrom(run: PipelineRun, fromState: RunState): Promise<void> {
+  private async executePipelineFrom(
+    run: PipelineRun,
+    fromState: RunState
+  ): Promise<void> {
     const states: RunState[] = [
-      'OCR_STARTED', 'OCR_DONE',
-      'EXTRACTION_STARTED', 'EXTRACTED',
-      'VALIDATION_STARTED', 'VALIDATED',
-      'PERSISTENCE_STARTED', 'PERSISTED'
+      "OCR_STARTED",
+      "OCR_DONE",
+      "EXTRACTION_STARTED",
+      "EXTRACTED",
+      "VALIDATION_STARTED",
+      "VALIDATED",
+      "PERSISTENCE_STARTED",
+      "PERSISTED",
     ];
 
     // Find starting index
@@ -133,24 +144,27 @@ export class PipelineOrchestrator {
 
     for (let i = startIndex; i < states.length; i++) {
       const state = states[i];
-      
+
       try {
         const result = await this.executeStep(run, state);
-        
+
         if (!result.success) {
-          runStore.transition(run.id, 'FAILED', { 
+          runStore.transition(run.id, "FAILED", {
             error: result.error,
-            reason: `Step ${state} failed` 
+            reason: `Step ${state} failed`,
           });
           return;
         }
 
-        runStore.transition(run.id, state, { reason: `Step ${state} completed` });
+        runStore.transition(run.id, state, {
+          reason: `Step ${state} completed`,
+        });
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        runStore.transition(run.id, 'FAILED', { 
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        runStore.transition(run.id, "FAILED", {
           error: errorMessage,
-          reason: `Step ${state} threw exception` 
+          reason: `Step ${state} threw exception`,
         });
         return;
       }
@@ -161,11 +175,11 @@ export class PipelineOrchestrator {
    * Get state index for starting execution
    */
   private getStateIndex(fromState: RunState, states: RunState[]): number {
-    if (fromState === 'CREATED') return 0;
-    
+    if (fromState === "CREATED") return 0;
+
     const index = states.indexOf(fromState);
     if (index === -1) return 0;
-    
+
     // Start from the next state after the given one
     return Math.max(0, index);
   }
@@ -173,23 +187,26 @@ export class PipelineOrchestrator {
   /**
    * Execute a single pipeline step
    */
-  private async executeStep(run: PipelineRun, state: RunState): Promise<StepResult> {
+  private async executeStep(
+    run: PipelineRun,
+    state: RunState
+  ): Promise<StepResult> {
     switch (state) {
-      case 'OCR_STARTED':
+      case "OCR_STARTED":
         return this.executeOcrStart(run);
-      case 'OCR_DONE':
+      case "OCR_DONE":
         return this.executeOcrComplete(run);
-      case 'EXTRACTION_STARTED':
+      case "EXTRACTION_STARTED":
         return this.executeExtractionStart(run);
-      case 'EXTRACTED':
+      case "EXTRACTED":
         return this.executeExtractionComplete(run);
-      case 'VALIDATION_STARTED':
+      case "VALIDATION_STARTED":
         return this.executeValidationStart(run);
-      case 'VALIDATED':
+      case "VALIDATED":
         return this.executeValidationComplete(run);
-      case 'PERSISTENCE_STARTED':
+      case "PERSISTENCE_STARTED":
         return this.executePersistenceStart(run);
-      case 'PERSISTED':
+      case "PERSISTED":
         return this.executePersistenceComplete(run);
       default:
         return { success: true };
@@ -205,7 +222,7 @@ export class PipelineOrchestrator {
 
   private async executeOcrComplete(_run: PipelineRun): Promise<StepResult> {
     await this.simulateDelay(10);
-    return { success: true, data: { text: 'Extracted text content' } };
+    return { success: true, data: { text: "Extracted text content" } };
   }
 
   private async executeExtractionStart(_run: PipelineRun): Promise<StepResult> {
@@ -213,7 +230,9 @@ export class PipelineOrchestrator {
     return { success: true };
   }
 
-  private async executeExtractionComplete(_run: PipelineRun): Promise<StepResult> {
+  private async executeExtractionComplete(
+    _run: PipelineRun
+  ): Promise<StepResult> {
     await this.simulateDelay(10);
     return { success: true, data: { fields: [] } };
   }
@@ -223,17 +242,23 @@ export class PipelineOrchestrator {
     return { success: true };
   }
 
-  private async executeValidationComplete(_run: PipelineRun): Promise<StepResult> {
+  private async executeValidationComplete(
+    _run: PipelineRun
+  ): Promise<StepResult> {
     await this.simulateDelay(10);
     return { success: true, data: { validatedFields: [], findings: [] } };
   }
 
-  private async executePersistenceStart(_run: PipelineRun): Promise<StepResult> {
+  private async executePersistenceStart(
+    _run: PipelineRun
+  ): Promise<StepResult> {
     await this.simulateDelay(10);
     return { success: true };
   }
 
-  private async executePersistenceComplete(_run: PipelineRun): Promise<StepResult> {
+  private async executePersistenceComplete(
+    _run: PipelineRun
+  ): Promise<StepResult> {
     await this.simulateDelay(10);
     return { success: true, data: { auditId: 1 } };
   }
@@ -249,15 +274,15 @@ export class PipelineOrchestrator {
 /**
  * Create quarantined orchestrator (scaffold / contract tests only).
  */
-export function createOrchestrator(options?: { 
-  mockOcr?: boolean; 
-  mockInterpreter?: boolean 
+export function createOrchestrator(options?: {
+  mockOcr?: boolean;
+  mockInterpreter?: boolean;
 }): PipelineOrchestrator {
   return new PipelineOrchestrator(options);
 }
 
 /** Quarantined default — simulated pipeline, not production documentProcessor. */
 export const orchestrator = new PipelineOrchestrator({
-  mockOcr: process.env.USE_MOCK_OCR === 'true',
-  mockInterpreter: process.env.USE_MOCK_INTERPRETER === 'true',
+  mockOcr: process.env.USE_MOCK_OCR === "true",
+  mockInterpreter: process.env.USE_MOCK_INTERPRETER === "true",
 });
