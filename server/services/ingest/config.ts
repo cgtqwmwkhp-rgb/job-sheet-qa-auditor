@@ -25,8 +25,7 @@ export function loadIngestConfig(
   const maxSkewSeconds =
     Number.isFinite(rawSkew) && rawSkew > 0 ? rawSkew : 300;
   const rawUser = parseInt(env.INGEST_SYSTEM_USER_ID ?? "", 10);
-  const systemUserId =
-    Number.isFinite(rawUser) && rawUser > 0 ? rawUser : null;
+  const systemUserId = Number.isFinite(rawUser) && rawUser > 0 ? rawUser : null;
 
   return {
     apiKey,

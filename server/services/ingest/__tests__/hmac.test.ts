@@ -52,9 +52,7 @@ describe("ingest HMAC", () => {
       path,
       bodySha256: sha256Hex(body),
     });
-    expect(canonical).toBe(
-      `1700000000.POST.${path}.${sha256Hex(body)}`
-    );
+    expect(canonical).toBe(`1700000000.POST.${path}.${sha256Hex(body)}`);
   });
 
   it("round-trips createIngestAuthHeaders + verifyIngestAuth", () => {

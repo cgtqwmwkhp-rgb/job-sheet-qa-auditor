@@ -16,10 +16,7 @@ export {
   sha256Hex,
   formatSignatureHeader,
 } from "./hmac";
-export {
-  acceptIngestUpload,
-  type IngestServiceDeps,
-} from "./ingestService";
+export { acceptIngestUpload, type IngestServiceDeps } from "./ingestService";
 export {
   MemoryIngestReceiptStore,
   getDefaultReceiptStore,

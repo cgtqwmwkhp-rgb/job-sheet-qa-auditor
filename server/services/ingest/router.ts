@@ -5,7 +5,12 @@
  * GET  /health         — config readiness (no secrets)
  */
 
-import { Router, type Request, type Response, type NextFunction } from "express";
+import {
+  Router,
+  type Request,
+  type Response,
+  type NextFunction,
+} from "express";
 import { z } from "zod";
 import { loadIngestConfig } from "./config";
 import { verifyIngestAuth } from "./hmac";

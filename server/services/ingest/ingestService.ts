@@ -13,11 +13,7 @@ import {
   type IngestUploadRequest,
 } from "./types";
 
-const ALLOWED_TYPES = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-]);
+const ALLOWED_TYPES = new Set(["application/pdf", "image/jpeg", "image/png"]);
 
 const MAX_BYTES = 10 * 1024 * 1024;
 

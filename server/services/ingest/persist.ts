@@ -14,7 +14,11 @@ export function createDefaultPersister(config: IngestConfig): IngestPersister {
     const sanitized = sanitizeFilename(input.fileName);
     const fileKey = `ingest/${input.deviceId}/${nanoid()}-${sanitized}`;
     const storage = getStorageAdapter();
-    const { url } = await storage.put(fileKey, input.fileBuffer, input.fileType);
+    const { url } = await storage.put(
+      fileKey,
+      input.fileBuffer,
+      input.fileType
+    );
 
     let jobSheetId: number | null = null;
     if (config.systemUserId != null) {

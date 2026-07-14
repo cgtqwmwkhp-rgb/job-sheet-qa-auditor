@@ -35,7 +35,9 @@ export function formatSignatureHeader(hexDigest: string): string {
   return `sha256=${hexDigest}`;
 }
 
-export function parseSignatureHeader(header: string | undefined): string | null {
+export function parseSignatureHeader(
+  header: string | undefined
+): string | null {
   if (!header) return null;
   const trimmed = header.trim();
   const prefix = "sha256=";
@@ -96,20 +98,30 @@ export function verifyIngestAuth(params: {
 
   const providedSig = parseSignatureHeader(params.signatureHeader);
   if (!providedSig) {
-    throw new IngestError("UNAUTHORIZED", "Missing or invalid X-Ingest-Signature");
+    throw new IngestError(
+      "UNAUTHORIZED",
+      "Missing or invalid X-Ingest-Signature"
+    );
   }
 
   const timestamp = (params.timestampHeader ?? "").trim();
   if (!/^\d+$/.test(timestamp)) {
-    throw new IngestError("UNAUTHORIZED", "Missing or invalid X-Ingest-Timestamp");
+    throw new IngestError(
+      "UNAUTHORIZED",
+      "Missing or invalid X-Ingest-Timestamp"
+    );
   }
 
   const tsSec = parseInt(timestamp, 10);
   const nowSec = Math.floor((params.nowMs ?? Date.now()) / 1000);
   if (Math.abs(nowSec - tsSec) > config.maxSkewSeconds) {
-    throw new IngestError("UNAUTHORIZED", "Timestamp outside allowed skew window", {
-      maxSkewSeconds: config.maxSkewSeconds,
-    });
+    throw new IngestError(
+      "UNAUTHORIZED",
+      "Timestamp outside allowed skew window",
+      {
+        maxSkewSeconds: config.maxSkewSeconds,
+      }
+    );
   }
 
   const bodySha256 = sha256Hex(params.rawBody);
