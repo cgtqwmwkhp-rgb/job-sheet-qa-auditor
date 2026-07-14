@@ -25,6 +25,7 @@ import { analyticsRouter } from "./routers/analyticsRouter";
 import { auditActionsRouter } from "./routers/auditActionsRouter";
 import { fixPacksRouter } from "./routers/fixPacksRouter";
 import { portalRouter } from "./routers/portalRouter";
+import { commsRouter } from "./routers/commsRouter";
 import { TRPCError } from "@trpc/server";
 import {
   enforceRateLimit,
@@ -77,6 +78,8 @@ export const appRouter = router({
   fixPacks: fixPacksRouter,
   /** PR-10: waive / override / flag / approve / undo */
   auditActions: auditActionsRouter,
+  /** PR-IO-COMMS: email send, FCM device tokens, notification inbox */
+  comms: commsRouter,
 
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
