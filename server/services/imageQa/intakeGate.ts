@@ -1,11 +1,11 @@
 /**
  * Image QA Intake Gate
  *
- * Runs lightweight quality checks at upload time by OCRing the real upload
- * buffer, then scoring OCR markdown via analyzeDocumentQuality.
+ * Runs real pixel blur/skew/contrast checks on JPEG/PNG upload buffers
+ * BEFORE any OCR spend. Garbage scans are rejected with retake feedback.
  *
- * Fail-open: unexpected errors (including OCR failures) return
- * passed:true + skipped:true.
+ * Fail-open: unexpected errors, empty buffers, or non-raster uploads (PDF)
+ * return passed:true + skipped:true — and still never call OCR for quality.
  *
  * resolveIntakeMarkdownProxy remains available for deterministic unit tests
  * of the fixture map itself — it is not used on the production path.
@@ -17,9 +17,9 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import type { ImageQaConfig, IntakeGateInput, IntakeGateResult } from "./types";
 import { getDefaultImageQaConfig } from "./types";
-import { analyzeDocumentQuality, type OcrPageInput } from "./imageQaService";
+import { analyzeImageBuffer, calculateQualityGrade } from "./detectors";
+import type { OcrPageInput } from "./imageQaService";
 import { buildRetakeFeedback } from "./retakeFeedback";
-import { extractTextFromBase64 } from "../ocr";
 
 const FEATURE_FLAG = "FEATURE_IMAGE_QA_INTAKE";
 
@@ -60,7 +60,7 @@ function loadFixtureMarkdown(fixtureName: string): string {
 
 /**
  * Deterministic mock map: filename / buffer → OCR-like markdown pages.
- * Test-only / internal — production intake uses OCR on the real buffer.
+ * Test-only / internal — production intake uses pixel analysis on the buffer.
  * Never calls getOCRAdapter or extractTextFromBase64.
  */
 export function resolveIntakeMarkdownProxy(input: {
@@ -92,7 +92,10 @@ export function isImageQaIntakeEnabled(): boolean {
   return process.env[FEATURE_FLAG] === "true";
 }
 
-function failOpenResult(reason: string): IntakeGateResult {
+function failOpenResult(
+  reason: string,
+  analysisMethod?: IntakeGateResult["analysisMethod"]
+): IntakeGateResult {
   return {
     passed: true,
     skipped: true,
@@ -101,40 +104,16 @@ function failOpenResult(reason: string): IntakeGateResult {
     retakeFeedback: [],
     requiresReview: false,
     reviewReasons: [],
+    analysisMethod,
+    ocrInvoked: false,
     error: reason,
   };
 }
 
 /**
- * OCR the upload buffer and map pages to OcrPageInput[].
- * Throws / returns empty on failure — caller fail-opens.
- */
-async function resolveIntakePagesFromBuffer(input: {
-  buffer: Buffer;
-  mimeType?: string;
-}): Promise<OcrPageInput[]> {
-  const ocrResult = await extractTextFromBase64(
-    input.buffer.toString("base64"),
-    input.mimeType || "application/pdf"
-  );
-
-  if (!ocrResult.success) {
-    throw new Error(ocrResult.error || "OCR extraction failed");
-  }
-
-  if (!ocrResult.pages || ocrResult.pages.length === 0) {
-    throw new Error("OCR returned no pages");
-  }
-
-  return ocrResult.pages.map(page => ({
-    pageNumber: page.pageNumber,
-    markdown: page.markdown ?? "",
-  }));
-}
-
-/**
- * Run the intake quality gate on the real upload buffer via OCR.
- * Never throws — fail-open on OCR or analysis errors.
+ * Run the intake quality gate on the real upload buffer via pixel analysis.
+ * Never throws — fail-open on decode/analysis errors.
+ * Never invokes OCR (challenge bar: reject garbage before paying OCR).
  */
 export async function runIntakeGate(
   input: IntakeGateInput,
@@ -145,36 +124,52 @@ export async function runIntakeGate(
       return failOpenResult("Empty buffer — intake gate skipped");
     }
 
-    const pages = await resolveIntakePagesFromBuffer({
-      buffer: input.buffer,
+    const metrics = analyzeImageBuffer(input.buffer, {
       mimeType: input.mimeType,
+      pageNumber: 1,
+      config,
     });
 
-    const documentId =
-      input.documentId ||
-      createHash("sha256")
-        .update(input.buffer)
-        .update(input.fileName || "")
-        .digest("hex")
-        .slice(0, 16);
+    if (!metrics) {
+      // PDF / unknown — cannot measure pixels without a render stack; skip
+      // without paying OCR for a fake text-heuristic quality score.
+      return failOpenResult(
+        "Non-raster upload — pixel intake QA unsupported (no OCR invoked)",
+        "unsupported"
+      );
+    }
 
-    const qaResult = analyzeDocumentQuality(documentId, pages, config);
+    const qualityScore = metrics.overallScore;
     const threshold = config.reviewQualityThreshold;
-    const qualityScore = qaResult.documentQuality.overallScore;
-    const passed = qaResult.success && qualityScore >= threshold;
-    const retakeFeedback = passed
-      ? []
-      : buildRetakeFeedback(qaResult.pageMetrics);
+    const hasHardFlags =
+      metrics.isBlurry ||
+      metrics.isSkewed ||
+      metrics.isLowContrast ||
+      metrics.isOverexposed ||
+      metrics.isUnderexposed;
+    const passed = qualityScore >= threshold && !hasHardFlags;
+    const retakeFeedback = passed ? [] : buildRetakeFeedback([metrics]);
+    const reviewReasons: string[] = [];
+    if (metrics.isBlurry) reviewReasons.push("Image is too blurry");
+    if (metrics.isSkewed) reviewReasons.push("Document appears skewed");
+    if (metrics.isLowContrast) reviewReasons.push("Low contrast / washed out");
+    if (metrics.isOverexposed) reviewReasons.push("Overexposed");
+    if (metrics.isUnderexposed) reviewReasons.push("Underexposed");
+    if (!passed && reviewReasons.length === 0) {
+      reviewReasons.push(`Quality score ${qualityScore} below threshold ${threshold}`);
+    }
 
     return {
       passed,
       skipped: false,
       qualityScore,
-      grade: qaResult.documentQuality.qualityGrade,
+      grade: calculateQualityGrade(qualityScore),
       retakeFeedback,
-      requiresReview: qaResult.documentQuality.requiresReview,
-      reviewReasons: qaResult.documentQuality.reviewReasons,
-      pageMetrics: qaResult.pageMetrics,
+      requiresReview: !passed,
+      reviewReasons,
+      pageMetrics: [metrics],
+      analysisMethod: "pixel",
+      ocrInvoked: false,
     };
   } catch (error) {
     const message =
