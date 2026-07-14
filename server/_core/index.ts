@@ -21,6 +21,7 @@ import { hydrateDeadLetterQueueFromDb } from "../utils/deadLetterQueue";
 import { hydrateApiCostLedgerFromDb } from "../services/finOps";
 import { pdfProxyRouter } from "./pdfProxy";
 import { templateSampleProxyRouter } from "./templateSampleProxy";
+import { ingestRouter } from "../services/ingest";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -44,8 +45,17 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
+  // Configure body parser with larger size limit for file uploads.
+  // Stash rawBody for HMAC verification on machine ingest (PR-IO-INGEST).
+  app.use(
+    express.json({
+      limit: "50mb",
+      verify: (req, _res, buf) => {
+        (req as express.Request & { rawBody?: string }).rawBody =
+          buf.toString("utf8");
+      },
+    })
+  );
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // Initialize default template for document processing
@@ -140,6 +150,9 @@ async function startServer() {
   // Provides same-origin PDF streaming to avoid CORS issues with Azure Blob
   app.use("/api/documents", pdfProxyRouter);
   app.use("/api/template-samples", templateSampleProxyRouter);
+
+  // Machine ingest API (API key + HMAC — no Entra browser). PR-IO-INGEST.
+  app.use("/api/ingest", ingestRouter);
 
   // tRPC API
   app.use(
