@@ -57,13 +57,18 @@ export interface ImageQaResult {
   checkType: "signature_present" | "tickboxes_checked";
   confidence: number;
   details: string;
+  /**
+   * False when no real detector/VLM ran — confidence must not be treated as evidence.
+   * Omitted or true means a real verification decision was produced.
+   */
+  available?: boolean;
   vlmProvider?: string;
   vlmModel?: string;
   vlmUsed?: boolean;
 }
 
 export interface RoiImageQaOptions {
-  /** Base64 crop for VLM; without this, heuristic only unless documentPdf set */
+  /** Base64 crop for VLM; without this, Image QA is unavailable unless documentPdf set */
   cropImage?: VlmCropImage;
   /** Full PDF for Anthropic document ink verification when crop unavailable */
   documentPdf?: VlmDocumentPdf;
@@ -177,17 +182,30 @@ export function extractFromRoi(
   };
 }
 
-function heuristicImageQa(fieldId: ImageQaField): ImageQaResult {
-  const checkType =
-    fieldId === "signatureBlock" ? "signature_present" : "tickboxes_checked";
+function imageQaCheckType(fieldId: ImageQaField): ImageQaResult["checkType"] {
+  return fieldId === "signatureBlock"
+    ? "signature_present"
+    : "tickboxes_checked";
+}
 
+/**
+ * Honest unavailable Image QA — never fabricates a live-looking pass/confidence.
+ * Fusion/VLM consumers must treat available:false as "no Image QA evidence".
+ */
+function unavailableImageQa(
+  fieldId: ImageQaField,
+  reason: string,
+  extras: Partial<Pick<ImageQaResult, "vlmProvider" | "vlmModel">> = {}
+): ImageQaResult {
   return {
     fieldId,
-    passed: true,
-    checkType,
-    confidence: 0.88,
-    details: `${checkType} verified in ROI region`,
+    passed: false,
+    checkType: imageQaCheckType(fieldId),
+    confidence: 0,
+    details: reason,
+    available: false,
     vlmUsed: false,
+    ...extras,
   };
 }
 
@@ -195,25 +213,33 @@ function heuristicImageQa(fieldId: ImageQaField): ImageQaResult {
  * Image QA for visual fields.
  * When FEATURE_VLM_VERIFICATION is on and a crop or PDF is provided for a
  * disputed / low-confidence field, calls the VLM adapter (Anthropic or mock).
- * Fail-soft: VLM errors fall back to the heuristic result.
+ * Without a real detector/VLM result, returns unavailable (never a fake pass).
+ * Fail-soft: VLM errors return unavailable, not a stub pass.
  */
 export async function runImageQa(
   _roi: RoiRegion,
   fieldId: ImageQaField,
   options: RoiImageQaOptions = {}
 ): Promise<ImageQaResult> {
-  const heuristic = heuristicImageQa(fieldId);
+  const checkType = imageQaCheckType(fieldId);
 
   if (!isVlmVerificationEnabled()) {
     if (options.disputed) {
+      // Fail-closed decision: disputed and cannot verify → not a pass.
       return {
-        ...heuristic,
+        fieldId,
         passed: false,
+        checkType,
         confidence: 0,
-        details: `${heuristic.checkType} disputed but VLM verification is off — cannot confirm`,
+        available: true,
+        details: `${checkType} disputed but VLM verification is off — cannot confirm`,
+        vlmUsed: false,
       };
     }
-    return heuristic;
+    return unavailableImageQa(
+      fieldId,
+      `${checkType} unavailable — no VLM/detector result (heuristic stub disabled)`
+    );
   }
 
   const config = getVlmConfig();
@@ -224,45 +250,48 @@ export async function runImageQa(
   const shouldUseVlm = hasMedia && (options.disputed === true || lowConfidence);
 
   if (!shouldUseVlm) {
-    return heuristic;
+    return unavailableImageQa(
+      fieldId,
+      hasMedia
+        ? `${checkType} unavailable — VLM not invoked (not disputed / confidence above threshold)`
+        : `${checkType} unavailable — no crop or PDF media for VLM`
+    );
   }
 
   try {
     const adapter = getVlmAdapter();
     const vlm = await adapter.verify({
       fieldId,
-      checkType: heuristic.checkType,
+      checkType,
       cropImage: options.cropImage,
       documentPdf: options.documentPdf,
       disputeReason: options.disputeReason,
     });
 
     if (!vlm.success) {
-      return {
-        ...heuristic,
-        details: `${heuristic.details} (vlm fail-soft: ${vlm.error || vlm.reasoning})`,
-        vlmProvider: vlm.provider,
-        vlmModel: vlm.model,
-        vlmUsed: false,
-      };
+      return unavailableImageQa(
+        fieldId,
+        `${checkType} unavailable (vlm fail-soft: ${vlm.error || vlm.reasoning})`,
+        { vlmProvider: vlm.provider, vlmModel: vlm.model }
+      );
     }
 
     return {
       fieldId,
       passed: vlm.present && vlm.confidence >= config.confidenceThreshold,
-      checkType: heuristic.checkType,
+      checkType,
       confidence: vlm.confidence,
-      details: vlm.reasoning || heuristic.details,
+      details: vlm.reasoning || `${checkType} verified via VLM`,
+      available: true,
       vlmProvider: vlm.provider,
       vlmModel: vlm.model,
       vlmUsed: true,
     };
   } catch {
-    return {
-      ...heuristic,
-      details: `${heuristic.details} (vlm exception fail-soft)`,
-      vlmUsed: false,
-    };
+    return unavailableImageQa(
+      fieldId,
+      `${checkType} unavailable (vlm exception fail-soft)`
+    );
   }
 }
 
@@ -420,9 +449,11 @@ export function requiresReviewQueue(trace: RoiProcessingTrace): {
     }
   }
 
-  // Check for failed image QA → OCR_FAILURE (processing issue)
+  // Check for failed image QA → OCR_FAILURE (processing issue).
+  // Unavailable (available:false) is not a failed check — it must not look like a live fail.
   for (const result of trace.results) {
-    if (result.imageQaResult && !result.imageQaResult.passed) {
+    const qa = result.imageQaResult;
+    if (qa && qa.available !== false && !qa.passed) {
       reasonCodes.add("OCR_FAILURE");
       break;
     }
