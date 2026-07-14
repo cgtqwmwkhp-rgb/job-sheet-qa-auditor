@@ -1,11 +1,18 @@
 /**
  * ROI Extraction Service
  *
- * PR-J: ROI-targeted processing for critical fields.
- * Improves accuracy and speed by extracting from specific regions.
+ * PR-J / PR-AI-05: ROI-targeted processing for critical fields.
+ * Crop → re-OCR (and VLM for visual fields) replaces the former mock trap
+ * that returned fabricated JOB-ROI-001 values.
  */
 
 import type { RoiConfig, RoiRegion } from "../templateRegistry/types";
+import {
+  createCropOcrRunner,
+  isRoiCropReocrEnabled,
+  type CropOcrRunner,
+  type RoiCropImage,
+} from "../ocrAdapter/cropOcrAdapter";
 import {
   getVlmAdapter,
   getVlmConfig,
@@ -42,23 +49,11 @@ export interface RoiExtractionResult {
   extracted: boolean;
   value: string | null;
   confidence: number;
-  source: "roi" | "fullpage" | "reprocessed" | "unavailable";
+  source: "roi" | "fullpage" | "reprocessed" | "crop_ocr";
   roiRegion?: RoiRegion;
   reprocessAttempts: number;
   imageQaResult?: ImageQaResult;
-  /** Set when ROI extraction is quarantined — no fabricated field value. */
-  unavailableReason?: string;
-}
-
-/** Canonical reason when crop/re-OCR path is not wired (former mock trap removed). */
-export const ROI_EXTRACTION_QUARANTINED_REASON =
-  "ROI extraction unavailable — crop/re-OCR not configured (mock quarantined)";
-
-export interface RoiExtractResult {
-  value: string | null;
-  confidence: number;
-  unavailable?: boolean;
-  reason?: string;
+  cropHash?: string;
 }
 
 /**
@@ -128,6 +123,17 @@ export const DEFAULT_PERFORMANCE_CAPS: PerformanceCaps = {
   minConfidenceThreshold: 0.6,
 };
 
+export interface ProcessWithRoiOptions {
+  /** PDF bytes for ROI crop → re-OCR */
+  pdfBuffer?: Buffer | null;
+  /** Injected crop OCR runner (tests / custom HTR later) */
+  cropOcrRunner?: CropOcrRunner;
+  /** Force crop path even when FEATURE_ROI_CROP_REOCR is off */
+  forceCropReocr?: boolean;
+  /** Full PDF for VLM when crop render fails */
+  documentPdf?: VlmDocumentPdf;
+}
+
 /**
  * Check if a field is a critical ROI field
  */
@@ -167,26 +173,55 @@ export function getMissingCriticalRois(
   return CRITICAL_ROI_FIELDS.filter(f => !presentRois.has(f));
 }
 
+const FIELD_EVIDENCE_PATTERNS: Record<string, RegExp[]> = {
+  jobReference: [
+    /(?:job\s*(?:ref(?:erence)?|no\.?|number|#)|jsr)\s*[:#-]?\s*([A-Z0-9][\w/-]{2,})/i,
+    /\b(JOB[-_\s]?\d{3,})\b/i,
+  ],
+  assetId: [
+    /(?:asset(?:\s*id)?|fleet|reg(?:istration)?|plant)\s*[:#-]?\s*([A-Z0-9][\w/-]{2,})/i,
+  ],
+  date: [
+    /(?:^|\b)(?:date|visited|completed)\s*[:#-]?\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2})/im,
+  ],
+  expiryDate: [
+    /(?:expir(?:y|es|ation)|valid\s*until)\s*[:#-]?\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2})/i,
+  ],
+  tickboxBlock: [/\b(all[_\s-]?checked|tick(?:ed|box)?s?\s*complete)\b/i],
+  signatureBlock: [/\b(signed|signature\s*present|sign[_-]?off)\b/i],
+};
+
 /**
- * ROI-targeted extraction entry point.
- * Quarantined: never fabricates JOB-ROI-001 / 0.92 placeholder values.
- * Real crop → re-OCR wiring lives in a follow-on PR; until then, unavailable.
+ * Evidence-based extraction from document text for an ROI field.
+ * Never fabricates placeholder values (former mock trap removed).
  */
 export function extractFromRoi(
-  _documentText: string,
-  _roi: RoiRegion,
-  _fieldId: string
-): RoiExtractResult {
-  void _documentText;
-  void _roi;
-  void _fieldId;
+  documentText: string,
+  roi: RoiRegion,
+  fieldId: string
+): { value: string | null; confidence: number } {
+  void roi; // geometry used by crop path; text path is field-pattern evidence
+  const text = documentText ?? "";
+  if (!text.trim()) {
+    return { value: null, confidence: 0 };
+  }
 
-  return {
-    value: null,
-    confidence: 0,
-    unavailable: true,
-    reason: ROI_EXTRACTION_QUARANTINED_REASON,
-  };
+  const patterns = FIELD_EVIDENCE_PATTERNS[fieldId];
+  if (patterns) {
+    for (const re of patterns) {
+      const m = text.match(re);
+      const captured = (m?.[1] || m?.[0] || "").trim();
+      if (captured) {
+        return {
+          value: captured.slice(0, 200),
+          // Labeled evidence is ROI-strength; crop OCR may still beat this.
+          confidence: 0.85,
+        };
+      }
+    }
+  }
+
+  return { value: null, confidence: 0 };
 }
 
 function imageQaCheckType(fieldId: ImageQaField): ImageQaResult["checkType"] {
@@ -302,8 +337,16 @@ export async function runImageQa(
   }
 }
 
+function toVlmCrop(crop: RoiCropImage): VlmCropImage {
+  return {
+    data: crop.dataBase64,
+    mediaType: crop.mediaType,
+  };
+}
+
 /**
- * Process a document using ROI-targeted extraction
+ * Process a document using ROI-targeted extraction.
+ * Prefers crop → re-OCR when PDF bytes (or injected runner) are available.
  */
 export async function processWithRoi(
   documentId: number,
@@ -311,12 +354,19 @@ export async function processWithRoi(
   templateVersionId: number,
   roiConfig: RoiConfig | null,
   fieldIds: string[],
-  caps: PerformanceCaps = DEFAULT_PERFORMANCE_CAPS
+  caps: PerformanceCaps = DEFAULT_PERFORMANCE_CAPS,
+  options: ProcessWithRoiOptions = {}
 ): Promise<RoiProcessingTrace> {
   const startTime = Date.now();
   const results: RoiExtractionResult[] = [];
   const warnings: string[] = [];
   let totalReprocessAttempts = 0;
+
+  const cropEnabled =
+    options.forceCropReocr === true ||
+    (isRoiCropReocrEnabled() &&
+      (Boolean(options.pdfBuffer?.length) || Boolean(options.cropOcrRunner)));
+  const cropRunner = options.cropOcrRunner ?? createCropOcrRunner();
 
   // Check for missing critical ROIs
   const missingCritical = getMissingCriticalRois(roiConfig);
@@ -329,46 +379,111 @@ export async function processWithRoi(
     let extracted = false;
     let value: string | null = null;
     let confidence = 0;
-    let source: "roi" | "fullpage" | "reprocessed" | "unavailable" = "fullpage";
+    let source: RoiExtractionResult["source"] = "fullpage";
     let reprocessAttempts = 0;
     let imageQaResult: ImageQaResult | undefined;
-    let unavailableReason: string | undefined;
+    let cropHash: string | undefined;
+    let lastCrop: RoiCropImage | undefined;
 
     if (roi) {
-      const roiResult = extractFromRoi(documentText, roi, fieldId);
+      source = "roi"; // ROI path attempted (never invent values)
 
-      if (roiResult.unavailable) {
-        value = null;
-        confidence = 0;
-        source = "unavailable";
-        extracted = false;
-        unavailableReason =
-          roiResult.reason ?? ROI_EXTRACTION_QUARANTINED_REASON;
-        warnings.push(
-          `ROI extraction quarantined for '${fieldId}': ${unavailableReason}`
-        );
-      } else {
-        value = roiResult.value;
-        confidence = roiResult.confidence;
-        source = "roi";
-        extracted = confidence >= caps.minConfidenceThreshold;
+      // Prefer crop → re-OCR for critical / text fields when enabled
+      if (cropEnabled && !requiresImageQa(fieldId)) {
+        const cropResult = await cropRunner({
+          fieldId,
+          roi,
+          pdfBuffer: options.pdfBuffer,
+          skipRetry: true,
+        });
+        if (cropResult.crop) {
+          lastCrop = cropResult.crop;
+          cropHash = cropResult.crop.cropHash;
+        }
+        if (cropResult.success && cropResult.value) {
+          value = cropResult.value;
+          confidence = cropResult.confidence;
+          source = "crop_ocr";
+          extracted = confidence >= caps.minConfidenceThreshold;
+        }
+      }
 
+      // Evidence fallback from document text (never mock placeholders)
+      if (!extracted) {
+        const roiResult = extractFromRoi(documentText, roi, fieldId);
+        if (roiResult.value) {
+          value = roiResult.value;
+          confidence = roiResult.confidence;
+          source = "roi";
+          extracted = confidence >= caps.minConfidenceThreshold;
+        }
+      }
+
+      // Run image QA for visual fields (pass crop when we have one)
+      if (requiresImageQa(fieldId)) {
+        if (cropEnabled && !lastCrop && options.pdfBuffer?.length) {
+          const cropOnly = await cropRunner({
+            fieldId,
+            roi,
+            pdfBuffer: options.pdfBuffer,
+            skipRetry: true,
+          });
+          if (cropOnly.crop) {
+            lastCrop = cropOnly.crop;
+            cropHash = cropOnly.crop.cropHash;
+          }
+          if (cropOnly.value) {
+            value = cropOnly.value;
+            confidence = Math.max(confidence, cropOnly.confidence);
+            source = "crop_ocr";
+          }
+        }
+
+        imageQaResult = await runImageQa(roi, fieldId as ImageQaField, {
+          extractionConfidence: confidence,
+          disputed: !extracted,
+          cropImage: lastCrop ? toVlmCrop(lastCrop) : undefined,
+          documentPdf: options.documentPdf,
+        });
         if (
+          imageQaResult.passed &&
+          imageQaResult.confidence >= caps.minConfidenceThreshold
+        ) {
+          extracted = true;
+          confidence = Math.max(confidence, imageQaResult.confidence);
+          if (!value) {
+            value =
+              fieldId === "signatureBlock" ? "signed" : "tickboxes_checked";
+          }
+        }
+      }
+
+      // Reprocess via crop OCR if still low confidence (respecting caps)
+      if (
+        !extracted &&
+        cropEnabled &&
+        totalReprocessAttempts < caps.maxReprocessAttemptsPerDoc
+      ) {
+        while (
           !extracted &&
+          reprocessAttempts < caps.maxReprocessAttemptsPerRoi &&
           totalReprocessAttempts < caps.maxReprocessAttemptsPerDoc
         ) {
-          while (
-            !extracted &&
-            reprocessAttempts < caps.maxReprocessAttemptsPerRoi &&
-            totalReprocessAttempts < caps.maxReprocessAttemptsPerDoc
-          ) {
-            reprocessAttempts++;
-            totalReprocessAttempts++;
+          reprocessAttempts++;
+          totalReprocessAttempts++;
 
-            const reprocessResult = extractFromRoi(documentText, roi, fieldId);
-            if (reprocessResult.unavailable) {
-              break;
-            }
+          const reprocessResult = await cropRunner({
+            fieldId,
+            roi,
+            pdfBuffer: options.pdfBuffer,
+            cropImage: lastCrop,
+            skipRetry: false,
+          });
+          if (reprocessResult.crop) {
+            lastCrop = reprocessResult.crop;
+            cropHash = reprocessResult.crop.cropHash;
+          }
+          if (reprocessResult.success && reprocessResult.value) {
             value = reprocessResult.value;
             confidence = reprocessResult.confidence;
             source = "reprocessed";
@@ -376,25 +491,26 @@ export async function processWithRoi(
           }
         }
       }
-
-      // Run image QA for visual fields (disputed when extraction unavailable)
-      if (requiresImageQa(fieldId)) {
-        imageQaResult = await runImageQa(roi, fieldId as ImageQaField, {
-          extractionConfidence: confidence,
-          disputed: !extracted,
-        });
-      }
     } else if (isCriticalRoiField(fieldId)) {
       // Critical field without ROI - flag for review
       warnings.push(`Critical field '${fieldId}' has no ROI defined`);
       extracted = false;
       confidence = 0;
     } else {
-      // Non-critical field without ROI - extract from full page
-      // In production: use full-page OCR result
-      value = `fullpage-${fieldId}`;
-      confidence = 0.75;
-      extracted = true;
+      // Non-critical field without ROI — evidence from full page text only
+      const full = extractFromRoi(
+        documentText,
+        {
+          name: fieldId,
+          page: 1,
+          bounds: { x: 0, y: 0, width: 1, height: 1 },
+        },
+        fieldId
+      );
+      value = full.value;
+      confidence = full.value ? Math.min(full.confidence, 0.75) : 0;
+      extracted = Boolean(full.value);
+      source = "fullpage";
     }
 
     results.push({
@@ -406,7 +522,7 @@ export async function processWithRoi(
       roiRegion: roi ?? undefined,
       reprocessAttempts,
       imageQaResult,
-      unavailableReason,
+      cropHash,
     });
   }
 

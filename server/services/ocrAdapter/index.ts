@@ -41,6 +41,21 @@ export type {
   AzureTextLine,
   ParsedAzureDiResult,
 } from "./parseAzureDiResponse";
+export {
+  FEATURE_ROI_CROP_REOCR,
+  isRoiCropReocrEnabled,
+  renderRoiCropFromPdf,
+  reOcrRoiCrop,
+  createCropOcrRunner,
+  valueFromCropOcrText,
+} from "./cropOcrAdapter";
+export type {
+  RoiCropImage,
+  CropOcrRequest,
+  CropOcrResult,
+  CropRenderer,
+  CropOcrRunner,
+} from "./cropOcrAdapter";
 
 import type { OCRAdapter, OCRProvider } from "./types";
 import { getOCRConfig } from "./types";
