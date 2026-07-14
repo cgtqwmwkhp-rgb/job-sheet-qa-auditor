@@ -16,6 +16,7 @@ import {
 } from "../../services/templateStudio/dryRunAudit";
 import { router } from "../../_core/trpc";
 import type { User } from "../../../drizzle/schema";
+import { createStudioStarterRoi } from "../../services/templateStudio/starterDraft";
 
 const testRouter = router({
   templates: templateRouter,
@@ -45,6 +46,19 @@ function createCaller(role: "user" | "admin" | "qa_lead" = "user", id = 1) {
     user: createMockUser(role, id),
   };
   return testRouter.createCaller(ctx);
+}
+
+/** Drafts start with empty ROI (no scaffold); activation tests need explicit ROIs. */
+async function attachStarterRoi(
+  caller: ReturnType<typeof createCaller>,
+  versionId: number
+) {
+  const saved = await caller.templates.studio.saveDraft({
+    versionId,
+    roiJson: createStudioStarterRoi(),
+    changeNotes: "Test: attach starter ROI for activation gates",
+  });
+  return saved.version;
 }
 
 describe("Template Studio contracts", () => {
@@ -106,10 +120,12 @@ describe("Template Studio contracts", () => {
 
   it("activationReport reflects gates; activateStaging succeeds for starter draft", async () => {
     const caller = createCaller("admin");
-    const { template, version } = await caller.templates.studio.createDraft({
-      name: "Activate Me",
-      selectionTokens: ["plantexpand-unique-activate"],
-    });
+    const { template, version: draft } =
+      await caller.templates.studio.createDraft({
+        name: "Activate Me",
+        selectionTokens: ["plantexpand-unique-activate"],
+      });
+    const version = await attachStarterRoi(caller, draft.id);
     await caller.templates.studio.scaffoldFixtures({
       versionId: version.id,
       sampleText:
@@ -232,10 +248,12 @@ describe("Template Studio contracts", () => {
 
   it("dual-control promote blocks self-approve", async () => {
     const author = createCaller("qa_lead", 10);
-    const { template, version } = await author.templates.studio.createDraft({
-      name: "Promote Me",
-      selectionTokens: ["promote-unique-token"],
-    });
+    const { template, version: draft } =
+      await author.templates.studio.createDraft({
+        name: "Promote Me",
+        selectionTokens: ["promote-unique-token"],
+      });
+    const version = await attachStarterRoi(author, draft.id);
     await author.templates.studio.scaffoldFixtures({ versionId: version.id });
     await seedAcknowledgedDryRunForTests({
       versionId: version.id,
