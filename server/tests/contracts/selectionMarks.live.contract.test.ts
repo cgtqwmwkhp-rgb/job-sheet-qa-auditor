@@ -124,7 +124,7 @@ describe("selectionMarks edge cases", () => {
     expect(rows[1].choice).toBe("Fail");
   });
 
-  it("builds Fail/UNREADABLE/Ok findings from rows", () => {
+  it("builds Fail/UNREADABLE findings from rows (Ok is artifact-only)", () => {
     const parsed = parseAzureDiResponse(live);
     const artifact = buildSelectionMarksArtifact(parsed.selectionMarks, {
       model: parsed.model,
@@ -134,8 +134,15 @@ describe("selectionMarks edge cases", () => {
     });
     const findings = buildSelectionMarkFindings(artifact.rows);
     expect(findings.some(f => f.normalisedSnippet === "Fail")).toBe(true);
-    expect(findings.some(f => f.normalisedSnippet === "Ok")).toBe(true);
     expect(findings.some(f => f.normalisedSnippet === "UNREADABLE")).toBe(true);
+    expect(findings.some(f => f.normalisedSnippet === "Ok")).toBe(false);
+    expect(
+      findings.every(
+        f =>
+          f.reasonCode !== "LOW_CONFIDENCE" ||
+          f.normalisedSnippet === "UNREADABLE"
+      )
+    ).toBe(true);
     expect(hasBlockingFailMarks(artifact)).toBe(true);
     const reconciled = reconcileSelectionMarksWithJudgment([], artifact);
     expect(reconciled.length).toBe(findings.length);
