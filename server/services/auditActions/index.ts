@@ -196,7 +196,8 @@ export async function applyFindingAction(
       ruleId: finding.ruleId,
       findingReasonCode: finding.reasonCode ?? undefined,
       fieldName: finding.fieldName ?? undefined,
-      originalValue: finding.normalisedSnippet ?? finding.rawSnippet ?? undefined,
+      originalValue:
+        finding.normalisedSnippet ?? finding.rawSnippet ?? undefined,
       reviewerReason: input.reason,
     });
   }

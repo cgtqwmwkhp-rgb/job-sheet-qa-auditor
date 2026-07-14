@@ -4,12 +4,8 @@
 
 export async function resolveJobSheetsForFindings(
   deps: {
-    getFinding: (
-      id: number
-    ) => Promise<{ auditResultId: number } | undefined>;
-    getAuditResult: (
-      id: number
-    ) => Promise<{ jobSheetId: number } | undefined>;
+    getFinding: (id: number) => Promise<{ auditResultId: number } | undefined>;
+    getAuditResult: (id: number) => Promise<{ jobSheetId: number } | undefined>;
   },
   findingIds: number[]
 ): Promise<Array<{ findingId: number; jobSheetId: number }>> {

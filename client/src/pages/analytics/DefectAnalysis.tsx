@@ -490,7 +490,9 @@ export default function DefectAnalysis() {
                       <TableCell className="text-right">
                         <WorstRuleActions
                           rule={rule}
-                          jobSheetIds={jobSheetsByRuleKey.get(rule.ruleKey) ?? []}
+                          jobSheetIds={
+                            jobSheetsByRuleKey.get(rule.ruleKey) ?? []
+                          }
                         />
                       </TableCell>
                     </TableRow>

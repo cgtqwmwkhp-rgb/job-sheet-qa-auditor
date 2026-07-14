@@ -69,9 +69,7 @@ export function withTrainingSignalDetails(
   };
 }
 
-export function extractTrainingSignal(
-  details: unknown
-): TrainingSignal | null {
+export function extractTrainingSignal(details: unknown): TrainingSignal | null {
   if (!details || typeof details !== "object") return null;
   const raw = (details as { trainingSignal?: unknown }).trainingSignal;
   if (!raw || typeof raw !== "object") return null;
