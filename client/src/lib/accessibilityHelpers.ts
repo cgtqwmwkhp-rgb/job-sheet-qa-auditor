@@ -5,6 +5,14 @@
  * Includes ARIA labels, keyboard navigation, and screen reader support.
  */
 
+/** Landmark id targeted by the app-shell skip link */
+export const MAIN_CONTENT_ID = "main-content";
+
+/** Persistent polite live region mounted in the app shell */
+export const A11Y_LIVE_REGION_ID = "a11y-status";
+
+export const SKIP_TO_MAIN_LABEL = "Skip to main content";
+
 /**
  * Generate descriptive ARIA label for action buttons
  */
@@ -182,12 +190,24 @@ export function trapFocus(container: HTMLElement) {
 }
 
 /**
- * Announce message to screen readers using ARIA live region
+ * Announce message to screen readers using the shell aria-live region
+ * when present, otherwise a short-lived fallback region.
  */
 export function announceToScreenReader(
   message: string,
   priority: "polite" | "assertive" = "polite"
 ) {
+  const shellRegion = document.getElementById(A11Y_LIVE_REGION_ID);
+  if (shellRegion) {
+    shellRegion.setAttribute("aria-live", priority);
+    // Clear then set so identical consecutive messages are announced
+    shellRegion.textContent = "";
+    window.requestAnimationFrame(() => {
+      shellRegion.textContent = message;
+    });
+    return;
+  }
+
   const liveRegion = document.createElement("div");
   liveRegion.setAttribute("role", "status");
   liveRegion.setAttribute("aria-live", priority);
@@ -197,9 +217,8 @@ export function announceToScreenReader(
 
   document.body.appendChild(liveRegion);
 
-  // Remove after announcement
   setTimeout(() => {
-    document.body.removeChild(liveRegion);
+    liveRegion.remove();
   }, 1000);
 }
 
@@ -207,14 +226,13 @@ export function announceToScreenReader(
  * Generate skip link for keyboard navigation
  */
 export function createSkipLink(
-  targetId: string,
-  label: string = "Skip to main content"
+  targetId: string = MAIN_CONTENT_ID,
+  label: string = SKIP_TO_MAIN_LABEL
 ): HTMLAnchorElement {
   const link = document.createElement("a");
   link.href = `#${targetId}`;
   link.textContent = label;
-  link.className =
-    "sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:p-4 focus:bg-background focus:text-foreground focus:border focus:rounded";
+  link.className = "skip-link";
   return link;
 }
 

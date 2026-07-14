@@ -125,7 +125,12 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
 ];
 
 export default function DisputeManagement() {
-  const { data: disputes, isLoading } = trpc.disputes.list.useQuery();
+  const {
+    data: disputes,
+    isLoading,
+    isError,
+    refetch,
+  } = trpc.disputes.list.useQuery();
   const updateDisputeStatus = trpc.disputes.updateStatus.useMutation();
   const utils = trpc.useUtils();
 
@@ -266,6 +271,37 @@ export default function DisputeManagement() {
             <StatCardSkeleton />
           </div>
           <ListSkeleton items={5} />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (isError) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-heading font-bold tracking-tight text-[#333030]">
+              Dispute Management
+            </h1>
+            <p className="text-[#706D6D] mt-1">
+              Triage technician-contested findings — start review, escalate, or
+              resolve in one place.
+            </p>
+          </div>
+          <Card className="border-destructive/30 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-sm font-medium text-destructive">
+              Unable to load disputes. Refresh and try again.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void refetch()}
+            >
+              Retry
+            </Button>
+          </Card>
         </div>
       </DashboardLayout>
     );

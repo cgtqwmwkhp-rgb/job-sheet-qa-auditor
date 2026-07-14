@@ -85,8 +85,12 @@ function downloadAuditLogCsv(
 export default function AuditLog() {
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Fetch audit logs from API
-  const { data: logs, isLoading } = trpc.auditLog.list.useQuery({ limit: 100 });
+  const {
+    data: logs,
+    isLoading,
+    isError,
+    refetch,
+  } = trpc.auditLog.list.useQuery({ limit: 100 });
 
   const filteredLogs =
     logs?.filter(
@@ -124,6 +128,21 @@ export default function AuditLog() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-7xl mx-auto">
+        {isError ? (
+          <Card className="border-destructive/30 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-sm font-medium text-destructive">
+              Unable to load audit log. Refresh and try again.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void refetch()}
+            >
+              Retry
+            </Button>
+          </Card>
+        ) : null}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-border/50">
           <div>
             <h1 className="text-3xl font-heading font-bold tracking-tight">
@@ -172,7 +191,7 @@ export default function AuditLog() {
               <div className="p-4">
                 <TableSkeleton rows={8} columns={6} />
               </div>
-            ) : filteredLogs.length > 0 ? (
+            ) : isError ? null : filteredLogs.length > 0 ? (
               <div className="max-h-[min(70vh,640px)] overflow-auto">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
