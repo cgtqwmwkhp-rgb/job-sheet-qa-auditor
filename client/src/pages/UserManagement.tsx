@@ -2,12 +2,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -93,8 +88,8 @@ export default function UserManagement() {
             </p>
           </div>
           <p className="text-sm text-muted-foreground">
-            {totalUsers} {totalUsers === 1 ? "user" : "users"} registered.
-            New users appear here after they sign in for the first time.
+            {totalUsers} {totalUsers === 1 ? "user" : "users"} registered. New
+            users appear here after they sign in for the first time.
           </p>
         </div>
 
