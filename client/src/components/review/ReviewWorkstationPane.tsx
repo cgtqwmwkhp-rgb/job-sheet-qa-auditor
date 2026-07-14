@@ -360,7 +360,9 @@ export function ReviewWorkstationPane({
           needsTemplateAuthoring: Boolean(
             (
               auditResult?.reportJson as
-                { needsTemplateAuthoring?: boolean } | null | undefined
+                | { needsTemplateAuthoring?: boolean }
+                | null
+                | undefined
             )?.needsTemplateAuthoring
           ),
           ...(() => {
@@ -428,7 +430,9 @@ export function ReviewWorkstationPane({
           Boolean(
             (
               auditResult?.reportJson as
-                { needsTemplateAuthoring?: boolean } | null | undefined
+                | { needsTemplateAuthoring?: boolean }
+                | null
+                | undefined
             )?.needsTemplateAuthoring
           ),
       }
