@@ -9,7 +9,12 @@ export function computeEce(
   binCount = 10
 ): EceResult {
   if (samples.length === 0) {
-    return { ece: 0, bins: [] };
+    return {
+      ece: null,
+      bins: [],
+      measurementReady: false,
+      note: "No labelled samples; ECE cannot be measured.",
+    };
   }
 
   const bins: EceResult["bins"] = [];
@@ -40,5 +45,5 @@ export function computeEce(
     }
   }
 
-  return { ece, bins };
+  return { ece, bins, measurementReady: true };
 }

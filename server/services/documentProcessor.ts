@@ -112,6 +112,7 @@ import {
 import {
   getFeatureFlagsFromEnv,
   processWithIntegration,
+  buildFusionInputMapsFromStages,
   type PipelineOutput,
 } from "./pipelineIntegration";
 import {
@@ -314,14 +315,19 @@ function buildFlaggedProcessorArtifacts(input: {
       input.processingSettings.llmConfidenceThreshold ?? 70
     );
     const labelledSamples: [] = [];
+    const eceResult = computeEce(labelledSamples);
 
     return {
       sampleCount: labelledSamples.length,
-      ece: computeEce(labelledSamples),
+      ece: eceResult.ece,
+      measurementReady: eceResult.measurementReady,
+      bins: eceResult.bins,
       thresholdSuggestion: suggestThreshold(labelledSamples, {
         currentThreshold,
       }),
-      note: "No reviewed outcome labels are available during upload processing.",
+      note:
+        eceResult.note ??
+        "No reviewed outcome labels are available during upload processing.",
     };
   });
 
@@ -1338,64 +1344,6 @@ async function processJobSheetWithOptions(
   }
 
   // =========================================================================
-  // Stage 1.85: Pipeline Integration (Phase 1.4) — FULL path only
-  // Master-flagged and fail-soft; sub-flags are no-ops unless enabled.
-  // Persists artifacts on reportJson without changing canonical analysis.
-  // =========================================================================
-  const pipelineIntegrationStartTime = Date.now();
-  let pipelineIntegrationResult: PipelineOutput | null = null;
-
-  if (process.env.FEATURE_PIPELINE_INTEGRATION === "true") {
-    try {
-      const fileContent = Buffer.from(extractedText, "utf-8");
-      pipelineIntegrationResult = await processWithIntegration(
-        {
-          documentId: String(jobSheetId),
-          fileContent,
-          fileHash: sha256(fileContent),
-          templateVersionId: usedTemplateVersionId,
-          templateHash: sha256(JSON.stringify(spec)),
-        },
-        getFeatureFlagsFromEnv(),
-        extractedText
-      );
-      recordStage(
-        {
-          stage: "Pipeline Integration",
-          status: "success",
-          durationMs: Date.now() - pipelineIntegrationStartTime,
-        },
-        "AI Analysis"
-      );
-    } catch (pipelineIntegrationError) {
-      console.warn(
-        "[DocumentProcessor] Pipeline integration failed (non-fatal):",
-        pipelineIntegrationError
-      );
-      recordStage(
-        {
-          stage: "Pipeline Integration",
-          status: "failed",
-          durationMs: Date.now() - pipelineIntegrationStartTime,
-          error:
-            pipelineIntegrationError instanceof Error
-              ? pipelineIntegrationError.message
-              : "Pipeline integration failed",
-        },
-        "AI Analysis"
-      );
-    }
-  } else {
-    recordStage(
-      {
-        stage: "Pipeline Integration",
-        status: "skipped",
-        durationMs: Date.now() - pipelineIntegrationStartTime,
-      },
-      "AI Analysis"
-    );
-  }
-
   // Stage 1.9: Fetch PDF once for VLM ink + Gemini multimodal (fail-soft)
   const pdfFetchStart = Date.now();
   let sharedPdfBuffer: Buffer | null = null;
@@ -1492,6 +1440,89 @@ async function processJobSheetWithOptions(
       status: "skipped",
       durationMs: 0,
     });
+  }
+
+  // =========================================================================
+  // Stage 1.97: Pipeline Integration (Phase 1.4) — after ROI spatial + VLM ink
+  // Master-flagged and fail-soft. Image QA fusion receives real stage maps or
+  // records an explicit skip reason — never a silent no-op when flagged.
+  // =========================================================================
+  const pipelineIntegrationStartTime = Date.now();
+  let pipelineIntegrationResult: PipelineOutput | null = null;
+
+  if (process.env.FEATURE_PIPELINE_INTEGRATION === "true") {
+    try {
+      const pinnedVersion = usedTemplateVersionId
+        ? getTemplateVersion(usedTemplateVersionId)
+        : null;
+      const fusionMaps = buildFusionInputMapsFromStages({
+        roiSpatialFields,
+        roiConfig: pinnedVersion?.roiJson,
+        selectionMarksResult,
+        vlmSignatureImageQa: vlmInkResult?.ran ? vlmInkResult.imageQa : null,
+      });
+      const integrationFlags = getFeatureFlagsFromEnv();
+      const fileContent = Buffer.from(extractedText, "utf-8");
+      pipelineIntegrationResult = await processWithIntegration(
+        {
+          documentId: String(jobSheetId),
+          fileContent,
+          fileHash: sha256(fileContent),
+          templateVersionId: usedTemplateVersionId,
+          templateHash: sha256(JSON.stringify(spec)),
+        },
+        integrationFlags,
+        extractedText,
+        fusionMaps.ocrResults,
+        fusionMaps.imageQaResults,
+        fusionMaps.roiBboxes
+      );
+      if (
+        integrationFlags.useImageQaFusion &&
+        pipelineIntegrationResult.imageQaFusionStatus &&
+        !pipelineIntegrationResult.imageQaFusionStatus.ran
+      ) {
+        console.info(
+          "[DocumentProcessor] Image QA fusion skipped:",
+          pipelineIntegrationResult.imageQaFusionStatus.skipReason ??
+            fusionMaps.skipReason
+        );
+      }
+      recordStage(
+        {
+          stage: "Pipeline Integration",
+          status: "success",
+          durationMs: Date.now() - pipelineIntegrationStartTime,
+        },
+        "AI Analysis"
+      );
+    } catch (pipelineIntegrationError) {
+      console.warn(
+        "[DocumentProcessor] Pipeline integration failed (non-fatal):",
+        pipelineIntegrationError
+      );
+      recordStage(
+        {
+          stage: "Pipeline Integration",
+          status: "failed",
+          durationMs: Date.now() - pipelineIntegrationStartTime,
+          error:
+            pipelineIntegrationError instanceof Error
+              ? pipelineIntegrationError.message
+              : "Pipeline integration failed",
+        },
+        "AI Analysis"
+      );
+    }
+  } else {
+    recordStage(
+      {
+        stage: "Pipeline Integration",
+        status: "skipped",
+        durationMs: Date.now() - pipelineIntegrationStartTime,
+      },
+      "AI Analysis"
+    );
   }
 
   // Stage 2: AI Analysis

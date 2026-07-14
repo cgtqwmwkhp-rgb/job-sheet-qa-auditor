@@ -297,6 +297,46 @@ describe("Pipeline Integration Contract Tests", () => {
       // Fusion should add evidence but not change overall status unexpectedly
       expect(["PASS", "FAIL", "REVIEW_QUEUE"]).toContain(result.status);
     });
+
+    it("should skip fusion honestly when flag is on but maps are incomplete", async () => {
+      const result = await processWithIntegration(
+        mockInput,
+        flagsWithFusion,
+        mockOcrText,
+        new Map(),
+        new Map(),
+        new Map()
+      );
+
+      expect(result.fusionResults).toHaveLength(0);
+      expect(result.fusionEvidence).toBeNull();
+      expect(result.imageQaFusionStatus).toEqual(
+        expect.objectContaining({
+          attempted: true,
+          ran: false,
+          fusedFieldCount: 0,
+        })
+      );
+      expect(result.imageQaFusionStatus?.skipReason).toMatch(
+        /image_qa_fusion_flag_on_but_no_complete_field_maps/
+      );
+    });
+
+    it("should skip fusion honestly when flag is on but maps are not provided", async () => {
+      const result = await processWithIntegration(
+        mockInput,
+        flagsWithFusion,
+        mockOcrText
+      );
+
+      expect(result.imageQaFusionStatus).toEqual(
+        expect.objectContaining({
+          attempted: true,
+          ran: false,
+          skipReason: "image_qa_fusion_flag_on_but_fusion_maps_not_provided",
+        })
+      );
+    });
   });
 
   describe("Deterministic Cache Integration", () => {

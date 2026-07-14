@@ -16,8 +16,12 @@ export interface EceBin {
 }
 
 export interface EceResult {
-  ece: number;
+  /** Null when no labelled samples — never report 0 as perfect calibration. */
+  ece: number | null;
   bins: EceBin[];
+  /** True only when sample count supports a meaningful ECE measurement. */
+  measurementReady: boolean;
+  note?: string;
 }
 
 export interface ThresholdSuggestion {

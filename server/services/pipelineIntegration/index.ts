@@ -12,3 +12,4 @@
 
 export * from './pipelineIntegrator';
 export * from './types';
+export * from './fusionInputMaps';

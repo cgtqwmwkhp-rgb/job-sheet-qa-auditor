@@ -41,6 +41,10 @@ import type {
   ValidationTraceArtifact,
 } from "./types";
 import { DEFAULT_FEATURE_FLAGS } from "./types";
+import {
+  describeFusionMapGap,
+  getFusionReadyFieldIds,
+} from "./fusionInputMaps";
 
 /**
  * Engine version constants for cache invalidation
@@ -99,6 +103,7 @@ export async function processWithIntegration(
   let validationTrace: ValidationTrace | null = null;
   let fusionResults: FusedFieldResult[] = [];
   let fusionEvidence: FusionEvidence | null = null;
+  let imageQaFusionStatus: PipelineOutput["imageQaFusionStatus"];
 
   // Critical field extraction
   if (flags.useCriticalFieldExtractor && ocrText) {
@@ -107,14 +112,38 @@ export async function processWithIntegration(
   }
 
   // Image QA fusion for tickboxes/signatures
-  if (flags.useImageQaFusion && ocrResults && imageQaResults && roiBboxes) {
-    fusionEvidence = fuseAllFields(
-      input.documentId,
-      ocrResults,
-      imageQaResults,
-      roiBboxes
-    );
-    fusionResults = fusionEvidence.fields;
+  if (flags.useImageQaFusion) {
+    const readyFieldIds =
+      ocrResults && imageQaResults && roiBboxes
+        ? getFusionReadyFieldIds(ocrResults, imageQaResults, roiBboxes)
+        : [];
+
+    if (readyFieldIds.length > 0 && ocrResults && imageQaResults && roiBboxes) {
+      fusionEvidence = fuseAllFields(
+        input.documentId,
+        ocrResults,
+        imageQaResults,
+        roiBboxes
+      );
+      fusionResults = fusionEvidence.fields;
+      imageQaFusionStatus = {
+        attempted: true,
+        ran: true,
+        readyFieldIds,
+        fusedFieldCount: fusionResults.length,
+      };
+    } else {
+      imageQaFusionStatus = {
+        attempted: true,
+        ran: false,
+        readyFieldIds,
+        fusedFieldCount: 0,
+        skipReason:
+          ocrResults && imageQaResults && roiBboxes
+            ? describeFusionMapGap(ocrResults, imageQaResults, roiBboxes)
+            : "image_qa_fusion_flag_on_but_fusion_maps_not_provided",
+      };
+    }
   }
 
   // Determine overall status
@@ -128,6 +157,7 @@ export async function processWithIntegration(
     validationTrace,
     fusionResults,
     fusionEvidence,
+    imageQaFusionStatus,
     fromCache: false,
     processingTimeMs: Date.now() - startTime,
     engineVersions: { ...ENGINE_VERSIONS },

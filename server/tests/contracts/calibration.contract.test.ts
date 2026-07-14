@@ -108,12 +108,14 @@ describe("Calibration Contract (Phase 3.3)", () => {
       expect(result.bins.length).toBe(10);
     });
 
-    it("handles empty samples", async () => {
+    it("does not report ECE=0 for empty samples (not perfect calibration)", async () => {
       const { computeEce } = await import("../../services/calibration");
 
       const result = computeEce([]);
-      expect(result.ece).toBe(0);
+      expect(result.ece).toBeNull();
+      expect(result.measurementReady).toBe(false);
       expect(result.bins).toEqual([]);
+      expect(result.note).toMatch(/cannot be measured/i);
     });
   });
 

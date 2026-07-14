@@ -50,6 +50,17 @@ export interface PipelineInput {
 }
 
 /**
+ * Image QA fusion execution status (honest skip when maps incomplete).
+ */
+export interface ImageQaFusionStatus {
+  attempted: boolean;
+  ran: boolean;
+  skipReason?: string;
+  readyFieldIds: string[];
+  fusedFieldCount: number;
+}
+
+/**
  * Pipeline output from processing
  */
 export interface PipelineOutput {
@@ -65,6 +76,8 @@ export interface PipelineOutput {
   fusionResults: FusedFieldResult[];
   /** Full fusion evidence artifact */
   fusionEvidence: FusionEvidence | null;
+  /** Fusion flag honesty — ran vs skipped with reason */
+  imageQaFusionStatus?: ImageQaFusionStatus;
   /** Whether result was from cache */
   fromCache: boolean;
   /** Cache key if cached */
