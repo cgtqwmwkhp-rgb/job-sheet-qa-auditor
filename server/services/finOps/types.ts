@@ -98,6 +98,6 @@ export interface ApiCostSummary {
   /** Calendar-month spend (UTC). */
   byMonth: PeriodCostBucket[];
   recentEvents: ApiCostEvent[];
-  /** Process-local retention note for operators. */
+  /** Retention / durability note for operators. */
   retentionNote: string;
 }

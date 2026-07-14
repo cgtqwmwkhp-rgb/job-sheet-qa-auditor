@@ -1,13 +1,21 @@
 /**
- * In-process API cost event ledger.
+ * API cost event ledger with durable MySQL write-through.
  *
- * Retains a ring buffer of recent LLM/API cost observations for the admin
- * Settings dashboard. Events are process-local (lost on revision restart /
- * scale-out); estimates use published token rates, not provider invoices.
+ * Hot path keeps an in-memory ring buffer for summaries / no-DB environments.
+ * When DATABASE_URL is available, events are persisted to `api_cost_events`
+ * and restored on boot via hydrateApiCostLedgerFromDb — restarts do not wipe
+ * cost history across replicas once the table is migrated.
  *
  * Dimensions: AI tool, provider, model, stage, job-sheet review, day, month.
+ * Estimates use published token rates, not provider invoices.
  */
 
+import { desc } from "drizzle-orm";
+import {
+  apiCostEvents,
+  type ApiCostEventRow,
+} from "../../../drizzle/schema";
+import { getDb } from "../../db";
 import { estimateTokenCostUsd } from "./pricing";
 import { deriveToolId, toolDisplayLabel } from "./toolLabels";
 import type {
@@ -21,10 +29,12 @@ import type {
 const MAX_EVENTS = 5_000;
 const RETENTION_NOTE =
   "Costs are estimated from token usage and approximate public rates. " +
-  "Events are retained in-memory on this app instance (up to 5,000) and reset on restart.";
+  "Events are write-through persisted to api_cost_events when the database " +
+  "is available (up to 5,000 retained in-memory) and restored on restart.";
 
 let events: ApiCostEvent[] = [];
 let seq = 0;
+let hydrated = false;
 
 function nextId(): string {
   seq += 1;
@@ -33,6 +43,137 @@ function nextId(): string {
 
 function roundUsd(n: number): number {
   return Math.round(n * 1_000_000) / 1_000_000;
+}
+
+function toRecordedAtDate(iso: string): Date {
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? new Date(ms) : new Date();
+}
+
+function decimalToNumber(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function rowToEvent(row: ApiCostEventRow): ApiCostEvent {
+  const recordedAt =
+    row.recordedAt instanceof Date
+      ? row.recordedAt.toISOString()
+      : new Date(row.recordedAt as unknown as string).toISOString();
+  return {
+    id: row.id,
+    recordedAt,
+    provider: row.provider,
+    model: row.model,
+    tool: row.tool,
+    stage: row.stage,
+    ...(row.jobSheetId != null ? { jobSheetId: row.jobSheetId } : {}),
+    inputTokens: row.inputTokens,
+    outputTokens: row.outputTokens,
+    estimatedCostUsd: decimalToNumber(row.estimatedCostUsd),
+    ...(row.latencyMs != null ? { latencyMs: row.latencyMs } : {}),
+  };
+}
+
+/**
+ * Persist one cost event to `api_cost_events` (best-effort, never throws).
+ */
+async function persistApiCostEvent(event: ApiCostEvent): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+
+    await db.insert(apiCostEvents).values({
+      id: event.id,
+      recordedAt: toRecordedAtDate(event.recordedAt),
+      provider: event.provider,
+      model: event.model,
+      tool: event.tool,
+      stage: event.stage,
+      jobSheetId: event.jobSheetId,
+      inputTokens: event.inputTokens,
+      outputTokens: event.outputTokens,
+      estimatedCostUsd: event.estimatedCostUsd.toFixed(6),
+      latencyMs: event.latencyMs,
+    });
+  } catch (error) {
+    console.warn(
+      "[FinOps] Failed to persist cost event (in-memory retained):",
+      error
+    );
+  }
+}
+
+/**
+ * Merge events by id (DB hydrate / restart restore). Newest recordedAt wins
+ * when trimming to MAX_EVENTS.
+ */
+export function importApiCostEvents(incoming: ApiCostEvent[]): number {
+  if (incoming.length === 0) return 0;
+  const byId = new Map(events.map(e => [e.id, e]));
+  let imported = 0;
+  for (const event of incoming) {
+    if (!byId.has(event.id)) {
+      byId.set(event.id, event);
+      imported += 1;
+    }
+  }
+  events = Array.from(byId.values())
+    .sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))
+    .slice(-MAX_EVENTS);
+  return imported;
+}
+
+/**
+ * Snapshot retained events (test / ops helper).
+ */
+export function exportApiCostEvents(): ApiCostEvent[] {
+  return [...events];
+}
+
+/**
+ * Hydrate the in-memory ledger from durable `api_cost_events` rows.
+ * Fail-safe: returns 0 and never throws when DB is unavailable / table missing.
+ */
+export async function hydrateApiCostLedgerFromDb(): Promise<number> {
+  try {
+    const db = await getDb();
+    if (!db) {
+      hydrated = true;
+      return 0;
+    }
+
+    const rows = await db
+      .select()
+      .from(apiCostEvents)
+      .orderBy(desc(apiCostEvents.recordedAt))
+      .limit(MAX_EVENTS);
+
+    const imported = importApiCostEvents(rows.map(rowToEvent));
+    hydrated = true;
+    if (imported > 0) {
+      console.log(
+        `[FinOps] Hydrated ${imported} cost event(s) from api_cost_events`
+      );
+    }
+    return imported;
+  } catch (error) {
+    hydrated = true;
+    console.warn(
+      "[FinOps] Failed to hydrate cost ledger from database (continuing with in-memory only):",
+      error
+    );
+    return 0;
+  }
+}
+
+/** Whether boot/lazy hydrate has completed (success or fail-safe skip). */
+export function isApiCostLedgerHydrated(): boolean {
+  return hydrated;
 }
 
 export type RecordApiCostInput = {
@@ -50,6 +191,7 @@ export type RecordApiCostInput = {
 
 /**
  * Record one API cost observation. Safe to call from hot paths; never throws.
+ * Write-through to MySQL when available (fire-and-forget).
  */
 export function recordApiCost(input: RecordApiCostInput): ApiCostEvent | null {
   try {
@@ -100,16 +242,21 @@ export function recordApiCost(input: RecordApiCostInput): ApiCostEvent | null {
     if (events.length > MAX_EVENTS) {
       events = events.slice(events.length - MAX_EVENTS);
     }
+
+    // Fire-and-forget durable write-through
+    void persistApiCostEvent(event);
+
     return event;
   } catch {
     return null;
   }
 }
 
-/** Test helper — wipe retained events. */
+/** Test helper — wipe retained in-memory events (does not delete DB rows). */
 export function clearApiCostLedger(): void {
   events = [];
   seq = 0;
+  hydrated = false;
 }
 
 export function getApiCostEventCount(): number {

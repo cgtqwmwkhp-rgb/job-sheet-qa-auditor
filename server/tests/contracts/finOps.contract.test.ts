@@ -14,6 +14,10 @@ import {
   recordApiCost,
   clearApiCostLedger,
   summarizeApiCosts,
+  hydrateApiCostLedgerFromDb,
+  exportApiCostEvents,
+  importApiCostEvents,
+  getApiCostEventCount,
   type StageCostSample,
 } from "../../services/finOps";
 
@@ -326,6 +330,48 @@ describe("FinOps Contract (Phase 3.x)", () => {
       const summary = summarizeApiCosts({ windowHours: 24, now });
       expect(summary.totalCalls).toBe(1);
       expect(summary.totalCostUsd).toBeCloseTo(0.02);
+    });
+
+    it("survives in-memory clear via export/import (restart restore path)", () => {
+      const now = new Date("2026-07-12T12:00:00.000Z");
+      recordApiCost({
+        provider: "gemini",
+        model: "gemini-2.0-flash",
+        stage: "judgment",
+        jobSheetId: 42,
+        estimatedCostUsd: 0.07,
+        recordedAt: new Date("2026-07-12T11:00:00.000Z"),
+      });
+      recordApiCost({
+        provider: "anthropic",
+        model: "claude-sonnet",
+        stage: "coaching",
+        estimatedCostUsd: 0.03,
+        recordedAt: new Date("2026-07-12T11:30:00.000Z"),
+      });
+
+      const snapshot = exportApiCostEvents();
+      expect(snapshot).toHaveLength(2);
+
+      // Simulate process restart wiping the in-memory ring buffer
+      clearApiCostLedger();
+      expect(getApiCostEventCount()).toBe(0);
+      expect(summarizeApiCosts({ windowHours: 24, now }).totalCalls).toBe(0);
+
+      // Restore from durable snapshot (same path hydrate uses after DB read)
+      const imported = importApiCostEvents(snapshot);
+      expect(imported).toBe(2);
+      expect(getApiCostEventCount()).toBe(2);
+
+      const summary = summarizeApiCosts({ windowHours: 24, now });
+      expect(summary.totalCalls).toBe(2);
+      expect(summary.totalCostUsd).toBeCloseTo(0.1);
+      expect(summary.jobSheetsReviewed).toBe(1);
+      expect(summary.retentionNote).toMatch(/api_cost_events/);
+    });
+
+    it("hydrateApiCostLedgerFromDb is fail-safe when getDb returns null", async () => {
+      await expect(hydrateApiCostLedgerFromDb()).resolves.toBe(0);
     });
   });
 

@@ -23,6 +23,10 @@ export {
   clearApiCostLedger,
   getApiCostEventCount,
   summarizeApiCosts,
+  hydrateApiCostLedgerFromDb,
+  importApiCostEvents,
+  exportApiCostEvents,
+  isApiCostLedgerHydrated,
   type RecordApiCostInput,
 } from "./ledger";
 

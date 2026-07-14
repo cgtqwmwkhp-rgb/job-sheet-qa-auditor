@@ -43,6 +43,13 @@
       "when": 1767981000000,
       "tag": "0005_audit_finding_resolution",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1767982000000,
+      "tag": "0006_api_cost_events",
+      "breakpoints": true
     }
   ]
 }
