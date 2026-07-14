@@ -145,4 +145,59 @@ describe("suggestRoiFromLayoutEvidence (precision-first)", () => {
     });
     expect(regions).toEqual([]);
   });
+
+  it("places tyre tread, wheel pressure, and nut torque measurement ROIs", () => {
+    const regions = suggestRoiFromLayoutEvidence({
+      layoutAvailable: true,
+      hasChecklist: false,
+      selectionRows: [],
+      lines: [
+        {
+          pageNumber: 1,
+          content: "OSF Tyre Tread Depth: 6mm",
+          xPercent: 8,
+          yPercent: 40,
+          widthPercent: 35,
+          heightPercent: 1.4,
+        },
+        {
+          pageNumber: 1,
+          content: "Tyre Size and Set Pressure: Size: 195/50R13C PSI: 95",
+          xPercent: 8,
+          yPercent: 55,
+          widthPercent: 55,
+          heightPercent: 1.4,
+        },
+        {
+          pageNumber: 1,
+          content: "Wheel Nut Torque (NM): 115",
+          xPercent: 8,
+          yPercent: 70,
+          widthPercent: 30,
+          heightPercent: 1.4,
+        },
+        {
+          pageNumber: 1,
+          content: "Hub Nut Torque: (NM): 280",
+          xPercent: 8,
+          yPercent: 74,
+          widthPercent: 30,
+          heightPercent: 1.4,
+        },
+      ],
+    });
+
+    expect(regions.find(r => r.name === "tyreTreadDepth")?.source).toBe(
+      "ocr-layout"
+    );
+    expect(regions.find(r => r.name === "wheelPressures")?.source).toBe(
+      "ocr-layout"
+    );
+    expect(regions.find(r => r.name === "wheelNutTorque")?.source).toBe(
+      "ocr-layout"
+    );
+    expect(regions.find(r => r.name === "hubNutTorque")?.source).toBe(
+      "ocr-layout"
+    );
+  });
 });

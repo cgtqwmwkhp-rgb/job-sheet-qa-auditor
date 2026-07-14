@@ -133,6 +133,34 @@ const LABEL_TO_FIELD: Array<{
     type: "list",
     required: false,
   },
+  {
+    re: /tyre\s*tread\s*depth|tread\s*depth/i,
+    field: "tyreTreadDepth",
+    label: "Tyre Tread Depth",
+    type: "number",
+    required: false,
+  },
+  {
+    re: /set\s*pressure|wheel\s*pressure|tyre\s*pressure|\bpsi\b/i,
+    field: "wheelPressures",
+    label: "Wheel Pressures (PSI)",
+    type: "number",
+    required: false,
+  },
+  {
+    re: /wheel\s*nut\s*torque/i,
+    field: "wheelNutTorque",
+    label: "Wheel Nut Torque",
+    type: "number",
+    required: false,
+  },
+  {
+    re: /hub\s*nut\s*torque/i,
+    field: "hubNutTorque",
+    label: "Hub Nut Torque",
+    type: "number",
+    required: false,
+  },
 ];
 
 function extractTokensFromText(text: string): string[] {

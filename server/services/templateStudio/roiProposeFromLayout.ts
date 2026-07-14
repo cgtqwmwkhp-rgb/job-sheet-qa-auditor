@@ -120,6 +120,33 @@ const FIELD_LABEL_MATCHERS: Array<{
     re: /^(work\s*description|comments|findings|details\s*of\s*work|scope\s*of\s*work)\b\s*:?\s*.{0,40}$/i,
     expand: "blockBelow",
   },
+  {
+    name: "tyreTreadDepth",
+    fields: ["tyreTreadDepth"],
+    re: /(osf|osr|nsf|nsr|3rd\s*axle)?.{0,12}tyre\s*tread\s*depth\b/i,
+    reject: /pressure|psi|torque/i,
+    expand: "blockBelow",
+  },
+  {
+    name: "wheelPressures",
+    fields: ["wheelPressures"],
+    re: /(tyre\s*size\s*and\s*set\s*pressure|set\s*pressure|wheel\s*pressures?|tyre\s*pressures?|\bpsi\b)\s*:?/i,
+    reject: /tread|torque/i,
+    expand: "rowRight",
+  },
+  {
+    name: "wheelNutTorque",
+    fields: ["wheelNutTorque"],
+    re: /^wheel\s*nut\s*torque\b/i,
+    reject: /hub/i,
+    expand: "rowRight",
+  },
+  {
+    name: "hubNutTorque",
+    fields: ["hubNutTorque"],
+    re: /^hub\s*nut\s*torque\b/i,
+    expand: "rowRight",
+  },
 ];
 
 function clamp01(n: number): number {
@@ -247,7 +274,7 @@ function scoreLabelLine(
     // "Asset Details", "Completion Details"
     return -1;
   }
-  if (text.length > 48) return -1;
+  if (text.length > 90) return -1;
 
   let score = 100;
   // Prefer short labels

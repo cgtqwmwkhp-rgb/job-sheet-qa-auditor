@@ -174,6 +174,30 @@ export const ROI_DRAW_GUIDANCE: Record<string, RoiDrawGuidance> = {
     howToDraw:
       "Box the notes heading and body. Prefer workDescription for the main work narrative.",
   },
+  tyreTreadDepth: {
+    summary: "Tyre tread depth readings (OSF/OSR/NSF/NSR and extra axles).",
+    lookFor:
+      '"Tyre Tread Depth", OSF/OSR/NSF/NSR rows, values in mm, "Please select".',
+    howToDraw:
+      "Box the whole tread-depth block (all wheel-position rows + mm values) in one ROI. Enable Measurement check if you add per-row threshold rules.",
+  },
+  wheelPressures: {
+    summary: "Set tyre / wheel pressures (PSI) on the form.",
+    lookFor:
+      '"Tyre Size and Set Pressure", "PSI", "Pressure", size + PSI on one line.',
+    howToDraw:
+      "Box the pressure label and PSI value together (e.g. PSI: 95). Include Size on the same line if they share one printed row.",
+  },
+  wheelNutTorque: {
+    summary: "Wheel nut torque reading in NM.",
+    lookFor: '"Wheel Nut Torque (NM)", handwritten or typed NM value.',
+    ...MEASUREMENT,
+  },
+  hubNutTorque: {
+    summary: "Hub nut torque reading in NM.",
+    lookFor: '"Hub Nut Torque (NM)", handwritten or typed NM value.',
+    ...MEASUREMENT,
+  },
 };
 
 const MEASUREMENT_HINT =
