@@ -13,6 +13,7 @@ import {
   Settings,
   HelpCircle,
   CheckSquare,
+  Flag,
 } from "lucide-react";
 
 import {
@@ -118,6 +119,16 @@ export function CommandCenter() {
               >
                 <Activity className="mr-2 h-4 w-4" />
                 <span>Monitoring</span>
+              </CommandItem>
+            ) : null}
+            {canMonitoring ? (
+              <CommandItem
+                onSelect={() =>
+                  runCommand(() => setLocation("/ops/feature-flags"))
+                }
+              >
+                <Flag className="mr-2 h-4 w-4" />
+                <span>Feature Flags</span>
               </CommandItem>
             ) : null}
           </CommandGroup>

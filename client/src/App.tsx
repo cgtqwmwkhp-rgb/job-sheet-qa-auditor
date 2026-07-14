@@ -64,6 +64,7 @@ const AuditLog = lazy(() => import("./pages/AuditLog"));
 const Settings = lazy(() => import("./pages/Settings"));
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
 const Monitoring = lazy(() => import("./pages/Monitoring"));
+const FeatureFlagMatrix = lazy(() => import("./pages/FeatureFlagMatrix"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Loading fallback — no app chrome (Phase 0 portal cleanliness)
@@ -241,6 +242,13 @@ function Router() {
         <Route path="/monitoring">
           <ProtectedRoute
             component={Monitoring}
+            allowedRoles={["admin", "qa_lead"]}
+          />
+        </Route>
+        {/* PR-OPS-FLAGS: read-only effective FEATURE_* + deploy matrix */}
+        <Route path="/ops/feature-flags">
+          <ProtectedRoute
+            component={FeatureFlagMatrix}
             allowedRoles={["admin", "qa_lead"]}
           />
         </Route>

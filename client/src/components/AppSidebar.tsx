@@ -24,6 +24,7 @@ import {
   MessageSquareWarning,
   HelpCircle,
   Activity,
+  Flag,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
@@ -41,6 +42,7 @@ const items = [
   { title: "Template Studio", url: "/template-studio", icon: FileText },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Monitoring", url: "/monitoring", icon: Activity },
+  { title: "Feature Flags", url: "/ops/feature-flags", icon: Flag },
   { title: "User Management", url: "/users", icon: Users },
   { title: "Audit Log", url: "/audit-log", icon: ShieldAlert },
   { title: "Settings", url: "/settings", icon: Settings },
@@ -63,7 +65,11 @@ export function AppSidebar() {
     if (item.title === "User Management") {
       return hasRole(["admin"]);
     }
-    if (item.title === "Settings" || item.title === "Monitoring") {
+    if (
+      item.title === "Settings" ||
+      item.title === "Monitoring" ||
+      item.title === "Feature Flags"
+    ) {
       return hasRole(["admin", "qa_lead"]);
     }
     return true;

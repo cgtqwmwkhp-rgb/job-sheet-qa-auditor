@@ -9,6 +9,7 @@ import {
 import { ENV } from "./env";
 import { getModelRegistry } from "../services/modelRegistry";
 import { summarizeApiCosts, getUsdToGbpRate } from "../services/finOps";
+import { getFeatureFlagMatrix } from "../services/featureFlagMatrix";
 
 // Runtime environment variables for version info (injected at build/deploy time)
 const GIT_SHA = process.env.GIT_SHA || "unknown";
@@ -117,6 +118,13 @@ export const systemRouter = router({
         },
       };
     }),
+
+  /**
+   * PR-OPS-FLAGS: Effective FEATURE_* + staging/prod deploy matrix (read-only).
+   * Visible to admin and QA lead — shows what this process sees and the
+   * documented azure-deploy contract (FlagOps owns the workflow file).
+   */
+  featureFlagMatrix: qaLeadProcedure.query(() => getFeatureFlagMatrix()),
 
   /**
    * PR-3: Platform config drift endpoint (admin-only)
