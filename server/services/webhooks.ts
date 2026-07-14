@@ -193,7 +193,10 @@ async function deleteSubscriptionFromDb(id: string): Promise<void> {
       .delete(webhookSubscriptions)
       .where(eq(webhookSubscriptions.id, id));
   } catch (error) {
-    console.warn("[Webhooks] Failed to delete subscription from database:", error);
+    console.warn(
+      "[Webhooks] Failed to delete subscription from database:",
+      error
+    );
   }
 }
 
@@ -229,9 +232,7 @@ async function persistDeliveryResult(
 /**
  * Merge subscriptions by id (DB hydrate / restart restore).
  */
-export function importWebhookSubscriptions(
-  incoming: WebhookConfig[]
-): number {
+export function importWebhookSubscriptions(incoming: WebhookConfig[]): number {
   if (incoming.length === 0) return 0;
   let imported = 0;
   for (const webhook of incoming) {

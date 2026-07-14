@@ -70,10 +70,7 @@ import {
   type FailurePathSignals,
 } from "./jobSummaryConsistency";
 import { evaluateImpliesRules } from "./impliesRules";
-import {
-  enrichFieldMapFromRangeRules,
-  evaluateRangeRules,
-} from "./rangeRules";
+import { enrichFieldMapFromRangeRules, evaluateRangeRules } from "./rangeRules";
 import {
   extractFieldsFromRoiSpatial,
   mergeRoiSpatialFields,

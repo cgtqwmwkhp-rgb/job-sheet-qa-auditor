@@ -51,11 +51,9 @@ describe("Durable Webhooks Contract (PR-IO-WEBHOOKS)", () => {
   });
 
   it("signed delivery log retains signature + payloadHash after restart import", async () => {
-    registerWebhook(
-      "https://example.test/hooks",
-      ["audit.completed"],
-      { secret: "whsec_test_secret_for_signing_123456" }
-    );
+    registerWebhook("https://example.test/hooks", ["audit.completed"], {
+      secret: "whsec_test_secret_for_signing_123456",
+    });
 
     vi.stubGlobal(
       "fetch",
