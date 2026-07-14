@@ -170,21 +170,26 @@ describe("ROI Processor - PR-J Contract Tests", () => {
   });
 
   describe("Image QA", () => {
-    it("should run image QA for tickbox block", async () => {
+    it("should run image QA for tickbox block as unavailable without VLM", async () => {
       const roi = getRoiForField(fullRoiConfig, "tickboxBlock")!;
       const result = await runImageQa(roi, "tickboxBlock");
 
       expect(result.checkType).toBe("tickboxes_checked");
-      expect(result.passed).toBeDefined();
-      expect(result.confidence).toBeGreaterThan(0);
+      expect(result.available).toBe(false);
+      expect(result.passed).toBe(false);
+      expect(result.confidence).toBe(0);
+      expect(result.confidence).not.toBe(0.88);
+      expect(result.details).toMatch(/unavailable/i);
     });
 
-    it("should run image QA for signature block", async () => {
+    it("should run image QA for signature block as unavailable without VLM", async () => {
       const roi = getRoiForField(fullRoiConfig, "signatureBlock")!;
       const result = await runImageQa(roi, "signatureBlock");
 
       expect(result.checkType).toBe("signature_present");
-      expect(result.passed).toBeDefined();
+      expect(result.available).toBe(false);
+      expect(result.passed).toBe(false);
+      expect(result.confidence).toBe(0);
     });
   });
 
@@ -254,6 +259,12 @@ describe("ROI Processor - PR-J Contract Tests", () => {
 
       expect(sigResult?.imageQaResult).toBeDefined();
       expect(tickResult?.imageQaResult).toBeDefined();
+      // Without VLM, Image QA must be unavailable — never a fake 0.88 pass
+      expect(sigResult?.imageQaResult?.available).toBe(false);
+      expect(sigResult?.imageQaResult?.confidence).toBe(0);
+      expect(sigResult?.imageQaResult?.confidence).not.toBe(0.88);
+      expect(tickResult?.imageQaResult?.available).toBe(false);
+      expect(tickResult?.imageQaResult?.confidence).not.toBe(0.88);
     });
 
     it("should record processing time", async () => {
