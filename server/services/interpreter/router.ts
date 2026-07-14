@@ -1,12 +1,20 @@
 /**
- * Interpreter Router
- * 
- * Routes requests to Gemini (default) or Claude (escalation).
- * 
+ * Interpreter Router — TEST-ONLY / QUARANTINED
+ *
+ * Routes requests to Gemini (default) or Claude (escalation) using
+ * SIMULATED confidence (Math.random). This module must NEVER feed
+ * production or staging quality paths.
+ *
  * CRITICAL INVARIANT:
  * - Interpreter results are ADVISORY ONLY
  * - They do NOT modify canonical document outcomes
  * - All advisory results are stored with model metadata
+ *
+ * QUARANTINE:
+ * - Not re-exported from the live interpreter barrel (index.ts)
+ * - Fail-closed if constructed or invoked when APP_ENV/NODE_ENV
+ *   indicates production or staging
+ * - Live providers live under interpreterAdapter/, not here
  */
 
 import type {
@@ -18,6 +26,39 @@ import type {
   AdvisoryArtifact,
 } from './types';
 import { DEFAULT_ROUTER_RULES } from './types';
+
+/** Explicit error when simulated confidence is blocked on a quality path. */
+export const SIMULATED_INTERPRETER_BLOCKED =
+  'InterpreterRouter is TEST-ONLY (simulated confidence). ' +
+  'Blocked on production/staging quality paths. Use interpreterAdapter for live providers.';
+
+/**
+ * True when this process is a production or staging quality path.
+ * Simulated confidence must never run there.
+ */
+export function isProductionQualityPath(): boolean {
+  const appEnv = (process.env.APP_ENV || '').toLowerCase();
+  if (
+    appEnv === 'production' ||
+    appEnv === 'prod' ||
+    appEnv === 'staging'
+  ) {
+    return true;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Fail closed: refuse simulated InterpreterRouter on prod/staging paths.
+ */
+export function assertSimulatedInterpreterAllowed(): void {
+  if (isProductionQualityPath()) {
+    throw new Error(SIMULATED_INTERPRETER_BLOCKED);
+  }
+}
 
 /**
  * Generate unique request ID
@@ -51,13 +92,14 @@ function hashString(str: string): number {
 }
 
 /**
- * Interpreter Router class
+ * Interpreter Router class (TEST-ONLY — simulated confidence)
  */
 export class InterpreterRouter {
   private rules: RouterRules;
   private artifacts: AdvisoryArtifact[] = [];
   
   constructor(rules: RouterRules = DEFAULT_ROUTER_RULES) {
+    assertSimulatedInterpreterAllowed();
     this.rules = rules;
   }
   
@@ -65,12 +107,13 @@ export class InterpreterRouter {
    * Route a request to the appropriate interpreter
    */
   async route(request: InterpreterRequest): Promise<InterpreterResponse> {
+    assertSimulatedInterpreterAllowed();
     const startTime = Date.now();
     
     // Determine provider based on routing rules
     const { provider, escalated, escalationReason } = this.selectProvider(request);
     
-    // Call the interpreter (simulated for now)
+    // Simulated only — never a live provider call
     const result = await this.callInterpreter(provider, request);
     
     const endTime = Date.now();
@@ -196,8 +239,8 @@ export class InterpreterRouter {
   }
   
   /**
-   * Call the interpreter provider
-   * Note: This is a simulation. In production, this would call actual APIs.
+   * Simulated interpreter only — random confidence.
+   * Hard-blocked on production/staging via assertSimulatedInterpreterAllowed.
    */
   private async callInterpreter(
     provider: InterpreterProvider,
@@ -210,6 +253,8 @@ export class InterpreterRouter {
     inputTokens: number;
     outputTokens: number;
   }> {
+    assertSimulatedInterpreterAllowed();
+
     // Simulate API call latency
     await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
     
@@ -269,6 +314,7 @@ export class InterpreterRouter {
     response: InterpreterResponse,
     canonicalValue: unknown
   ): AdvisoryArtifact {
+    assertSimulatedInterpreterAllowed();
     const artifact: AdvisoryArtifact = {
       artifactId: generateArtifactId(),
       documentId: request.documentId,
@@ -358,14 +404,15 @@ export class InterpreterRouter {
 }
 
 /**
- * Singleton router instance
+ * Singleton router instance (TEST-ONLY)
  */
 let routerInstance: InterpreterRouter | null = null;
 
 /**
- * Get or create router instance
+ * Get or create router instance (TEST-ONLY — fail-closed on prod/staging)
  */
 export function getInterpreterRouter(rules?: RouterRules): InterpreterRouter {
+  assertSimulatedInterpreterAllowed();
   if (!routerInstance) {
     routerInstance = new InterpreterRouter(rules);
   }

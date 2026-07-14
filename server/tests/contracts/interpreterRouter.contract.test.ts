@@ -8,18 +8,98 @@
  * - All advisory results stored with model metadata
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   InterpreterRouter,
   getInterpreterRouter,
   resetInterpreterRouter,
+  assertSimulatedInterpreterAllowed,
+  isProductionQualityPath,
+  SIMULATED_INTERPRETER_BLOCKED,
 } from '../../../server/services/interpreter/router';
 import { DEFAULT_ROUTER_RULES } from '../../../server/services/interpreter/types';
 import type { InterpreterRequest, RouterRules } from '../../../server/services/interpreter/types';
+import * as interpreterBarrel from '../../../server/services/interpreter/index';
 
 describe('Interpreter Router Contract Tests', () => {
   beforeEach(() => {
     resetInterpreterRouter();
+  });
+
+  describe('QUARANTINE: simulated confidence blocked on quality paths', () => {
+    const savedAppEnv = process.env.APP_ENV;
+    const savedNodeEnv = process.env.NODE_ENV;
+
+    afterEach(() => {
+      if (savedAppEnv === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = savedAppEnv;
+      if (savedNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = savedNodeEnv;
+      resetInterpreterRouter();
+    });
+
+    it('fail-closed: constructor throws when APP_ENV=production', () => {
+      process.env.APP_ENV = 'production';
+      expect(isProductionQualityPath()).toBe(true);
+      expect(() => new InterpreterRouter()).toThrow(SIMULATED_INTERPRETER_BLOCKED);
+      expect(() => assertSimulatedInterpreterAllowed()).toThrow(
+        SIMULATED_INTERPRETER_BLOCKED
+      );
+    });
+
+    it('fail-closed: getInterpreterRouter throws when APP_ENV=staging', () => {
+      process.env.APP_ENV = 'staging';
+      expect(() => getInterpreterRouter()).toThrow(SIMULATED_INTERPRETER_BLOCKED);
+    });
+
+    it('fail-closed: constructor throws when NODE_ENV=production', () => {
+      delete process.env.APP_ENV;
+      process.env.NODE_ENV = 'production';
+      expect(() => new InterpreterRouter()).toThrow(SIMULATED_INTERPRETER_BLOCKED);
+    });
+
+    it('live barrel must not re-export simulated InterpreterRouter', () => {
+      expect(interpreterBarrel).not.toHaveProperty('InterpreterRouter');
+      expect(interpreterBarrel).not.toHaveProperty('getInterpreterRouter');
+      expect(interpreterBarrel).not.toHaveProperty('resetInterpreterRouter');
+    });
+
+    it('no production server module imports interpreter/router', async () => {
+      const { readdir, readFile } = await import('node:fs/promises');
+      const { join } = await import('node:path');
+      const root = join(process.cwd(), 'server');
+      const offenders: string[] = [];
+
+      async function walk(dir: string): Promise<void> {
+        const entries = await readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const full = join(dir, entry.name);
+          if (entry.isDirectory()) {
+            if (
+              entry.name === 'tests' ||
+              entry.name === 'node_modules' ||
+              entry.name === 'interpreter'
+            ) {
+              continue;
+            }
+            await walk(full);
+            continue;
+          }
+          if (!/\.(ts|tsx|js|mjs)$/.test(entry.name)) continue;
+          if (/\.(test|spec)\.(ts|tsx|js)$/.test(entry.name)) continue;
+          const src = await readFile(full, 'utf8');
+          if (
+            /from\s+['"][^'"]*interpreter\/router['"]/.test(src) ||
+            /getInterpreterRouter|new\s+InterpreterRouter/.test(src)
+          ) {
+            offenders.push(full.replace(process.cwd() + '/', ''));
+          }
+        }
+      }
+
+      await walk(root);
+      expect(offenders).toEqual([]);
+    });
   });
 
   describe('Routing Rules', () => {
