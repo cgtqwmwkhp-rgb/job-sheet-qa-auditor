@@ -279,6 +279,14 @@ jobs:
               ENABLE_SCHEDULER="${{ vars.ENABLE_SCHEDULER || 'false' }}" \
               FEATURE_OVERTURN_METRICS=true \
               FEATURE_PHOTO_PAIR_COMPARE=true \
+              FEATURE_VLM_VERIFICATION=true \
+              FEATURE_IMAGE_QA_INTAKE=true \
+              FEATURE_GEMINI_MULTIMODAL=true \
+              VLM_PROVIDER=anthropic \
+              FEATURE_OCR_CROSS_CHECK=true \
+              OCR_CROSS_CHECK_PERCENT=15 \
+              FEATURE_OCR_FAILOVER=true \
+              OCR_FALLBACK_PROVIDER=azure \
               TEMPLATE_REGISTRY_MYSQL_PERSISTENCE_ENABLED=true
 
       - name: Set secrets as environment variables
@@ -753,6 +761,10 @@ jobs:
               FEATURE_IMAGE_QA_INTAKE=true \
               FEATURE_GEMINI_MULTIMODAL=true \
               VLM_PROVIDER=anthropic \
+              FEATURE_OCR_CROSS_CHECK=true \
+              OCR_CROSS_CHECK_PERCENT=15 \
+              FEATURE_OCR_FAILOVER=true \
+              OCR_FALLBACK_PROVIDER=azure \
               TEMPLATE_REGISTRY_MYSQL_PERSISTENCE_ENABLED=true
 
       - name: Set secrets as environment variables
