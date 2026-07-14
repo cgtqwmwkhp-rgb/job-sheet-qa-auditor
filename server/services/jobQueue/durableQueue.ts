@@ -467,7 +467,7 @@ export function createInProcessDurableBackend(): JobQueueBackend {
       let reclaimed = 0;
       const staleMs = getStaleLockMs();
       const now = Date.now();
-      for (const job of jobsById.values()) {
+      for (const job of Array.from(jobsById.values())) {
         if (
           job.status === "running" &&
           job.startedAt &&
