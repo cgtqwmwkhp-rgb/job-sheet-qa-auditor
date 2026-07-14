@@ -146,6 +146,7 @@ import {
   extractTechnicianNameFromReport,
   resolveTechnicianMatch,
 } from "./technicianAttribution";
+import { webhookEvents } from "./webhooks";
 import { v4 as uuidv4 } from "uuid";
 import {
   beginProcessingProgress,
@@ -2719,6 +2720,22 @@ async function processJobSheetWithOptions(
     ? "failed"
     : mapAnalyzerOverallToJobSheetStatus(analysisResult.overallResult);
   finishProgress(terminalStatus);
+
+  // PR-IO-WEBHOOKS: emit audit.completed after Stage-3 Store Results succeeds
+  if (!storageFailed && auditResultId != null) {
+    void webhookEvents
+      .auditCompleted(
+        auditResultId,
+        analysisResult.overallResult,
+        analysisResult.score
+      )
+      .catch(err =>
+        console.warn(
+          "[DocumentProcessor] audit.completed webhook emit failed (non-fatal):",
+          err
+        )
+      );
+  }
 
   return {
     success: analysisResult.success && !storageFailed && !!auditResultId,
