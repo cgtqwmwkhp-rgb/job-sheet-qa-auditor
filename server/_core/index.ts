@@ -21,6 +21,7 @@ import {
 } from "../services/templateRegistry";
 import { hydrateDeadLetterQueueFromDb } from "../utils/deadLetterQueue";
 import { hydrateApiCostLedgerFromDb } from "../services/finOps";
+import { assertSharedLimitsReplicaSafety } from "../utils/rateLimiter";
 import { pdfProxyRouter } from "./pdfProxy";
 import { templateSampleProxyRouter } from "./templateSampleProxy";
 import { ingestRouter } from "../services/ingest";
@@ -45,6 +46,10 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // In-memory rate limits / live processStatus are unsafe across replicas.
+  // Multi-replica requires Redis (SHARED_LIMITS_REDIS_URL / REDIS_URL).
+  assertSharedLimitsReplicaSafety();
+
   const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads.

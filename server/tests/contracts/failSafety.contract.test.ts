@@ -59,9 +59,9 @@ Additional notes about the site visit and asset condition.
 describe("Fail-Safety Contract (PR-3)", () => {
   const originalEnv = { ...process.env };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     clearDeadLetterQueue();
-    clearAllRateLimits();
+    await clearAllRateLimits();
     delete process.env.GEMINI_API_KEY;
     delete process.env.BUILT_IN_FORGE_API_KEY;
     delete process.env.OPENAI_API_KEY;
@@ -230,26 +230,26 @@ describe("Fail-Safety Contract (PR-3)", () => {
   });
 
   describe("D. Rate limiting", () => {
-    it("enforces RATE_LIMITS.upload and throws RateLimitError", () => {
+    it("enforces RATE_LIMITS.upload and throws RateLimitError", async () => {
       const key = "user:pr3-upload";
       for (let i = 0; i < RATE_LIMITS.upload.maxRequests; i++) {
-        const result = enforceRateLimit(key, RATE_LIMITS.upload);
+        const result = await enforceRateLimit(key, RATE_LIMITS.upload);
         expect(result.allowed).toBe(true);
       }
 
-      expect(() => enforceRateLimit(key, RATE_LIMITS.upload)).toThrow(
-        RateLimitError
-      );
+      await expect(
+        enforceRateLimit(key, RATE_LIMITS.upload)
+      ).rejects.toBeInstanceOf(RateLimitError);
     });
 
-    it("enforces RATE_LIMITS.processing", () => {
+    it("enforces RATE_LIMITS.processing", async () => {
       const key = "user:pr3-process";
       for (let i = 0; i < RATE_LIMITS.processing.maxRequests; i++) {
-        enforceRateLimit(key, RATE_LIMITS.processing);
+        await enforceRateLimit(key, RATE_LIMITS.processing);
       }
-      expect(() => enforceRateLimit(key, RATE_LIMITS.processing)).toThrow(
-        RateLimitError
-      );
+      await expect(
+        enforceRateLimit(key, RATE_LIMITS.processing)
+      ).rejects.toBeInstanceOf(RateLimitError);
     });
 
     it("routers map RateLimitError to TRPC TOO_MANY_REQUESTS on upload/process", () => {
@@ -281,13 +281,15 @@ describe("Fail-Safety Contract (PR-3)", () => {
       expect(analytics).toContain("runDlqRetry");
     });
 
-    it("resetRateLimit clears a key for subsequent requests", () => {
+    it("resetRateLimit clears a key for subsequent requests", async () => {
       const key = "user:pr3-reset";
       for (let i = 0; i < RATE_LIMITS.upload.maxRequests; i++) {
-        enforceRateLimit(key, RATE_LIMITS.upload);
+        await enforceRateLimit(key, RATE_LIMITS.upload);
       }
-      resetRateLimit(key);
-      expect(enforceRateLimit(key, RATE_LIMITS.upload).allowed).toBe(true);
+      await resetRateLimit(key);
+      expect((await enforceRateLimit(key, RATE_LIMITS.upload)).allowed).toBe(
+        true
+      );
     });
   });
 });
