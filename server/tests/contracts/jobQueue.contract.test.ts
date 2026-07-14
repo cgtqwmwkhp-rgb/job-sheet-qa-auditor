@@ -85,6 +85,33 @@ describe("Async job queue — Phase 1.2", () => {
     expect(getJobSheetProcessingJob(first.jobId)?.status).toBe("completed");
   });
 
+  it("dedupes primary queued work by contentHash across job sheets", async () => {
+    const contentHash =
+      "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const first = enqueueJobSheetProcessing({
+      source: "primary",
+      jobSheetId: 40,
+      documentUrl: "https://example.test/a.pdf",
+      contentHash,
+      userId: 1,
+    });
+    const second = enqueueJobSheetProcessing({
+      source: "primary",
+      jobSheetId: 41,
+      documentUrl: "https://example.test/b.pdf",
+      contentHash,
+      userId: 1,
+    });
+
+    expect(first.deduped).toBe(false);
+    expect(second.deduped).toBe(true);
+    expect(second.jobId).toBe(first.jobId);
+    expect(second.jobSheetId).toBe(41);
+
+    await drainJobSheetProcessingQueue();
+    expect(orchestrateJobSheetProcessing).toHaveBeenCalledTimes(1);
+  });
+
   it("runs orchestrateJobSheetProcessing with the enqueued payload", async () => {
     enqueueJobSheetProcessing({
       source: "primary",

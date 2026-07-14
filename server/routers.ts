@@ -18,6 +18,10 @@ import {
   enqueueJobSheetProcessing,
   isAsyncProcessingEnabled,
 } from "./services/jobQueue";
+import {
+  resolveProcessIdempotency,
+  toProcessDedupeResponse,
+} from "./services/idempotency";
 import { validateMistralApiKey } from "./services/ocr";
 import { resolveProcessStatus } from "./services/processStatus";
 import { templateRouter } from "./routers/templateRouter";
@@ -376,12 +380,98 @@ export const appRouter = router({
           });
         }
 
-        if (jobSheet.status === "processing") {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message:
-              "Cannot process: document is currently being processed. Please wait for the current processing to complete.",
+        // Content-hash OCR idempotency (re-upload / double-click / dual replica).
+        // Same fileHash must not start a second billable OCR on the primary path.
+        const idempotency = await resolveProcessIdempotency({
+          jobSheetId: input.id,
+          status: jobSheet.status,
+          contentHash: jobSheet.fileHash,
+          lookup: {
+            findInFlightByContentHash: db.findInFlightJobSheetByContentHash,
+            findProcessedByContentHash: db.findProcessedJobSheetByContentHash,
+          },
+        });
+
+        if (idempotency.action === "dedupe") {
+          if (idempotency.reason === "same_sheet_processing") {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message:
+                "Cannot process: document is currently being processed. Please wait for the current processing to complete.",
+            });
+          }
+
+          await db.logAction({
+            userId: ctx.user.id,
+            action: "PROCESS_JOB_SHEET_DEDUPED",
+            entityType: "job_sheet",
+            entityId: input.id,
+            details: {
+              reason: idempotency.reason,
+              contentHash: idempotency.contentHash,
+              idempotencyKey: idempotency.idempotencyKey,
+              reusedFromJobSheetId: idempotency.reusedFromJobSheetId,
+            },
           });
+
+          return toProcessDedupeResponse({
+            jobSheetId: input.id,
+            contentHash: idempotency.contentHash,
+            idempotencyKey: idempotency.idempotencyKey,
+            reason: idempotency.reason,
+            reusedFromJobSheetId: idempotency.reusedFromJobSheetId,
+            async: isAsyncProcessingEnabled(),
+            status: "processing",
+          });
+        }
+
+        const contentHash =
+          idempotency.action === "proceed"
+            ? idempotency.contentHash
+            : undefined;
+        const idempotencyKey =
+          idempotency.action === "proceed"
+            ? idempotency.idempotencyKey
+            : undefined;
+
+        // Soft-claim before enqueue/OCR so peer replicas observing the same
+        // fileHash see status=processing. If multiple claimants race, the
+        // lowest jobSheetId wins; losers roll back and return dedupe.
+        if (contentHash) {
+          await db.updateJobSheetStatus(input.id, "processing");
+
+          const claimants =
+            await db.listInFlightJobSheetsByContentHash(contentHash);
+          const winnerId = claimants.reduce(
+            (min, row) => Math.min(min, row.id),
+            input.id
+          );
+
+          if (winnerId !== input.id) {
+            await db.updateJobSheetStatus(input.id, "pending");
+            await db.logAction({
+              userId: ctx.user.id,
+              action: "PROCESS_JOB_SHEET_DEDUPED",
+              entityType: "job_sheet",
+              entityId: input.id,
+              details: {
+                reason: "in_flight",
+                contentHash,
+                idempotencyKey,
+                reusedFromJobSheetId: winnerId,
+                race: true,
+              },
+            });
+            return toProcessDedupeResponse({
+              jobSheetId: input.id,
+              contentHash,
+              idempotencyKey: idempotencyKey!,
+              reason: "in_flight",
+              reusedFromJobSheetId: winnerId,
+              async: isAsyncProcessingEnabled(),
+              status: "processing",
+            });
+          }
         }
 
         if (isAsyncProcessingEnabled()) {
@@ -391,6 +481,8 @@ export const appRouter = router({
             documentUrl: jobSheet.fileUrl,
             goldSpecId: input.goldSpecId,
             userId: ctx.user.id,
+            contentHash,
+            idempotencyKey,
           });
         }
 

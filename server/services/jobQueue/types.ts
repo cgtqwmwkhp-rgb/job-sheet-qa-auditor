@@ -12,6 +12,13 @@ export interface JobSheetProcessingPayload {
   goldSpecId?: number;
   userId?: number;
   templateVersionId?: number;
+  /**
+   * SHA-256 of document bytes (fileHash). When present on primary process,
+   * enqueue also dedupes by content so re-upload / dual-click cannot OCR twice.
+   */
+  contentHash?: string;
+  /** Deterministic process-ocr idempotency key derived from contentHash. */
+  idempotencyKey?: string;
 }
 
 export type JobSheetQueueStatus = "queued" | "running" | "completed" | "failed";

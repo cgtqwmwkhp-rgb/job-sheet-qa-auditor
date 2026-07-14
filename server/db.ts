@@ -369,6 +369,100 @@ export async function updateJobSheetFileHash(id: number, fileHash: string) {
 }
 
 /**
+ * Process-idempotency: another sheet with the same content hash currently OCR'ing.
+ * Dual-replica safe (shared MySQL); excludes the requesting sheet.
+ */
+export async function findInFlightJobSheetByContentHash(
+  contentHash: string,
+  excludeJobSheetId: number
+): Promise<{ id: number; status: string; fileHash: string | null } | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const normalized = contentHash.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const rows = await db
+    .select({
+      id: jobSheets.id,
+      status: jobSheets.status,
+      fileHash: jobSheets.fileHash,
+    })
+    .from(jobSheets)
+    .where(
+      and(
+        eq(jobSheets.fileHash, normalized),
+        eq(jobSheets.status, "processing"),
+        ne(jobSheets.id, excludeJobSheetId)
+      )
+    )
+    .orderBy(jobSheets.id)
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+/**
+ * All in-flight sheets for a content hash (including the requester).
+ * Used to elect a single OCR winner under dual-replica soft-claim races.
+ */
+export async function listInFlightJobSheetsByContentHash(
+  contentHash: string
+): Promise<Array<{ id: number; status: string; fileHash: string | null }>> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const normalized = contentHash.trim().toLowerCase();
+  if (!normalized) return [];
+
+  return db
+    .select({
+      id: jobSheets.id,
+      status: jobSheets.status,
+      fileHash: jobSheets.fileHash,
+    })
+    .from(jobSheets)
+    .where(
+      and(eq(jobSheets.fileHash, normalized), eq(jobSheets.status, "processing"))
+    )
+    .orderBy(jobSheets.id);
+}
+
+/**
+ * Process-idempotency: prior successful OCR for the same content hash.
+ * completed / review_queue both imply OCR already billed.
+ */
+export async function findProcessedJobSheetByContentHash(
+  contentHash: string,
+  excludeJobSheetId: number
+): Promise<{ id: number; status: string; fileHash: string | null } | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const normalized = contentHash.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const rows = await db
+    .select({
+      id: jobSheets.id,
+      status: jobSheets.status,
+      fileHash: jobSheets.fileHash,
+    })
+    .from(jobSheets)
+    .where(
+      and(
+        eq(jobSheets.fileHash, normalized),
+        inArray(jobSheets.status, ["completed", "review_queue"]),
+        ne(jobSheets.id, excludeJobSheetId)
+      )
+    )
+    .orderBy(desc(jobSheets.updatedAt))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+/**
  * Set / clear technician attribution on a job sheet (analytics scorecards).
  */
 export async function updateJobSheetTechnicianId(
