@@ -1,12 +1,14 @@
 /**
- * Shadow / champion-challenger evaluation (PR-21)
+ * Shadow / champion-challenger evaluation (PR-21 / PR-AI-11)
  *
  * Runs a challenger judgment in parallel without affecting canonical results
  * unless canary mode samples the request. Fail-soft: never throws into the
  * main pipeline.
  *
  * Default path uses deterministic rule-based analysis. FEATURE_SHADOW_REAL_MODEL
- * enables a shadow-only alternate model adapter; errors stay fail-soft.
+ * enables a shadow-only alternate model adapter. In advisory shadow mode,
+ * real-model failures fall back to rule_based so pp-delta measurement continues.
+ * In canary mode, real-model failures stay fail-soft (no serve).
  */
 
 import {
@@ -21,7 +23,7 @@ import {
 } from "./config";
 import { buildShadowComparison, toJudgmentSnapshot } from "./compare";
 import { runShadowRealModelAnalysis } from "./modelAdapter";
-import type { ShadowComparison } from "./types";
+import type { ChallengerStrategy, ShadowComparison } from "./types";
 
 export interface ShadowEvalInput {
   extractedText: string;
@@ -45,36 +47,55 @@ export interface ShadowEvalResult {
   canaryApplied: boolean;
 }
 
-async function runChallenger(
-  config: ShadowChallengerConfig,
+function runRuleBasedChallenger(
   extractedText: string,
   goldSpec: GoldSpec,
   pageCount: number
-): Promise<AnalysisResult> {
+): AnalysisResult {
   const start = Date.now();
-  if (config.strategy === "real_model") {
-    return runShadowRealModelAnalysis({
-      extractedText,
-      goldSpec,
-      pageCount,
-      modelId: config.realModelId,
-    });
-  }
-
-  if (config.strategy === "rule_based") {
-    const base = performRuleBasedAnalysis(extractedText, goldSpec, pageCount);
-    return {
-      ...base,
-      processingTimeMs: Date.now() - start,
-      model: "shadow-challenger-rule-based",
-    };
-  }
-  // Exhaustive fallback — keep fail-soft
   const base = performRuleBasedAnalysis(extractedText, goldSpec, pageCount);
   return {
     ...base,
     processingTimeMs: Date.now() - start,
     model: "shadow-challenger-rule-based",
+  };
+}
+
+async function runChallenger(
+  config: ShadowChallengerConfig,
+  extractedText: string,
+  goldSpec: GoldSpec,
+  pageCount: number
+): Promise<{ analysis: AnalysisResult; strategyUsed: ChallengerStrategy }> {
+  if (config.strategy === "real_model") {
+    try {
+      const analysis = await runShadowRealModelAnalysis({
+        extractedText,
+        goldSpec,
+        pageCount,
+        modelId: config.realModelId,
+      });
+      return { analysis, strategyUsed: "real_model" };
+    } catch (error) {
+      // Advisory shadow: keep measuring with coded challenger.
+      // Canary: rethrow so evaluate fail-softs and never serves a fallback.
+      if (config.mode === "canary") {
+        throw error;
+      }
+      console.warn(
+        "[ShadowChallenger] real_model unavailable; falling back to rule_based for advisory measurement:",
+        error instanceof Error ? error.message : error
+      );
+      return {
+        analysis: runRuleBasedChallenger(extractedText, goldSpec, pageCount),
+        strategyUsed: "rule_based",
+      };
+    }
+  }
+
+  return {
+    analysis: runRuleBasedChallenger(extractedText, goldSpec, pageCount),
+    strategyUsed: "rule_based",
   };
 }
 
@@ -98,7 +119,7 @@ export async function evaluateShadowChallenger(
     }
 
     const start = Date.now();
-    const challenger = await runChallenger(
+    const { analysis: challenger, strategyUsed } = await runChallenger(
       config,
       input.extractedText,
       input.goldSpec,
@@ -111,11 +132,12 @@ export async function evaluateShadowChallenger(
       config.mode === "canary"
         ? shouldApplyCanary(sampleKey, config.canaryPercent)
         : true;
+    // Shadow mode is advisory-only: never serve challenger.
     const canaryApplied = config.mode === "canary" && sampled;
 
     const comparison = buildShadowComparison({
       mode: config.mode,
-      strategy: config.strategy,
+      strategy: strategyUsed,
       champion: toJudgmentSnapshot({
         overallResult: input.champion.overallResult,
         score: input.champion.score,
