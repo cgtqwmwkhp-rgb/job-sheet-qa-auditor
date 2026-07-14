@@ -50,6 +50,13 @@
       "when": 1767982000000,
       "tag": "0006_api_cost_events",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1767983000000,
+      "tag": "0007_comms_inbox",
+      "breakpoints": true
     }
   ]
 }
