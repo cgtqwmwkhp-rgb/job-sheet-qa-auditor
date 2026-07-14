@@ -258,6 +258,9 @@ export default function Monitoring() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/ops/feature-flags">Feature flags</Link>
+            </Button>
             <Badge variant={autoRefresh ? "default" : "outline"}>
               {autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
             </Badge>

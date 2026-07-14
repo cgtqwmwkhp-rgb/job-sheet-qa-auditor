@@ -4,25 +4,25 @@ This document provides a consolidated view of all environment variables required
 
 ## Quick Reference
 
-| Category | Variable | Required | Staging | Production |
-|----------|----------|----------|---------|------------|
-| **Core** | `NODE_ENV` | ✅ | `production` | `production` |
-| | `PORT` | ✅ | `3000` | `3000` |
-| **Database** | `DATABASE_URL` | ✅ | `mysql://...@staging-server` | `mysql://...@prod-server` |
-| **Storage** | `STORAGE_PROVIDER` | ✅ | `azure` | `azure` |
-| | `AZURE_STORAGE_CONNECTION_STRING` | ✅ | From Key Vault | From Key Vault |
-| | `AZURE_STORAGE_CONTAINER_NAME` | ✅ | `jobsheets-staging` | `jobsheets-prod` |
-| **Safety** | `ENABLE_PURGE_EXECUTION` | ✅ | `false` | `false` |
-| | `ENABLE_SCHEDULER` | ✅ | `false` | `false` |
-| **Build** | `GIT_SHA` | ✅ | Set by CI | Set by CI |
-| | `PLATFORM_VERSION` | ⚪ | Set by CI | Set by CI |
-| | `BUILD_TIME` | ⚪ | Set by CI | Set by CI |
-| **AI** | `MISTRAL_API_KEY` | ✅ | From secrets | From secrets |
-| | `GEMINI_API_KEY` | ⚪ | From secrets | From secrets |
-| | `ENABLE_GEMINI_INSIGHTS` | ⚪ | `true` | `true` |
-| **Auth** | `OAUTH_SERVER_URL` | ⚪ | OAuth provider URL | OAuth provider URL |
-| | `OWNER_OPEN_ID` | ⚪ | Admin user OpenID | Admin user OpenID |
-| | `JWT_SECRET` | ✅ | 32+ char secret | 32+ char secret |
+| Category     | Variable                          | Required | Staging                      | Production                |
+| ------------ | --------------------------------- | -------- | ---------------------------- | ------------------------- |
+| **Core**     | `NODE_ENV`                        | ✅       | `production`                 | `production`              |
+|              | `PORT`                            | ✅       | `3000`                       | `3000`                    |
+| **Database** | `DATABASE_URL`                    | ✅       | `mysql://...@staging-server` | `mysql://...@prod-server` |
+| **Storage**  | `STORAGE_PROVIDER`                | ✅       | `azure`                      | `azure`                   |
+|              | `AZURE_STORAGE_CONNECTION_STRING` | ✅       | From Key Vault               | From Key Vault            |
+|              | `AZURE_STORAGE_CONTAINER_NAME`    | ✅       | `jobsheets-staging`          | `jobsheets-prod`          |
+| **Safety**   | `ENABLE_PURGE_EXECUTION`          | ✅       | `false`                      | `false`                   |
+|              | `ENABLE_SCHEDULER`                | ✅       | `false`                      | `false`                   |
+| **Build**    | `GIT_SHA`                         | ✅       | Set by CI                    | Set by CI                 |
+|              | `PLATFORM_VERSION`                | ⚪       | Set by CI                    | Set by CI                 |
+|              | `BUILD_TIME`                      | ⚪       | Set by CI                    | Set by CI                 |
+| **AI**       | `MISTRAL_API_KEY`                 | ✅       | From secrets                 | From secrets              |
+|              | `GEMINI_API_KEY`                  | ⚪       | From secrets                 | From secrets              |
+|              | `ENABLE_GEMINI_INSIGHTS`          | ⚪       | `true`                       | `true`                    |
+| **Auth**     | `OAUTH_SERVER_URL`                | ⚪       | OAuth provider URL           | OAuth provider URL        |
+|              | `OWNER_OPEN_ID`                   | ⚪       | Admin user OpenID            | Admin user OpenID         |
+|              | `JWT_SECRET`                      | ✅       | 32+ char secret              | 32+ char secret           |
 
 Legend: ✅ = Required, ⚪ = Optional
 
@@ -121,17 +121,44 @@ az containerapp update \
     JWT_SECRET=secretref:jwt-secret
 ```
 
+## Feature flags (`FEATURE_*`) — staging ↔ production contract
+
+Documented for the admin/QA Feature Flag Matrix UI (`/ops/feature-flags`).
+**FlagOps owns** `.github/workflows/azure-deploy.yml`; this table is a read-only
+contract mirror. Effective values are whatever the running process sees in
+`process.env`.
+
+### Critical — must match env-to-env
+
+| Variable                         | Staging               | Production            | Notes                            |
+| -------------------------------- | --------------------- | --------------------- | -------------------------------- |
+| `FEATURE_OVERTURN_METRICS`       | `true`                | `true`                | Set in both deploy jobs          |
+| `FEATURE_PHOTO_PAIR_COMPARE`     | `true`                | `true`                | Set in both deploy jobs          |
+| `FEATURE_SELECTION_MARKS`        | `true` (if DI)        | `true` (if DI)        | When Azure DI secrets present    |
+| `FEATURE_COACHING_LLM_NARRATIVE` | `true` (if Anthropic) | `true` (if Anthropic) | When `ANTHROPIC_API_KEY` present |
+| `FEATURE_COACHING_VERIFIER`      | `true` (if OpenAI)    | `true` (if OpenAI)    | When `OPENAI_API_KEY` present    |
+
+### Critical — intentionally divergent (prod promotion)
+
+| Variable                    | Staging | Production | Notes                    |
+| --------------------------- | ------- | ---------- | ------------------------ |
+| `FEATURE_VLM_VERIFICATION`  | unset   | `true`     | Prod-only until promoted |
+| `FEATURE_IMAGE_QA_INTAKE`   | unset   | `true`     | Prod-only until promoted |
+| `FEATURE_GEMINI_MULTIMODAL` | unset   | `true`     | Prod-only until promoted |
+
+In-app view: **Feature Flags** (admin / qa_lead) → `/ops/feature-flags`.
+
 ## Safety Controls
 
 ### Staging-Only Variables
 
 These should NEVER be enabled on production:
 
-| Variable | Staging Value | Production Value |
-|----------|---------------|------------------|
-| `DEV_BYPASS_AUTH` | `false` | `false` |
-| `ENABLE_DEBUG_LOGGING` | `true` (optional) | `false` |
-| `LOG_LEVEL` | `debug` (optional) | `info` |
+| Variable               | Staging Value      | Production Value |
+| ---------------------- | ------------------ | ---------------- |
+| `DEV_BYPASS_AUTH`      | `false`            | `false`          |
+| `ENABLE_DEBUG_LOGGING` | `true` (optional)  | `false`          |
+| `LOG_LEVEL`            | `debug` (optional) | `info`           |
 
 ### Production Safety Gates
 
