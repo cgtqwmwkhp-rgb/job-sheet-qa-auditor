@@ -71,9 +71,11 @@ export function mapAzureRolesToDbRole(
  * Role to persist for an Azure Easy Auth session.
  *
  * - Explicit Entra app roles win (including viewer → user).
- * - No claims → qa_lead for new users (Entra already gates app access).
- * - Existing legacy `user` rows without claims → promote to qa_lead on sign-in
- *   so prod/staging behave the same for staff who passed Entra.
+ * - No claims → least-privilege `user` for brand-new accounts only.
+ * - Existing DB roles are preserved when claims are absent (no auto-promotion).
+ *
+ * Staff requiring qa_lead must receive an Entra app-role claim, or be promoted
+ * explicitly via ops (`scripts/ops/promote-staff-to-qalead.mjs`).
  */
 export function resolveAzureAuthRole(input: {
   roleClaims: string[];
@@ -82,7 +84,6 @@ export function resolveAzureAuthRole(input: {
 }): DbUserRole | undefined {
   const mapped = mapAzureRolesToDbRole(input.roleClaims);
   if (mapped) return mapped;
-  if (input.isNewUser) return "qa_lead";
-  if (input.existingRole === "user") return "qa_lead";
+  if (input.isNewUser) return "user";
   return undefined;
 }

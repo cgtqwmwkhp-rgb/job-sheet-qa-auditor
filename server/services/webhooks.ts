@@ -514,7 +514,7 @@ async function deliverWebhook(
 export async function emitWebhookEvent(
   event: WebhookEvent,
   data: Record<string, unknown>,
-  options: { redactPII?: boolean } = {}
+  { redactPII = true }: { redactPII?: boolean } = {}
 ): Promise<WebhookDeliveryResult[]> {
   await ensureHydrated();
   const correlationId = getCorrelationId();
@@ -529,8 +529,8 @@ export async function emitWebhookEvent(
     return [];
   }
 
-  // Optionally redact PII from data
-  const safeData = options.redactPII ? redactObject(data) : data;
+  // Redact PII from data by default (opt out with redactPII: false)
+  const safeData = redactPII ? redactObject(data) : data;
 
   const payload: WebhookPayload = {
     id: uuidv4(),
