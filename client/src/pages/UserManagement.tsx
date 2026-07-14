@@ -32,8 +32,12 @@ import {
 export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Fetch users from API
-  const { data: users, isLoading } = trpc.users.list.useQuery();
+  const {
+    data: users,
+    isLoading,
+    isError,
+    refetch,
+  } = trpc.users.list.useQuery();
   const updateRole = trpc.users.updateRole.useMutation();
   const utils = trpc.useUtils();
 
@@ -78,6 +82,21 @@ export default function UserManagement() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-7xl mx-auto">
+        {isError ? (
+          <Card className="border-destructive/30 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-sm font-medium text-destructive">
+              Unable to load users. Refresh and try again.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void refetch()}
+            >
+              Retry
+            </Button>
+          </Card>
+        ) : null}
         <div className="pb-4 border-b border-border/50 space-y-4">
           <div>
             <h1 className="text-3xl font-heading font-bold tracking-tight">
@@ -157,7 +176,7 @@ export default function UserManagement() {
               <div className="p-4">
                 <TableSkeleton rows={6} columns={5} />
               </div>
-            ) : filteredUsers.length > 0 ? (
+            ) : isError ? null : filteredUsers.length > 0 ? (
               <div className="max-h-[min(70vh,640px)] overflow-auto">
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">

@@ -19,6 +19,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  A11Y_LIVE_REGION_ID,
+  MAIN_CONTENT_ID,
+  SKIP_TO_MAIN_LABEL,
+} from "@/lib/accessibilityHelpers";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -114,9 +119,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <SidebarProvider>
-      <a href="#main-content" className="skip-link">
-        Skip to main content
+      <a href={`#${MAIN_CONTENT_ID}`} className="skip-link">
+        {SKIP_TO_MAIN_LABEL}
       </a>
+      <div
+        id={A11Y_LIVE_REGION_ID}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      />
       <AppSidebar />
       <SidebarInset className="bg-[#F9F9F9]">
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-[#EBE8E8] bg-white/95 px-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
@@ -163,7 +175,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </header>
         <main
-          id="main-content"
+          id={MAIN_CONTENT_ID}
           tabIndex={-1}
           className="flex-1 overflow-auto bg-[#F9F9F9] p-6 text-[#333030] outline-none"
         >
