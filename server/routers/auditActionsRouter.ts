@@ -33,6 +33,8 @@ import {
   RateLimitError,
   RATE_LIMITS,
 } from "../utils/rateLimiter";
+import { withTransaction } from "../utils/transactions";
+import type { DbClient } from "../db";
 
 async function throwIfRateLimited(
   fn: () => unknown | Promise<unknown>
@@ -56,7 +58,7 @@ async function enforceReviewLimit(userId: number): Promise<void> {
   );
 }
 
-function createDbDeps(): AuditActionDeps {
+function createDbDeps(tx?: DbClient): AuditActionDeps {
   return {
     getFinding: async id => {
       const row = await db.getAuditFindingById(id);
@@ -88,8 +90,10 @@ function createDbDeps(): AuditActionDeps {
         reasonCode: row.reasonCode,
       };
     },
-    updateFindingResolution: (id, data) => db.updateFindingResolution(id, data),
-    updateFindingSnippet: (id, data) => db.updateFindingSnippet(id, data),
+    updateFindingResolution: (id, data) =>
+      db.updateFindingResolution(id, data, tx),
+    updateFindingSnippet: (id, data) =>
+      db.updateFindingSnippet(id, data, tx),
     getAuditResult: async id => {
       const row = await db.getAuditResultById(id);
       if (!row) return undefined;
@@ -100,15 +104,23 @@ function createDbDeps(): AuditActionDeps {
       };
     },
     updateAuditResultStatus: (id, result) =>
-      db.updateAuditResultStatus(id, result),
-    updateJobSheetStatus: (id, status) => db.updateJobSheetStatus(id, status),
-    createWaiver: data => db.createWaiver(data),
+      db.updateAuditResultStatus(id, result, tx),
+    updateJobSheetStatus: (id, status) =>
+      db.updateJobSheetStatus(id, status, tx),
+    createWaiver: data => db.createWaiver(data, tx),
     getWaiverByFindingId: id => db.getWaiverByFindingId(id),
-    deleteWaiver: id => db.deleteWaiver(id),
+    deleteWaiver: id => db.deleteWaiver(id, tx),
     logAction: async data => {
-      await db.logAction(data);
+      await db.logAction(data, { tx, required: true });
     },
   };
+}
+
+/** Atomic compliance mutation: resolution + side effects + system_audit_log. */
+async function runAuditAction<T>(
+  fn: (deps: AuditActionDeps) => Promise<T>
+): Promise<T> {
+  return withTransaction(async tx => fn(createDbDeps(tx)));
 }
 
 const findingActionInput = z.object({
@@ -132,12 +144,14 @@ export const auditActionsRouter = router({
     .mutation(async ({ ctx, input }) => {
       await enforceReviewLimit(ctx.user.id);
       try {
-        return await applyFindingAction(createDbDeps(), {
-          findingId: input.findingId,
-          action: "waive",
-          reason: input.reason,
-          userId: ctx.user.id,
-        });
+        return await runAuditAction(deps =>
+          applyFindingAction(deps, {
+            findingId: input.findingId,
+            action: "waive",
+            reason: input.reason,
+            userId: ctx.user.id,
+          })
+        );
       } catch (err) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -152,13 +166,15 @@ export const auditActionsRouter = router({
     .mutation(async ({ ctx, input }) => {
       await enforceReviewLimit(ctx.user.id);
       try {
-        return await applyFindingAction(createDbDeps(), {
-          findingId: input.findingId,
-          action: "override",
-          reason: input.reason,
-          userId: ctx.user.id,
-          trainingReasonCode: input.trainingReasonCode,
-        });
+        return await runAuditAction(deps =>
+          applyFindingAction(deps, {
+            findingId: input.findingId,
+            action: "override",
+            reason: input.reason,
+            userId: ctx.user.id,
+            trainingReasonCode: input.trainingReasonCode,
+          })
+        );
       } catch (err) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -173,12 +189,14 @@ export const auditActionsRouter = router({
     .mutation(async ({ ctx, input }) => {
       await enforceReviewLimit(ctx.user.id);
       try {
-        return await applyFindingAction(createDbDeps(), {
-          findingId: input.findingId,
-          action: "flag",
-          reason: input.reason,
-          userId: ctx.user.id,
-        });
+        return await runAuditAction(deps =>
+          applyFindingAction(deps, {
+            findingId: input.findingId,
+            action: "flag",
+            reason: input.reason,
+            userId: ctx.user.id,
+          })
+        );
       } catch (err) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -193,12 +211,14 @@ export const auditActionsRouter = router({
     .mutation(async ({ ctx, input }) => {
       await enforceReviewLimit(ctx.user.id);
       try {
-        return await applyFindingAction(createDbDeps(), {
-          findingId: input.findingId,
-          action: "approve",
-          reason: input.reason,
-          userId: ctx.user.id,
-        });
+        return await runAuditAction(deps =>
+          applyFindingAction(deps, {
+            findingId: input.findingId,
+            action: "approve",
+            reason: input.reason,
+            userId: ctx.user.id,
+          })
+        );
       } catch (err) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -212,10 +232,12 @@ export const auditActionsRouter = router({
     .input(z.object({ findingId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       try {
-        return await undoFindingAction(createDbDeps(), {
-          findingId: input.findingId,
-          userId: ctx.user.id,
-        });
+        return await runAuditAction(deps =>
+          undoFindingAction(deps, {
+            findingId: input.findingId,
+            userId: ctx.user.id,
+          })
+        );
       } catch (err) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -233,11 +255,13 @@ export const auditActionsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      return bulkApproveFindings(createDbDeps(), {
-        findingIds: input.findingIds,
-        reason: input.reason,
-        userId: ctx.user.id,
-      });
+      return runAuditAction(deps =>
+        bulkApproveFindings(deps, {
+          findingIds: input.findingIds,
+          reason: input.reason,
+          userId: ctx.user.id,
+        })
+      );
     }),
 
   /** Approve a job sheet out of the hold queue. */
@@ -256,12 +280,14 @@ export const auditActionsRouter = router({
           message: "Job sheet not found",
         });
       }
-      return approveJobSheet(createDbDeps(), {
-        jobSheetId: input.jobSheetId,
-        userId: ctx.user.id,
-        reason: input.reason,
-        previousStatus: sheet.status,
-      });
+      return runAuditAction(deps =>
+        approveJobSheet(deps, {
+          jobSheetId: input.jobSheetId,
+          userId: ctx.user.id,
+          reason: input.reason,
+          previousStatus: sheet.status,
+        })
+      );
     }),
 
   /** Undo job sheet approve — restore to prior status (default review_queue). */
@@ -281,11 +307,13 @@ export const auditActionsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      return undoJobSheetApprove(createDbDeps(), {
-        jobSheetId: input.jobSheetId,
-        userId: ctx.user.id,
-        restoreStatus: input.restoreStatus,
-      });
+      return runAuditAction(deps =>
+        undoJobSheetApprove(deps, {
+          jobSheetId: input.jobSheetId,
+          userId: ctx.user.id,
+          restoreStatus: input.restoreStatus,
+        })
+      );
     }),
 
   /**
@@ -304,14 +332,16 @@ export const auditActionsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        return await captureFieldCorrection(createDbDeps(), {
-          findingId: input.findingId,
-          fieldName: input.fieldName,
-          originalValue: input.originalValue,
-          correctedValue: input.correctedValue,
-          userId: ctx.user.id,
-          trainingReasonCode: input.trainingReasonCode,
-        });
+        return await runAuditAction(deps =>
+          captureFieldCorrection(deps, {
+            findingId: input.findingId,
+            fieldName: input.fieldName,
+            originalValue: input.originalValue,
+            correctedValue: input.correctedValue,
+            userId: ctx.user.id,
+            trainingReasonCode: input.trainingReasonCode,
+          })
+        );
       } catch (err) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -331,11 +361,13 @@ export const auditActionsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        return await undoFieldCorrection(createDbDeps(), {
-          findingId: input.findingId,
-          previousSnippet: input.previousSnippet,
-          userId: ctx.user.id,
-        });
+        return await runAuditAction(deps =>
+          undoFieldCorrection(deps, {
+            findingId: input.findingId,
+            previousSnippet: input.previousSnippet,
+            userId: ctx.user.id,
+          })
+        );
       } catch (err) {
         throw new TRPCError({
           code: "BAD_REQUEST",

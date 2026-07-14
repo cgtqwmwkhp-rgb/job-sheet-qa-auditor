@@ -56,6 +56,27 @@ export async function getDb() {
   return _db;
 }
 
+/** Drizzle client — use for transactional writes via {@link runTransaction}. */
+export type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+
+async function resolveDbClient(tx?: DbClient): Promise<DbClient> {
+  if (tx) return tx;
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db;
+}
+
+/**
+ * Run a callback inside a single MySQL transaction (commit or full rollback).
+ */
+export async function runTransaction<T>(
+  fn: (tx: DbClient) => Promise<T>
+): Promise<T> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.transaction(fn);
+}
+
 /**
  * Test database connectivity by running a simple query.
  * Returns { connected: true, latencyMs } on success, or { connected: false, error } on failure.
@@ -351,9 +372,12 @@ export async function getJobSheets(options?: {
     .offset(options?.offset ?? 0);
 }
 
-export async function updateJobSheetStatus(id: number, status: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+export async function updateJobSheetStatus(
+  id: number,
+  status: string,
+  tx?: DbClient
+) {
+  const db = await resolveDbClient(tx);
 
   await db
     .update(jobSheets)
@@ -693,10 +717,10 @@ export async function updateFindingResolution(
       | "flagged"
       | "approved"
       | null;
-  }
+  },
+  tx?: DbClient
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  const db = await resolveDbClient(tx);
 
   await db
     .update(auditFindings)
@@ -713,10 +737,10 @@ export async function updateFindingResolution(
 /** PR-13: persist reviewer field correction into normalisedSnippet (no new migration). */
 export async function updateFindingSnippet(
   id: number,
-  data: { normalisedSnippet: string }
+  data: { normalisedSnippet: string },
+  tx?: DbClient
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  const db = await resolveDbClient(tx);
 
   await db
     .update(auditFindings)
@@ -741,17 +765,16 @@ export async function getAuditResultById(id: number) {
 
 export async function updateAuditResultStatus(
   id: number,
-  result: "pass" | "fail" | "review_queue" | "waived"
+  result: "pass" | "fail" | "review_queue" | "waived",
+  tx?: DbClient
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  const db = await resolveDbClient(tx);
 
   await db.update(auditResults).set({ result }).where(eq(auditResults.id, id));
 }
 
-export async function deleteWaiver(id: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+export async function deleteWaiver(id: number, tx?: DbClient) {
+  const db = await resolveDbClient(tx);
 
   await db.delete(waivers).where(eq(waivers.id, id));
 }
@@ -919,9 +942,8 @@ export async function assignDisputeReviewer(
 
 // ============ WAIVER QUERIES ============
 
-export async function createWaiver(data: InsertWaiver) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+export async function createWaiver(data: InsertWaiver, tx?: DbClient) {
+  const db = await resolveDbClient(tx);
 
   const result = await db.insert(waivers).values(data);
   return { id: Number(result[0].insertId) };
@@ -942,9 +964,17 @@ export async function getWaiverByFindingId(auditFindingId: number) {
 
 // ============ AUDIT LOG QUERIES ============
 
-export async function logAction(data: InsertSystemAuditLog) {
-  const db = await getDb();
+export async function logAction(
+  data: InsertSystemAuditLog,
+  options?: { tx?: DbClient; required?: boolean }
+) {
+  const db = options?.tx ?? (await getDb());
   if (!db) {
+    if (options?.required) {
+      throw new Error(
+        "Database not available — system audit log write is required"
+      );
+    }
     console.warn("[Database] Cannot log action: database not available");
     return;
   }
