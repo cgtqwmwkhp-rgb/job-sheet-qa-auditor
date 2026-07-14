@@ -182,10 +182,10 @@ export function extractFromRoi(
   };
 }
 
-function imageQaCheckType(
-  fieldId: ImageQaField
-): ImageQaResult["checkType"] {
-  return fieldId === "signatureBlock" ? "signature_present" : "tickboxes_checked";
+function imageQaCheckType(fieldId: ImageQaField): ImageQaResult["checkType"] {
+  return fieldId === "signatureBlock"
+    ? "signature_present"
+    : "tickboxes_checked";
 }
 
 /**
