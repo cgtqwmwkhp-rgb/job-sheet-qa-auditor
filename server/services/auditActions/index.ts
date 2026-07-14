@@ -13,6 +13,10 @@ import {
   type FindingAction,
   type ResolutionStatus,
 } from "./types";
+import {
+  buildTrainingSignal,
+  withTrainingSignalDetails,
+} from "../trainingSignals";
 
 export interface FindingRecord {
   id: number;
@@ -26,6 +30,8 @@ export interface FindingRecord {
   fieldName?: string | null;
   rawSnippet?: string | null;
   normalisedSnippet?: string | null;
+  ruleId?: string | null;
+  reasonCode?: string | null;
 }
 
 export interface AuditResultRecord {
@@ -121,6 +127,8 @@ export async function applyFindingAction(
     action: FindingAction;
     reason: string;
     userId: number;
+    /** TrainLoop taxonomy when overturning (override action only). */
+    trainingReasonCode?: string | null;
   }
 ): Promise<AuditActionResult> {
   const finding = await deps.getFinding(input.findingId);
@@ -169,18 +177,36 @@ export async function applyFindingAction(
     userId: input.userId,
   });
 
+  const audit = await deps.getAuditResult(finding.auditResultId);
+  const logDetails: Record<string, unknown> = {
+    previousStatus: previous,
+    newStatus: next,
+    reason: input.reason,
+    waiverId,
+    ...sideEffects,
+  };
+
+  if (input.action === "override") {
+    logDetails.trainingSignal = buildTrainingSignal({
+      signalType: "override",
+      findingId: input.findingId,
+      trainingReasonCode: input.trainingReasonCode,
+      auditResultId: finding.auditResultId,
+      jobSheetId: audit?.jobSheetId,
+      ruleId: finding.ruleId,
+      findingReasonCode: finding.reasonCode ?? undefined,
+      fieldName: finding.fieldName ?? undefined,
+      originalValue: finding.normalisedSnippet ?? finding.rawSnippet ?? undefined,
+      reviewerReason: input.reason,
+    });
+  }
+
   await deps.logAction({
     userId: input.userId,
     action: `FINDING_${input.action.toUpperCase()}`,
     entityType: "audit_finding",
     entityId: input.findingId,
-    details: {
-      previousStatus: previous,
-      newStatus: next,
-      reason: input.reason,
-      waiverId,
-      ...sideEffects,
-    },
+    details: logDetails,
   });
 
   return {
@@ -364,6 +390,8 @@ export async function captureFieldCorrection(
     originalValue?: string;
     correctedValue: string;
     userId: number;
+    /** TrainLoop taxonomy — OCR/ROI/rule/template vs true defect. */
+    trainingReasonCode?: string | null;
   }
 ): Promise<FieldCorrectionResult> {
   const finding = await deps.getFinding(input.findingId);
@@ -389,17 +417,34 @@ export async function captureFieldCorrection(
     normalisedSnippet: corrected,
   });
 
+  const audit = await deps.getAuditResult(finding.auditResultId);
+  const trainingSignal = buildTrainingSignal({
+    signalType: "field_correction",
+    findingId: input.findingId,
+    trainingReasonCode: input.trainingReasonCode,
+    auditResultId: finding.auditResultId,
+    jobSheetId: audit?.jobSheetId,
+    ruleId: finding.ruleId,
+    findingReasonCode: finding.reasonCode ?? undefined,
+    fieldName,
+    originalValue,
+    correctedValue: corrected,
+  });
+
   await deps.logAction({
     userId: input.userId,
     action: "FIELD_CORRECTION",
     entityType: "audit_finding",
     entityId: input.findingId,
-    details: {
-      fieldName,
-      originalValue,
-      correctedValue: corrected,
-      previousSnippet,
-    },
+    details: withTrainingSignalDetails(
+      {
+        fieldName,
+        originalValue,
+        correctedValue: corrected,
+        previousSnippet,
+      },
+      trainingSignal
+    ),
   });
 
   return {
