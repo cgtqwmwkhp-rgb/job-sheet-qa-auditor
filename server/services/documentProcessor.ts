@@ -161,6 +161,10 @@ import {
 } from "./processingProgressStore";
 import type { JobSheetProcessStatus } from "@shared/processingProgress";
 import { mapAnalyzerOverallToJobSheetStatus } from "./processStatus";
+import {
+  recordPipelineJobComplete,
+  recordPipelineStage,
+} from "./metrics/pipelineMetrics";
 
 export interface ProcessingResult {
   success: boolean;
@@ -493,7 +497,7 @@ export async function orchestrateJobSheetProcessing(
 
   // Wrap processing with timeout to prevent hung jobs
   try {
-    return await withTimeout(
+    const result = await withTimeout(
       processJobSheetWithOptions(request.jobSheetId, documentUrl, {
         goldSpecId: request.goldSpecId,
         templateVersionId: request.templateVersionId,
@@ -505,6 +509,12 @@ export async function orchestrateJobSheetProcessing(
       TIMEOUT_CONFIG.DOCUMENT_PROCESSING,
       `Job sheet ${request.jobSheetId} processing`
     );
+    try {
+      recordPipelineJobComplete(result.success);
+    } catch {
+      // metrics must never block processing
+    }
+    return result;
   } catch (error) {
     // If timeout, mark job as failed and log (never for dry-run / non-persist)
     if (
@@ -516,6 +526,11 @@ export async function orchestrateJobSheetProcessing(
         `[DocumentProcessor] Job ${request.jobSheetId} timed out after ${error.timeoutMs}ms`
       );
       await db.updateJobSheetStatus(request.jobSheetId, "failed");
+    }
+    try {
+      recordPipelineJobComplete(false);
+    } catch {
+      // metrics must never block processing
     }
     throw error;
   }
@@ -551,6 +566,19 @@ async function processJobSheetWithOptions(
     nextRunning?: string
   ) => {
     stages.push(stage);
+    try {
+      recordPipelineStage(
+        stage.stage,
+        stage.status === "success"
+          ? "success"
+          : stage.status === "skipped"
+            ? "skipped"
+            : "failed",
+        stage.durationMs ?? 0
+      );
+    } catch {
+      // metrics must never block processing
+    }
     if (skipProgress || jobSheetId <= 0) return;
     try {
       syncStagesFromProcessor(jobSheetId, stages, nextRunning);
