@@ -71,7 +71,7 @@ describe("VLM Verification — Phase 2.5", () => {
     expect(result.provider).toBe("mock");
   });
 
-  it("runImageQa heuristic-passes non-disputed when flag off", async () => {
+  it("runImageQa returns unavailable (not fake 0.88) when flag off and not disputed", async () => {
     process.env.FEATURE_VLM_VERIFICATION = "false";
     const result = await runImageQa(roi, "signatureBlock", {
       cropImage: {
@@ -80,8 +80,11 @@ describe("VLM Verification — Phase 2.5", () => {
       },
     });
     expect(result.vlmUsed).toBe(false);
-    expect(result.passed).toBe(true);
-    expect(result.confidence).toBe(0.88);
+    expect(result.available).toBe(false);
+    expect(result.passed).toBe(false);
+    expect(result.confidence).toBe(0);
+    expect(result.confidence).not.toBe(0.88);
+    expect(result.details).toMatch(/unavailable/i);
   });
 
   it("runImageQa fail-closed: disputed + VLM off → passed:false", async () => {
@@ -94,6 +97,7 @@ describe("VLM Verification — Phase 2.5", () => {
       disputed: true,
     });
     expect(result.vlmUsed).toBe(false);
+    expect(result.available).toBe(true);
     expect(result.passed).toBe(false);
     expect(result.confidence).toBe(0);
     expect(result.details).toMatch(/disputed.*VLM.*off/i);
@@ -108,6 +112,7 @@ describe("VLM Verification — Phase 2.5", () => {
       disputed: true,
     });
     expect(result.vlmUsed).toBe(true);
+    expect(result.available).toBe(true);
     expect(result.vlmProvider).toBe("mock");
     expect(result.passed).toBe(true);
   });
@@ -123,11 +128,12 @@ describe("VLM Verification — Phase 2.5", () => {
       disputeReason: "ink not in OCR",
     });
     expect(result.vlmUsed).toBe(true);
+    expect(result.available).toBe(true);
     expect(result.vlmProvider).toBe("mock");
     expect(result.passed).toBe(true);
   });
 
-  it("fail-soft: VLM failure falls back to heuristic", async () => {
+  it("fail-soft: VLM failure returns unavailable (not stub pass)", async () => {
     getMockVlmAdapter().setShouldFail(true);
     const result = await runImageQa(roi, "tickboxBlock", {
       cropImage: {
@@ -138,8 +144,11 @@ describe("VLM Verification — Phase 2.5", () => {
       disputeReason: "conflict",
     });
     expect(result.vlmUsed).toBe(false);
-    expect(result.passed).toBe(true);
-    expect(result.details).toMatch(/fail-soft/);
+    expect(result.available).toBe(false);
+    expect(result.passed).toBe(false);
+    expect(result.confidence).toBe(0);
+    expect(result.confidence).not.toBe(0.88);
+    expect(result.details).toMatch(/unavailable.*fail-soft/i);
   });
 
   it("respects max crops config default", () => {
