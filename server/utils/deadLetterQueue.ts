@@ -97,7 +97,9 @@ function updateAffectedRows(result: unknown): number {
  * Re-read one row from DB into the cache. Evicts if missing/resolved.
  * Returns the cached job when still unresolved.
  */
-async function refreshCacheEntryFromDb(id: string): Promise<FailedJob | undefined> {
+async function refreshCacheEntryFromDb(
+  id: string
+): Promise<FailedJob | undefined> {
   try {
     const db = await getDb();
     if (!db) return deadLetterQueue.get(id);
