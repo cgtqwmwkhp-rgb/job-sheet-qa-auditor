@@ -1,5 +1,8 @@
 /**
- * Shadow disagreement summary builder (PR-21)
+ * Shadow disagreement summary builder (PR-21 / PR-AI-11)
+ *
+ * Surfaces pass-rate pp deltas so challenger lift can be measured in
+ * advisory shadow mode before any canary serve.
  */
 
 import {
@@ -38,7 +41,11 @@ export function buildShadowChallengerSummary(input: {
     enabled: config.enabled,
     mode: config.mode,
     canaryPercent: config.canaryPercent,
+    strategy: config.strategy,
+    realModelEnabled: config.realModelEnabled,
+    realModelId: config.realModelId,
     asOf: input.asOf ?? new Date().toISOString(),
     report,
+    passRate: report.passRate,
   };
 }

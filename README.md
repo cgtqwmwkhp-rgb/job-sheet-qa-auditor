@@ -52,16 +52,19 @@ Enterprise-grade document auditing system for job sheet validation with OCR extr
 Pinned models are exposed via `system.modelCurrency` / `ai.modelRegistry` (no secrets).
 Roles: `ocr`, `judgment`, `interpreter`, optional `fallback_ocr`. Currency metadata is env-sourced (`source: "env"`).
 
-### Shadow / Champion-Challenger (PR-21)
+### Shadow / Champion-Challenger (PR-21 / PR-AI-11)
 
-| Variable                     | Description                                              | Default      |
-| ---------------------------- | -------------------------------------------------------- | ------------ |
-| `FEATURE_SHADOW_CHALLENGER`  | Enable shadow/canary evaluation on live traffic          | unset (off)  |
-| `SHADOW_MODE`                | `shadow` (compare only), `canary`, or `off`              | `shadow`     |
-| `SHADOW_CANARY_PERCENT`      | 0–100; fraction of traffic served by challenger (canary) | `0`          |
-| `SHADOW_CHALLENGER_STRATEGY` | Challenger strategy (`rule_based` overnight)             | `rule_based` |
+| Variable                         | Description                                              | Default            |
+| -------------------------------- | -------------------------------------------------------- | ------------------ |
+| `FEATURE_SHADOW_CHALLENGER`      | Enable shadow/canary evaluation on live traffic          | unset (off)        |
+| `SHADOW_MODE`                    | `shadow` (compare only), `canary`, or `off`              | `shadow`           |
+| `SHADOW_CANARY_PERCENT`          | 0–100; fraction of traffic served by challenger (canary) | `0`                |
+| `SHADOW_CHALLENGER_STRATEGY`     | Challenger strategy (`rule_based` overnight)             | `rule_based`       |
+| `FEATURE_SHADOW_REAL_MODEL`      | Use Gemini Flash (or `SHADOW_REAL_MODEL_ID`) challenger  | unset (off)        |
+| `SHADOW_REAL_MODEL_ID`           | Alternate model id for real-model strategy               | `gemini-2.0-flash` |
+| `SHADOW_MEASUREMENT_MIN_SAMPLES` | Min comparisons before `passRate.measurementReady`       | `30`               |
 
-Shadow comparisons persist on `reportJson.shadowComparison` and never change canonical results unless canary samples the request. Disagreement reporting: `analytics.getShadowChallengerSummary` / `getShadowDisagreements`.
+**Measurement path (before canary):** set `FEATURE_SHADOW_CHALLENGER=true`, `SHADOW_MODE=shadow`, `SHADOW_CANARY_PERCENT=0`. Comparisons persist on `reportJson.shadowComparison` and never change canonical results. Aggregate pass-rate pp deltas via `analytics.getShadowChallengerSummary` → `passRate.passRatePpDelta` (challenger PASS% − champion PASS%). Do not enable canary until `passRate.measurementReady` is true.
 
 ### Testing
 
