@@ -329,8 +329,7 @@ export async function processWithRoi(
     let extracted = false;
     let value: string | null = null;
     let confidence = 0;
-    let source: "roi" | "fullpage" | "reprocessed" | "unavailable" =
-      "fullpage";
+    let source: "roi" | "fullpage" | "reprocessed" | "unavailable" = "fullpage";
     let reprocessAttempts = 0;
     let imageQaResult: ImageQaResult | undefined;
     let unavailableReason: string | undefined;
@@ -343,7 +342,8 @@ export async function processWithRoi(
         confidence = 0;
         source = "unavailable";
         extracted = false;
-        unavailableReason = roiResult.reason ?? ROI_EXTRACTION_QUARANTINED_REASON;
+        unavailableReason =
+          roiResult.reason ?? ROI_EXTRACTION_QUARANTINED_REASON;
         warnings.push(
           `ROI extraction quarantined for '${fieldId}': ${unavailableReason}`
         );
