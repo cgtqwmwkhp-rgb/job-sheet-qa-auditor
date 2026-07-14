@@ -49,9 +49,11 @@ import {
 } from "./services/imageQa";
 import { getModelRegistry } from "./services/modelRegistry";
 
-function throwIfRateLimited(fn: () => void): void {
+async function throwIfRateLimited(
+  fn: () => unknown | Promise<unknown>
+): Promise<void> {
   try {
-    fn();
+    await fn();
   } catch (error) {
     if (error instanceof RateLimitError) {
       throw new TRPCError({
@@ -223,7 +225,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        throwIfRateLimited(() =>
+        await throwIfRateLimited(() =>
           enforceRateLimit(`user:${ctx.user.id}:upload`, RATE_LIMITS.upload)
         );
 
@@ -365,7 +367,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        throwIfRateLimited(() =>
+        await throwIfRateLimited(() =>
           enforceRateLimit(
             `user:${ctx.user.id}:processing`,
             RATE_LIMITS.processing
@@ -874,7 +876,7 @@ export const appRouter = router({
     reprocess: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        throwIfRateLimited(() =>
+        await throwIfRateLimited(() =>
           enforceRateLimit(
             `user:${ctx.user.id}:processing`,
             RATE_LIMITS.processing

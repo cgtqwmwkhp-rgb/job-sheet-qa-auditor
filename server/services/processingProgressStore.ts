@@ -1,12 +1,13 @@
 /**
- * In-memory live processing progress (PR-11).
- * Lets clients poll per-stage status while processJobSheet runs.
- * Process is still request-scoped; this is a best-effort live view (no websockets).
+ * Live processing progress store (PR-11 + PR-OPS-LIMITS).
+ *
+ * Default: in-memory Map (single-replica only — see assertSharedLimitsReplicaSafety).
+ * With SHARED_LIMITS_REDIS_URL / REDIS_URL: write-through to Redis so processStatus
+ * polls work across replicas.
  */
 
 import {
   PIPELINE_STAGE_LABELS,
-  PIPELINE_CORE_STAGES,
   derivePercentComplete,
   normalizeReportStages,
   type JobSheetProcessStatus,
@@ -14,6 +15,10 @@ import {
   type ProcessingStageSnapshot,
   type StageRunStatus,
 } from "@shared/processingProgress";
+import {
+  getSharedLimitsBackend,
+  getSharedLimitsRedis,
+} from "../utils/rateLimiter";
 
 interface LiveEntry {
   jobSheetId: number;
@@ -24,10 +29,18 @@ interface LiveEntry {
   updatedAt: string;
 }
 
+const PROGRESS_KEY_PREFIX = "jsqa:progress:";
+const PROGRESS_TTL_MS = 30 * 60 * 1000; // 30 minutes while running
+const FINISHED_TTL_MS = 5 * 60 * 1000; // match previous in-memory drop window
+
 const liveByJobSheet = new Map<number, LiveEntry>();
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function progressKey(jobSheetId: number): string {
+  return `${PROGRESS_KEY_PREFIX}${jobSheetId}`;
 }
 
 function ensureEntry(jobSheetId: number): LiveEntry {
@@ -67,12 +80,35 @@ function toView(entry: LiveEntry): ProcessStatusView {
   };
 }
 
+function mirrorToRedis(entry: LiveEntry, ttlMs: number): void {
+  if (getSharedLimitsBackend() !== "redis") return;
+  const view = toView(entry);
+  void getSharedLimitsRedis()
+    .then(client =>
+      client.set(progressKey(entry.jobSheetId), JSON.stringify(view), ttlMs)
+    )
+    .catch(err => {
+      console.warn(
+        `[SharedLimits] progress Redis mirror failed for jobSheet ${entry.jobSheetId}:`,
+        err instanceof Error ? err.message : err
+      );
+    });
+}
+
+function deleteFromRedis(jobSheetId: number): void {
+  if (getSharedLimitsBackend() !== "redis") return;
+  void getSharedLimitsRedis()
+    .then(client => client.del(progressKey(jobSheetId)))
+    .catch(() => {
+      /* best-effort */
+    });
+}
+
 /** Begin tracking a job sheet pipeline run. */
 export function beginProcessingProgress(jobSheetId: number): void {
   const entry = ensureEntry(jobSheetId);
   entry.status = "processing";
   entry.updatedAt = nowIso();
-  // Mark Upload done; next stage running
   const upload = entry.stages.find(s => s.stage === "Upload");
   if (upload) {
     upload.status = "success";
@@ -84,6 +120,7 @@ export function beginProcessingProgress(jobSheetId: number): void {
     entry.currentStage = "OCR Text Extraction";
   }
   liveByJobSheet.set(jobSheetId, entry);
+  mirrorToRedis(entry, PROGRESS_TTL_MS);
 }
 
 /** Mark a named stage as currently running (creates row if unknown). */
@@ -102,6 +139,7 @@ export function markStageRunning(jobSheetId: number, stage: string): void {
     row.error = undefined;
   }
   liveByJobSheet.set(jobSheetId, entry);
+  mirrorToRedis(entry, PROGRESS_TTL_MS);
 }
 
 /** Record a finished stage (success / failed / skipped). */
@@ -125,10 +163,10 @@ export function markStageComplete(
     row.error = error;
   }
 
-  // Advance currentStage to next pending canonical stage when possible
   const next = entry.stages.find(s => s.status === "pending");
   entry.currentStage = next?.stage ?? stage;
   liveByJobSheet.set(jobSheetId, entry);
+  mirrorToRedis(entry, PROGRESS_TTL_MS);
 }
 
 /** Sync live view from the processor's stages array (after each push). */
@@ -152,7 +190,6 @@ export function syncStagesFromProcessor(
     return s;
   });
 
-  // Preserve Upload success
   const upload = normalized.find(s => s.stage === "Upload");
   if (upload && upload.status === "pending") {
     upload.status = "success";
@@ -167,6 +204,7 @@ export function syncStagesFromProcessor(
     null;
   entry.status = "processing";
   liveByJobSheet.set(jobSheetId, entry);
+  mirrorToRedis(entry, PROGRESS_TTL_MS);
 }
 
 /** Mark the run finished and keep a short-lived snapshot for late pollers. */
@@ -188,24 +226,50 @@ export function finishProcessingProgress(
     entry.stages = normalizeReportStages(stages);
   }
   liveByJobSheet.set(jobSheetId, entry);
+  mirrorToRedis(entry, FINISHED_TTL_MS);
 
-  // Drop after a short window so memory does not grow unbounded
-  setTimeout(
-    () => {
-      const current = liveByJobSheet.get(jobSheetId);
-      if (current && current.updatedAt === entry.updatedAt) {
-        liveByJobSheet.delete(jobSheetId);
-      }
-    },
-    5 * 60 * 1000
-  );
+  setTimeout(() => {
+    const current = liveByJobSheet.get(jobSheetId);
+    if (current && current.updatedAt === entry.updatedAt) {
+      liveByJobSheet.delete(jobSheetId);
+      deleteFromRedis(jobSheetId);
+    }
+  }, FINISHED_TTL_MS);
 }
 
+/** Local in-memory snapshot (same replica that is processing). */
 export function getLiveProcessingProgress(
   jobSheetId: number
 ): ProcessStatusView | null {
   const entry = liveByJobSheet.get(jobSheetId);
   return entry ? toView(entry) : null;
+}
+
+/**
+ * Cross-replica live progress: Redis first when configured, else memory.
+ * Used by processStatus polling so sticky-session-less replicas still see progress.
+ */
+export async function getLiveProcessingProgressShared(
+  jobSheetId: number
+): Promise<ProcessStatusView | null> {
+  if (getSharedLimitsBackend() === "redis") {
+    try {
+      const client = await getSharedLimitsRedis();
+      const raw = await client.get(progressKey(jobSheetId));
+      if (raw) {
+        const parsed = JSON.parse(raw) as ProcessStatusView;
+        if (parsed && parsed.jobSheetId === jobSheetId) {
+          return { ...parsed, source: "live" };
+        }
+      }
+    } catch (err) {
+      console.warn(
+        `[SharedLimits] progress Redis read failed for jobSheet ${jobSheetId}:`,
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+  return getLiveProcessingProgress(jobSheetId);
 }
 
 /** Test helper — clear all live entries. */
