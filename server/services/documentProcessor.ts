@@ -76,10 +76,7 @@ import {
   mergeRoiSpatialFields,
   type PreExtractedFieldMap,
 } from "./roiSpatialExtraction";
-import {
-  CRITICAL_ROI_FIELDS,
-  processWithRoi,
-} from "./roiProcessor";
+import { CRITICAL_ROI_FIELDS, processWithRoi } from "./roiProcessor";
 import { isRoiCropReocrEnabled } from "./ocrAdapter/cropOcrAdapter";
 import type { RuleSpec } from "./templateRegistry/types";
 import {
@@ -1488,8 +1485,7 @@ async function processJobSheetWithOptions(
         }
         recordStage({
           stage: "ROI Crop Re-OCR",
-          status:
-            Object.keys(cropFields).length > 0 ? "success" : "skipped",
+          status: Object.keys(cropFields).length > 0 ? "success" : "skipped",
           durationMs: Date.now() - cropReocrStart,
         });
       } else {
@@ -1508,7 +1504,8 @@ async function processJobSheetWithOptions(
         stage: "ROI Crop Re-OCR",
         status: "failed",
         durationMs: Date.now() - cropReocrStart,
-        error: cropErr instanceof Error ? cropErr.message : "crop re-OCR failed",
+        error:
+          cropErr instanceof Error ? cropErr.message : "crop re-OCR failed",
       });
     }
   } else {

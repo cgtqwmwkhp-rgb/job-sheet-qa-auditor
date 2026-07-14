@@ -89,7 +89,9 @@ function loadNapiCanvas(): NapiCanvasModule | null {
   if (cachedCanvas !== undefined) return cachedCanvas;
   try {
     const pdfjsPkg = require.resolve("pdfjs-dist/package.json");
-    const canvasPath = require.resolve("@napi-rs/canvas", { paths: [pdfjsPkg] });
+    const canvasPath = require.resolve("@napi-rs/canvas", {
+      paths: [pdfjsPkg],
+    });
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     cachedCanvas = require(canvasPath) as NapiCanvasModule;
     return cachedCanvas;
@@ -305,8 +307,7 @@ export async function reOcrRoiCrop(
   }
 
   try {
-    const adapter =
-      deps.adapter ?? (await import("./index")).getOCRAdapter();
+    const adapter = deps.adapter ?? (await import("./index")).getOCRAdapter();
     const ocr = await adapter.extractFromBase64(
       crop.dataBase64,
       crop.mediaType,
@@ -330,7 +331,10 @@ export async function reOcrRoiCrop(
       };
     }
 
-    const ocrText = ocr.pages.map(p => p.markdown || "").join("\n").trim();
+    const ocrText = ocr.pages
+      .map(p => p.markdown || "")
+      .join("\n")
+      .trim();
     const value = valueFromCropOcrText(ocrText, fieldId);
     const confidence = value ? confidenceFromOcrResult(ocr) : 0;
 

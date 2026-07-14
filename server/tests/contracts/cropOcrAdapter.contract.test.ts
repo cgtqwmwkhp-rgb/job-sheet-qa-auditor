@@ -90,15 +90,13 @@ describe("cropOcrAdapter — PR-AI-05", () => {
 
   describe("valueFromCropOcrText", () => {
     it("extracts job reference from cramped crop text", () => {
-      expect(
-        valueFromCropOcrText("Job Ref: JOB-88421", "jobReference")
-      ).toBe("JOB-88421");
+      expect(valueFromCropOcrText("Job Ref: JOB-88421", "jobReference")).toBe(
+        "JOB-88421"
+      );
     });
 
     it("extracts asset id", () => {
-      expect(valueFromCropOcrText("Asset ID AB12 CDE", "assetId")).toBe(
-        "AB12"
-      );
+      expect(valueFromCropOcrText("Asset ID AB12 CDE", "assetId")).toBe("AB12");
     });
 
     it("returns null for empty OCR", () => {

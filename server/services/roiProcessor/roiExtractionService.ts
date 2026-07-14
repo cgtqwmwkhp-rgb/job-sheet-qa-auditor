@@ -445,7 +445,10 @@ export async function processWithRoi(
           cropImage: lastCrop ? toVlmCrop(lastCrop) : undefined,
           documentPdf: options.documentPdf,
         });
-        if (imageQaResult.passed && imageQaResult.confidence >= caps.minConfidenceThreshold) {
+        if (
+          imageQaResult.passed &&
+          imageQaResult.confidence >= caps.minConfidenceThreshold
+        ) {
           extracted = true;
           confidence = Math.max(confidence, imageQaResult.confidence);
           if (!value) {
@@ -495,11 +498,15 @@ export async function processWithRoi(
       confidence = 0;
     } else {
       // Non-critical field without ROI — evidence from full page text only
-      const full = extractFromRoi(documentText, {
-        name: fieldId,
-        page: 1,
-        bounds: { x: 0, y: 0, width: 1, height: 1 },
-      }, fieldId);
+      const full = extractFromRoi(
+        documentText,
+        {
+          name: fieldId,
+          page: 1,
+          bounds: { x: 0, y: 0, width: 1, height: 1 },
+        },
+        fieldId
+      );
       value = full.value;
       confidence = full.value ? Math.min(full.confidence, 0.75) : 0;
       extracted = Boolean(full.value);

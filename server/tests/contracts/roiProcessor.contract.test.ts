@@ -213,13 +213,11 @@ describe("ROI Processor - PR-J Contract Tests", () => {
 
   describe("ROI Processing", () => {
     it("should process document with full ROI config", async () => {
-      const trace = await processWithRoi(
-        1,
-        EVIDENCE_DOC,
-        100,
-        fullRoiConfig,
-        ["jobReference", "assetId", "signatureBlock"]
-      );
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
+        "jobReference",
+        "assetId",
+        "signatureBlock",
+      ]);
 
       expect(trace.documentId).toBe(1);
       expect(trace.templateVersionId).toBe(100);
@@ -228,13 +226,9 @@ describe("ROI Processor - PR-J Contract Tests", () => {
     });
 
     it("should use ROI source when ROI exists", async () => {
-      const trace = await processWithRoi(
-        1,
-        EVIDENCE_DOC,
-        100,
-        fullRoiConfig,
-        ["jobReference"]
-      );
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
+        "jobReference",
+      ]);
 
       expect(trace.results[0].source).toBe("roi");
     });
@@ -264,13 +258,10 @@ describe("ROI Processor - PR-J Contract Tests", () => {
     });
 
     it("should include image QA for visual fields", async () => {
-      const trace = await processWithRoi(
-        1,
-        EVIDENCE_DOC,
-        100,
-        fullRoiConfig,
-        ["signatureBlock", "tickboxBlock"]
-      );
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
+        "signatureBlock",
+        "tickboxBlock",
+      ]);
 
       const sigResult = trace.results.find(r => r.fieldId === "signatureBlock");
       const tickResult = trace.results.find(r => r.fieldId === "tickboxBlock");
@@ -286,25 +277,17 @@ describe("ROI Processor - PR-J Contract Tests", () => {
     });
 
     it("should record processing time", async () => {
-      const trace = await processWithRoi(
-        1,
-        EVIDENCE_DOC,
-        100,
-        fullRoiConfig,
-        ["jobReference"]
-      );
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
+        "jobReference",
+      ]);
 
       expect(trace.processingTimeMs).toBeGreaterThanOrEqual(0);
     });
 
     it("should record ROI region in result", async () => {
-      const trace = await processWithRoi(
-        1,
-        EVIDENCE_DOC,
-        100,
-        fullRoiConfig,
-        ["jobReference"]
-      );
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
+        "jobReference",
+      ]);
 
       expect(trace.results[0].roiRegion).toBeDefined();
       expect(trace.results[0].roiRegion!.name).toBe("jobReference");
@@ -354,13 +337,10 @@ describe("ROI Processor - PR-J Contract Tests", () => {
     });
 
     it("should track reprocess attempts", async () => {
-      const trace = await processWithRoi(
-        1,
-        EVIDENCE_DOC,
-        100,
-        fullRoiConfig,
-        ["jobReference", "assetId"]
-      );
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
+        "jobReference",
+        "assetId",
+      ]);
 
       // Each result should track its reprocess attempts
       for (const result of trace.results) {
@@ -391,13 +371,11 @@ describe("ROI Processor - PR-J Contract Tests", () => {
 
   describe("Review Queue Routing", () => {
     it("should not require review when all critical ROIs present", async () => {
-      const trace = await processWithRoi(
-        1,
-        EVIDENCE_DOC,
-        100,
-        fullRoiConfig,
-        ["jobReference", "assetId", "signatureBlock"]
-      );
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
+        "jobReference",
+        "assetId",
+        "signatureBlock",
+      ]);
 
       const review = requiresReviewQueue(trace);
 
