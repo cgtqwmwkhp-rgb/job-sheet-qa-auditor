@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { suggestRoiFromLayoutEvidence } from "../../services/templateStudio/roiProposeFromLayout";
+import {
+  suggestRoiFromLayoutEvidence,
+  textTruthSupportsMatcher,
+} from "../../services/templateStudio/roiProposeFromLayout";
 
 describe("suggestRoiFromLayoutEvidence (precision-first)", () => {
   const sampleLines = [
@@ -265,5 +268,37 @@ describe("suggestRoiFromLayoutEvidence (precision-first)", () => {
     expect(regions.find(r => r.name === "hubNutTorque")?.source).toBe(
       "ocr-layout"
     );
+  });
+
+  it("gates field ROIs on live text truth (Azure geometry alone is not enough)", () => {
+    // Azure geometry sees Job ID + Asset No; live OCR (Mistral) only has Job ID.
+    const regions = suggestRoiFromLayoutEvidence({
+      layoutAvailable: true,
+      hasChecklist: false,
+      selectionRows: [],
+      lines: sampleLines,
+      textTruth: "--- Page 1 ---\nJob Summary Report\nJob ID: 12345\nDate: 01/01/2026\n",
+    });
+
+    expect(regions.find(r => r.name === "jobReference")).toBeTruthy();
+    expect(regions.find(r => r.name === "date")).toBeTruthy();
+    // Asset No exists in Azure lines but not in live text truth → skip
+    expect(regions.find(r => r.name === "assetId")).toBeUndefined();
+    expect(regions.find(r => r.name === "jobReference")!.why).toMatch(
+      /live text truth confirmed/i
+    );
+  });
+
+  it("textTruthSupportsMatcher unanchors line-bound regexes", () => {
+    expect(
+      textTruthSupportsMatcher(
+        "Header\nJob ID: ABC\nFooter",
+        /^(job\s*(id|no\.?|number))\b/i
+      )
+    ).toBe(true);
+    expect(
+      textTruthSupportsMatcher("No job fields here", /^(job\s*id)\b/i)
+    ).toBe(false);
+    expect(textTruthSupportsMatcher(undefined, /^job\s*id$/i)).toBe(true);
   });
 });
