@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { requestNotificationPermission, onMessageListener } from "@/lib/firebase";
+import {
+  requestNotificationPermission,
+  onMessageListener,
+} from "@/lib/firebase";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
@@ -29,7 +32,10 @@ export function usePushNotifications() {
         });
         registeredToken.current = token;
       } catch (error) {
-        console.warn("[FCM] Failed to register device token with server", error);
+        console.warn(
+          "[FCM] Failed to register device token with server",
+          error
+        );
       }
     };
 

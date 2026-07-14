@@ -78,10 +78,7 @@ async function persistOutbox(row: InsertEmailOutbox): Promise<void> {
 async function updateOutbox(
   id: string,
   patch: Partial<
-    Pick<
-      EmailOutboxRow,
-      "status" | "error" | "providerMessageId" | "sentAt"
-    >
+    Pick<EmailOutboxRow, "status" | "error" | "providerMessageId" | "sentAt">
   >
 ): Promise<void> {
   const mem = memoryOutbox.find(r => r.id === id);
@@ -216,9 +213,7 @@ async function sendViaGraph(
             contentType: input.bodyHtml ? "HTML" : "Text",
             content: input.bodyHtml || input.bodyText || "",
           },
-          toRecipients: [
-            { emailAddress: { address: input.toEmail } },
-          ],
+          toRecipients: [{ emailAddress: { address: input.toEmail } }],
         },
         saveToSentItems: false,
       }),
@@ -240,12 +235,15 @@ function parseAcsConnectionString(connectionString: string): {
   accessKey: string;
 } {
   const parts = Object.fromEntries(
-    connectionString.split(";").filter(Boolean).map(pair => {
-      const idx = pair.indexOf("=");
-      return idx === -1
-        ? [pair, ""]
-        : [pair.slice(0, idx), pair.slice(idx + 1)];
-    })
+    connectionString
+      .split(";")
+      .filter(Boolean)
+      .map(pair => {
+        const idx = pair.indexOf("=");
+        return idx === -1
+          ? [pair, ""]
+          : [pair.slice(0, idx), pair.slice(idx + 1)];
+      })
   ) as Record<string, string>;
 
   const endpoint = (parts.endpoint || parts.Endpoint || "").replace(/\/$/, "");
@@ -262,7 +260,10 @@ async function sendViaAcs(
   input: SendEmailInput
 ): Promise<{ messageId: string }> {
   const connectionString = process.env.ACS_CONNECTION_STRING?.trim();
-  const endpointEnv = process.env.ACS_EMAIL_ENDPOINT?.trim()?.replace(/\/$/, "");
+  const endpointEnv = process.env.ACS_EMAIL_ENDPOINT?.trim()?.replace(
+    /\/$/,
+    ""
+  );
   const accessKeyEnv = process.env.ACS_EMAIL_ACCESS_KEY?.trim();
   const from = getEmailFromAddress();
 

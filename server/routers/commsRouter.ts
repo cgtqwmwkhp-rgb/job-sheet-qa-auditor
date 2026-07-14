@@ -84,10 +84,7 @@ export const commsRouter = router({
 
     await createNotification({
       userId: ctx.user.id,
-      title:
-        result.status === "sent"
-          ? "Test email sent"
-          : "Test email failed",
+      title: result.status === "sent" ? "Test email sent" : "Test email failed",
       message:
         result.status === "sent"
           ? `Summary email delivered via ${result.provider} to ${toEmail}.`

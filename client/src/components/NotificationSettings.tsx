@@ -58,8 +58,8 @@ export function NotificationSettings() {
         </CardTitle>
         <CardDescription>
           Category toggles are preview-only. Test summary email uses the live
-          email provider ({emailStatus.data?.provider ?? "…"}) and writes a
-          bell inbox event when sent.
+          email provider ({emailStatus.data?.provider ?? "…"}) and writes a bell
+          inbox event when sent.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -188,9 +188,7 @@ export function NotificationSettings() {
           disabled={sendTestEmail.isPending}
         >
           <Mail className="h-4 w-4 mr-2" />
-          {sendTestEmail.isPending
-            ? "Sending…"
-            : "Send Test Summary Email"}
+          {sendTestEmail.isPending ? "Sending…" : "Send Test Summary Email"}
         </Button>
 
         <Dialog>
