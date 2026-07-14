@@ -1,15 +1,19 @@
 /**
- * VLM ink verification helpers — fail-soft PDF path.
+ * VLM ink verification helpers — fail-soft PDF + signature crop path (AI-09).
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   isGeminiMultimodalEnabled,
   pdfBufferToVlmDocument,
+  resolveSignatureRois,
   verifySignatureInk,
   VLM_PDF_MAX_BYTES,
 } from "../../services/vlmInkVerification";
 import { getMockVlmAdapter } from "../../services/vlmAdapter";
+
+const tinyPngBase64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 describe("vlmInkVerification", () => {
   const envKeys = [
@@ -55,6 +59,63 @@ describe("vlmInkVerification", () => {
     expect(result.imageQa?.vlmUsed).toBe(true);
     expect(result.preExtractedHint?.value).toBe("Present");
     expect(result.artifact.vlmUsed).toBe(true);
+  });
+
+  it("prefers cropped signature ROI over full PDF when crop provided", async () => {
+    const result = await verifySignatureInk({
+      documentUrl: "https://example.com/doc.pdf",
+      pdfBuffer: Buffer.from("%PDF-1.4 mock job sheet"),
+      disputed: true,
+      roiConfig: {
+        regions: [
+          {
+            name: "signatureBlock",
+            page: 1,
+            bounds: { x: 0.1, y: 0.75, width: 0.8, height: 0.2 },
+            fields: ["customerSignature"],
+          },
+        ],
+      },
+      cropImages: {
+        signatureBlock: {
+          data: tinyPngBase64,
+          mediaType: "image/png",
+          encoding: "base64",
+        },
+      },
+    });
+    expect(result.ran).toBe(true);
+    expect(result.artifact.mediaMode).toBe("crop");
+    expect(result.artifact.pixelCropped).toBe(true);
+    expect(result.cropResults?.[0]?.media).toBe("crop");
+    expect(result.cropResults?.[0]?.cropReference?.cropHash).toMatch(/^crop_/);
+    expect(result.preExtractedHint?.value).toBe("Present");
+  });
+
+  it("resolveSignatureRois uses template signature regions", () => {
+    const rois = resolveSignatureRois({
+      regions: [
+        {
+          name: "jobReference",
+          page: 1,
+          bounds: { x: 0, y: 0, width: 0.5, height: 0.1 },
+        },
+        {
+          name: "customerSignature",
+          page: 1,
+          bounds: { x: 0.1, y: 0.8, width: 0.4, height: 0.15 },
+        },
+        {
+          name: "engineerSignOff",
+          page: 1,
+          bounds: { x: 0.55, y: 0.8, width: 0.4, height: 0.15 },
+        },
+      ],
+    });
+    expect(rois.map(r => r.name)).toEqual([
+      "customerSignature",
+      "engineerSignOff",
+    ]);
   });
 
   it("pdfBufferToVlmDocument rejects oversized buffers", () => {
