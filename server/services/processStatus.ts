@@ -1,10 +1,10 @@
 /**
  * Resolve process status for polling (PR-11).
- * Prefer live in-memory progress → reportJson.processingStages → status-only.
+ * Prefer live progress (memory or Redis shared) → reportJson.processingStages → status-only.
  */
 
 import * as db from "../db";
-import { getLiveProcessingProgress } from "./processingProgressStore";
+import { getLiveProcessingProgressShared } from "./processingProgressStore";
 import {
   buildStatusOnlyView,
   derivePercentComplete,
@@ -75,8 +75,8 @@ export async function resolveProcessStatus(
 
   const status = asJobSheetStatus(jobSheet.status);
 
-  // Live progress wins while the request is in-flight
-  const live = getLiveProcessingProgress(jobSheetId);
+  // Live progress wins while the request is in-flight (Redis-backed when configured)
+  const live = await getLiveProcessingProgressShared(jobSheetId);
   if (live && (status === "processing" || live.status === "processing")) {
     return {
       ...live,

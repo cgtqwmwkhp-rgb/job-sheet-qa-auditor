@@ -30,9 +30,11 @@ import {
   RATE_LIMITS,
 } from "../utils/rateLimiter";
 
-function throwIfRateLimited(fn: () => void): void {
+async function throwIfRateLimited(
+  fn: () => unknown | Promise<unknown>
+): Promise<void> {
   try {
-    fn();
+    await fn();
   } catch (err) {
     if (err instanceof RateLimitError) {
       throw new TRPCError({
@@ -44,8 +46,8 @@ function throwIfRateLimited(fn: () => void): void {
   }
 }
 
-function enforceReviewLimit(userId: number): void {
-  throwIfRateLimited(() =>
+async function enforceReviewLimit(userId: number): Promise<void> {
+  await throwIfRateLimited(() =>
     enforceRateLimit(`user:${userId}:review`, RATE_LIMITS.review)
   );
 }
@@ -116,7 +118,7 @@ export const auditActionsRouter = router({
   waive: adminProcedure
     .input(findingActionInput)
     .mutation(async ({ ctx, input }) => {
-      enforceReviewLimit(ctx.user.id);
+      await enforceReviewLimit(ctx.user.id);
       try {
         return await applyFindingAction(createDbDeps(), {
           findingId: input.findingId,
@@ -136,7 +138,7 @@ export const auditActionsRouter = router({
   override: qaLeadProcedure
     .input(findingActionInput)
     .mutation(async ({ ctx, input }) => {
-      enforceReviewLimit(ctx.user.id);
+      await enforceReviewLimit(ctx.user.id);
       try {
         return await applyFindingAction(createDbDeps(), {
           findingId: input.findingId,
@@ -156,7 +158,7 @@ export const auditActionsRouter = router({
   flag: qaLeadProcedure
     .input(findingActionInput)
     .mutation(async ({ ctx, input }) => {
-      enforceReviewLimit(ctx.user.id);
+      await enforceReviewLimit(ctx.user.id);
       try {
         return await applyFindingAction(createDbDeps(), {
           findingId: input.findingId,
@@ -176,7 +178,7 @@ export const auditActionsRouter = router({
   approve: qaLeadProcedure
     .input(findingActionInput)
     .mutation(async ({ ctx, input }) => {
-      enforceReviewLimit(ctx.user.id);
+      await enforceReviewLimit(ctx.user.id);
       try {
         return await applyFindingAction(createDbDeps(), {
           findingId: input.findingId,

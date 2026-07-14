@@ -276,9 +276,11 @@ async function loadShadowChallengerInputs(input?: AnalyticsPeriodInput) {
   return { period, reportJsons };
 }
 
-function throwIfRateLimited(fn: () => unknown): void {
+async function throwIfRateLimited(
+  fn: () => unknown | Promise<unknown>
+): Promise<void> {
   try {
-    fn();
+    await fn();
   } catch (err) {
     if (err instanceof RateLimitError) {
       throw new TRPCError({
@@ -886,7 +888,7 @@ export const analyticsRouter = router({
         .optional()
     )
     .mutation(async ({ ctx, input }) => {
-      throwIfRateLimited(() =>
+      await throwIfRateLimited(() =>
         enforceRateLimit(`user:${ctx.user.id}:review`, RATE_LIMITS.review)
       );
       return runDlqRetryPass({ limit: input?.limit });
