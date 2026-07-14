@@ -8,23 +8,12 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import {
-  Mail,
-  Sparkles,
-  Eye,
-  Send,
-  RefreshCw,
-  CheckCircle2,
-  User,
-  Users,
-} from "lucide-react";
-import { toast } from "sonner";
+import { Mail, Eye, RefreshCw, User, Users } from "lucide-react";
 
 interface EmailTemplate {
   id: string;
@@ -64,109 +53,100 @@ const DEFAULT_TEMPLATES: EmailTemplate[] = [
   },
 ];
 
-export function EmailTemplateManager() {
-  const [templates, setTemplates] =
-    useState<EmailTemplate[]>(DEFAULT_TEMPLATES);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
-    DEFAULT_TEMPLATES[0].id
-  );
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [previewContent, setPreviewContent] = useState<string | null>(null);
-
-  const selectedTemplate =
-    templates.find(t => t.id === selectedTemplateId) || templates[0];
-
-  const handleUpdateTemplate = (key: keyof EmailTemplate, value: any) => {
-    setTemplates(prev =>
-      prev.map(t => (t.id === selectedTemplateId ? { ...t, [key]: value } : t))
-    );
-  };
-
-  const generatePreview = () => {
-    setIsGenerating(true);
-    setPreviewContent(null);
-
-    // Simulate AI generation delay
-    setTimeout(() => {
-      const mockContent =
-        selectedTemplate.id === "daily-summary"
-          ? `
+function sampleLayoutHtml(template: EmailTemplate): string {
+  if (template.id === "daily-summary") {
+    return `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
             <div style="background-color: #0f172a; padding: 20px; text-align: center;">
               <h2 style="color: #ffffff; margin: 0;">Daily Performance Digest</h2>
-              <p style="color: #94a3b8; margin: 5px 0 0;">${new Date().toLocaleDateString()}</p>
+              <p style="color: #94a3b8; margin: 5px 0 0;">Sample date</p>
             </div>
             <div style="padding: 24px; background-color: #ffffff;">
               <p>Dear Stakeholders,</p>
-              <p>Here is the summary of today's Job Sheet QA performance:</p>
+              <p>Placeholder body for the daily digest layout. Numbers below are static sample values, not live data.</p>
               
               <div style="display: flex; gap: 16px; margin: 24px 0;">
                 <div style="flex: 1; background: #f8fafc; padding: 16px; border-radius: 8px; text-align: center;">
-                  <div style="font-size: 24px; font-weight: bold; color: #0f172a;">142</div>
+                  <div style="font-size: 24px; font-weight: bold; color: #0f172a;">—</div>
                   <div style="font-size: 12px; color: #64748b;">Audits Processed</div>
                 </div>
                 <div style="flex: 1; background: #f0fdf4; padding: 16px; border-radius: 8px; text-align: center;">
-                  <div style="font-size: 24px; font-weight: bold; color: #16a34a;">94.2%</div>
+                  <div style="font-size: 24px; font-weight: bold; color: #16a34a;">—</div>
                   <div style="font-size: 12px; color: #64748b;">Pass Rate</div>
                 </div>
                 <div style="flex: 1; background: #fef2f2; padding: 16px; border-radius: 8px; text-align: center;">
-                  <div style="font-size: 24px; font-weight: bold; color: #dc2626;">3</div>
+                  <div style="font-size: 24px; font-weight: bold; color: #dc2626;">—</div>
                   <div style="font-size: 12px; color: #64748b;">Critical Defects</div>
                 </div>
               </div>
 
               <h3 style="font-size: 16px; color: #334155; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Top Critical Defects</h3>
               <ul style="color: #475569; padding-left: 20px;">
-                <li>Missing Customer Signature (2 occurrences)</li>
-                <li>Incorrect Serial Number Photo (1 occurrence)</li>
+                <li>Sample defect A</li>
+                <li>Sample defect B</li>
               </ul>
 
               <div style="margin-top: 24px; padding: 16px; background-color: #fff7ed; border-left: 4px solid #f97316; border-radius: 4px;">
-                <strong>Hold Queue Status:</strong> 12 items pending review. <a href="#" style="color: #ea580c;">View Queue &rarr;</a>
+                <strong>Hold Queue Status:</strong> Placeholder — no live queue data in this preview.
               </div>
             </div>
             <div style="background-color: #f1f5f9; padding: 16px; text-align: center; font-size: 12px; color: #64748b;">
-              &copy; 2024 Job Sheet QA Auditor. Automated Report.
+              Sample layout only — not generated by AI.
             </div>
           </div>
-        `
-          : `
+        `;
+  }
+
+  return `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
             <div style="background-color: #2563eb; padding: 20px; text-align: center;">
               <h2 style="color: #ffffff; margin: 0;">Weekly Scorecard</h2>
-              <p style="color: #bfdbfe; margin: 5px 0 0;">Week of ${new Date().toLocaleDateString()}</p>
+              <p style="color: #bfdbfe; margin: 5px 0 0;">Sample week</p>
             </div>
             <div style="padding: 24px; background-color: #ffffff;">
-              <p>Hi Alex,</p>
-              <p>Great work this week! Here's how you performed compared to the team average.</p>
+              <p>Hi [Engineer],</p>
+              <p>Placeholder body for the weekly scorecard layout. Metrics below are static samples, not live data.</p>
               
               <div style="margin: 24px 0; padding: 20px; background: #eff6ff; border-radius: 12px; text-align: center;">
                 <div style="font-size: 14px; color: #1e40af; margin-bottom: 8px;">Your Pass Rate</div>
-                <div style="font-size: 48px; font-weight: bold; color: #1d4ed8;">98.5%</div>
-                <div style="font-size: 14px; color: #1e40af; margin-top: 4px;">Team Avg: 94.2%</div>
+                <div style="font-size: 48px; font-weight: bold; color: #1d4ed8;">—</div>
+                <div style="font-size: 14px; color: #1e40af; margin-top: 4px;">Team Avg: —</div>
               </div>
 
               <h3 style="font-size: 16px; color: #334155;">Focus Area for Next Week</h3>
               <p style="color: #475569; line-height: 1.5;">
-                We noticed 2 instances of <strong>"Blurry Photos"</strong> this week. 
-                <br/><br/>
-                <em>Tip: Try tapping the screen to focus before capturing, especially in low-light environments.</em>
+                Coaching tip placeholder. AI generation is not wired yet.
               </p>
-
-              <div style="margin-top: 24px; text-align: center;">
-                <a href="#" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Full Report</a>
-              </div>
             </div>
             <div style="background-color: #f1f5f9; padding: 16px; text-align: center; font-size: 12px; color: #64748b;">
-              &copy; 2024 Job Sheet QA Auditor. Automated Report.
+              Sample layout only — not generated by AI.
             </div>
           </div>
         `;
+}
 
-      setPreviewContent(mockContent);
-      setIsGenerating(false);
-      toast.success("AI Preview Generated");
-    }, 1500);
+export function EmailTemplateManager() {
+  const [templates, setTemplates] =
+    useState<EmailTemplate[]>(DEFAULT_TEMPLATES);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
+    DEFAULT_TEMPLATES[0].id
+  );
+  const [previewContent, setPreviewContent] = useState<string | null>(null);
+
+  const selectedTemplate =
+    templates.find(t => t.id === selectedTemplateId) || templates[0];
+
+  const handleUpdateTemplate = (
+    key: keyof EmailTemplate,
+    value: EmailTemplate[keyof EmailTemplate]
+  ) => {
+    setTemplates(prev =>
+      prev.map(t => (t.id === selectedTemplateId ? { ...t, [key]: value } : t))
+    );
+  };
+
+  const showSampleLayout = () => {
+    setPreviewContent(sampleLayoutHtml(selectedTemplate));
   };
 
   return (
@@ -208,8 +188,13 @@ export function EmailTemplateManager() {
                   </div>
                 </div>
               ))}
-              <Button variant="outline" className="w-full mt-4 border-dashed">
-                <span className="mr-2">+</span> New Template
+              <Button
+                variant="outline"
+                className="w-full mt-4 border-dashed"
+                disabled
+                title="Creating templates is not wired yet"
+              >
+                <span className="mr-2">+</span> New Template (not wired)
               </Button>
             </div>
           </CardContent>
@@ -224,7 +209,7 @@ export function EmailTemplateManager() {
               <CardTitle>Template Editor</CardTitle>
               <div className="flex items-center gap-2">
                 <Label htmlFor="active-mode" className="text-xs">
-                  Active
+                  Active (local only)
                 </Label>
                 <Switch
                   id="active-mode"
@@ -236,7 +221,8 @@ export function EmailTemplateManager() {
               </div>
             </div>
             <CardDescription>
-              Configure AI generation rules and schedule.
+              Draft prompts and schedule locally. AI generation and outbound
+              mail are not wired yet — changes are not saved.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 flex-1 overflow-auto">
@@ -263,7 +249,10 @@ export function EmailTemplateManager() {
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={selectedTemplate.targetAudience}
                   onChange={e =>
-                    handleUpdateTemplate("targetAudience", e.target.value)
+                    handleUpdateTemplate(
+                      "targetAudience",
+                      e.target.value as EmailTemplate["targetAudience"]
+                    )
                   }
                 >
                   <option value="stakeholders">Stakeholders</option>
@@ -276,7 +265,10 @@ export function EmailTemplateManager() {
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={selectedTemplate.frequency}
                   onChange={e =>
-                    handleUpdateTemplate("frequency", e.target.value)
+                    handleUpdateTemplate(
+                      "frequency",
+                      e.target.value as EmailTemplate["frequency"]
+                    )
                   }
                 >
                   <option value="daily">Daily</option>
@@ -288,43 +280,37 @@ export function EmailTemplateManager() {
 
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <Label className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-primary" />
-                  AI Content Prompt
-                </Label>
+                <Label>Content prompt (draft)</Label>
                 <Badge variant="outline" className="text-[10px]">
-                  GPT-4o
+                  Not connected
                 </Badge>
               </div>
               <Textarea
                 className="min-h-[200px] font-mono text-sm"
                 value={selectedTemplate.aiPrompt}
                 onChange={e => handleUpdateTemplate("aiPrompt", e.target.value)}
-                placeholder="Describe how the AI should generate this email..."
+                placeholder="Describe how the email should read when generation is wired..."
               />
               <p className="text-xs text-muted-foreground">
-                Use natural language to instruct the AI on tone, data points to
-                include, and formatting preferences.
+                Prompt text is edited locally only. No model is called from this
+                screen.
               </p>
             </div>
           </CardContent>
           <CardFooter className="border-t p-4 flex justify-between">
             <Button
               variant="ghost"
-              onClick={() => setTemplates(DEFAULT_TEMPLATES)}
+              onClick={() => {
+                setTemplates(DEFAULT_TEMPLATES);
+                setPreviewContent(null);
+              }}
             >
               <RefreshCw className="w-4 h-4 mr-2" />
               Reset
             </Button>
-            <Button onClick={generatePreview} disabled={isGenerating}>
-              {isGenerating ? (
-                <>Generating...</>
-              ) : (
-                <>
-                  <Eye className="w-4 h-4 mr-2" />
-                  Generate Preview
-                </>
-              )}
+            <Button variant="outline" onClick={showSampleLayout}>
+              <Eye className="w-4 h-4 mr-2" />
+              Show sample layout
             </Button>
           </CardFooter>
         </Card>
@@ -335,19 +321,22 @@ export function EmailTemplateManager() {
         <Card className="h-full flex flex-col bg-muted/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Live Preview
+              Sample layout
             </CardTitle>
+            <CardDescription className="text-xs">
+              Static placeholder HTML — not AI output and not live data.
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-auto p-4">
             {previewContent ? (
-              <div className="animate-in fade-in zoom-in-95 duration-[var(--duration-slow)]">
+              <div>
                 <div className="mb-4 text-sm border-b pb-2">
                   <div className="flex gap-2 mb-1">
                     <span className="text-muted-foreground w-12">To:</span>
-                    <span className="font-medium">
+                    <span className="font-medium text-muted-foreground">
                       {selectedTemplate.targetAudience === "stakeholders"
-                        ? "stakeholders@company.com"
-                        : "alex.murphy@company.com"}
+                        ? "(audience: stakeholders)"
+                        : "(audience: engineers)"}
                     </span>
                   </div>
                   <div className="flex gap-2">
@@ -365,21 +354,13 @@ export function EmailTemplateManager() {
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground space-y-3 opacity-50">
                 <Mail className="w-12 h-12" />
-                <p className="text-sm text-center max-w-[200px]">
-                  Click "Generate Preview" to see how the AI renders this
-                  template with sample data.
+                <p className="text-sm text-center max-w-[220px]">
+                  Click &quot;Show sample layout&quot; for a static HTML sketch
+                  of this template. AI preview is not available.
                 </p>
               </div>
             )}
           </CardContent>
-          {previewContent && (
-            <CardFooter className="border-t p-4 bg-white">
-              <Button className="w-full" variant="default">
-                <Send className="w-4 h-4 mr-2" />
-                Send Test Email
-              </Button>
-            </CardFooter>
-          )}
         </Card>
       </div>
     </div>
