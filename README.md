@@ -66,6 +66,18 @@ Roles: `ocr`, `judgment`, `interpreter`, optional `fallback_ocr`. Currency metad
 
 **Measurement path (before canary):** set `FEATURE_SHADOW_CHALLENGER=true`, `SHADOW_MODE=shadow`, `SHADOW_CANARY_PERCENT=0`. Comparisons persist on `reportJson.shadowComparison` and never change canonical results. Aggregate pass-rate pp deltas via `analytics.getShadowChallengerSummary` → `passRate.passRatePpDelta` (challenger PASS% − champion PASS%). Do not enable canary until `passRate.measurementReady` is true.
 
+### Azure DI custom JSR form model (PR-AI-06)
+
+PlantExpand form-specific path — **default OFF**. Requires a trained custom neural model id.
+
+| Variable                         | Description                                                                 | Default     |
+| -------------------------------- | --------------------------------------------------------------------------- | ----------- |
+| `FEATURE_AZURE_DI_CUSTOM_JSR`    | Enable custom neural JSR pass as selectionMarks / structured-field voter    | unset (off) |
+| `AZURE_DI_CUSTOM_JSR_MODEL_ID`   | Trained Azure DI custom model id (e.g. `plantexpand-jsr-custom-v1`)         | unset       |
+| `AZURE_DI_CUSTOM_JSR_MAX_POLL_MS`| Max poll budget for the custom analyze operation                            | `45000`     |
+
+Uses shared `AZURE_DI_ENDPOINT` / `AZURE_DI_KEY`. When gated on, `runSelectionMarkDetection` votes checklist rows against `prebuilt-layout` geometry and merges GoldSpec `preExtractedFields`. See `docs/planning/AI-07-document-ai-textract-eval.md` for Document AI / Textract 3rd-voter eval (not integrated).
+
 ### Testing
 
 | Variable               | Description                               | Default  |

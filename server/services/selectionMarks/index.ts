@@ -8,6 +8,10 @@
  * - unset → enabled when AZURE_DI_ENDPOINT + AZURE_DI_KEY are set
  * - "true" / "1" → force on
  * - "false" / "0" → force off
+ *
+ * Custom neural voter (PR-AI-06): when FEATURE_AZURE_DI_CUSTOM_JSR +
+ * AZURE_DI_CUSTOM_JSR_MODEL_ID are set, a PlantExpand JSR custom model pass
+ * votes checklist rows + structured fields alongside prebuilt-layout geometry.
  */
 
 import type {
@@ -15,11 +19,18 @@ import type {
   AzureTextLine,
 } from "../ocrAdapter/parseAzureDiResponse";
 import { extractLayoutSelectionMarks } from "../ocrAdapter/azureDocumentIntelligenceAdapter";
+import {
+  extractCustomJsrForm,
+  isAzureCustomJsrEnabled,
+  type AzureCustomFormExtractResult,
+} from "../ocrAdapter/azureCustomFormAdapter";
 import { getOCRConfig } from "../ocrAdapter/types";
 import type { Finding } from "../analyzer";
 
 export const FEATURE_FLAG = "FEATURE_SELECTION_MARKS";
 export const ENGINE_VERSION = "selection-marks-v1";
+/** Engine stamp when custom JSR voter contributes checklist rows. */
+export const ENGINE_VERSION_WITH_CUSTOM_VOTER = "selection-marks-v1+custom-jsr";
 
 /** Minimum confidence for a Fail mark to drive S1 findings / block auto-PASS. */
 export const FAIL_CONFIDENCE_THRESHOLD = 80;
@@ -63,6 +74,15 @@ export interface SelectionMarksArtifact {
     marksDetected: number;
   };
   error?: string;
+  /** Present when custom neural JSR voter contributed rows or fields. */
+  customVoter?: {
+    enabled: boolean;
+    model?: string;
+    docType?: string;
+    fieldsExtracted?: number;
+    checklistRowsFromCustom?: number;
+    preferredSource: "layout" | "custom" | "merged";
+  };
 }
 
 export interface SelectionMarksResult {
@@ -324,8 +344,8 @@ export function formatSelectionMarksHints(rows: SelectionMarkRow[]): string {
     const label = r.label ? ` "${r.label}"` : ` row ${r.rowIndex + 1}`;
     return `- Checklist${label}: ${r.choice} (confidence=${r.confidence}, page=${r.pageNumber}, marks=${r.markCount}, selected=${r.selectedCount})`;
   });
-  return `## Selection Marks (Azure DI prebuilt-layout — visual ground truth)
-These are radio/checkbox states detected from the page image, not OCR text.
+  return `## Selection Marks (Azure DI — visual ground truth)
+These are radio/checkbox states detected from the page image / custom form model, not OCR text alone.
 Treat high-confidence choices as authoritative for Ok/Adv/Fail/N/A columns.
 Do NOT contradict a selected mark using text alone.
 
@@ -340,15 +360,22 @@ export function buildSelectionMarksArtifact(
     headerText?: string;
     lines?: AzureTextLine[];
     error?: string;
+    engineVersion?: string;
+    customVoter?: SelectionMarksArtifact["customVoter"];
+    /** Prefer these rows over geometry-mapped marks when provided. */
+    preferredRows?: SelectionMarkRow[];
   }
 ): SelectionMarksArtifact {
-  const rows = mapSelectionMarksToRows(marks, {
-    headerText: meta.headerText,
-    lines: meta.lines,
-  });
+  const rows =
+    meta.preferredRows && meta.preferredRows.length > 0
+      ? meta.preferredRows
+      : mapSelectionMarksToRows(marks, {
+          headerText: meta.headerText,
+          lines: meta.lines,
+        });
   const readableRows = rows.filter(r => r.choice !== "UNREADABLE").length;
   return {
-    engineVersion: ENGINE_VERSION,
+    engineVersion: meta.engineVersion ?? ENGINE_VERSION,
     model: meta.model,
     processingTimeMs: meta.processingTimeMs,
     rows,
@@ -359,6 +386,7 @@ export function buildSelectionMarksArtifact(
       marksDetected: marks.length,
     },
     error: meta.error,
+    ...(meta.customVoter ? { customVoter: meta.customVoter } : {}),
   };
 }
 
@@ -368,10 +396,17 @@ export function artifactToResult(
     layoutText?: string;
     lines?: AzureTextLine[];
     selectionMarks?: AzureSelectionMark[];
+    /** Extra GoldSpec fields from custom JSR voter (merged under layout). */
+    extraPreExtractedFields?: Record<
+      string,
+      { value: string; confidence: number; pageNumber: number }
+    >;
   }
 ): SelectionMarksResult {
   const hintsBlock = formatSelectionMarksHints(artifact.rows);
-  const preExtractedFields: SelectionMarksResult["preExtractedFields"] = {};
+  const preExtractedFields: SelectionMarksResult["preExtractedFields"] = {
+    ...(options?.extraPreExtractedFields ?? {}),
+  };
 
   // Aggregate: if any Fail selected → surface; else summarise readable choices
   const readable = artifact.rows.filter(r => r.choice !== "UNREADABLE");
@@ -401,6 +436,60 @@ export function artifactToResult(
       ? { selectionMarks: options.selectionMarks }
       : {}),
   };
+}
+
+/**
+ * Convert custom neural checklist_* choices into SelectionMarkRow shape.
+ */
+export function customChoicesToSelectionRows(
+  choices: AzureCustomFormExtractResult["checklistChoices"]
+): SelectionMarkRow[] {
+  return choices.map((c, i) => ({
+    rowIndex: i,
+    pageNumber: c.pageNumber,
+    label: c.label,
+    choice: c.choice,
+    confidence: c.confidence,
+    selectedCount: c.choice === "UNREADABLE" ? 0 : 1,
+    markCount: 1,
+  }));
+}
+
+/**
+ * Vote between layout geometry rows and custom neural checklist fields.
+ * Prefer custom when it yields ≥1 readable row and average confidence ≥ layout
+ * (or layout produced no readable rows). Otherwise keep layout geometry.
+ */
+export function voteChecklistRows(
+  layoutRows: SelectionMarkRow[],
+  customRows: SelectionMarkRow[]
+): {
+  rows: SelectionMarkRow[];
+  preferredSource: "layout" | "custom" | "merged";
+} {
+  const layoutReadable = layoutRows.filter(r => r.choice !== "UNREADABLE");
+  const customReadable = customRows.filter(r => r.choice !== "UNREADABLE");
+
+  if (customReadable.length === 0) {
+    return { rows: layoutRows, preferredSource: "layout" };
+  }
+  if (layoutReadable.length === 0) {
+    return { rows: customRows, preferredSource: "custom" };
+  }
+
+  const avg = (rows: SelectionMarkRow[]) =>
+    rows.reduce((s, r) => s + r.confidence, 0) / rows.length;
+
+  if (avg(customReadable) >= avg(layoutReadable) - 2) {
+    // Prefer form-trained labels; keep layout rows that custom did not cover
+    // when custom row count is thinner than layout.
+    if (customReadable.length >= layoutReadable.length) {
+      return { rows: customRows, preferredSource: "custom" };
+    }
+    return { rows: customRows, preferredSource: "merged" };
+  }
+
+  return { rows: layoutRows, preferredSource: "layout" };
 }
 
 /**
@@ -523,6 +612,8 @@ export function countHighConfidenceFailMarks(
 
 /**
  * Run layout selection-mark detection for a document URL (fail-soft).
+ * When the Azure DI custom JSR model is gated on, runs it as a parallel voter
+ * for checklist rows + structured fields.
  * Returns null when disabled, not configured, or timed out; never throws.
  */
 export async function runSelectionMarkDetection(
@@ -532,11 +623,18 @@ export async function runSelectionMarkDetection(
   if (!isSelectionMarksEnabled()) return null;
 
   try {
-    const layout = await extractLayoutSelectionMarks(documentUrl);
+    const layoutPromise = extractLayoutSelectionMarks(documentUrl);
+    const customPromise = isAzureCustomJsrEnabled()
+      ? extractCustomJsrForm(documentUrl)
+      : Promise.resolve(null);
+
+    const [layout, custom] = await Promise.all([layoutPromise, customPromise]);
+
     if (
       !layout.success &&
       (layout.errorCode === "AZURE_DI_NOT_CONFIGURED" ||
-        layout.errorCode === "AZURE_DI_TIMEOUT")
+        layout.errorCode === "AZURE_DI_TIMEOUT") &&
+      !(custom && custom.success)
     ) {
       console.warn(
         `[SelectionMarks] skipped: ${layout.errorCode} — ${layout.error}`
@@ -550,17 +648,84 @@ export async function runSelectionMarkDetection(
         .map(p => p.markdown)
         .join("\n")
         .slice(0, 4000);
-    const artifact = buildSelectionMarksArtifact(layout.selectionMarks, {
-      model: layout.model,
-      processingTimeMs: layout.processingTimeMs,
+
+    const layoutRows = mapSelectionMarksToRows(layout.selectionMarks, {
       headerText,
       lines: layout.lines,
-      error: layout.success ? undefined : layout.error,
     });
+
+    let preferredRows: SelectionMarkRow[] | undefined;
+    let preferredSource: "layout" | "custom" | "merged" = "layout";
+    let engineVersion = ENGINE_VERSION;
+    let model = layout.model;
+    let customVoter: SelectionMarksArtifact["customVoter"] | undefined;
+    let extraPreExtracted:
+      | SelectionMarksResult["preExtractedFields"]
+      | undefined;
+
+    if (custom && custom.success) {
+      const customRows = customChoicesToSelectionRows(custom.checklistChoices);
+      const vote = voteChecklistRows(layoutRows, customRows);
+      preferredRows = vote.rows;
+      preferredSource = vote.preferredSource;
+      engineVersion = ENGINE_VERSION_WITH_CUSTOM_VOTER;
+      model =
+        preferredSource === "layout"
+          ? `${layout.model}+${custom.model}`
+          : `${custom.model}+${layout.model}`;
+      customVoter = {
+        enabled: true,
+        model: custom.model,
+        docType: custom.docType,
+        fieldsExtracted: custom.fields.length,
+        checklistRowsFromCustom: customRows.length,
+        preferredSource,
+      };
+      extraPreExtracted = custom.preExtractedFields;
+    } else if (isAzureCustomJsrEnabled() && custom && !custom.success) {
+      customVoter = {
+        enabled: true,
+        model: custom.model,
+        fieldsExtracted: 0,
+        checklistRowsFromCustom: 0,
+        preferredSource: "layout",
+      };
+      console.warn(
+        `[SelectionMarks] custom JSR voter soft-failed: ${custom.errorCode} — ${custom.error}`
+      );
+    }
+
+    const processingTimeMs = Math.max(
+      layout.processingTimeMs,
+      custom?.processingTimeMs ?? 0
+    );
+
+    const marks =
+      layout.selectionMarks.length > 0
+        ? layout.selectionMarks
+        : (custom?.selectionMarks ?? []);
+    const lines =
+      layout.lines.length > 0 ? layout.lines : (custom?.lines ?? []);
+    const layoutText = layout.layoutText || custom?.layoutText;
+
+    const artifact = buildSelectionMarksArtifact(marks, {
+      model,
+      processingTimeMs,
+      headerText,
+      lines,
+      error: layout.success
+        ? undefined
+        : layout.error || (custom && !custom.success ? custom.error : undefined),
+      engineVersion,
+      customVoter,
+      preferredRows,
+    });
+
     return artifactToResult(artifact, {
-      layoutText: layout.layoutText,
-      lines: layout.lines,
-      selectionMarks: layout.selectionMarks,
+      layoutText,
+      lines,
+      selectionMarks: marks,
+      extraPreExtractedFields: extraPreExtracted,
     });
   } catch (error) {
     console.warn("[SelectionMarks] fail-soft:", error);
