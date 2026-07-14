@@ -76,6 +76,8 @@ import {
   mergeRoiSpatialFields,
   type PreExtractedFieldMap,
 } from "./roiSpatialExtraction";
+import { CRITICAL_ROI_FIELDS, processWithRoi } from "./roiProcessor";
+import { isRoiCropReocrEnabled } from "./ocrAdapter/cropOcrAdapter";
 import type { RuleSpec } from "./templateRegistry/types";
 import {
   evaluateWastedJourneyConsistency,
@@ -1361,6 +1363,104 @@ async function processJobSheetWithOptions(
       status: "failed",
       durationMs: Date.now() - pdfFetchStart,
       error: pdfErr instanceof Error ? pdfErr.message : "pdf fetch failed",
+    });
+  }
+
+  // Stage 1.92: ROI crop → re-OCR for critical fields (PR-AI-05 / CropVision)
+  // Fail-soft. Beats whole-PDF plateau on cramped / handwriting-adjacent ROIs.
+  // HTR model swap is follow-on (AI-15) via CropOcrRunner.
+  const cropReocrStart = Date.now();
+  if (isRoiCropReocrEnabled() && sharedPdfBuffer?.length) {
+    try {
+      const pinnedForCrop = usedTemplateVersionId
+        ? getTemplateVersion(usedTemplateVersionId)
+        : null;
+      const cropRoiConfig = pinnedForCrop?.roiJson ?? null;
+      if (cropRoiConfig?.regions?.length) {
+        const cropTrace = await processWithRoi(
+          jobSheetId,
+          extractedText,
+          usedTemplateVersionId ?? 0,
+          cropRoiConfig,
+          [...CRITICAL_ROI_FIELDS],
+          undefined,
+          {
+            pdfBuffer: sharedPdfBuffer,
+            documentPdf:
+              sharedPdfBuffer.length <= VLM_PDF_MAX_BYTES
+                ? {
+                    data: sharedPdfBuffer.toString("base64"),
+                    mediaType: "application/pdf" as const,
+                  }
+                : undefined,
+          }
+        );
+        const cropFields: PreExtractedFieldMap = {};
+        for (const r of cropTrace.results) {
+          if (!r.value || !r.extracted) continue;
+          // Skip pure visual blocks unless OCR produced real text
+          if (
+            (r.fieldId === "tickboxBlock" || r.fieldId === "signatureBlock") &&
+            (r.value === "signed" || r.value === "tickboxes_checked")
+          ) {
+            continue;
+          }
+          cropFields[r.fieldId] = {
+            value: r.value,
+            confidence: Math.round(Math.min(1, r.confidence) * 100),
+            pageNumber: r.roiRegion?.page ?? 1,
+          };
+        }
+        if (Object.keys(cropFields).length > 0) {
+          roiSpatialFields = mergeRoiSpatialFields(
+            roiSpatialFields,
+            cropFields,
+            {
+              preferRoiFor: new Set([
+                "jobReference",
+                "assetId",
+                "date",
+                "expiryDate",
+              ]),
+            }
+          );
+        }
+        if (cropTrace.warnings.length) {
+          console.info(
+            "[DocumentProcessor] ROI crop re-OCR warnings:",
+            cropTrace.warnings.slice(0, 5).join("; ")
+          );
+        }
+        recordStage({
+          stage: "ROI Crop Re-OCR",
+          status: Object.keys(cropFields).length > 0 ? "success" : "skipped",
+          durationMs: Date.now() - cropReocrStart,
+        });
+      } else {
+        recordStage({
+          stage: "ROI Crop Re-OCR",
+          status: "skipped",
+          durationMs: Date.now() - cropReocrStart,
+        });
+      }
+    } catch (cropErr) {
+      console.warn(
+        "[DocumentProcessor] ROI crop re-OCR failed (non-fatal):",
+        cropErr
+      );
+      recordStage({
+        stage: "ROI Crop Re-OCR",
+        status: "failed",
+        durationMs: Date.now() - cropReocrStart,
+        error:
+          cropErr instanceof Error ? cropErr.message : "crop re-OCR failed",
+      });
+    }
+  } else {
+    recordStage({
+      stage: "ROI Crop Re-OCR",
+      status: "skipped",
+      durationMs: Date.now() - cropReocrStart,
     });
   }
 

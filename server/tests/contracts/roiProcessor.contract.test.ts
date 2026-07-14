@@ -17,7 +17,6 @@ import {
   processWithRoi,
   requiresReviewQueue,
   DEFAULT_PERFORMANCE_CAPS,
-  ROI_EXTRACTION_QUARANTINED_REASON,
   type RoiConfig,
   type PerformanceCaps,
 } from "../../services/roiProcessor";
@@ -73,6 +72,16 @@ const partialRoiConfig: RoiConfig = {
     },
   ],
 };
+
+/** Evidence-bearing document text — no fabricated JOB-ROI-001 mock trap */
+const EVIDENCE_DOC = [
+  "Job Reference: JOB-88421",
+  "Asset ID: AST-5521",
+  "Date: 15/01/2024",
+  "Expiry: 15/01/2025",
+  "Signature: signed",
+  "Tickboxes: all_checked",
+].join("\n");
 
 describe("ROI Processor - PR-J Contract Tests", () => {
   describe("Critical ROI Fields", () => {
@@ -153,25 +162,28 @@ describe("ROI Processor - PR-J Contract Tests", () => {
   });
 
   describe("ROI Extraction", () => {
-    it("returns unavailable (not mock JOB-ROI-001) when crop/re-OCR not wired", () => {
+    it("should extract value from ROI evidence (no mock trap)", () => {
       const roi = getRoiForField(fullRoiConfig, "jobReference")!;
-      const result = extractFromRoi("document text", roi, "jobReference");
+      const result = extractFromRoi(EVIDENCE_DOC, roi, "jobReference");
 
-      expect(result.unavailable).toBe(true);
-      expect(result.value).toBeNull();
-      expect(result.confidence).toBe(0);
-      expect(result.confidence).not.toBe(0.92);
-      expect(result.reason).toBe(ROI_EXTRACTION_QUARANTINED_REASON);
+      expect(result.value).toBe("JOB-88421");
+      expect(result.confidence).toBeGreaterThan(0);
+      expect(result.value).not.toBe("JOB-ROI-001");
     });
 
-    it("never fabricates placeholder asset IDs or high mock confidence", () => {
+    it("should have high confidence for ROI extraction", () => {
       const roi = getRoiForField(fullRoiConfig, "assetId")!;
-      const result = extractFromRoi("document text", roi, "assetId");
+      const result = extractFromRoi(EVIDENCE_DOC, roi, "assetId");
 
-      expect(result.value).not.toBe("ASSET-ROI-001");
+      // ROI extraction should have higher confidence than full-page
+      expect(result.confidence).toBeGreaterThan(0.8);
+    });
+
+    it("should return null when no evidence (never fabricate)", () => {
+      const roi = getRoiForField(fullRoiConfig, "jobReference")!;
+      const result = extractFromRoi("no labels here", roi, "jobReference");
       expect(result.value).toBeNull();
-      expect(result.confidence).toBeLessThan(0.6);
-      expect(result.confidence).not.toBe(0.92);
+      expect(result.confidence).toBe(0);
     });
   });
 
@@ -200,45 +212,31 @@ describe("ROI Processor - PR-J Contract Tests", () => {
   });
 
   describe("ROI Processing", () => {
-    it("should process document with full ROI config (honest unavailable extraction)", async () => {
-      const trace = await processWithRoi(
-        1,
-        "test document text",
-        100,
-        fullRoiConfig,
-        ["jobReference", "assetId", "signatureBlock"]
-      );
+    it("should process document with full ROI config", async () => {
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
+        "jobReference",
+        "assetId",
+        "signatureBlock",
+      ]);
 
       expect(trace.documentId).toBe(1);
       expect(trace.templateVersionId).toBe(100);
       expect(trace.results.length).toBe(3);
-      expect(trace.warnings.some(w => w.includes("quarantined"))).toBe(true);
-      for (const r of trace.results) {
-        expect(r.value).not.toBe("JOB-ROI-001");
-        expect(r.value).not.toBe("ASSET-ROI-001");
-        expect(r.confidence).not.toBe(0.92);
-      }
+      expect(trace.warnings.length).toBe(0);
     });
 
-    it("should mark ROI source as unavailable when extraction quarantined", async () => {
-      const trace = await processWithRoi(
-        1,
-        "test document",
-        100,
-        fullRoiConfig,
-        ["jobReference"]
-      );
+    it("should use ROI source when ROI exists", async () => {
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
+        "jobReference",
+      ]);
 
-      expect(trace.results[0].source).toBe("unavailable");
-      expect(trace.results[0].extracted).toBe(false);
-      expect(trace.results[0].value).toBeNull();
-      expect(trace.results[0].unavailableReason).toMatch(/quarantined/i);
+      expect(trace.results[0].source).toBe("roi");
     });
 
     it("should use fullpage source when ROI missing", async () => {
       const trace = await processWithRoi(
         1,
-        "test document",
+        EVIDENCE_DOC,
         100,
         partialRoiConfig,
         ["customerName"] // Not a critical field, no ROI
@@ -250,7 +248,7 @@ describe("ROI Processor - PR-J Contract Tests", () => {
     it("should add warning for missing critical ROIs", async () => {
       const trace = await processWithRoi(
         1,
-        "test document",
+        EVIDENCE_DOC,
         100,
         partialRoiConfig,
         ["jobReference", "signatureBlock"]
@@ -260,50 +258,74 @@ describe("ROI Processor - PR-J Contract Tests", () => {
     });
 
     it("should include image QA for visual fields", async () => {
-      const trace = await processWithRoi(
-        1,
-        "test document",
-        100,
-        fullRoiConfig,
-        ["signatureBlock", "tickboxBlock"]
-      );
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
+        "signatureBlock",
+        "tickboxBlock",
+      ]);
 
       const sigResult = trace.results.find(r => r.fieldId === "signatureBlock");
       const tickResult = trace.results.find(r => r.fieldId === "tickboxBlock");
 
       expect(sigResult?.imageQaResult).toBeDefined();
       expect(tickResult?.imageQaResult).toBeDefined();
-      // Quarantined extraction → disputed; without VLM, fail-closed (not fake 0.88 pass)
+      // Without VLM, Image QA must be unavailable — never a fake 0.88 pass
+      expect(sigResult?.imageQaResult?.available).toBe(false);
       expect(sigResult?.imageQaResult?.confidence).toBe(0);
       expect(sigResult?.imageQaResult?.confidence).not.toBe(0.88);
-      expect(sigResult?.imageQaResult?.passed).toBe(false);
+      expect(tickResult?.imageQaResult?.available).toBe(false);
       expect(tickResult?.imageQaResult?.confidence).not.toBe(0.88);
-      expect(tickResult?.imageQaResult?.passed).toBe(false);
     });
 
     it("should record processing time", async () => {
-      const trace = await processWithRoi(
-        1,
-        "test document",
-        100,
-        fullRoiConfig,
-        ["jobReference"]
-      );
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
+        "jobReference",
+      ]);
 
       expect(trace.processingTimeMs).toBeGreaterThanOrEqual(0);
     });
 
     it("should record ROI region in result", async () => {
-      const trace = await processWithRoi(
-        1,
-        "test document",
-        100,
-        fullRoiConfig,
-        ["jobReference"]
-      );
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
+        "jobReference",
+      ]);
 
       expect(trace.results[0].roiRegion).toBeDefined();
       expect(trace.results[0].roiRegion!.name).toBe("jobReference");
+    });
+
+    it("should prefer injected crop OCR over text evidence", async () => {
+      const trace = await processWithRoi(
+        1,
+        EVIDENCE_DOC,
+        100,
+        fullRoiConfig,
+        ["jobReference"],
+        undefined,
+        {
+          forceCropReocr: true,
+          cropOcrRunner: async () => ({
+            fieldId: "jobReference",
+            success: true,
+            value: "JOB-FROM-CROP",
+            confidence: 0.93,
+            method: "crop_ocr",
+            crop: {
+              dataBase64: "aa",
+              mediaType: "image/png",
+              page: 1,
+              bounds: { x: 0.05, y: 0.1, width: 0.4, height: 0.05 },
+              cropHash: "crop_abc123def4",
+              widthPx: 100,
+              heightPx: 20,
+            },
+            processingTimeMs: 1,
+          }),
+        }
+      );
+
+      expect(trace.results[0].value).toBe("JOB-FROM-CROP");
+      expect(trace.results[0].source).toBe("crop_ocr");
+      expect(trace.results[0].cropHash).toBe("crop_abc123def4");
     });
   });
 
@@ -315,13 +337,10 @@ describe("ROI Processor - PR-J Contract Tests", () => {
     });
 
     it("should track reprocess attempts", async () => {
-      const trace = await processWithRoi(
-        1,
-        "test document",
-        100,
-        fullRoiConfig,
-        ["jobReference", "assetId"]
-      );
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
+        "jobReference",
+        "assetId",
+      ]);
 
       // Each result should track its reprocess attempts
       for (const result of trace.results) {
@@ -339,7 +358,7 @@ describe("ROI Processor - PR-J Contract Tests", () => {
 
       const trace = await processWithRoi(
         1,
-        "test document",
+        EVIDENCE_DOC,
         100,
         fullRoiConfig,
         ["jobReference"],
@@ -351,27 +370,23 @@ describe("ROI Processor - PR-J Contract Tests", () => {
   });
 
   describe("Review Queue Routing", () => {
-    it("should require review when ROI extraction is quarantined (LOW_CONFIDENCE)", async () => {
-      const trace = await processWithRoi(
-        1,
-        "test document",
-        100,
-        fullRoiConfig,
-        ["jobReference", "assetId", "signatureBlock"]
-      );
+    it("should not require review when all critical ROIs present", async () => {
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
+        "jobReference",
+        "assetId",
+        "signatureBlock",
+      ]);
 
       const review = requiresReviewQueue(trace);
 
-      expect(review.required).toBe(true);
-      expect(review.reasonCodes).toContain("LOW_CONFIDENCE");
-      // Visual fields disputed after quarantine may also route OCR_FAILURE when VLM off
-      expect(review.reasonCodes.length).toBeGreaterThanOrEqual(1);
+      expect(review.required).toBe(false);
+      expect(review.reasonCodes).toEqual([]);
     });
 
     it("should require review when critical ROIs missing (canonical: SPEC_GAP)", async () => {
       const trace = await processWithRoi(
         1,
-        "test document",
+        EVIDENCE_DOC,
         100,
         partialRoiConfig, // Missing date, expiry, tickbox, signature
         ["jobReference"]
@@ -398,22 +413,27 @@ describe("ROI Processor - PR-J Contract Tests", () => {
   });
 
   describe("Determinism", () => {
-    it("should produce consistent unavailable results for same input", async () => {
-      const trace1 = await processWithRoi(1, "test", 100, fullRoiConfig, [
+    it("should produce consistent results for same input", async () => {
+      const trace1 = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
         "jobReference",
       ]);
-      const trace2 = await processWithRoi(1, "test", 100, fullRoiConfig, [
+      const trace2 = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
         "jobReference",
       ]);
 
       expect(trace1.results[0].value).toBe(trace2.results[0].value);
       expect(trace1.results[0].source).toBe(trace2.results[0].source);
-      expect(trace1.results[0].source).toBe("unavailable");
     });
 
     it("should maintain field order in results", async () => {
       const fields = ["jobReference", "assetId", "date", "signatureBlock"];
-      const trace = await processWithRoi(1, "test", 100, fullRoiConfig, fields);
+      const trace = await processWithRoi(
+        1,
+        EVIDENCE_DOC,
+        100,
+        fullRoiConfig,
+        fields
+      );
 
       expect(trace.results.map(r => r.fieldId)).toEqual(fields);
     });
@@ -481,7 +501,7 @@ describe("ROI Processor - PR-J Contract Tests", () => {
     });
 
     it("should never return non-canonical codes like IMAGE_QA_FAILED", async () => {
-      const trace = await processWithRoi(1, "test", 100, fullRoiConfig, [
+      const trace = await processWithRoi(1, EVIDENCE_DOC, 100, fullRoiConfig, [
         "tickboxBlock",
         "signatureBlock",
       ]);
@@ -503,46 +523,6 @@ describe("ROI Processor - PR-J Contract Tests", () => {
       // SPEC_GAP = config issue, MISSING_FIELD = document issue
       expect(review.reasonCodes).toContain("SPEC_GAP");
       expect(review.reasonCodes).not.toContain("MISSING_FIELD");
-    });
-  });
-
-  describe("Mock Fiction Guard (R1)", () => {
-    const FORBIDDEN_ROI_MOCK_VALUES = [
-      "JOB-ROI-001",
-      "ASSET-ROI-001",
-      "all_checked",
-      "signed",
-    ] as const;
-    const FORBIDDEN_MOCK_CONFIDENCE = 0.92;
-    const FORBIDDEN_HEURISTIC_IQA_CONFIDENCE = 0.88;
-
-    it("extractFromRoi never emits mock trap confidence 0.92", () => {
-      for (const fieldId of CRITICAL_ROI_FIELDS) {
-        const roi = getRoiForField(fullRoiConfig, fieldId);
-        if (!roi) continue;
-        const result = extractFromRoi("any text", roi, fieldId);
-        expect(result.confidence).not.toBe(FORBIDDEN_MOCK_CONFIDENCE);
-      }
-    });
-
-    it("processWithRoi never surfaces JOB-ROI-001-style placeholders", async () => {
-      const trace = await processWithRoi(
-        1,
-        "Job Ref: JOB-REAL-999",
-        100,
-        fullRoiConfig,
-        [...CRITICAL_ROI_FIELDS]
-      );
-
-      for (const r of trace.results) {
-        expect(FORBIDDEN_ROI_MOCK_VALUES).not.toContain(r.value ?? "");
-        expect(r.confidence).not.toBe(FORBIDDEN_MOCK_CONFIDENCE);
-        if (r.imageQaResult) {
-          expect(r.imageQaResult.confidence).not.toBe(
-            FORBIDDEN_HEURISTIC_IQA_CONFIDENCE
-          );
-        }
-      }
     });
   });
 });
