@@ -56,7 +56,9 @@ export function AIPersonaSettings() {
                 <Scale className="h-4 w-4" />
                 Audit Strictness
               </Label>
-              <span className="font-mono text-sm">{PREVIEW_STRICTNESS[0]}%</span>
+              <span className="font-mono text-sm">
+                {PREVIEW_STRICTNESS[0]}%
+              </span>
             </div>
             <Slider
               value={PREVIEW_STRICTNESS}
@@ -74,10 +76,7 @@ export function AIPersonaSettings() {
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label
-                htmlFor="tone-check"
-                className="flex items-center gap-2"
-              >
+              <Label htmlFor="tone-check" className="flex items-center gap-2">
                 <MessageSquareWarning className="h-4 w-4" />
                 Tone & Language Analysis
               </Label>
@@ -143,7 +142,10 @@ export function AIPersonaSettings() {
               disabled
               aria-describedby="prompt-override-hint"
             />
-            <p id="prompt-override-hint" className="text-xs text-muted-foreground">
+            <p
+              id="prompt-override-hint"
+              className="text-xs text-muted-foreground"
+            >
               Not editable — no persona persistence API.
             </p>
           </div>
@@ -172,10 +174,7 @@ export function AIPersonaSettings() {
             <RefreshCw className="h-4 w-4 mr-2" />
             Reset to Default
           </Button>
-          <Button
-            disabled
-            title="Save unavailable — no persona settings API"
-          >
+          <Button disabled title="Save unavailable — no persona settings API">
             <Save className="h-4 w-4 mr-2" />
             Save Configuration (not wired)
           </Button>
