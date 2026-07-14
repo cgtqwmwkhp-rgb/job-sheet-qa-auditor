@@ -30,6 +30,8 @@ vi.mock("./db", () => ({
     fileName: "test.pdf",
     status: "completed",
     fileUrl: "https://example.com/test.pdf",
+    technicianId: 1,
+    uploadedBy: 1,
   }),
   createJobSheet: vi.fn().mockResolvedValue({ id: 3 }),
   updateJobSheetStatus: vi.fn().mockResolvedValue(undefined),
@@ -102,15 +104,19 @@ vi.mock("./db", () => ({
   logAction: vi.fn().mockResolvedValue(undefined),
   getEngineerAnalyticsDocuments: vi.fn().mockResolvedValue([
     {
-      technicianId: 2,
+      technicianId: 1,
       jobSheetId: 1,
+      referenceNumber: "JS-100",
+      siteInfo: "London Data Center",
+      result: "pass",
+      confidenceScore: 92,
       processedAt: new Date("2024-06-10T10:00:00Z"),
     },
   ]),
   getEngineerAnalyticsFindings: vi.fn().mockResolvedValue([
     {
       findingId: 1,
-      technicianId: 2,
+      technicianId: 1,
       jobSheetId: 1,
       severity: "S1",
       reasonCode: "MISSING_FIELD",
@@ -440,12 +446,12 @@ describe("analytics.engineer (PR-15)", () => {
     const caller = appRouter.createCaller(ctx);
 
     const result = await caller.analytics.getEngineerScoreCard({
-      engineerId: "2",
+      engineerId: "1",
       startDate: "2024-06-01T00:00:00.000Z",
       endDate: "2024-06-30T23:59:59.999Z",
     });
 
-    expect(result.scoreCard?.engineerId).toBe("2");
+    expect(result.scoreCard?.engineerId).toBe("1");
     expect(result.drilldown.length).toBeGreaterThan(0);
     expect(result.drilldown[0].jobSheetId).toBe(1);
   });
@@ -657,6 +663,26 @@ describe("specs", () => {
   });
 });
 
+describe("portal", () => {
+  it("returns myDashboard scoped to the signed-in technician", async () => {
+    const { ctx } = createAuthContext("technician");
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.portal.myDashboard();
+
+    expect(result).toHaveProperty("scorecard");
+    expect(result).toHaveProperty("stats");
+    expect(result).toHaveProperty("recentAudits");
+    expect(result).toHaveProperty("defects");
+    expect(Array.isArray(result.recentAudits)).toBe(true);
+    expect(Array.isArray(result.defects)).toBe(true);
+    for (const d of result.defects) {
+      expect(d.title).not.toMatch(/Blurry Serial Number/i);
+      expect(d.findingId).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe("disputes", () => {
   it("lists disputes", async () => {
     const { ctx } = createAuthContext();
@@ -677,6 +703,40 @@ describe("disputes", () => {
     });
 
     expect(result).toHaveProperty("id");
+  });
+
+  it("lets a technician create a dispute on their attributed finding", async () => {
+    const { ctx } = createAuthContext("technician");
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.disputes.create({
+      auditFindingId: 1,
+      reason: "Signature is on page 2",
+    });
+
+    expect(result).toHaveProperty("id");
+  });
+
+  it("rejects technician dispute on another tech's finding", async () => {
+    const db = await import("./db");
+    vi.mocked(db.getJobSheetById).mockResolvedValueOnce({
+      id: 1,
+      fileName: "test.pdf",
+      status: "completed",
+      fileUrl: "https://example.com/test.pdf",
+      technicianId: 99,
+      uploadedBy: 2,
+    } as Awaited<ReturnType<typeof db.getJobSheetById>>);
+
+    const { ctx } = createAuthContext("technician");
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(
+      caller.disputes.create({
+        auditFindingId: 1,
+        reason: "Not mine",
+      })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("updates dispute status", async () => {

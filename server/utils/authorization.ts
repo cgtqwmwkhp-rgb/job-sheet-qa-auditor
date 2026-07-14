@@ -18,6 +18,8 @@ export interface ResourceOwnership {
   /** Schema field on job_sheets */
   uploadedBy?: number | null;
   userId?: number | null;
+  /** Attributed technician on job_sheets (portal evidence / disputes) */
+  technicianId?: number | null;
   [key: string]: unknown; // Allow additional properties from full objects
 }
 
@@ -43,6 +45,7 @@ export function resolveResourceOwnerId(
  *
  * Access rules:
  * - Admins and QA leads can access all job sheets
+ * - Attributed technicians can access their job sheets
  * - Regular users can only access their own uploads
  *
  * @throws TRPCError with code FORBIDDEN if access denied
@@ -63,6 +66,15 @@ export function enforceJobSheetAccess(
     return;
   }
 
+  // Attributed technicians can access their own job sheets (portal evidence)
+  if (
+    currentUser.role === "technician" &&
+    typeof resource.technicianId === "number" &&
+    resource.technicianId === currentUser.id
+  ) {
+    return;
+  }
+
   // Regular users can only access their own uploads
   const ownerId = resolveResourceOwnerId(resource);
   if (!ownerId || ownerId !== currentUser.id) {
@@ -78,6 +90,7 @@ export function enforceJobSheetAccess(
  *
  * Access rules:
  * - Admins and QA leads can access all audits
+ * - Attributed technicians can access audits for their job sheets
  * - Regular users can only access audits for job sheets they uploaded
  *
  * @throws TRPCError with code FORBIDDEN if access denied
@@ -105,6 +118,14 @@ export function enforceAuditAccess(
       code: "FORBIDDEN",
       message: "You do not have permission to access this audit",
     });
+  }
+
+  if (
+    currentUser.role === "technician" &&
+    typeof jobSheetResource.technicianId === "number" &&
+    jobSheetResource.technicianId === currentUser.id
+  ) {
+    return;
   }
 
   const ownerId = resolveResourceOwnerId(jobSheetResource);
@@ -162,8 +183,15 @@ export function filterJobSheetsByAccess<T extends ResourceOwnership>(
     return resources;
   }
 
-  // Regular users only see their own uploads
+  // Technicians see attributed sheets; others see their own uploads
   return resources.filter(r => {
+    if (
+      currentUser.role === "technician" &&
+      typeof r.technicianId === "number" &&
+      r.technicianId === currentUser.id
+    ) {
+      return true;
+    }
     const ownerId = resolveResourceOwnerId(r);
     return ownerId === currentUser.id;
   });

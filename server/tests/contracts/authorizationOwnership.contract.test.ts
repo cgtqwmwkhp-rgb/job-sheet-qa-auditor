@@ -1,5 +1,6 @@
 /**
- * Object-level auth must honour job_sheets.uploadedBy (schema field name).
+ * Object-level auth must honour job_sheets.uploadedBy (schema field name)
+ * and technicianId for attributed technicians (portal evidence / disputes).
  */
 
 import { describe, expect, it } from "vitest";
@@ -35,6 +36,24 @@ describe("enforceJobSheetAccess", () => {
       enforceJobSheetAccess({ uploadedBy: 5 }, { id: 8, role: "user" })
     ).toThrow(TRPCError);
   });
+
+  it("allows attributed technician via technicianId", () => {
+    expect(() =>
+      enforceJobSheetAccess(
+        { uploadedBy: 99, technicianId: 7 },
+        { id: 7, role: "technician" }
+      )
+    ).not.toThrow();
+  });
+
+  it("denies technician for another tech's sheet", () => {
+    expect(() =>
+      enforceJobSheetAccess(
+        { uploadedBy: 99, technicianId: 3 },
+        { id: 7, role: "technician" }
+      )
+    ).toThrow(TRPCError);
+  });
 });
 
 describe("filterJobSheetsByAccess", () => {
@@ -52,5 +71,18 @@ describe("filterJobSheetsByAccess", () => {
     expect(filterJobSheetsByAccess(rows, { id: 1, role: "qa_lead" })).toEqual(
       rows
     );
+  });
+
+  it("includes technician-attributed sheets for technicians", async () => {
+    const { filterJobSheetsByAccess } = await import(
+      "../../utils/authorization"
+    );
+    const rows = [
+      { id: 1, uploadedBy: 9, technicianId: 5 },
+      { id: 2, uploadedBy: 8, technicianId: 8 },
+    ];
+    expect(
+      filterJobSheetsByAccess(rows, { id: 5, role: "technician" })
+    ).toEqual([rows[0]]);
   });
 });
