@@ -409,10 +409,7 @@ ${input.layoutText.slice(0, 8000)}`;
   }
 }
 
-function appendLayoutError(
-  current: string | undefined,
-  next: string
-): string {
+function appendLayoutError(current: string | undefined, next: string): string {
   return current ? `${current} · ${next}` : next;
 }
 
@@ -502,8 +499,7 @@ export async function proposeFromSample(input: {
   }
 
   // Prefer live OCR (production text truth); Azure layout text is geometry-only fallback.
-  const searchText =
-    liveOcrText || azureLayoutText || lines.join("\n");
+  const searchText = liveOcrText || azureLayoutText || lines.join("\n");
 
   const hasChecklistGrid =
     selectionMarkRows.length >= 3 ||
@@ -646,7 +642,11 @@ export async function proposeFromSample(input: {
     // Gate ROI field placement on production text truth when available
     textTruth: liveOcrText || undefined,
   });
-  if (layoutAvailable && !roiGeometryAvailable && !layoutError?.includes("no text geometry")) {
+  if (
+    layoutAvailable &&
+    !roiGeometryAvailable &&
+    !layoutError?.includes("no text geometry")
+  ) {
     layoutError = appendLayoutError(
       layoutError,
       "OCR layout had no usable line geometry for ROI placement"

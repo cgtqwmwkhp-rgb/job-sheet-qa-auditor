@@ -267,7 +267,11 @@ function expandCapture(
     // Typical 2-col table: label ~left half of cell group, value to the right
     const valuePad = 0.22;
     const width = clamp01(
-      Math.min(MAX_ROW_W, Math.max(base.width + valuePad, 0.2), 1 - base.x - 0.02)
+      Math.min(
+        MAX_ROW_W,
+        Math.max(base.width + valuePad, 0.2),
+        1 - base.x - 0.02
+      )
     );
     const height = clamp01(
       Math.min(MAX_ROW_H, Math.max(base.height * 1.35, 0.018))
@@ -434,9 +438,7 @@ export function suggestRoiFromLayoutEvidence(input: {
   const { lines, selectionRows, hasChecklist, layoutAvailable, textTruth } =
     input;
   const regions: ProposedRoiRegion[] = [];
-  const truthNote = textTruth?.trim()
-    ? " · live text truth confirmed"
-    : "";
+  const truthNote = textTruth?.trim() ? " · live text truth confirmed" : "";
 
   if (!layoutAvailable || lines.length === 0) {
     // Callers must surface layoutError — do not invent positions.
@@ -459,9 +461,7 @@ export function suggestRoiFromLayoutEvidence(input: {
           x: 0.03,
           y: clamp01(Math.max(0, union.y - 0.005)),
           width: 0.94,
-          height: clamp01(
-            Math.min(0.12, Math.max(0.05, union.height + 0.015))
-          ),
+          height: clamp01(Math.min(0.12, Math.max(0.05, union.height + 0.015))),
         },
         confidence: 0.85,
         source: "ocr-layout",

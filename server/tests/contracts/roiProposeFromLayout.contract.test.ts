@@ -277,7 +277,8 @@ describe("suggestRoiFromLayoutEvidence (precision-first)", () => {
       hasChecklist: false,
       selectionRows: [],
       lines: sampleLines,
-      textTruth: "--- Page 1 ---\nJob Summary Report\nJob ID: 12345\nDate: 01/01/2026\n",
+      textTruth:
+        "--- Page 1 ---\nJob Summary Report\nJob ID: 12345\nDate: 01/01/2026\n",
     });
 
     expect(regions.find(r => r.name === "jobReference")).toBeTruthy();

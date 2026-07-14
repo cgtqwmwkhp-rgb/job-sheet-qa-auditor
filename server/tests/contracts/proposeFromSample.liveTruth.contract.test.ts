@@ -4,12 +4,9 @@ vi.mock("../../services/ocr", () => ({
   extractTextFromDocument: vi.fn(),
 }));
 
-vi.mock(
-  "../../services/ocrAdapter/azureDocumentIntelligenceAdapter",
-  () => ({
-    extractLayoutSelectionMarks: vi.fn(),
-  })
-);
+vi.mock("../../services/ocrAdapter/azureDocumentIntelligenceAdapter", () => ({
+  extractLayoutSelectionMarks: vi.fn(),
+}));
 
 vi.mock("../../services/templateStudio/sampleStore", () => ({
   getStudioSampleUrl: vi.fn(),
