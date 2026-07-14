@@ -87,6 +87,10 @@ import { type SelectionTrace } from "@/components/audit/SelectionTracePanel";
 import { mapSelectionTraceFromReport } from "@/components/review/mapSelectionTrace";
 import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
 import {
+  TRAINING_REASON_OPTIONS,
+  type TrainingReasonCode,
+} from "@/components/review/trainingReasonLabels";
+import {
   DocQualityBreakdown,
   mapDocQualityPenaltiesFromReport,
   type DocQualityPenalty,
@@ -561,10 +565,16 @@ function ReviewWorkstationContent({
     action: "override" | "waive";
   } | null>(null);
   const [actionReason, setActionReason] = useState("");
+  const [overrideTrainingReason, setOverrideTrainingReason] = useState<
+    TrainingReasonCode | ""
+  >("");
   const [correctionDialog, setCorrectionDialog] = useState<Finding | null>(
     null
   );
   const [correctedValue, setCorrectedValue] = useState("");
+  const [correctionTrainingReason, setCorrectionTrainingReason] = useState<
+    TrainingReasonCode | ""
+  >("");
   // Default true = auto-load PDF. Remount via key={jobSheetId} on parent resets state.
   const [showPdfViewer, setShowPdfViewer] = useState(true);
   const [showLegend, setShowLegend] = useState(false);
@@ -700,6 +710,7 @@ function ReviewWorkstationContent({
   const openOverrideForFinding = (finding: Finding) => {
     setActionDialog({ finding, action: "override" });
     setActionReason("");
+    setOverrideTrainingReason("");
     // Focus reason on next paint so o → type → ⌘↵ is one continuous keyboard path.
     requestAnimationFrame(() => {
       document.getElementById("override-reason")?.focus();
@@ -709,6 +720,7 @@ function ReviewWorkstationContent({
   const openCorrectForFinding = (finding: Finding) => {
     setCorrectionDialog(finding);
     setCorrectedValue(finding.message || finding.value || "");
+    setCorrectionTrainingReason("");
   };
 
   const handleOverrideClick = (finding: Finding, e: MouseEvent) => {
@@ -732,18 +744,24 @@ function ReviewWorkstationContent({
       toast.error("Enter a corrected value");
       return;
     }
+    if (!correctionTrainingReason) {
+      toast.error("Select a training reason");
+      return;
+    }
     captureCorrection.mutate(
       {
         findingId,
         fieldName: correctionDialog.field,
         originalValue: correctionDialog.value,
         correctedValue: correctedValue.trim(),
+        trainingReasonCode: correctionTrainingReason,
       },
       {
         onSuccess: result => {
           invalidateFindings();
           setCorrectionDialog(null);
           setCorrectedValue("");
+          setCorrectionTrainingReason("");
           focusWorkstationPane();
           toast.success("Correction saved", {
             action: {
@@ -813,6 +831,10 @@ function ReviewWorkstationContent({
       toast.error("Please provide a reason");
       return;
     }
+    if (actionDialog.action === "override" && !overrideTrainingReason) {
+      toast.error("Select a training reason");
+      return;
+    }
     const mutation =
       actionDialog.action === "waive" ? waiveMutation : overrideMutation;
     const label =
@@ -823,6 +845,9 @@ function ReviewWorkstationContent({
     // Close + optimistic pass immediately so p95 action feel is not network-bound.
     setActionDialog(null);
     setActionReason("");
+    const trainingReasonCode =
+      actionKind === "override" ? overrideTrainingReason : undefined;
+    setOverrideTrainingReason("");
     const nextOptimistic = new Set(optimisticPassedIds);
     nextOptimistic.add(finding.id);
     setOptimisticPassedIds(nextOptimistic);
@@ -844,7 +869,13 @@ function ReviewWorkstationContent({
     }
 
     mutation.mutate(
-      { findingId, reason },
+      {
+        findingId,
+        reason,
+        ...(trainingReasonCode
+          ? { trainingReasonCode: trainingReasonCode as TrainingReasonCode }
+          : {}),
+      },
       {
         onSuccess: () => {
           setPendingActionIds(prev => {
@@ -1648,6 +1679,7 @@ function ReviewWorkstationContent({
           if (!open) {
             setActionDialog(null);
             setActionReason("");
+            setOverrideTrainingReason("");
             focusWorkstationPane();
           }
         }}
@@ -1685,6 +1717,33 @@ function ReviewWorkstationContent({
               </p>
             </div>
             {actionDialog?.action === "override" && (
+              <div className="space-y-2">
+                <Label htmlFor="override-training-reason">
+                  Training reason
+                </Label>
+                <Select
+                  value={overrideTrainingReason}
+                  onValueChange={value =>
+                    setOverrideTrainingReason(value as TrainingReasonCode)
+                  }
+                >
+                  <SelectTrigger id="override-training-reason">
+                    <SelectValue placeholder="Why should the model learn from this?" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TRAINING_REASON_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Feeds TrainLoop signals for ECE and Template Studio inbox.
+                </p>
+              </div>
+            )}
+            {actionDialog?.action === "override" && (
               <Button
                 variant="link"
                 className="px-0 h-auto"
@@ -1706,6 +1765,7 @@ function ReviewWorkstationContent({
               onClick={() => {
                 setActionDialog(null);
                 setActionReason("");
+                setOverrideTrainingReason("");
                 focusWorkstationPane();
               }}
             >
@@ -1716,7 +1776,8 @@ function ReviewWorkstationContent({
               disabled={
                 overrideMutation.isPending ||
                 waiveMutation.isPending ||
-                !actionReason.trim()
+                !actionReason.trim() ||
+                (actionDialog?.action === "override" && !overrideTrainingReason)
               }
             >
               {(overrideMutation.isPending || waiveMutation.isPending) && (
@@ -1734,6 +1795,7 @@ function ReviewWorkstationContent({
           if (!open) {
             setCorrectionDialog(null);
             setCorrectedValue("");
+            setCorrectionTrainingReason("");
           }
         }}
       >
@@ -1765,6 +1827,28 @@ function ReviewWorkstationContent({
                 onChange={e => setCorrectedValue(e.target.value)}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="correction-training-reason">
+                Training reason
+              </Label>
+              <Select
+                value={correctionTrainingReason}
+                onValueChange={value =>
+                  setCorrectionTrainingReason(value as TrainingReasonCode)
+                }
+              >
+                <SelectTrigger id="correction-training-reason">
+                  <SelectValue placeholder="What should the model learn?" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TRAINING_REASON_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -1772,13 +1856,18 @@ function ReviewWorkstationContent({
               onClick={() => {
                 setCorrectionDialog(null);
                 setCorrectedValue("");
+                setCorrectionTrainingReason("");
               }}
             >
               Cancel
             </Button>
             <Button
               onClick={submitCorrection}
-              disabled={captureCorrection.isPending || !correctedValue.trim()}
+              disabled={
+                captureCorrection.isPending ||
+                !correctedValue.trim() ||
+                !correctionTrainingReason
+              }
             >
               {captureCorrection.isPending && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
