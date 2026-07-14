@@ -37,6 +37,8 @@ export interface EnqueueJobSheetProcessingResponse {
   status: "queued" | "running" | "completed" | "failed";
   deduped: boolean;
   durable?: boolean;
+  contentHash?: string;
+  idempotencyKey?: string;
 }
 
 function isThenable<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
@@ -49,7 +51,8 @@ function isThenable<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
 
 function toResponse(
   result: EnqueueJobSheetProcessingResult,
-  durable: boolean
+  durable: boolean,
+  payload: JobSheetProcessingPayload
 ): EnqueueJobSheetProcessingResponse {
   if (!result.deduped) {
     startJobSheetProcessingWorker();
@@ -62,10 +65,12 @@ function toResponse(
     accepted: true,
     async: true,
     jobId: result.job.id,
-    jobSheetId: result.job.payload.jobSheetId,
+    jobSheetId: payload.jobSheetId,
     status: result.job.status,
     deduped: result.deduped,
     durable,
+    contentHash: result.job.payload.contentHash ?? payload.contentHash,
+    idempotencyKey: result.job.payload.idempotencyKey ?? payload.idempotencyKey,
   };
 }
 
@@ -85,11 +90,11 @@ export function enqueueJobSheetProcessing(
 
   if (isThenable(enqueued)) {
     return Promise.resolve(enqueued).then(result =>
-      toResponse(result, durable)
+      toResponse(result, durable, payload)
     );
   }
 
-  return toResponse(enqueued, durable);
+  return toResponse(enqueued, durable, payload);
 }
 
 export async function getJobSheetProcessingJobAsync(

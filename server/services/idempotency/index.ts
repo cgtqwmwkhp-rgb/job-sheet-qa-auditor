@@ -1,10 +1,11 @@
 /**
- * Idempotency key module (Phase 3.x)
+ * Idempotency key module (Phase 3.x) + process/enqueue OCR guard.
  *
- * Feature flag (default OFF):
- * - FEATURE_IDEMPOTENCY=true → enable idempotency keys in downstream wiring
+ * Feature flag (default OFF for key emission wiring):
+ * - FEATURE_IDEMPOTENCY=true → attach idempotencyKey on enqueue responses
  *
- * Not yet wired into documentProcessor — intentional ownership boundary.
+ * Content-hash OCR double-bill protection on `jobSheets.process` is always on
+ * when a fileHash is present (PR-OPS-IDEMPOTENT challenge bar).
  */
 
 export const FEATURE_FLAG = "FEATURE_IDEMPOTENCY";
@@ -15,3 +16,15 @@ export function isIdempotencyEnabled(): boolean {
 
 export * from "./types";
 export { buildIdempotencyKey } from "./key";
+export {
+  PROCESS_OCR_SCOPE,
+  buildProcessOcrIdempotencyKey,
+  isProcessedJobSheetStatus,
+  resolveProcessIdempotency,
+  toProcessDedupeResponse,
+  type ContentHashSibling,
+  type ProcessDedupeResponse,
+  type ProcessIdempotencyDecision,
+  type ProcessIdempotencyLookup,
+  type ProcessIdempotencyReason,
+} from "./processGuard";

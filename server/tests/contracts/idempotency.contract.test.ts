@@ -11,6 +11,8 @@ import {
   FEATURE_FLAG,
   isIdempotencyEnabled,
   buildIdempotencyKey,
+  buildProcessOcrIdempotencyKey,
+  PROCESS_OCR_SCOPE,
   type IdempotencyKey,
 } from "../../services/idempotency";
 
@@ -138,6 +140,14 @@ describe("Idempotency Contract (Phase 3.x)", () => {
 
       expect(record.scope).toBe("process-job");
       expect(record.key).toMatch(/^process-job:[0-9a-f]{32}$/);
+    });
+  });
+
+  describe("process-ocr content-hash keys", () => {
+    it("builds deterministic process-ocr keys for enqueue wiring", () => {
+      const key = buildProcessOcrIdempotencyKey("file-hash-1");
+      expect(key).toBe(buildIdempotencyKey(PROCESS_OCR_SCOPE, ["file-hash-1"]));
+      expect(key).toMatch(/^process-ocr:[0-9a-f]{32}$/);
     });
   });
 });
