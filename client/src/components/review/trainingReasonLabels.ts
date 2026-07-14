@@ -7,4 +7,5 @@ export const TRAINING_REASON_OPTIONS = [
   { value: "true_defect", label: "True defect (teach the model)" },
 ] as const;
 
-export type TrainingReasonCode = (typeof TRAINING_REASON_OPTIONS)[number]["value"];
+export type TrainingReasonCode =
+  (typeof TRAINING_REASON_OPTIONS)[number]["value"];

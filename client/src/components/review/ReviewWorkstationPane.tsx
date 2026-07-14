@@ -1718,7 +1718,9 @@ function ReviewWorkstationContent({
             </div>
             {actionDialog?.action === "override" && (
               <div className="space-y-2">
-                <Label htmlFor="override-training-reason">Training reason</Label>
+                <Label htmlFor="override-training-reason">
+                  Training reason
+                </Label>
                 <Select
                   value={overrideTrainingReason}
                   onValueChange={value =>
@@ -1826,7 +1828,9 @@ function ReviewWorkstationContent({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="correction-training-reason">Training reason</Label>
+              <Label htmlFor="correction-training-reason">
+                Training reason
+              </Label>
               <Select
                 value={correctionTrainingReason}
                 onValueChange={value =>

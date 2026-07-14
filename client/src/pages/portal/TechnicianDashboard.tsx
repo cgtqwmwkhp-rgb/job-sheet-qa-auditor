@@ -228,9 +228,7 @@ export default function TechnicianDashboard() {
                     </span>
                   </div>
                   <Progress
-                    value={
-                      hasScoreData ? Math.min(100, Math.max(0, score)) : 0
-                    }
+                    value={hasScoreData ? Math.min(100, Math.max(0, score)) : 0}
                     className="h-2.5 bg-black/20 [&>div]:bg-white"
                   />
                 </div>
