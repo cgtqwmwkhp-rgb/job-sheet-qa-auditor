@@ -22,6 +22,7 @@ import {
 import { hydrateDeadLetterQueueFromDb } from "../utils/deadLetterQueue";
 import { hydrateApiCostLedgerFromDb } from "../services/finOps";
 import { assertSharedLimitsReplicaSafety } from "../utils/rateLimiter";
+import { hydrateWebhooksFromDb } from "../services/webhooks";
 import { pdfProxyRouter } from "./pdfProxy";
 import { templateSampleProxyRouter } from "./templateSampleProxy";
 import { ingestRouter } from "../services/ingest";
@@ -158,6 +159,18 @@ async function startServer() {
     }
   } catch (error) {
     console.warn("[FinOps] Boot hydrate skipped:", error);
+  }
+
+  // PR-IO-WEBHOOKS: restore durable webhook subscriptions + signed delivery log
+  try {
+    const webhookHydrated = await hydrateWebhooksFromDb();
+    if (webhookHydrated > 0) {
+      console.log(
+        `[Webhooks] Boot hydrate restored ${webhookHydrated} subscription(s)`
+      );
+    }
+  } catch (error) {
+    console.warn("[Webhooks] Boot hydrate skipped:", error);
   }
 
   // Health check endpoints (before auth, before static files)
