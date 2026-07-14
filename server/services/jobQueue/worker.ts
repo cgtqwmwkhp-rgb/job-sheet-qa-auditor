@@ -1,10 +1,5 @@
-import {
-  completeJobSheetProcessingJob,
-  dequeueJobSheetProcessingJob,
-  failJobSheetProcessingJob,
-  hasQueuedJobSheetProcessingJobs,
-  type JobSheetProcessingPayload,
-} from "./inMemoryQueue";
+import { getJobQueueBackend } from "./backend";
+import type { JobSheetProcessingPayload } from "./types";
 
 interface OrchestrateRequest {
   source: string;
@@ -29,6 +24,7 @@ interface JobSheetProcessorModule {
 }
 
 let activeDrain: Promise<void> | null = null;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 export function selectJobSheetProcessor(
   processorModule: JobSheetProcessorModule
@@ -83,14 +79,15 @@ async function runJob(payload: JobSheetProcessingPayload): Promise<void> {
 }
 
 async function runDrain(): Promise<void> {
-  let job = dequeueJobSheetProcessingJob();
+  const backend = getJobQueueBackend();
+  let job = await backend.dequeue();
 
   while (job) {
     try {
       await runJob(job.payload);
-      completeJobSheetProcessingJob(job.id);
+      await backend.complete(job.id);
     } catch (error) {
-      failJobSheetProcessingJob(job.id, error);
+      await backend.fail(job.id, error);
       console.error("[JobQueue] Job sheet processing failed", {
         jobId: job.id,
         jobSheetId: job.payload.jobSheetId,
@@ -98,7 +95,7 @@ async function runDrain(): Promise<void> {
       });
     }
 
-    job = dequeueJobSheetProcessingJob();
+    job = await backend.dequeue();
   }
 }
 
@@ -108,10 +105,34 @@ export function startJobSheetProcessingWorker(): void {
   activeDrain = runDrain().finally(() => {
     activeDrain = null;
 
-    if (hasQueuedJobSheetProcessingJobs()) {
-      startJobSheetProcessingWorker();
-    }
+    void Promise.resolve(getJobQueueBackend().hasQueued()).then(hasQueued => {
+      if (hasQueued) {
+        startJobSheetProcessingWorker();
+      }
+    });
   });
+}
+
+/**
+ * Scale-out: periodically claim queued work enqueued by other instances.
+ * Safe no-op when the queue is empty.
+ */
+export function startJobSheetProcessingPoller(intervalMs = 5_000): void {
+  if (pollTimer) return;
+
+  pollTimer = setInterval(() => {
+    startJobSheetProcessingWorker();
+  }, intervalMs);
+
+  if (typeof pollTimer === "object" && "unref" in pollTimer) {
+    pollTimer.unref();
+  }
+}
+
+export function stopJobSheetProcessingPoller(): void {
+  if (!pollTimer) return;
+  clearInterval(pollTimer);
+  pollTimer = null;
 }
 
 export async function drainJobSheetProcessingQueue(): Promise<void> {
