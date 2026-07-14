@@ -1,14 +1,17 @@
 /**
  * Template Studio — propose template fields/rules/ROI/tokens from a sample PDF.
  *
- * Pipeline:
- * 1. Azure DI layout (+ selection marks) when configured
- * 2. Heuristic seed from fallback/starter + layout labels
- * 3. Optional Gemini structured propose (skipped cleanly when no API key)
+ * Live-engine unity (same split as documentProcessor production path):
+ * 1. Live OCR text truth via extractTextFromDocument (Mistral primary by default)
+ * 2. Azure DI layout geometry (+ selection marks) for ROI placement
+ * 3. Heuristic seed from fallback/starter + live-OCR labels
+ * 4. Optional Gemini structured propose (skipped cleanly when no API key)
  *
+ * Authors must tune ROIs against the same text truth production audits read.
  * Never silently invents Fail/UNREADABLE without evidence — confidence + sources shown.
  */
 
+import { extractTextFromDocument } from "../ocr";
 import { extractLayoutSelectionMarks } from "../ocrAdapter/azureDocumentIntelligenceAdapter";
 import {
   mapSelectionMarksToRows,
@@ -34,6 +37,12 @@ import {
 
 export type { ProposedRoiRegion } from "./roiProposeFromLayout";
 
+/** Where field/token heuristics sourced their document text. */
+export type StudioTextTruthSource =
+  | "live-ocr"
+  | "azure-layout-fallback"
+  | "none";
+
 export interface ProposedField {
   field: FieldSpec;
   confidence: number;
@@ -54,7 +63,14 @@ export interface ProposalArtifact {
   versionId: number;
   layoutAvailable: boolean;
   layoutError?: string;
+  /** Preview of the text truth used for field/token propose (live OCR preferred). */
   layoutTextPreview: string;
+  /** Production-aligned text source for field/token heuristics. */
+  textTruthSource: StudioTextTruthSource;
+  /** Provider/model id when live OCR succeeded (e.g. mistral / model name). */
+  textTruthProvider?: string;
+  /** Geometry source used for ROI placement. */
+  geometrySource: "azure-layout" | "none";
   selectionMarkRows: Array<{
     rowIndex: number;
     label?: string;
@@ -303,6 +319,14 @@ function buildRulesFromFields(fields: ProposedField[]): ProposedRule[] {
     }));
 }
 
+function joinLiveOcrPages(
+  pages: Array<{ pageNumber: number; markdown: string }>
+): string {
+  return pages
+    .map(page => `--- Page ${page.pageNumber} ---\n${page.markdown}`)
+    .join("\n\n");
+}
+
 async function callGeminiPropose(input: {
   layoutText: string;
   rows: SelectionMarkRow[];
@@ -385,46 +409,106 @@ ${input.layoutText.slice(0, 8000)}`;
   }
 }
 
+function appendLayoutError(
+  current: string | undefined,
+  next: string
+): string {
+  return current ? `${current} · ${next}` : next;
+}
+
 export async function proposeFromSample(input: {
   versionId: number;
   templateName?: string;
 }): Promise<ProposalArtifact> {
   const sample = await getStudioSampleUrl(input.versionId);
-  let layoutText = "";
+  let liveOcrText = "";
+  let liveOcrProvider: string | undefined;
+  let azureLayoutText = "";
   let layoutAvailable = false;
   let layoutError: string | undefined;
   let selectionMarkRows: SelectionMarkRow[] = [];
   let layoutLines: import("../ocrAdapter/parseAzureDiResponse").AzureTextLine[] =
     [];
   let lines: string[] = [];
+  let geometrySource: ProposalArtifact["geometrySource"] = "none";
 
   if (!sample) {
     layoutError = "No sample attached — using starter proposal only";
   } else {
-    const layout = await extractLayoutSelectionMarks(sample.url);
+    // Same dual-engine split as live audits: primary OCR text + Azure geometry.
+    const [ocrResult, layout] = await Promise.all([
+      extractTextFromDocument(sample.url).catch(err => ({
+        success: false as const,
+        pages: [] as Array<{ pageNumber: number; markdown: string }>,
+        totalPages: 0,
+        model: "unknown",
+        provider: undefined as string | undefined,
+        error: err instanceof Error ? err.message : "Live OCR failed",
+      })),
+      extractLayoutSelectionMarks(sample.url),
+    ]);
+
+    if (ocrResult.success && ocrResult.pages.length > 0) {
+      liveOcrText = joinLiveOcrPages(ocrResult.pages);
+      liveOcrProvider =
+        (typeof ocrResult.provider === "string" && ocrResult.provider) ||
+        ocrResult.model ||
+        "live-ocr";
+    } else {
+      layoutError = appendLayoutError(
+        layoutError,
+        ocrResult.error ||
+          "Live OCR returned no pages — field proposals may not match production text truth"
+      );
+    }
+
     if (!layout.success) {
-      layoutError = layout.error || "Azure DI layout failed";
+      layoutError = appendLayoutError(
+        layoutError,
+        layout.error || "Azure DI layout failed"
+      );
     } else {
       layoutAvailable = true;
       layoutLines = layout.lines ?? [];
       lines = layoutLines.map(l => l.content || "");
-      layoutText =
+      azureLayoutText =
         layout.layoutText?.trim() || lines.filter(Boolean).join("\n");
       selectionMarkRows = mapSelectionMarksToRows(layout.selectionMarks ?? [], {
         lines: layout.lines,
       });
       if (layoutLines.length === 0) {
-        layoutError =
-          "Azure DI layout returned no text geometry (0 lines/words with polygons). Cannot place accurate ROIs — draw manually or re-attach sample and retry Suggest fields.";
-        // Keep layoutAvailable for field/token heuristics from layoutText, but ROI path needs geometry
+        layoutError = appendLayoutError(
+          layoutError,
+          "Azure DI layout returned no text geometry (0 lines/words with polygons). Cannot place accurate ROIs — draw manually or re-attach sample and retry Suggest fields."
+        );
+        // Keep layoutAvailable for token heuristics fallback, but ROI path needs geometry
+      } else {
+        geometrySource = "azure-layout";
       }
     }
   }
 
+  const textTruthSource: StudioTextTruthSource = liveOcrText
+    ? "live-ocr"
+    : azureLayoutText || lines.length
+      ? "azure-layout-fallback"
+      : "none";
+
+  if (textTruthSource === "azure-layout-fallback") {
+    layoutError = appendLayoutError(
+      layoutError,
+      "Live OCR unavailable — field/token proposals used Azure layout text (not production text truth)"
+    );
+  }
+
+  // Prefer live OCR (production text truth); Azure layout text is geometry-only fallback.
+  const searchText =
+    liveOcrText || azureLayoutText || lines.join("\n");
+
   const hasChecklistGrid =
     selectionMarkRows.length >= 3 ||
-    /\bok\b.*\badv\b.*\bfail\b/i.test(layoutText) ||
-    /\bok\b[\s|/]+adv[\s|/]+fail/i.test(layoutText);
+    /\bok\b.*\badv\b.*\bfail\b/i.test(searchText) ||
+    /\bok\b[\s|/]+adv[\s|/]+fail/i.test(searchText);
 
   const name = input.templateName || "Studio Proposal";
   const starter = createStudioStarterSpec(name);
@@ -441,15 +525,16 @@ export async function proposeFromSample(input: {
     });
   }
 
-  // Boost / add from label heuristics
-  const searchText = layoutText || lines.join("\n");
+  // Boost / add from label heuristics against live text truth
+  const labelSource =
+    textTruthSource === "live-ocr" ? "live-ocr-label" : "ocr-label";
   for (const mapping of LABEL_TO_FIELD) {
     if (!mapping.re.test(searchText)) continue;
     const existing = proposedFields.find(p => p.field.field === mapping.field);
     if (existing) {
       existing.confidence = Math.min(0.95, existing.confidence + 0.25);
-      existing.source = "ocr-label";
-      existing.why = `OCR label matched /${mapping.re.source}/`;
+      existing.source = labelSource;
+      existing.why = `Live text truth matched /${mapping.re.source}/ (${textTruthSource})`;
     } else {
       proposedFields.push({
         field: {
@@ -460,8 +545,8 @@ export async function proposeFromSample(input: {
           extractionHints: [mapping.label.toLowerCase()],
         },
         confidence: 0.8,
-        source: "ocr-label",
-        why: `OCR label matched /${mapping.re.source}/`,
+        source: labelSource,
+        why: `Live text truth matched /${mapping.re.source}/ (${textTruthSource})`,
         accepted: true,
       });
     }
@@ -558,15 +643,20 @@ export async function proposeFromSample(input: {
     selectionRows: selectionMarkRows,
     hasChecklist: hasChecklistGrid,
     layoutAvailable: roiGeometryAvailable,
+    // Gate ROI field placement on production text truth when available
+    textTruth: liveOcrText || undefined,
   });
-  if (layoutAvailable && !roiGeometryAvailable && !layoutError) {
-    layoutError =
-      "OCR layout had no usable line geometry for ROI placement";
+  if (layoutAvailable && !roiGeometryAvailable && !layoutError?.includes("no text geometry")) {
+    layoutError = appendLayoutError(
+      layoutError,
+      "OCR layout had no usable line geometry for ROI placement"
+    );
   }
   if (roiGeometryAvailable && roiRegions.length === 0) {
-    layoutError =
-      (layoutError ? `${layoutError} · ` : "") +
-      "OCR geometry present but no field labels matched — draw ROIs manually using Draw labels tooltips.";
+    layoutError = appendLayoutError(
+      layoutError,
+      "OCR geometry present but no field labels matched live text truth — draw ROIs manually using Draw labels tooltips."
+    );
   }
 
   const acceptedFields = proposedFields
@@ -597,6 +687,9 @@ export async function proposeFromSample(input: {
         layoutAvailable,
         geminiUsed,
         hasChecklistGrid,
+        textTruthSource,
+        textTruthProvider: liveOcrProvider,
+        geometrySource,
       },
     },
     acceptedRoi
@@ -605,11 +698,22 @@ export async function proposeFromSample(input: {
   const proposedSelection = createStudioStarterSelection(requiredTokensAny);
   proposedSelection.optionalTokens = optionalTokens;
 
+  const tokenSources = [
+    ...(ocrTokens.length
+      ? [textTruthSource === "live-ocr" ? "live-ocr" : "ocr"]
+      : []),
+    ...(geminiUsed ? ["gemini"] : []),
+    "starter",
+  ];
+
   return {
     versionId: input.versionId,
     layoutAvailable,
     layoutError,
     layoutTextPreview: searchText.slice(0, 2000),
+    textTruthSource,
+    textTruthProvider: liveOcrProvider,
+    geometrySource,
     selectionMarkRows: selectionMarkRows.map(r => ({
       rowIndex: r.rowIndex,
       label: r.label,
@@ -623,11 +727,7 @@ export async function proposeFromSample(input: {
       requiredTokensAny,
       optionalTokens,
       confidence: tokenSet.length ? 0.75 : 0.5,
-      sources: [
-        ...(ocrTokens.length ? ["ocr"] : []),
-        ...(geminiUsed ? ["gemini"] : []),
-        "starter",
-      ],
+      sources: tokenSources,
     },
     roiRegions,
     geminiUsed,
