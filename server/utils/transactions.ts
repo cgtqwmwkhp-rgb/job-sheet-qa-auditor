@@ -5,7 +5,13 @@
  * Ensures atomicity and rollback on errors.
  */
 
-import { getDb, runTransaction, type DbClient } from "../db";
+import {
+  getDb,
+  runTransaction,
+  type DbClient,
+  type DbExecutor,
+  type DbTx,
+} from "../db";
 
 export class TransactionError extends Error {
   constructor(
@@ -17,14 +23,14 @@ export class TransactionError extends Error {
   }
 }
 
-export type { DbClient };
+export type { DbClient, DbExecutor, DbTx };
 
 /**
  * Executes a function within a database transaction.
  * Automatically commits on success or rolls back on error.
  */
 export async function withTransaction<T>(
-  fn: (tx: DbClient) => Promise<T>
+  fn: (tx: DbTx) => Promise<T>
 ): Promise<T> {
   try {
     return await runTransaction(fn);

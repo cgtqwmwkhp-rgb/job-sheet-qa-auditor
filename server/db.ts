@@ -58,8 +58,10 @@ export async function getDb() {
 
 /** Drizzle client — use for transactional writes via {@link runTransaction}. */
 export type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+export type DbTx = Parameters<Parameters<DbClient["transaction"]>[0]>[0];
+export type DbExecutor = DbClient | DbTx;
 
-async function resolveDbClient(tx?: DbClient): Promise<DbClient> {
+async function resolveDbClient(tx?: DbExecutor): Promise<DbExecutor> {
   if (tx) return tx;
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -70,7 +72,7 @@ async function resolveDbClient(tx?: DbClient): Promise<DbClient> {
  * Run a callback inside a single MySQL transaction (commit or full rollback).
  */
 export async function runTransaction<T>(
-  fn: (tx: DbClient) => Promise<T>
+  fn: (tx: DbTx) => Promise<T>
 ): Promise<T> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -375,7 +377,7 @@ export async function getJobSheets(options?: {
 export async function updateJobSheetStatus(
   id: number,
   status: string,
-  tx?: DbClient
+  tx?: DbExecutor
 ) {
   const db = await resolveDbClient(tx);
 
@@ -718,7 +720,7 @@ export async function updateFindingResolution(
       | "approved"
       | null;
   },
-  tx?: DbClient
+  tx?: DbExecutor
 ) {
   const db = await resolveDbClient(tx);
 
@@ -738,7 +740,7 @@ export async function updateFindingResolution(
 export async function updateFindingSnippet(
   id: number,
   data: { normalisedSnippet: string },
-  tx?: DbClient
+  tx?: DbExecutor
 ) {
   const db = await resolveDbClient(tx);
 
@@ -766,14 +768,14 @@ export async function getAuditResultById(id: number) {
 export async function updateAuditResultStatus(
   id: number,
   result: "pass" | "fail" | "review_queue" | "waived",
-  tx?: DbClient
+  tx?: DbExecutor
 ) {
   const db = await resolveDbClient(tx);
 
   await db.update(auditResults).set({ result }).where(eq(auditResults.id, id));
 }
 
-export async function deleteWaiver(id: number, tx?: DbClient) {
+export async function deleteWaiver(id: number, tx?: DbExecutor) {
   const db = await resolveDbClient(tx);
 
   await db.delete(waivers).where(eq(waivers.id, id));
@@ -942,7 +944,7 @@ export async function assignDisputeReviewer(
 
 // ============ WAIVER QUERIES ============
 
-export async function createWaiver(data: InsertWaiver, tx?: DbClient) {
+export async function createWaiver(data: InsertWaiver, tx?: DbExecutor) {
   const db = await resolveDbClient(tx);
 
   const result = await db.insert(waivers).values(data);
@@ -966,7 +968,7 @@ export async function getWaiverByFindingId(auditFindingId: number) {
 
 export async function logAction(
   data: InsertSystemAuditLog,
-  options?: { tx?: DbClient; required?: boolean }
+  options?: { tx?: DbExecutor; required?: boolean }
 ) {
   const db = options?.tx ?? (await getDb());
   if (!db) {

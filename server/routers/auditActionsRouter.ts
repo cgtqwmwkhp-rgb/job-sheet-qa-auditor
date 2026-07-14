@@ -34,7 +34,7 @@ import {
   RATE_LIMITS,
 } from "../utils/rateLimiter";
 import { withTransaction } from "../utils/transactions";
-import type { DbClient } from "../db";
+import type { DbExecutor } from "../db";
 
 async function throwIfRateLimited(
   fn: () => unknown | Promise<unknown>
@@ -58,7 +58,7 @@ async function enforceReviewLimit(userId: number): Promise<void> {
   );
 }
 
-function createDbDeps(tx?: DbClient): AuditActionDeps {
+function createDbDeps(tx?: DbExecutor): AuditActionDeps {
   return {
     getFinding: async id => {
       const row = await db.getAuditFindingById(id);
