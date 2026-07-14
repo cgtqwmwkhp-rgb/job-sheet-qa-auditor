@@ -38,11 +38,11 @@ const TOUR_STEPS: TourStep[] = [
     targetPath: "/",
   },
   {
-    title: "First Fix Analysis",
+    title: "Analytics Overview",
     description:
-      "Track return visits and identify 'Lemon' assets. Use the AI-driven insights to spot patterns in engineer performance and site access issues.",
+      "Review executive KPIs, exception rates, technician performance, and predictive risk from the live analytics hub.",
     icon: <BarChart3 className="h-12 w-12 text-blue-500" />,
-    targetPath: "/analytics/first-fix",
+    targetPath: "/analytics",
   },
   {
     title: "AI Auditor Persona",

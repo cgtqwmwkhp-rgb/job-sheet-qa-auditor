@@ -44,11 +44,6 @@ const TechnicianPerformance = lazy(
 const EngineerCoachingPack = lazy(
   () => import("./pages/analytics/EngineerCoachingPack")
 );
-const FirstFixAnalysis = lazy(
-  () => import("./pages/analytics/FirstFixAnalysis")
-);
-const AIAnalyst = lazy(() => import("./pages/analytics/AIAnalyst"));
-const ReportStudio = lazy(() => import("./pages/analytics/ReportStudio"));
 const SiteIntelligence = lazy(
   () => import("./pages/analytics/SiteIntelligence")
 );
@@ -198,22 +193,6 @@ function Router() {
         <Route path="/analytics/predictive">
           <RequireStaff>
             <PredictiveRisk />
-          </RequireStaff>
-        </Route>
-        {/* Coming Soon pages kept routable but out of nav */}
-        <Route path="/analytics/first-fix">
-          <RequireStaff>
-            <FirstFixAnalysis />
-          </RequireStaff>
-        </Route>
-        <Route path="/analytics/ai">
-          <RequireStaff>
-            <AIAnalyst />
-          </RequireStaff>
-        </Route>
-        <Route path="/analytics/reports">
-          <RequireStaff>
-            <ReportStudio />
           </RequireStaff>
         </Route>
         <Route path="/portal/dashboard">
