@@ -76,9 +76,9 @@ export class AnthropicVlmAdapter implements VlmAdapter {
 
     const prompt =
       input.checkType === "signature_present"
-        ? input.documentPdf && !input.cropImage
-          ? `Look at the Technician / Customer / Engineer Signature area on this job sheet PDF. Does it show handwritten ink (signature or clear mark of signing)? Reply JSON only: {"present":boolean,"confidence":0-1,"reasoning":"short"}`
-          : `Does this crop show a handwritten signature or clear mark of signing? Reply JSON only: {"present":boolean,"confidence":0-1,"reasoning":"short"}`
+        ? input.cropImage
+          ? `This image is a cropped signature ROI. Does it show handwritten ink (signature or clear mark of signing)? Ignore printed labels like "Signature" or "Sign here". Reply JSON only: {"present":boolean,"confidence":0-1,"reasoning":"short"}`
+          : `Look at the Technician / Customer / Engineer Signature area on this job sheet PDF. Does it show handwritten ink (signature or clear mark of signing)? Reply JSON only: {"present":boolean,"confidence":0-1,"reasoning":"short"}`
         : `Does this crop show one or more tickboxes that are checked/ticked? Reply JSON only: {"present":boolean,"confidence":0-1,"reasoning":"short"}`;
 
     const mediaParts: AnthropicContentPart[] = [];

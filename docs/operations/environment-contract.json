@@ -117,6 +117,13 @@
           "required": false,
           "default": "false",
           "value": "true"
+        },
+        "FEATURE_MULTIMODAL_ROI_EXTRACT": {
+          "type": "env",
+          "description": "Gemini structured JSON field extract per page/ROI crop (AI-08). Defaults on when GEMINI_API_KEY is set unless explicitly false.",
+          "required": false,
+          "default": "false",
+          "value": "true"
         }
       }
     }
