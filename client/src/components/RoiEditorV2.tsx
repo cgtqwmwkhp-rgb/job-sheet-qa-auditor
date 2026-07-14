@@ -1,6 +1,6 @@
 /**
  * ROI Editor V2 Component
- * 
+ *
  * PR-L/N: Enhanced ROI editor with PDF preview and usability improvements.
  * - PDF.js integration for document preview (PR-N)
  * - PDF file upload with drag-and-drop
@@ -12,22 +12,27 @@
  * - ROI resize handles
  */
 
-import { useState, useRef, useEffect, useCallback, useMemo, type CSSProperties } from 'react';
-import { PdfPreview } from './PdfPreview';
-import { ThresholdRulesPanel } from './ThresholdRulesPanel';
 import {
-  getRoiDrawGuidance,
-} from './roiDrawGuidance';
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  type CSSProperties,
+} from "react";
+import { PdfPreview } from "./PdfPreview";
+import { ThresholdRulesPanel } from "./ThresholdRulesPanel";
+import { getRoiDrawGuidance } from "./roiDrawGuidance";
 import {
   ensureSpecField,
   loadRememberedRoiLabels,
   rememberRoiLabel,
-} from './roiLabelMemory';
+} from "./roiLabelMemory";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from "@/components/ui/tooltip";
 
 /**
  * ROI Region type
@@ -58,84 +63,339 @@ interface RoiConfig {
  */
 const STANDARD_ROI_TYPES = [
   { id: "header", label: "Header", color: "#3b82f6", critical: false },
-  { id: "jobReference", label: "Job Reference", color: "#10b981", critical: true },
+  {
+    id: "jobReference",
+    label: "Job Reference",
+    color: "#10b981",
+    critical: true,
+  },
   { id: "assetId", label: "Asset ID", color: "#f59e0b", critical: true },
-  { id: "serialNumber", label: "Serial Number", color: "#d97706", critical: false },
+  {
+    id: "serialNumber",
+    label: "Serial Number",
+    color: "#d97706",
+    critical: false,
+  },
   { id: "makeModel", label: "Make / Model", color: "#ca8a04", critical: false },
   { id: "date", label: "Date", color: "#8b5cf6", critical: true },
   { id: "expiryDate", label: "Expiry Date", color: "#ec4899", critical: true },
-  { id: "nextServiceDate", label: "Next Service Date", color: "#d946ef", critical: false },
-  { id: "customerName", label: "Customer Name", color: "#db2777", critical: false },
-  { id: "siteAddress", label: "Site Address", color: "#be185d", critical: false },
-  { id: "siteContact", label: "Site Contact", color: "#9d174d", critical: false },
-  { id: "siteAddressContact", label: "Site Address / Contact", color: "#831843", critical: false },
-  { id: "engineerName", label: "Engineer Name", color: "#ea580c", critical: false },
-  { id: "mileageHours", label: "Mileage / Hours", color: "#c2410c", critical: false },
-  { id: "status", label: "Status / Outcome", color: "#b45309", critical: false },
+  {
+    id: "nextServiceDate",
+    label: "Next Service Date",
+    color: "#d946ef",
+    critical: false,
+  },
+  {
+    id: "customerName",
+    label: "Customer Name",
+    color: "#db2777",
+    critical: false,
+  },
+  {
+    id: "siteAddress",
+    label: "Site Address",
+    color: "#be185d",
+    critical: false,
+  },
+  {
+    id: "siteContact",
+    label: "Site Contact",
+    color: "#9d174d",
+    critical: false,
+  },
+  {
+    id: "siteAddressContact",
+    label: "Site Address / Contact",
+    color: "#831843",
+    critical: false,
+  },
+  {
+    id: "engineerName",
+    label: "Engineer Name",
+    color: "#ea580c",
+    critical: false,
+  },
+  {
+    id: "mileageHours",
+    label: "Mileage / Hours",
+    color: "#c2410c",
+    critical: false,
+  },
+  {
+    id: "status",
+    label: "Status / Outcome",
+    color: "#b45309",
+    critical: false,
+  },
   // Completion Details (JSR panel)
-  { id: "completionDetails", label: "Completion Details (panel)", color: "#7c3aed", critical: false },
-  { id: "complianceType", label: "Compliance Type", color: "#6d28d9", critical: false },
-  { id: "complianceTitle", label: "Compliance Title", color: "#5b21b6", critical: false },
-  { id: "serviceCompleted", label: "Service Completed?", color: "#8b5cf6", critical: false },
-  { id: "allWorksCompleted", label: "All Works Completed?", color: "#7c3aed", critical: false },
-  { id: "consumablesUsed", label: "Consumables Used?", color: "#6d28d9", critical: false },
-  { id: "additionalTasksComplete", label: "Additional Tasks Complete?", color: "#5b21b6", critical: false },
-  { id: "returnVisitNeeded", label: "Return Visit Needed?", color: "#4c1d95", critical: false },
-  { id: "assetSafeToUse", label: "Asset Safe To Use?", color: "#a21caf", critical: false },
-  { id: "jobDuration", label: "Job Duration", color: "#c026d3", critical: false },
+  {
+    id: "completionDetails",
+    label: "Completion Details (panel)",
+    color: "#7c3aed",
+    critical: false,
+  },
+  {
+    id: "complianceType",
+    label: "Compliance Type",
+    color: "#6d28d9",
+    critical: false,
+  },
+  {
+    id: "complianceTitle",
+    label: "Compliance Title",
+    color: "#5b21b6",
+    critical: false,
+  },
+  {
+    id: "serviceCompleted",
+    label: "Service Completed?",
+    color: "#8b5cf6",
+    critical: false,
+  },
+  {
+    id: "allWorksCompleted",
+    label: "All Works Completed?",
+    color: "#7c3aed",
+    critical: false,
+  },
+  {
+    id: "consumablesUsed",
+    label: "Consumables Used?",
+    color: "#6d28d9",
+    critical: false,
+  },
+  {
+    id: "additionalTasksComplete",
+    label: "Additional Tasks Complete?",
+    color: "#5b21b6",
+    critical: false,
+  },
+  {
+    id: "returnVisitNeeded",
+    label: "Return Visit Needed?",
+    color: "#4c1d95",
+    critical: false,
+  },
+  {
+    id: "assetSafeToUse",
+    label: "Asset Safe To Use?",
+    color: "#a21caf",
+    critical: false,
+  },
+  {
+    id: "jobDuration",
+    label: "Job Duration",
+    color: "#c026d3",
+    critical: false,
+  },
   { id: "overtime", label: "Overtime", color: "#d946ef", critical: false },
   { id: "travel", label: "Travel", color: "#e879f9", critical: false },
   // Measurements
-  { id: "tyreTreadDepth", label: "Tyre Tread Depth", color: "#0d9488", critical: false },
-  { id: "wheelPressures", label: "Wheel Pressures (PSI)", color: "#0f766e", critical: false },
-  { id: "wheelNutTorque", label: "Wheel Nut Torque", color: "#115e59", critical: false },
-  { id: "hubNutTorque", label: "Hub Nut Torque", color: "#134e4a", critical: false },
+  {
+    id: "tyreTreadDepth",
+    label: "Tyre Tread Depth",
+    color: "#0d9488",
+    critical: false,
+  },
+  {
+    id: "wheelPressures",
+    label: "Wheel Pressures (PSI)",
+    color: "#0f766e",
+    critical: false,
+  },
+  {
+    id: "wheelNutTorque",
+    label: "Wheel Nut Torque",
+    color: "#115e59",
+    critical: false,
+  },
+  {
+    id: "hubNutTorque",
+    label: "Hub Nut Torque",
+    color: "#134e4a",
+    critical: false,
+  },
   // Checklist: ONE ROI for Task Description + Ok / Adv / Fail / N/A columns
-  { id: "tickboxBlock", label: "Checklist grid (Ok/Adv/Fail/N/A)", color: "#06b6d4", critical: true },
-  { id: "complianceTickboxes", label: "Compliance checklist (alias)", color: "#0891b2", critical: false },
-  { id: "workDescription", label: "Work Description", color: "#6366f1", critical: false },
+  {
+    id: "tickboxBlock",
+    label: "Checklist grid (Ok/Adv/Fail/N/A)",
+    color: "#06b6d4",
+    critical: true,
+  },
+  {
+    id: "complianceTickboxes",
+    label: "Compliance checklist (alias)",
+    color: "#0891b2",
+    critical: false,
+  },
+  {
+    id: "workDescription",
+    label: "Work Description",
+    color: "#6366f1",
+    critical: false,
+  },
   { id: "partsUsed", label: "Parts Used", color: "#4f46e5", critical: false },
-  { id: "partsRequired", label: "Parts Required", color: "#4338ca", critical: false },
-  { id: "recommendations", label: "Recommendations", color: "#3730a3", critical: false },
+  {
+    id: "partsRequired",
+    label: "Parts Required",
+    color: "#4338ca",
+    critical: false,
+  },
+  {
+    id: "recommendations",
+    label: "Recommendations",
+    color: "#3730a3",
+    critical: false,
+  },
   { id: "notes", label: "Notes / Comments", color: "#312e81", critical: false },
-  { id: "signatureBlock", label: "Signature Block", color: "#ef4444", critical: true },
-  { id: "engineerSignature", label: "Engineer Signature", color: "#f97316", critical: false },
-  { id: "customerSignature", label: "Customer Signature", color: "#84cc16", critical: false },
+  {
+    id: "signatureBlock",
+    label: "Signature Block",
+    color: "#ef4444",
+    critical: true,
+  },
+  {
+    id: "engineerSignature",
+    label: "Engineer Signature",
+    color: "#f97316",
+    critical: false,
+  },
+  {
+    id: "customerSignature",
+    label: "Customer Signature",
+    color: "#84cc16",
+    critical: false,
+  },
 ] as const;
 
 /**
  * Pre-defined ROI templates by document type
  */
 const ROI_TEMPLATES: Record<string, RoiConfig> = {
-  'maintenance': {
+  maintenance: {
     regions: [
-      { name: 'header', page: 1, bounds: { x: 0, y: 0, width: 1, height: 0.1 }, enabled: true },
-      { name: 'jobReference', page: 1, bounds: { x: 0.05, y: 0.1, width: 0.4, height: 0.05 }, enabled: true },
-      { name: 'assetId', page: 1, bounds: { x: 0.5, y: 0.1, width: 0.45, height: 0.05 }, enabled: true },
-      { name: 'date', page: 1, bounds: { x: 0.7, y: 0.02, width: 0.25, height: 0.04 }, enabled: true },
-      { name: 'workDescription', page: 1, bounds: { x: 0.05, y: 0.2, width: 0.9, height: 0.4 }, enabled: true },
-      { name: 'signatureBlock', page: 1, bounds: { x: 0, y: 0.85, width: 1, height: 0.15 }, enabled: true },
+      {
+        name: "header",
+        page: 1,
+        bounds: { x: 0, y: 0, width: 1, height: 0.1 },
+        enabled: true,
+      },
+      {
+        name: "jobReference",
+        page: 1,
+        bounds: { x: 0.05, y: 0.1, width: 0.4, height: 0.05 },
+        enabled: true,
+      },
+      {
+        name: "assetId",
+        page: 1,
+        bounds: { x: 0.5, y: 0.1, width: 0.45, height: 0.05 },
+        enabled: true,
+      },
+      {
+        name: "date",
+        page: 1,
+        bounds: { x: 0.7, y: 0.02, width: 0.25, height: 0.04 },
+        enabled: true,
+      },
+      {
+        name: "workDescription",
+        page: 1,
+        bounds: { x: 0.05, y: 0.2, width: 0.9, height: 0.4 },
+        enabled: true,
+      },
+      {
+        name: "signatureBlock",
+        page: 1,
+        bounds: { x: 0, y: 0.85, width: 1, height: 0.15 },
+        enabled: true,
+      },
     ],
   },
-  'inspection': {
+  inspection: {
     regions: [
-      { name: 'header', page: 1, bounds: { x: 0, y: 0, width: 1, height: 0.1 }, enabled: true },
-      { name: 'jobReference', page: 1, bounds: { x: 0.05, y: 0.1, width: 0.4, height: 0.05 }, enabled: true },
-      { name: 'assetId', page: 1, bounds: { x: 0.5, y: 0.1, width: 0.45, height: 0.05 }, enabled: true },
-      { name: 'date', page: 1, bounds: { x: 0.7, y: 0.02, width: 0.25, height: 0.04 }, enabled: true },
-      { name: 'expiryDate', page: 1, bounds: { x: 0.7, y: 0.08, width: 0.25, height: 0.04 }, enabled: true },
-      { name: 'tickboxBlock', page: 1, bounds: { x: 0.05, y: 0.25, width: 0.9, height: 0.4 }, enabled: true },
-      { name: 'signatureBlock', page: 1, bounds: { x: 0, y: 0.85, width: 1, height: 0.15 }, enabled: true },
+      {
+        name: "header",
+        page: 1,
+        bounds: { x: 0, y: 0, width: 1, height: 0.1 },
+        enabled: true,
+      },
+      {
+        name: "jobReference",
+        page: 1,
+        bounds: { x: 0.05, y: 0.1, width: 0.4, height: 0.05 },
+        enabled: true,
+      },
+      {
+        name: "assetId",
+        page: 1,
+        bounds: { x: 0.5, y: 0.1, width: 0.45, height: 0.05 },
+        enabled: true,
+      },
+      {
+        name: "date",
+        page: 1,
+        bounds: { x: 0.7, y: 0.02, width: 0.25, height: 0.04 },
+        enabled: true,
+      },
+      {
+        name: "expiryDate",
+        page: 1,
+        bounds: { x: 0.7, y: 0.08, width: 0.25, height: 0.04 },
+        enabled: true,
+      },
+      {
+        name: "tickboxBlock",
+        page: 1,
+        bounds: { x: 0.05, y: 0.25, width: 0.9, height: 0.4 },
+        enabled: true,
+      },
+      {
+        name: "signatureBlock",
+        page: 1,
+        bounds: { x: 0, y: 0.85, width: 1, height: 0.15 },
+        enabled: true,
+      },
     ],
   },
-  'installation': {
+  installation: {
     regions: [
-      { name: 'header', page: 1, bounds: { x: 0, y: 0, width: 1, height: 0.12 }, enabled: true },
-      { name: 'jobReference', page: 1, bounds: { x: 0.05, y: 0.12, width: 0.4, height: 0.05 }, enabled: true },
-      { name: 'assetId', page: 1, bounds: { x: 0.5, y: 0.12, width: 0.45, height: 0.05 }, enabled: true },
-      { name: 'date', page: 1, bounds: { x: 0.05, y: 0.2, width: 0.3, height: 0.04 }, enabled: true },
-      { name: 'engineerSignature', page: 1, bounds: { x: 0, y: 0.75, width: 0.5, height: 0.12 }, enabled: true },
-      { name: 'customerSignature', page: 1, bounds: { x: 0.5, y: 0.75, width: 0.5, height: 0.12 }, enabled: true },
+      {
+        name: "header",
+        page: 1,
+        bounds: { x: 0, y: 0, width: 1, height: 0.12 },
+        enabled: true,
+      },
+      {
+        name: "jobReference",
+        page: 1,
+        bounds: { x: 0.05, y: 0.12, width: 0.4, height: 0.05 },
+        enabled: true,
+      },
+      {
+        name: "assetId",
+        page: 1,
+        bounds: { x: 0.5, y: 0.12, width: 0.45, height: 0.05 },
+        enabled: true,
+      },
+      {
+        name: "date",
+        page: 1,
+        bounds: { x: 0.05, y: 0.2, width: 0.3, height: 0.04 },
+        enabled: true,
+      },
+      {
+        name: "engineerSignature",
+        page: 1,
+        bounds: { x: 0, y: 0.75, width: 0.5, height: 0.12 },
+        enabled: true,
+      },
+      {
+        name: "customerSignature",
+        page: 1,
+        bounds: { x: 0.5, y: 0.75, width: 0.5, height: 0.12 },
+        enabled: true,
+      },
     ],
   },
 };
@@ -158,7 +418,7 @@ interface RoiEditorV2Props {
   /** Whether editor is read-only */
   readOnly?: boolean;
   /** Document type for template suggestions */
-  documentType?: 'maintenance' | 'inspection' | 'installation';
+  documentType?: "maintenance" | "inspection" | "installation";
   /** Show PDF preview panel */
   showPdfPreview?: boolean;
   /** Live specJson text — used to attach threshold rules to regions */
@@ -176,23 +436,23 @@ interface RoiEditorV2Props {
 }
 
 const CUSTOM_COLOR_PALETTE = [
-  '#0ea5e9',
-  '#14b8a6',
-  '#a855f7',
-  '#f43f5e',
-  '#eab308',
-  '#22c55e',
-  '#64748b',
+  "#0ea5e9",
+  "#14b8a6",
+  "#a855f7",
+  "#f43f5e",
+  "#eab308",
+  "#22c55e",
+  "#64748b",
 ];
 
 const CRITICAL_FIELD_IDS = new Set([
-  'jobReference',
-  'assetId',
-  'date',
-  'expiryDate',
-  'engineerSignOff',
-  'tickboxBlock',
-  'complianceTickboxes',
+  "jobReference",
+  "assetId",
+  "date",
+  "expiryDate",
+  "engineerSignOff",
+  "tickboxBlock",
+  "complianceTickboxes",
 ]);
 
 function slugifyLabel(label: string): string {
@@ -236,13 +496,18 @@ function normalizeBoundValue(n: number): number {
 }
 
 function clampBounds(b: NormBounds): NormBounds {
-  let x = Math.max(0, Math.min(1, b.x));
-  let y = Math.max(0, Math.min(1, b.y));
+  const x = Math.max(0, Math.min(1, b.x));
+  const y = Math.max(0, Math.min(1, b.y));
   let width = Math.max(0.008, Math.min(1, b.width));
   let height = Math.max(0.008, Math.min(1, b.height));
   if (x + width > 1) width = 1 - x;
   if (y + height > 1) height = 1 - y;
-  return { x, y, width: Math.max(0.008, width), height: Math.max(0.008, height) };
+  return {
+    x,
+    y,
+    width: Math.max(0.008, width),
+    height: Math.max(0.008, height),
+  };
 }
 
 function normalizeRegionBounds(bounds: NormBounds): NormBounds {
@@ -294,7 +559,16 @@ const HANDLE_CURSOR: Record<ResizeHandle, string> = {
   se: "nwse-resize",
 };
 
-const ALL_HANDLES: ResizeHandle[] = ["n", "s", "e", "w", "ne", "nw", "se", "sw"];
+const ALL_HANDLES: ResizeHandle[] = [
+  "n",
+  "s",
+  "e",
+  "w",
+  "ne",
+  "nw",
+  "se",
+  "sw",
+];
 
 function handleStyle(handle: ResizeHandle): CSSProperties {
   const edge = 8;
@@ -313,13 +587,37 @@ function handleStyle(handle: ResizeHandle): CSSProperties {
   };
   switch (handle) {
     case "n":
-      return { ...base, left: `calc(50% - ${half}px)`, top: -half, width: 14, marginLeft: -3 };
+      return {
+        ...base,
+        left: `calc(50% - ${half}px)`,
+        top: -half,
+        width: 14,
+        marginLeft: -3,
+      };
     case "s":
-      return { ...base, left: `calc(50% - ${half}px)`, bottom: -half, width: 14, marginLeft: -3 };
+      return {
+        ...base,
+        left: `calc(50% - ${half}px)`,
+        bottom: -half,
+        width: 14,
+        marginLeft: -3,
+      };
     case "e":
-      return { ...base, right: -half, top: `calc(50% - ${half}px)`, height: 14, marginTop: -3 };
+      return {
+        ...base,
+        right: -half,
+        top: `calc(50% - ${half}px)`,
+        height: 14,
+        marginTop: -3,
+      };
     case "w":
-      return { ...base, left: -half, top: `calc(50% - ${half}px)`, height: 14, marginTop: -3 };
+      return {
+        ...base,
+        left: -half,
+        top: `calc(50% - ${half}px)`,
+        height: 14,
+        marginTop: -3,
+      };
     case "ne":
       return { ...base, right: -half, top: -half };
     case "nw":
@@ -359,9 +657,14 @@ export function RoiEditorV2({
   );
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
-  const [drawCurrent, setDrawCurrent] = useState<{ x: number; y: number } | null>(null);
-  const [currentTool, setCurrentTool] = useState<string>('jobReference');
+  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(
+    null
+  );
+  const [drawCurrent, setDrawCurrent] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [currentTool, setCurrentTool] = useState<string>("jobReference");
   const [zoom, setZoom] = useState(150);
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [gridSize] = useState(0.05); // 5% grid
@@ -373,16 +676,13 @@ export function RoiEditorV2({
   const currentToolRef = useRef(currentTool);
   currentToolRef.current = currentTool;
   /** Move / resize in progress (mutually exclusive with draw) */
-  const interactRef = useRef<
-    | null
-    | {
-        kind: "move" | "resize";
-        name: string;
-        handle?: ResizeHandle;
-        origin: { x: number; y: number };
-        startBounds: NormBounds;
-      }
-  >(null);
+  const interactRef = useRef<null | {
+    kind: "move" | "resize";
+    name: string;
+    handle?: ResizeHandle;
+    origin: { x: number; y: number };
+    startBounds: NormBounds;
+  }>(null);
   const [localPdfData, setLocalPdfData] = useState<ArrayBuffer | null>(null);
   const [pdfFileName, setPdfFileName] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -438,7 +738,9 @@ export function RoiEditorV2({
     const known = new Set(STANDARD_ROI_TYPES.map(t => t.id));
     const extras = (initialRoi?.regions ?? [])
       .map(r => r.name)
-      .filter(name => !known.has(name as (typeof STANDARD_ROI_TYPES)[number]["id"]));
+      .filter(
+        name => !known.has(name as (typeof STANDARD_ROI_TYPES)[number]["id"])
+      );
     if (extras.length === 0) return;
     setCustomTypes(prev => {
       const have = new Set(prev.map(t => t.id));
@@ -479,7 +781,10 @@ export function RoiEditorV2({
       /** Persist to cross-template memory (custom labels) */
       remember?: boolean;
     }) => {
-      if (entry.remember !== false && !STANDARD_ROI_TYPES.some(t => t.id === entry.id)) {
+      if (
+        entry.remember !== false &&
+        !STANDARD_ROI_TYPES.some(t => t.id === entry.id)
+      ) {
         rememberRoiLabel(entry);
       }
       if (!onSpecJsonChange) return;
@@ -533,45 +838,54 @@ export function RoiEditorV2({
   /**
    * Handle PDF file upload
    */
-  const handlePdfUpload = useCallback((file: File) => {
-    if (!file.type.includes('pdf')) {
-      return;
-    }
+  const handlePdfUpload = useCallback(
+    (file: File) => {
+      if (!file.type.includes("pdf")) {
+        return;
+      }
 
-    setPdfFileName(file.name);
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const arrayBuffer = e.target?.result as ArrayBuffer;
-      setLocalPdfData(arrayBuffer);
-    };
-    reader.readAsArrayBuffer(file);
+      setPdfFileName(file.name);
 
-    onPdfUpload?.(file);
-  }, [onPdfUpload]);
+      const reader = new FileReader();
+      reader.onload = e => {
+        const arrayBuffer = e.target?.result as ArrayBuffer;
+        setLocalPdfData(arrayBuffer);
+      };
+      reader.readAsArrayBuffer(file);
+
+      onPdfUpload?.(file);
+    },
+    [onPdfUpload]
+  );
 
   /**
    * Handle file input change
    */
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handlePdfUpload(file);
-    }
-  }, [handlePdfUpload]);
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        handlePdfUpload(file);
+      }
+    },
+    [handlePdfUpload]
+  );
 
   /**
    * Handle drag and drop
    */
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      handlePdfUpload(file);
-    }
-  }, [handlePdfUpload]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragOver(false);
+
+      const file = e.dataTransfer.files?.[0];
+      if (file) {
+        handlePdfUpload(file);
+      }
+    },
+    [handlePdfUpload]
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -597,7 +911,7 @@ export function RoiEditorV2({
    */
   const getRegionColor = (name: string): string => {
     const type = allRoiTypes.find(t => t.id === name);
-    return type?.color ?? '#6b7280';
+    return type?.color ?? "#6b7280";
   };
 
   const regionLabel = (name: string): string => {
@@ -672,10 +986,13 @@ export function RoiEditorV2({
   /**
    * Snap value to grid
    */
-  const snapValue = useCallback((value: number): number => {
-    if (!snapToGrid) return value;
-    return Math.round(value / gridSize) * gridSize;
-  }, [snapToGrid, gridSize]);
+  const snapValue = useCallback(
+    (value: number): number => {
+      if (!snapToGrid) return value;
+      return Math.round(value / gridSize) * gridSize;
+    },
+    [snapToGrid, gridSize]
+  );
 
   const clientToNorm = useCallback(
     (clientX: number, clientY: number) => {
@@ -797,9 +1114,7 @@ export function RoiEditorV2({
                 dy
               );
         setRegions(prev =>
-          prev.map(r =>
-            r.name === interact.name ? { ...r, bounds: next } : r
-          )
+          prev.map(r => (r.name === interact.name ? { ...r, bounds: next } : r))
         );
         return;
       }
@@ -875,9 +1190,9 @@ export function RoiEditorV2({
    * Toggle region enabled state
    */
   const toggleRegion = (name: string) => {
-    setRegions(prev => prev.map(r => 
-      r.name === name ? { ...r, enabled: !r.enabled } : r
-    ));
+    setRegions(prev =>
+      prev.map(r => (r.name === name ? { ...r, enabled: !r.enabled } : r))
+    );
   };
 
   /**
@@ -910,7 +1225,12 @@ export function RoiEditorV2({
    */
   const copyFromPrevious = () => {
     if (previousVersionRoi) {
-      setRegions(previousVersionRoi.regions.map(r => ({ ...r, enabled: r.enabled ?? true })));
+      setRegions(
+        previousVersionRoi.regions.map(r => ({
+          ...r,
+          enabled: r.enabled ?? true,
+        }))
+      );
     }
   };
 
@@ -935,78 +1255,94 @@ export function RoiEditorV2({
    * Get missing critical ROIs
    */
   const getMissingCritical = (): string[] => {
-    const presentNames = new Set(regions.filter(r => r.enabled !== false).map(r => r.name));
+    const presentNames = new Set(
+      regions.filter(r => r.enabled !== false).map(r => r.name)
+    );
     return allRoiTypes
       .filter(t => t.critical && !presentNames.has(t.id))
       .map(t => t.label);
   };
 
   const missingCritical = getMissingCritical();
-  const filteredTypes = showCriticalOnly 
+  const filteredTypes = showCriticalOnly
     ? allRoiTypes.filter(t => t.critical)
     : allRoiTypes;
 
   return (
-    <div className="roi-editor-v2" style={{ fontFamily: 'system-ui, sans-serif' }}>
+    <div
+      className="roi-editor-v2"
+      style={{ fontFamily: "system-ui, sans-serif" }}
+    >
       {/* Header with controls */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '16px',
-        padding: '12px 16px',
-        backgroundColor: '#1e293b',
-        borderRadius: '8px',
-        color: 'white',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "16px",
+          padding: "12px 16px",
+          backgroundColor: "#1e293b",
+          borderRadius: "8px",
+          color: "white",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 600 }}>
             ROI Editor
           </h2>
           {missingCritical.length > 0 && (
-            <span style={{
-              padding: '4px 10px',
-              backgroundColor: '#fbbf24',
-              color: '#1e293b',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: 600,
-            }}>
-              {missingCritical.length} critical ROI{missingCritical.length > 1 ? 's' : ''} missing
+            <span
+              style={{
+                padding: "4px 10px",
+                backgroundColor: "#fbbf24",
+                color: "#1e293b",
+                borderRadius: "4px",
+                fontSize: "12px",
+                fontWeight: 600,
+              }}
+            >
+              {missingCritical.length} critical ROI
+              {missingCritical.length > 1 ? "s" : ""} missing
             </span>
           )}
         </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           {/* Zoom controls — higher range for precise ROI placement */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <button
               type="button"
               onClick={() => setZoom(z => Math.max(75, z - 25))}
               style={{
-                padding: '4px 8px',
-                backgroundColor: '#334155',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
+                padding: "4px 8px",
+                backgroundColor: "#334155",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
               }}
             >
               −
             </button>
-            <span style={{ fontSize: '13px', minWidth: '50px', textAlign: 'center' }}>
+            <span
+              style={{
+                fontSize: "13px",
+                minWidth: "50px",
+                textAlign: "center",
+              }}
+            >
               {zoom}%
             </span>
             <button
               type="button"
               onClick={() => setZoom(z => Math.min(300, z + 25))}
               style={{
-                padding: '4px 8px',
-                backgroundColor: '#334155',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
+                padding: "4px 8px",
+                backgroundColor: "#334155",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
               }}
             >
               +
@@ -1015,13 +1351,13 @@ export function RoiEditorV2({
               type="button"
               onClick={() => setZoom(150)}
               style={{
-                padding: '4px 8px',
-                backgroundColor: '#475569',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '11px',
+                padding: "4px 8px",
+                backgroundColor: "#475569",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "11px",
               }}
               title="Reset to 150%"
             >
@@ -1031,13 +1367,13 @@ export function RoiEditorV2({
               type="button"
               onClick={() => setZoom(200)}
               style={{
-                padding: '4px 8px',
-                backgroundColor: '#BEDA41',
-                color: '#1a1f0a',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '11px',
+                padding: "4px 8px",
+                backgroundColor: "#BEDA41",
+                color: "#1a1f0a",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "11px",
                 fontWeight: 600,
               }}
               title="Large view for accurate labelling"
@@ -1045,13 +1381,20 @@ export function RoiEditorV2({
               Large
             </button>
           </div>
-          
+
           {/* Snap to grid toggle */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              fontSize: "13px",
+            }}
+          >
             <input
               type="checkbox"
               checked={snapToGrid}
-              onChange={(e) => setSnapToGrid(e.target.checked)}
+              onChange={e => setSnapToGrid(e.target.checked)}
             />
             Snap to grid
           </label>
@@ -1059,14 +1402,16 @@ export function RoiEditorV2({
       </div>
 
       {/* Compact templates row (not the draw palette) */}
-      <div style={{
-        display: 'flex',
-        gap: '8px',
-        marginBottom: '12px',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-      }}>
-        <span style={{ fontSize: '12px', color: '#6b7280' }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          marginBottom: "12px",
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <span style={{ fontSize: "12px", color: "#6b7280" }}>
           Rough starters (not form-accurate):
         </span>
         {Object.keys(ROI_TEMPLATES).map(type => (
@@ -1077,13 +1422,13 @@ export function RoiEditorV2({
             disabled={readOnly}
             title="Places approximate boxes only — you must move each onto the real printed field"
             style={{
-              padding: '4px 10px',
-              backgroundColor: '#f1f5f9',
-              border: '1px solid #e2e8f0',
-              borderRadius: '6px',
-              fontSize: '12px',
-              cursor: readOnly ? 'not-allowed' : 'pointer',
-              textTransform: 'capitalize',
+              padding: "4px 10px",
+              backgroundColor: "#f1f5f9",
+              border: "1px solid #e2e8f0",
+              borderRadius: "6px",
+              fontSize: "12px",
+              cursor: readOnly ? "not-allowed" : "pointer",
+              textTransform: "capitalize",
             }}
           >
             {type}
@@ -1095,13 +1440,13 @@ export function RoiEditorV2({
             onClick={copyFromPrevious}
             disabled={readOnly}
             style={{
-              padding: '4px 10px',
-              backgroundColor: '#dbeafe',
-              color: '#1d4ed8',
-              border: '1px solid #93c5fd',
-              borderRadius: '6px',
-              fontSize: '12px',
-              cursor: readOnly ? 'not-allowed' : 'pointer',
+              padding: "4px 10px",
+              backgroundColor: "#dbeafe",
+              color: "#1d4ed8",
+              border: "1px solid #93c5fd",
+              borderRadius: "6px",
+              fontSize: "12px",
+              cursor: readOnly ? "not-allowed" : "pointer",
               fontWeight: 500,
             }}
           >
@@ -1112,23 +1457,23 @@ export function RoiEditorV2({
           type="button"
           onClick={() => setDrawPaletteOpen(o => !o)}
           style={{
-            marginLeft: 'auto',
-            padding: '4px 12px',
-            backgroundColor: drawPaletteOpen ? '#1e293b' : '#BEDA41',
-            color: drawPaletteOpen ? '#fff' : '#1a1f0a',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '12px',
+            marginLeft: "auto",
+            padding: "4px 12px",
+            backgroundColor: drawPaletteOpen ? "#1e293b" : "#BEDA41",
+            color: drawPaletteOpen ? "#fff" : "#1a1f0a",
+            border: "none",
+            borderRadius: "6px",
+            fontSize: "12px",
             fontWeight: 600,
-            cursor: 'pointer',
+            cursor: "pointer",
           }}
           title={
             drawPaletteOpen
-              ? 'Hide floating draw labels'
-              : 'Show floating draw labels'
+              ? "Hide floating draw labels"
+              : "Show floating draw labels"
           }
         >
-          {drawPaletteOpen ? 'Hide labels panel' : 'Show labels panel'}
+          {drawPaletteOpen ? "Hide labels panel" : "Show labels panel"}
         </button>
       </div>
 
@@ -1138,7 +1483,7 @@ export function RoiEditorV2({
         type="file"
         accept=".pdf"
         onChange={handleFileChange}
-        style={{ display: 'none' }}
+        style={{ display: "none" }}
       />
 
       {/* Labels dock | PDF | Regions — labels never cover the page */}
@@ -1181,7 +1526,9 @@ export function RoiEditorV2({
               }}
             >
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#1e293b" }}>
+                <div
+                  style={{ fontSize: 12, fontWeight: 700, color: "#1e293b" }}
+                >
                   Draw labels
                 </div>
                 <div style={{ fontSize: 10, color: "#64748b" }}>
@@ -1248,20 +1595,20 @@ export function RoiEditorV2({
                     <TooltipTrigger asChild>
                       <button
                         type="button"
-                          onClick={() => {
-                            setCurrentTool(type.id);
-                            // Selecting any label (standard or custom) binds Fields
-                            bindLabelToTemplate({
-                              id: type.id,
-                              label: type.label,
-                              color: type.color,
-                              critical: type.critical,
-                              type: specMeta?.type ?? "string",
-                              remember: !STANDARD_ROI_TYPES.some(
-                                t => t.id === type.id
-                              ),
-                            });
-                          }}
+                        onClick={() => {
+                          setCurrentTool(type.id);
+                          // Selecting any label (standard or custom) binds Fields
+                          bindLabelToTemplate({
+                            id: type.id,
+                            label: type.label,
+                            color: type.color,
+                            critical: type.critical,
+                            type: specMeta?.type ?? "string",
+                            remember: !STANDARD_ROI_TYPES.some(
+                              t => t.id === type.id
+                            ),
+                          });
+                        }}
                         disabled={readOnly}
                         aria-label={`${type.label}. ${guidance.summary} How to draw: ${guidance.howToDraw}`}
                         data-testid={`roi-draw-tool-${type.id}`}
@@ -1276,9 +1623,7 @@ export function RoiEditorV2({
                           border: active
                             ? `2px solid ${type.color}`
                             : "1px solid #e2e8f0",
-                          backgroundColor: active
-                            ? `${type.color}18`
-                            : "#fff",
+                          backgroundColor: active ? `${type.color}18` : "#fff",
                           color: active ? type.color : "#334155",
                           cursor: readOnly ? "not-allowed" : "pointer",
                           fontSize: 12,
@@ -1295,9 +1640,7 @@ export function RoiEditorV2({
                           }}
                         />
                         {type.critical && (
-                          <span
-                            style={{ color: "#dc2626", fontSize: 9 }}
-                          >
+                          <span style={{ color: "#dc2626", fontSize: 9 }}>
                             ●
                           </span>
                         )}
@@ -1388,7 +1731,9 @@ export function RoiEditorV2({
                     boxSizing: "border-box",
                   }}
                 />
-                <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.35 }}>
+                <div
+                  style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.35 }}
+                >
                   New labels are stored in browser memory and added to this
                   template&apos;s fields so ids stay consistent next time.
                 </div>
@@ -1471,126 +1816,129 @@ export function RoiEditorV2({
 
         {/* Canvas with PDF preview */}
         <div style={{ flex: "1 1 auto", minWidth: 0, position: "relative" }}>
-          <div style={{
-            marginBottom: '8px',
-            fontSize: '14px',
-            color: '#6b7280',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}>
+          <div
+            style={{
+              marginBottom: "8px",
+              fontSize: "14px",
+              color: "#6b7280",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
             <span>
               {readOnly
-                ? 'Preview Mode'
+                ? "Preview Mode"
                 : `Click and drag on the PDF to place “${regionLabel(currentTool)}”. Open the labels panel to switch fields.`}
-              {pdfFileName && <span style={{ marginLeft: '12px', color: '#3b82f6' }}>({pdfFileName})</span>}
+              {pdfFileName && (
+                <span style={{ marginLeft: "12px", color: "#3b82f6" }}>
+                  ({pdfFileName})
+                </span>
+              )}
             </span>
             {totalPages > 1 && (
-              <span>Page {currentPage} of {totalPages}</span>
+              <span>
+                Page {currentPage} of {totalPages}
+              </span>
             )}
           </div>
           {(currentTool === "tickboxBlock" ||
             currentTool === "complianceTickboxes") &&
             !readOnly && (
-            <div
-              style={{
-                marginBottom: 8,
-                padding: "8px 10px",
-                borderRadius: 6,
-                backgroundColor: "#FEF9C3",
-                border: "1px solid #FDE68A",
-                fontSize: 12,
-                color: "#854D0E",
-                lineHeight: 1.35,
-              }}
-              data-testid="tickbox-draw-coach"
-            >
-              Tickbox tip: cover the full checklist grid — row requirement text
-              + all four columns (Ok / Adv / Fail / N/A) and the column headers.
-              One block, not one ROI per column.
-            </div>
-          )}
-
-
-            {/* Accuracy coaching — announce OCR vs generic repeatedly */}
-            {regions.length > 0 && (
               <div
-                data-testid="roi-accuracy-banner"
-                style={{
-                  marginBottom: 8,
-                  padding: "10px 12px",
-                  backgroundColor:
-                    roiProvenance?.mode === "ocr-layout"
-                      ? "#ECFDF5"
-                      : "#FEF3C7",
-                  border:
-                    roiProvenance?.mode === "ocr-layout"
-                      ? "2px solid #10B981"
-                      : "2px solid #F59E0B",
-                  borderRadius: 8,
-                  fontSize: 12,
-                  color:
-                    roiProvenance?.mode === "ocr-layout"
-                      ? "#064E3B"
-                      : "#78350F",
-                  lineHeight: 1.45,
-                  fontWeight: 500,
-                }}
-              >
-                {roiProvenance?.mode === "ocr-layout" ? (
-                  <>
-                    <strong>OCR-placed (tight row boxes).</strong> Each box
-                    should cover one printed label + its value on the same row —
-                    not a section header, not half the page. If any box is off,
-                    select it → drag / edge-resize until it hugs the field.
-                    Re-run Suggest fields after this update if boxes still look
-                    like the old oversized blobs.
-                  </>
-                ) : roiProvenance?.mode === "starter-fallback" ? (
-                  <>
-                    <strong>
-                      No OCR-placed boxes — do not trust anything on this page.
-                    </strong>{" "}
-                    Azure DI layout did not return usable field geometry (or
-                    Suggest fields was not applied). Clear these boxes and either
-                    re-run <em>Suggest fields</em> with the sample attached, or
-                    draw each field yourself using Draw labels + edge resize.
-                    Generic Maintenance/Inspection scaffolds will always look like
-                    this mess.
-                  </>
-                ) : (
-                  <>
-                    <strong>Placement must match the printed field.</strong>{" "}
-                    Prefer OCR propose (Suggest fields) over rough starters.
-                    Select a box, drag to move, hover an edge/corner to resize.
-                    Job Reference must sit on Job ID (label + value) — not
-                    Completion Details. Rough starters are guesses only.
-                  </>
-                )}
-              </div>
-            )}
-            {(roiProvenance?.mode === "starter-fallback" ||
-              !roiProvenance ||
-              roiProvenance.mode === "unknown") && (
-              <div
-                data-testid="roi-accuracy-banner-repeat"
                 style={{
                   marginBottom: 8,
                   padding: "8px 10px",
-                  backgroundColor: "#FEE2E2",
-                  border: "1px solid #EF4444",
-                  borderRadius: 8,
-                  fontSize: 11,
-                  color: "#7F1D1D",
-                  lineHeight: 1.4,
+                  borderRadius: 6,
+                  backgroundColor: "#FEF9C3",
+                  border: "1px solid #FDE68A",
+                  fontSize: 12,
+                  color: "#854D0E",
+                  lineHeight: 1.35,
                 }}
+                data-testid="tickbox-draw-coach"
               >
-                Reminder: generic Maintenance / Inspection / Installation layouts
-                are <strong>not</strong> a detailed review of this PDF. Only
-                OCR-informed propose (or careful manual draw) produces a usable
-                template.
+                Tickbox tip: cover the full checklist grid — row requirement
+                text + all four columns (Ok / Adv / Fail / N/A) and the column
+                headers. One block, not one ROI per column.
               </div>
             )}
+
+          {/* Accuracy coaching — announce OCR vs generic repeatedly */}
+          {regions.length > 0 && (
+            <div
+              data-testid="roi-accuracy-banner"
+              style={{
+                marginBottom: 8,
+                padding: "10px 12px",
+                backgroundColor:
+                  roiProvenance?.mode === "ocr-layout" ? "#ECFDF5" : "#FEF3C7",
+                border:
+                  roiProvenance?.mode === "ocr-layout"
+                    ? "2px solid #10B981"
+                    : "2px solid #F59E0B",
+                borderRadius: 8,
+                fontSize: 12,
+                color:
+                  roiProvenance?.mode === "ocr-layout" ? "#064E3B" : "#78350F",
+                lineHeight: 1.45,
+                fontWeight: 500,
+              }}
+            >
+              {roiProvenance?.mode === "ocr-layout" ? (
+                <>
+                  <strong>OCR-placed (tight row boxes).</strong> Each box should
+                  cover one printed label + its value on the same row — not a
+                  section header, not half the page. If any box is off, select
+                  it → drag / edge-resize until it hugs the field. Re-run
+                  Suggest fields after this update if boxes still look like the
+                  old oversized blobs.
+                </>
+              ) : roiProvenance?.mode === "starter-fallback" ? (
+                <>
+                  <strong>
+                    No OCR-placed boxes — do not trust anything on this page.
+                  </strong>{" "}
+                  Azure DI layout did not return usable field geometry (or
+                  Suggest fields was not applied). Clear these boxes and either
+                  re-run <em>Suggest fields</em> with the sample attached, or
+                  draw each field yourself using Draw labels + edge resize.
+                  Generic Maintenance/Inspection scaffolds will always look like
+                  this mess.
+                </>
+              ) : (
+                <>
+                  <strong>Placement must match the printed field.</strong>{" "}
+                  Prefer OCR propose (Suggest fields) over rough starters.
+                  Select a box, drag to move, hover an edge/corner to resize.
+                  Job Reference must sit on Job ID (label + value) — not
+                  Completion Details. Rough starters are guesses only.
+                </>
+              )}
+            </div>
+          )}
+          {(roiProvenance?.mode === "starter-fallback" ||
+            !roiProvenance ||
+            roiProvenance.mode === "unknown") && (
+            <div
+              data-testid="roi-accuracy-banner-repeat"
+              style={{
+                marginBottom: 8,
+                padding: "8px 10px",
+                backgroundColor: "#FEE2E2",
+                border: "1px solid #EF4444",
+                borderRadius: 8,
+                fontSize: 11,
+                color: "#7F1D1D",
+                lineHeight: 1.4,
+              }}
+            >
+              Reminder: generic Maintenance / Inspection / Installation layouts
+              are <strong>not</strong> a detailed review of this PDF. Only
+              OCR-informed propose (or careful manual draw) produces a usable
+              template.
+            </div>
+          )}
 
           {/* Shared scrollport: PDF + ROI labels must move together */}
           <div
@@ -1605,231 +1953,254 @@ export function RoiEditorV2({
               padding: "16px",
             }}
           >
-          <div
-            ref={canvasRef}
-            onMouseDown={handleMouseDown}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            data-testid="roi-draw-surface"
-            style={{
-              // Size from real PDF bitmap — never maxWidth+aspectRatio squash
-              width: pageSize.width,
-              height: pageSize.height,
-              backgroundColor: '#ffffff',
-              border: '2px solid #e2e8f0',
-              borderRadius: '8px',
-              position: 'relative',
-              cursor: readOnly ? 'default' : isDrawing ? 'crosshair' : 'crosshair',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              overflow: 'visible',
-              margin: '0 auto',
-              flexShrink: 0,
-              transition: 'border-color 0.2s',
-              userSelect: 'none',
-              touchAction: 'none',
-            }}
-          >
-            {/* Grid overlay when snap enabled */}
-            {snapToGrid && (
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                backgroundImage: `
+            <div
+              ref={canvasRef}
+              onMouseDown={handleMouseDown}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              data-testid="roi-draw-surface"
+              style={{
+                // Size from real PDF bitmap — never maxWidth+aspectRatio squash
+                width: pageSize.width,
+                height: pageSize.height,
+                backgroundColor: "#ffffff",
+                border: "2px solid #e2e8f0",
+                borderRadius: "8px",
+                position: "relative",
+                cursor: readOnly
+                  ? "default"
+                  : isDrawing
+                    ? "crosshair"
+                    : "crosshair",
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                overflow: "visible",
+                margin: "0 auto",
+                flexShrink: 0,
+                transition: "border-color 0.2s",
+                userSelect: "none",
+                touchAction: "none",
+              }}
+            >
+              {/* Grid overlay when snap enabled */}
+              {snapToGrid && (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    backgroundImage: `
                   linear-gradient(to right, #e2e8f020 1px, transparent 1px),
                   linear-gradient(to bottom, #e2e8f020 1px, transparent 1px)
                 `,
-                backgroundSize: `${gridSize * 100}% ${gridSize * 100}%`,
-                pointerEvents: 'none',
-                zIndex: 1,
-              }} />
-            )}
+                    backgroundSize: `${gridSize * 100}% ${gridSize * 100}%`,
+                    pointerEvents: "none",
+                    zIndex: 1,
+                  }}
+                />
+              )}
 
-            {/* PDF Preview using PDF.js — natural aspect; pointer-events none so drag-draw works */}
-            {showPdfPreview && effectivePdfSource && (
-              <PdfPreview
-                pdfSource={effectivePdfSource}
-                page={currentPage}
-                zoom={zoom}
-                onPageChange={setCurrentPage}
-                onPagesLoaded={setTotalPages}
-                onDimensionsChange={(width, height) => {
-                  if (width <= 0 || height <= 0) return;
-                  setPageSize(prev =>
-                    prev.width === width && prev.height === height
-                      ? prev
-                      : { width, height }
-                  );
-                }}
-                showPageControls={false}
-                embedInParent
-              />
-            )}
+              {/* PDF Preview using PDF.js — natural aspect; pointer-events none so drag-draw works */}
+              {showPdfPreview && effectivePdfSource && (
+                <PdfPreview
+                  pdfSource={effectivePdfSource}
+                  page={currentPage}
+                  zoom={zoom}
+                  onPageChange={setCurrentPage}
+                  onPagesLoaded={setTotalPages}
+                  onDimensionsChange={(width, height) => {
+                    if (width <= 0 || height <= 0) return;
+                    setPageSize(prev =>
+                      prev.width === width && prev.height === height
+                        ? prev
+                        : { width, height }
+                    );
+                  }}
+                  showPageControls={false}
+                  embedInParent
+                />
+              )}
 
-            {/* Page placeholder if no PDF - with upload button */}
-            {!effectivePdfSource && (
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                color: isDragOver ? '#3b82f6' : '#6b7280',
-                fontSize: '18px',
-                fontWeight: 600,
-                pointerEvents: 'auto',
-                textAlign: 'center',
-                padding: '40px',
-              }}>
-                <svg 
-                  width="48" 
-                  height="48" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="1.5"
-                  style={{ margin: '0 auto 16px' }}
-                >
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14,2 14,8 20,8" />
-                  <line x1="12" y1="18" x2="12" y2="12" />
-                  <polyline points="9,15 12,12 15,15" />
-                </svg>
-                <div>{isDragOver ? 'Drop PDF here' : 'Drop PDF or click to upload'}</div>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
+              {/* Page placeholder if no PDF - with upload button */}
+              {!effectivePdfSource && (
+                <div
                   style={{
-                    marginTop: '16px',
-                    padding: '10px 20px',
-                    backgroundColor: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontWeight: 500,
-                    fontSize: '14px',
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                    color: isDragOver ? "#3b82f6" : "#6b7280",
+                    fontSize: "18px",
+                    fontWeight: 600,
+                    pointerEvents: "auto",
+                    textAlign: "center",
+                    padding: "40px",
                   }}
                 >
-                  Select PDF File
-                </button>
-                <div style={{ fontSize: '12px', marginTop: '12px', color: '#9ca3af' }}>
-                  or drag and drop a PDF file
+                  <svg
+                    width="48"
+                    height="48"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    style={{ margin: "0 auto 16px" }}
+                  >
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14,2 14,8 20,8" />
+                    <line x1="12" y1="18" x2="12" y2="12" />
+                    <polyline points="9,15 12,12 15,15" />
+                  </svg>
+                  <div>
+                    {isDragOver
+                      ? "Drop PDF here"
+                      : "Drop PDF or click to upload"}
+                  </div>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      marginTop: "16px",
+                      padding: "10px 20px",
+                      backgroundColor: "#3b82f6",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontWeight: 500,
+                      fontSize: "14px",
+                    }}
+                  >
+                    Select PDF File
+                  </button>
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      marginTop: "12px",
+                      color: "#9ca3af",
+                    }}
+                  >
+                    or drag and drop a PDF file
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Live rubber-band while dragging a new ROI */}
-            {isDrawing && drawStart && drawCurrent && (
-              <div
-                data-testid="roi-draw-preview"
-                style={{
-                  position: "absolute",
-                  left: `${Math.min(drawStart.x, drawCurrent.x) * 100}%`,
-                  top: `${Math.min(drawStart.y, drawCurrent.y) * 100}%`,
-                  width: `${Math.abs(drawCurrent.x - drawStart.x) * 100}%`,
-                  height: `${Math.abs(drawCurrent.y - drawStart.y) * 100}%`,
-                  border: `2px dashed ${getRegionColor(currentTool)}`,
-                  backgroundColor: `${getRegionColor(currentTool)}25`,
-                  borderRadius: 4,
-                  pointerEvents: "none",
-                  zIndex: 6,
-                  boxSizing: "border-box",
-                }}
-              />
-            )}
+              {/* Live rubber-band while dragging a new ROI */}
+              {isDrawing && drawStart && drawCurrent && (
+                <div
+                  data-testid="roi-draw-preview"
+                  style={{
+                    position: "absolute",
+                    left: `${Math.min(drawStart.x, drawCurrent.x) * 100}%`,
+                    top: `${Math.min(drawStart.y, drawCurrent.y) * 100}%`,
+                    width: `${Math.abs(drawCurrent.x - drawStart.x) * 100}%`,
+                    height: `${Math.abs(drawCurrent.y - drawStart.y) * 100}%`,
+                    border: `2px dashed ${getRegionColor(currentTool)}`,
+                    backgroundColor: `${getRegionColor(currentTool)}25`,
+                    borderRadius: 4,
+                    pointerEvents: "none",
+                    zIndex: 6,
+                    boxSizing: "border-box",
+                  }}
+                />
+              )}
 
-            {/* Rendered regions — click to select, drag to move, edges to resize */}
-            {regions.filter(r => r.enabled !== false).map(region => {
-              const selected = selectedRegion === region.name;
-              const color = getRegionColor(region.name);
-              return (
-              <div
-                key={region.name}
-                data-testid={`roi-region-${region.name}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedRegion(region.name);
-                  setCurrentTool(region.name);
-                }}
-                onMouseDown={(e) => {
-                  // Don't start a new draw when clicking an existing region
-                  e.stopPropagation();
-                  if (e.button !== 0 || readOnly) return;
-                  e.preventDefault();
-                  beginMoveRegion(
-                    region.name,
-                    region.bounds,
-                    e.clientX,
-                    e.clientY
-                  );
-                }}
-                style={{
-                  position: 'absolute',
-                  left: `${region.bounds.x * 100}%`,
-                  top: `${region.bounds.y * 100}%`,
-                  width: `${region.bounds.width * 100}%`,
-                  height: `${region.bounds.height * 100}%`,
-                  backgroundColor: `${color}30`,
-                  border: `2px solid ${color}`,
-                  borderRadius: '4px',
-                  cursor: readOnly ? 'default' : 'move',
-                  boxSizing: 'border-box',
-                  outline: selected ? `3px solid ${color}` : 'none',
-                  outlineOffset: '2px',
-                  zIndex: selected ? 5 : 4,
-                }}
-                title={
-                  readOnly
-                    ? regionLabel(region.name)
-                    : "Drag to move · hover edges/corners to resize"
-                }
-              >
-                <span style={{
-                  position: 'absolute',
-                  top: '2px',
-                  left: '2px',
-                  fontSize: '10px',
-                  fontWeight: 600,
-                  color,
-                  backgroundColor: 'white',
-                  padding: '1px 4px',
-                  borderRadius: '3px',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '2px',
-                  pointerEvents: 'none',
-                  whiteSpace: 'nowrap',
-                  zIndex: 1,
-                }}>
-                  {isCritical(region.name) && (
-                    <span style={{ color: '#dc2626' }}>●</span>
-                  )}
-                  {regionLabel(region.name)}
-                </span>
-                {selected && !readOnly &&
-                  ALL_HANDLES.map(handle => (
+              {/* Rendered regions — click to select, drag to move, edges to resize */}
+              {regions
+                .filter(r => r.enabled !== false)
+                .map(region => {
+                  const selected = selectedRegion === region.name;
+                  const color = getRegionColor(region.name);
+                  return (
                     <div
-                      key={handle}
-                      data-testid={`roi-resize-${region.name}-${handle}`}
-                      style={handleStyle(handle)}
-                      onMouseDown={e => {
+                      key={region.name}
+                      data-testid={`roi-region-${region.name}`}
+                      onClick={e => {
                         e.stopPropagation();
+                        setSelectedRegion(region.name);
+                        setCurrentTool(region.name);
+                      }}
+                      onMouseDown={e => {
+                        // Don't start a new draw when clicking an existing region
+                        e.stopPropagation();
+                        if (e.button !== 0 || readOnly) return;
                         e.preventDefault();
-                        if (e.button !== 0) return;
-                        beginResizeRegion(
+                        beginMoveRegion(
                           region.name,
                           region.bounds,
-                          handle,
                           e.clientX,
                           e.clientY
                         );
                       }}
-                    />
-                  ))}
-              </div>
-              );
-            })}
-          </div>
+                      style={{
+                        position: "absolute",
+                        left: `${region.bounds.x * 100}%`,
+                        top: `${region.bounds.y * 100}%`,
+                        width: `${region.bounds.width * 100}%`,
+                        height: `${region.bounds.height * 100}%`,
+                        backgroundColor: `${color}30`,
+                        border: `2px solid ${color}`,
+                        borderRadius: "4px",
+                        cursor: readOnly ? "default" : "move",
+                        boxSizing: "border-box",
+                        outline: selected ? `3px solid ${color}` : "none",
+                        outlineOffset: "2px",
+                        zIndex: selected ? 5 : 4,
+                      }}
+                      title={
+                        readOnly
+                          ? regionLabel(region.name)
+                          : "Drag to move · hover edges/corners to resize"
+                      }
+                    >
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: "2px",
+                          left: "2px",
+                          fontSize: "10px",
+                          fontWeight: 600,
+                          color,
+                          backgroundColor: "white",
+                          padding: "1px 4px",
+                          borderRadius: "3px",
+                          boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "2px",
+                          pointerEvents: "none",
+                          whiteSpace: "nowrap",
+                          zIndex: 1,
+                        }}
+                      >
+                        {isCritical(region.name) && (
+                          <span style={{ color: "#dc2626" }}>●</span>
+                        )}
+                        {regionLabel(region.name)}
+                      </span>
+                      {selected &&
+                        !readOnly &&
+                        ALL_HANDLES.map(handle => (
+                          <div
+                            key={handle}
+                            data-testid={`roi-resize-${region.name}-${handle}`}
+                            style={handleStyle(handle)}
+                            onMouseDown={e => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              if (e.button !== 0) return;
+                              beginResizeRegion(
+                                region.name,
+                                region.bounds,
+                                handle,
+                                e.clientX,
+                                e.clientY
+                              );
+                            }}
+                          />
+                        ))}
+                    </div>
+                  );
+                })}
+            </div>
           </div>
         </div>
 
@@ -1846,77 +2217,102 @@ export function RoiEditorV2({
             overflow: "auto",
           }}
         >
-          <div style={{
-            padding: '12px',
-            backgroundColor: '#f8fafc',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0',
-          }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: 600 }}>
+          <div
+            style={{
+              padding: "12px",
+              backgroundColor: "#f8fafc",
+              borderRadius: "8px",
+              border: "1px solid #e2e8f0",
+            }}
+          >
+            <h3
+              style={{
+                margin: "0 0 12px 0",
+                fontSize: "15px",
+                fontWeight: 600,
+              }}
+            >
               Regions ({regions.length})
             </h3>
 
             {/* Missing critical warning */}
             {missingCritical.length > 0 && (
-              <div style={{
-                padding: '8px 10px',
-                backgroundColor: '#fef3c7',
-                border: '1px solid #fbbf24',
-                borderRadius: '6px',
-                marginBottom: '12px',
-                fontSize: '12px',
-                lineHeight: 1.35,
-              }}>
-                <strong>Missing critical:</strong>{' '}
-                {missingCritical.join(', ')}
+              <div
+                style={{
+                  padding: "8px 10px",
+                  backgroundColor: "#fef3c7",
+                  border: "1px solid #fbbf24",
+                  borderRadius: "6px",
+                  marginBottom: "12px",
+                  fontSize: "12px",
+                  lineHeight: 1.35,
+                }}
+              >
+                <strong>Missing critical:</strong> {missingCritical.join(", ")}
               </div>
             )}
 
             {regions.length === 0 ? (
-              <p style={{ color: '#6b7280', fontSize: '14px' }}>
-                No regions defined. Select a type and draw on the canvas, or apply a template.
+              <p style={{ color: "#6b7280", fontSize: "14px" }}>
+                No regions defined. Select a type and draw on the canvas, or
+                apply a template.
               </p>
             ) : (
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                 {regions.map(region => (
                   <li
                     key={region.name}
                     style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '10px 12px',
-                      marginBottom: '8px',
-                      backgroundColor: selectedRegion === region.name ? `${getRegionColor(region.name)}15` : 'white',
-                      border: `1px solid ${selectedRegion === region.name ? getRegionColor(region.name) : '#e2e8f0'}`,
-                      borderRadius: '6px',
-                      cursor: 'pointer',
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "10px 12px",
+                      marginBottom: "8px",
+                      backgroundColor:
+                        selectedRegion === region.name
+                          ? `${getRegionColor(region.name)}15`
+                          : "white",
+                      border: `1px solid ${selectedRegion === region.name ? getRegionColor(region.name) : "#e2e8f0"}`,
+                      borderRadius: "6px",
+                      cursor: "pointer",
                       opacity: region.enabled === false ? 0.5 : 1,
                     }}
                     onClick={() => setSelectedRegion(region.name)}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
                       {/* Enable/disable toggle */}
                       {!readOnly && (
                         <input
                           type="checkbox"
                           checked={region.enabled !== false}
-                          onChange={(e) => {
+                          onChange={e => {
                             e.stopPropagation();
                             toggleRegion(region.name);
                           }}
                         />
                       )}
-                      <span style={{
-                        display: 'inline-block',
-                        width: '12px',
-                        height: '12px',
-                        backgroundColor: getRegionColor(region.name),
-                        borderRadius: '3px',
-                      }} />
-                      <span style={{ fontWeight: 500, fontSize: '13px' }}>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          width: "12px",
+                          height: "12px",
+                          backgroundColor: getRegionColor(region.name),
+                          borderRadius: "3px",
+                        }}
+                      />
+                      <span style={{ fontWeight: 500, fontSize: "13px" }}>
                         {isCritical(region.name) && (
-                          <span style={{ color: '#dc2626', marginRight: '4px' }}>●</span>
+                          <span
+                            style={{ color: "#dc2626", marginRight: "4px" }}
+                          >
+                            ●
+                          </span>
                         )}
                         {regionLabel(region.name)}
                       </span>
@@ -1956,18 +2352,18 @@ export function RoiEditorV2({
                     </div>
                     {!readOnly && (
                       <button
-                        onClick={(e) => {
+                        onClick={e => {
                           e.stopPropagation();
                           deleteRegion(region.name);
                         }}
                         style={{
-                          padding: '4px 8px',
-                          backgroundColor: '#fef2f2',
-                          color: '#dc2626',
-                          border: '1px solid #fecaca',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '11px',
+                          padding: "4px 8px",
+                          backgroundColor: "#fef2f2",
+                          color: "#dc2626",
+                          border: "1px solid #fecaca",
+                          borderRadius: "4px",
+                          cursor: "pointer",
+                          fontSize: "11px",
                         }}
                       >
                         ×
@@ -1983,73 +2379,92 @@ export function RoiEditorV2({
               selectedRegion &&
               specJsonText != null &&
               onSpecJsonChange && (
-              <div style={{ marginTop: 12 }} data-testid="roi-region-threshold">
-                <ThresholdRulesPanel
-                  compact
-                  specJsonText={specJsonText}
-                  onSpecJsonChange={onSpecJsonChange}
-                  defaultField={selectedRegion}
-                  extraFields={regions.map(r => r.name)}
-                />
-              </div>
-            )}
+                <div
+                  style={{ marginTop: 12 }}
+                  data-testid="roi-region-threshold"
+                >
+                  <ThresholdRulesPanel
+                    compact
+                    specJsonText={specJsonText}
+                    onSpecJsonChange={onSpecJsonChange}
+                    defaultField={selectedRegion}
+                    extraFields={regions.map(r => r.name)}
+                  />
+                </div>
+              )}
 
             {/* Actions — allow saving progress even if some critical ROIs are still missing */}
             {!readOnly && (
-              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div
+                style={{
+                  marginTop: 12,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
                 {missingCritical.length > 0 && (
-                  <p style={{ margin: 0, fontSize: 11, color: '#92400e', lineHeight: 1.35 }}>
-                    You can save progress now. Still missing critical labels:{' '}
-                    {missingCritical.join(', ')}.
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 11,
+                      color: "#92400e",
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    You can save progress now. Still missing critical labels:{" "}
+                    {missingCritical.join(", ")}.
                   </p>
                 )}
-                <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={clearAll}
-                  style={{
-                    flex: 1,
-                    padding: '8px 12px',
-                    backgroundColor: '#f8fafc',
-                    color: '#374151',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontWeight: 500,
-                    fontSize: '13px',
-                  }}
-                >
-                  Clear All
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={regions.filter(r => r.enabled !== false).length === 0}
-                  style={{
-                    flex: 1,
-                    padding: '8px 12px',
-                    backgroundColor:
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={clearAll}
+                    style={{
+                      flex: 1,
+                      padding: "8px 12px",
+                      backgroundColor: "#f8fafc",
+                      color: "#374151",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontWeight: 500,
+                      fontSize: "13px",
+                    }}
+                  >
+                    Clear All
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={
                       regions.filter(r => r.enabled !== false).length === 0
-                        ? '#94a3b8'
-                        : '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor:
+                    }
+                    style={{
+                      flex: 1,
+                      padding: "8px 12px",
+                      backgroundColor:
+                        regions.filter(r => r.enabled !== false).length === 0
+                          ? "#94a3b8"
+                          : "#3b82f6",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "6px",
+                      cursor:
+                        regions.filter(r => r.enabled !== false).length === 0
+                          ? "not-allowed"
+                          : "pointer",
+                      fontWeight: 500,
+                      fontSize: "13px",
+                    }}
+                    title={
                       regions.filter(r => r.enabled !== false).length === 0
-                        ? 'not-allowed'
-                        : 'pointer',
-                    fontWeight: 500,
-                    fontSize: '13px',
-                  }}
-                  title={
-                    regions.filter(r => r.enabled !== false).length === 0
-                      ? 'Draw at least one region first'
-                      : missingCritical.length > 0
-                        ? 'Saves current regions (critical labels still missing)'
-                        : 'Save ROI regions'
-                  }
-                >
-                  Save ROI
-                </button>
+                        ? "Draw at least one region first"
+                        : missingCritical.length > 0
+                          ? "Saves current regions (critical labels still missing)"
+                          : "Save ROI regions"
+                    }
+                  >
+                    Save ROI
+                  </button>
                 </div>
               </div>
             )}
@@ -2057,27 +2472,35 @@ export function RoiEditorV2({
 
           {/* JSON Preview */}
           <details style={{ marginTop: 12 }}>
-            <summary style={{
-              cursor: 'pointer',
-              padding: '6px 10px',
-              backgroundColor: '#f1f5f9',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: 500,
-            }}>
+            <summary
+              style={{
+                cursor: "pointer",
+                padding: "6px 10px",
+                backgroundColor: "#f1f5f9",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: 500,
+              }}
+            >
               View JSON
             </summary>
-            <pre style={{
-              marginTop: '8px',
-              padding: '12px',
-              backgroundColor: '#1e293b',
-              color: '#e2e8f0',
-              borderRadius: '6px',
-              fontSize: '11px',
-              overflow: 'auto',
-              maxHeight: '200px',
-            }}>
-              {JSON.stringify({ regions: regions.filter(r => r.enabled !== false) }, null, 2)}
+            <pre
+              style={{
+                marginTop: "8px",
+                padding: "12px",
+                backgroundColor: "#1e293b",
+                color: "#e2e8f0",
+                borderRadius: "6px",
+                fontSize: "11px",
+                overflow: "auto",
+                maxHeight: "200px",
+              }}
+            >
+              {JSON.stringify(
+                { regions: regions.filter(r => r.enabled !== false) },
+                null,
+                2
+              )}
             </pre>
           </details>
         </div>
