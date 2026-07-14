@@ -215,6 +215,19 @@ describe("Training signals contract", () => {
       expect(content).toContain("template-studio");
       expect(content).toContain("resolveSampleAudits");
     });
+
+    it("ReviewWorkstationPane exposes training reason picker on override/correction", () => {
+      const panePath = path.resolve(
+        __dirname,
+        "../../../client/src/components/review/ReviewWorkstationPane.tsx"
+      );
+      const content = fs.readFileSync(panePath, "utf-8");
+      expect(content).toContain("trainingReasonLabels");
+      expect(content).toContain("overrideTrainingReason");
+      expect(content).toContain("correctionTrainingReason");
+      expect(content).toContain("trainingReasonCode");
+      expect(content).toContain("Training reason");
+    });
   });
 });
 

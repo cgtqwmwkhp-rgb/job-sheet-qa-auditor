@@ -128,6 +128,7 @@ export default function TechnicianDashboard() {
   const deltaToTarget = data?.scorecard.deltaToTarget ?? 0;
   const passedAudits = data?.stats.passedAudits ?? 0;
   const defectsFound = data?.stats.defectsFound ?? 0;
+  const hasScoreData = (data?.scorecard.documentsProcessed ?? 0) > 0;
 
   return (
     <div className="min-h-screen bg-muted/40 pb-20">
@@ -198,10 +199,15 @@ export default function TechnicianDashboard() {
                       Current Quality Score
                     </p>
                     <h2 className="text-5xl font-bold tracking-tight">
-                      {score.toFixed(1)}%
+                      {hasScoreData ? `${score.toFixed(1)}%` : "—"}
                     </h2>
+                    {!hasScoreData && (
+                      <p className="text-xs text-primary-foreground/70 mt-1">
+                        Score appears after your first attributed audit
+                      </p>
+                    )}
                   </div>
-                  {percentile > 0 && (
+                  {hasScoreData && percentile > 0 && (
                     <Badge className="bg-primary-foreground/15 hover:bg-primary-foreground/20 text-primary-foreground border-none px-3 py-1">
                       Top {Math.max(1, 100 - percentile)}%
                     </Badge>
@@ -211,12 +217,20 @@ export default function TechnicianDashboard() {
                   <div className="flex justify-between text-xs font-medium text-primary-foreground/80">
                     <span>Monthly Target: {monthlyTarget}%</span>
                     <span className="text-primary-foreground">
-                      {deltaToTarget >= 0 ? "+" : ""}
-                      {deltaToTarget.toFixed(1)}%
+                      {hasScoreData ? (
+                        <>
+                          {deltaToTarget >= 0 ? "+" : ""}
+                          {deltaToTarget.toFixed(1)}%
+                        </>
+                      ) : (
+                        "—"
+                      )}
                     </span>
                   </div>
                   <Progress
-                    value={Math.min(100, Math.max(0, score))}
+                    value={
+                      hasScoreData ? Math.min(100, Math.max(0, score)) : 0
+                    }
                     className="h-2.5 bg-black/20 [&>div]:bg-white"
                   />
                 </div>
