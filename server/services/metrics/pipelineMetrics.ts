@@ -35,12 +35,14 @@ interface PipelineMetricsStore {
 }
 
 function slugifyStage(stage: string): string {
-  return stage
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 48) || "unknown";
+  return (
+    stage
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 48) || "unknown"
+  );
 }
 
 function histogramKey(stage: string, status: StageOutcome): string {
@@ -157,7 +159,9 @@ export function formatPipelinePrometheusMetrics(dlqDepth?: number): string {
   lines.push("# HELP ocr_requests_total OCR extraction attempts by outcome");
   lines.push("# TYPE ocr_requests_total counter");
   for (const status of ["success", "failed"] as const) {
-    lines.push(`ocr_requests_total{status="${status}"} ${store.ocrRequests[status]}`);
+    lines.push(
+      `ocr_requests_total{status="${status}"} ${store.ocrRequests[status]}`
+    );
   }
 
   lines.push("# HELP pipeline_jobs_total Completed pipeline jobs by outcome");
@@ -209,7 +213,9 @@ export function formatPipelinePrometheusMetrics(dlqDepth?: number): string {
   }
 
   if (typeof dlqDepth === "number") {
-    lines.push("# HELP pipeline_dlq_depth Unresolved jobs in dead-letter queue");
+    lines.push(
+      "# HELP pipeline_dlq_depth Unresolved jobs in dead-letter queue"
+    );
     lines.push("# TYPE pipeline_dlq_depth gauge");
     lines.push(`pipeline_dlq_depth ${dlqDepth}`);
   }

@@ -59,7 +59,9 @@ describe("Pipeline Metrics Contract (ObsSlo R7)", () => {
 
       const body = formatPipelinePrometheusMetrics();
 
-      expect(body).toContain("# TYPE pipeline_stage_duration_seconds histogram");
+      expect(body).toContain(
+        "# TYPE pipeline_stage_duration_seconds histogram"
+      );
       expect(body).toContain(
         'pipeline_stage_duration_seconds_bucket{stage="ocr_text_extraction",status="success",le="5"} 1'
       );

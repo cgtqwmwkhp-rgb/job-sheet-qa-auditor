@@ -1,6 +1,6 @@
 # Parity and Integrity Alert Rules
 # Vendor-neutral format compatible with Prometheus Alertmanager
-# 
+#
 # CANONICAL SEVERITY LABELS: S0, S1, S2, S3
 # - S0: Critical (must be 100%)
 # - S1: High (must be >= 95%)
