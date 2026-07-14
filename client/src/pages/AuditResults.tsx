@@ -304,9 +304,7 @@ export default function AuditResults() {
             : "Unredacted export downloaded"
         );
       } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Export failed"
-        );
+        toast.error(error instanceof Error ? error.message : "Export failed");
         throw error;
       }
     },

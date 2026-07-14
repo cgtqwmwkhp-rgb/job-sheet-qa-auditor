@@ -971,12 +971,10 @@ describe("auditLog", () => {
 describe("exports + batchOperations mounts (PR-IO-EXPORTS)", () => {
   it("mounts exports router on appRouter", () => {
     expect(appRouter._def.procedures).toBeDefined();
-    expect(
-      Object.keys(appRouter._def.record).includes("exports")
-    ).toBe(true);
-    expect(
-      Object.keys(appRouter._def.record).includes("batchOperations")
-    ).toBe(true);
+    expect(Object.keys(appRouter._def.record).includes("exports")).toBe(true);
+    expect(Object.keys(appRouter._def.record).includes("batchOperations")).toBe(
+      true
+    );
   });
 
   it("exports CSV + JSON bundle from real audit result id", async () => {
