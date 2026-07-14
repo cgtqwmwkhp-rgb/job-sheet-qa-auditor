@@ -32,6 +32,9 @@ import { portalRouter } from "./routers/portalRouter";
 import { commsRouter } from "./routers/commsRouter";
 import { exportsRouter } from "./routers/exportsRouter";
 import { batchOperationsRouter } from "./routers/batchOperations";
+// PR-PLAT-STAGE5 (retire): Stage-5 phantom audit/pipeline/review-queue
+// routers stay quarantined (in-memory + simulated). Do not mount them.
+// Real processing: jobSheets.process → orchestrateJobSheetProcessing below.
 import { TRPCError } from "@trpc/server";
 import {
   enforceRateLimit,
