@@ -462,3 +462,29 @@ export const failedJobs = mysqlTable("failed_jobs", {
 
 export type FailedJobRow = typeof failedJobs.$inferSelect;
 export type InsertFailedJob = typeof failedJobs.$inferInsert;
+
+/**
+ * API Cost Events — durable FinOps ledger (PR-DATA-FINOPS)
+ * Write-through from in-memory cost ledger when DATABASE_URL is available.
+ * Restored on boot so restarts / scale-out do not wipe cost history.
+ */
+export const apiCostEvents = mysqlTable("api_cost_events", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  recordedAt: timestamp("recordedAt").notNull(),
+  provider: varchar("provider", { length: 64 }).notNull(),
+  model: varchar("model", { length: 128 }).notNull(),
+  tool: varchar("tool", { length: 128 }).notNull(),
+  stage: varchar("stage", { length: 64 }).notNull(),
+  jobSheetId: int("jobSheetId"),
+  inputTokens: int("inputTokens").default(0).notNull(),
+  outputTokens: int("outputTokens").default(0).notNull(),
+  estimatedCostUsd: decimal("estimatedCostUsd", {
+    precision: 12,
+    scale: 6,
+  }).notNull(),
+  latencyMs: int("latencyMs"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ApiCostEventRow = typeof apiCostEvents.$inferSelect;
+export type InsertApiCostEvent = typeof apiCostEvents.$inferInsert;

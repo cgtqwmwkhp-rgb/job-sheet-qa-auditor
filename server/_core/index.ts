@@ -18,6 +18,7 @@ import {
   hasWastedJourneyTemplate,
 } from "../services/templateRegistry";
 import { hydrateDeadLetterQueueFromDb } from "../utils/deadLetterQueue";
+import { hydrateApiCostLedgerFromDb } from "../services/finOps";
 import { pdfProxyRouter } from "./pdfProxy";
 import { templateSampleProxyRouter } from "./templateSampleProxy";
 
@@ -109,6 +110,18 @@ async function startServer() {
     }
   } catch (error) {
     console.warn("[DLQ] Boot hydrate skipped:", error);
+  }
+
+  // PR-DATA-FINOPS: restore in-memory cost ledger from api_cost_events (fail-safe)
+  try {
+    const costHydrated = await hydrateApiCostLedgerFromDb();
+    if (costHydrated > 0) {
+      console.log(
+        `[FinOps] Boot hydrate restored ${costHydrated} cost event(s)`
+      );
+    }
+  } catch (error) {
+    console.warn("[FinOps] Boot hydrate skipped:", error);
   }
 
   // Health check endpoints (before auth, before static files)
