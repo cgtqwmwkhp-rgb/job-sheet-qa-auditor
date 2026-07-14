@@ -1,9 +1,14 @@
 /**
  * Error Tracking and Logging
  *
- * Centralized error tracking for the application.
- * In production, this would integrate with services like Sentry, LogRocket, etc.
+ * Centralized client error tracking. When a Sentry DSN is configured
+ * (build-time VITE_SENTRY_DSN or runtime via system.health), production
+ * errors are reported with user / route / audit context. Missing DSN
+ * fails soft — console-only, never throws.
  */
+
+import type { ErrorInfo } from "react";
+import * as Sentry from "@sentry/react";
 
 export interface ErrorContext {
   user?: {
@@ -14,28 +19,221 @@ export interface ErrorContext {
   route?: string;
   component?: string;
   action?: string;
-  metadata?: Record<string, any>;
+  /** Job sheet id from /audits?id=… (primary audit workspace key). */
+  auditId?: number;
+  jobSheetId?: number;
+  metadata?: Record<string, unknown>;
+}
+
+type SentryInitState = "idle" | "initializing" | "ready" | "disabled";
+
+let sentryState: SentryInitState = "idle";
+let baseContext: Partial<ErrorContext> = {};
+let warnedMissingDsn = false;
+
+function readBuildTimeDsn(): string | undefined {
+  const dsn = import.meta.env.VITE_SENTRY_DSN;
+  if (typeof dsn !== "string" || !dsn.trim()) return undefined;
+  // Guard unsubstituted deploy templates (same pattern as analytics.ts)
+  if (dsn.includes("%") || dsn.includes("${")) return undefined;
+  return dsn.trim();
+}
+
+function readEnvironment(): string {
+  const fromEnv = import.meta.env.VITE_SENTRY_ENVIRONMENT;
+  if (typeof fromEnv === "string" && fromEnv.trim()) return fromEnv.trim();
+  return import.meta.env.MODE || "production";
+}
+
+function readRelease(): string | undefined {
+  const fromEnv = import.meta.env.VITE_SENTRY_RELEASE;
+  if (typeof fromEnv === "string" && fromEnv.trim()) return fromEnv.trim();
+  return undefined;
+}
+
+/**
+ * Extract audit / job-sheet identifiers from the current URL.
+ * Audit workspace uses `/audits?id=<jobSheetId>`.
+ */
+export function auditContextFromLocation(
+  href: string = typeof window !== "undefined" ? window.location.href : ""
+): Pick<ErrorContext, "route" | "auditId" | "jobSheetId"> {
+  if (!href) return {};
+  try {
+    const url = new URL(href, "http://local");
+    const route = url.pathname;
+    const rawId =
+      url.searchParams.get("id") ||
+      url.searchParams.get("jobSheetId") ||
+      url.searchParams.get("auditId");
+    const parsed = rawId ? Number.parseInt(rawId, 10) : NaN;
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return { route };
+    }
+    // /audits?id=N is the job-sheet id; keep auditId alias for challenge bar.
+    return { route, jobSheetId: parsed, auditId: parsed };
+  } catch {
+    return {};
+  }
+}
+
+function mergeContext(context?: Partial<ErrorContext>): ErrorContext {
+  const fromLocation = auditContextFromLocation();
+  return {
+    ...fromLocation,
+    ...baseContext,
+    ...context,
+    route:
+      context?.route ||
+      baseContext.route ||
+      fromLocation.route ||
+      (typeof window !== "undefined" ? window.location.pathname : undefined),
+    metadata: {
+      ...fromLocation,
+      ...baseContext.metadata,
+      ...context?.metadata,
+    },
+  };
+}
+
+function applyUserContext(user?: ErrorContext["user"]) {
+  if (!user || sentryState !== "ready") return;
+  Sentry.setUser({
+    id: String(user.id),
+    email: user.email,
+  });
+  Sentry.setTag("user.role", user.role);
+}
+
+function captureToSentry(
+  error: Error,
+  context: ErrorContext,
+  extras?: Record<string, unknown>
+) {
+  if (sentryState !== "ready") return;
+
+  Sentry.withScope(scope => {
+    if (context.user) {
+      scope.setUser({
+        id: String(context.user.id),
+        email: context.user.email,
+      });
+      scope.setTag("user.role", context.user.role);
+    }
+
+    if (context.route) scope.setTag("route", context.route);
+    if (context.component) scope.setTag("component", context.component);
+    if (context.action) scope.setTag("action", context.action);
+    if (context.auditId != null) {
+      scope.setTag("auditId", String(context.auditId));
+      scope.setContext("audit", {
+        auditId: context.auditId,
+        jobSheetId: context.jobSheetId ?? context.auditId,
+      });
+    } else if (context.jobSheetId != null) {
+      scope.setTag("jobSheetId", String(context.jobSheetId));
+      scope.setContext("audit", { jobSheetId: context.jobSheetId });
+    }
+
+    if (context.metadata || extras) {
+      scope.setContext("app", { ...context.metadata, ...extras });
+    }
+
+    Sentry.captureException(error);
+  });
+}
+
+function warnMissingDsnOnce() {
+  if (warnedMissingDsn || !import.meta.env.PROD) return;
+  warnedMissingDsn = true;
+  console.info(
+    "[ErrorTracking] Sentry DSN not configured — errors stay console-only. Set VITE_SENTRY_DSN (build) or SENTRY_CLIENT_DSN (runtime)."
+  );
+}
+
+/**
+ * Initialize the Sentry browser client. Safe to call multiple times;
+ * no-ops when DSN is missing or already ready.
+ */
+export function initSentry(dsn?: string): boolean {
+  if (sentryState === "ready") return true;
+  if (sentryState === "disabled") return false;
+
+  const resolved = (dsn || readBuildTimeDsn())?.trim();
+  if (!resolved) {
+    sentryState = "disabled";
+    warnMissingDsnOnce();
+    return false;
+  }
+
+  try {
+    sentryState = "initializing";
+    Sentry.init({
+      dsn: resolved,
+      environment: readEnvironment(),
+      release: readRelease(),
+      // Keep noise down; we primarily report explicit exceptions.
+      tracesSampleRate: 0,
+      // Fail soft: never break the app if Sentry transport fails.
+      beforeSend(event) {
+        return event;
+      },
+    });
+    sentryState = "ready";
+    applyUserContext(baseContext.user);
+    return true;
+  } catch (err) {
+    sentryState = "disabled";
+    console.warn(
+      "[ErrorTracking] Sentry init failed — continuing without telemetry",
+      err
+    );
+    return false;
+  }
+}
+
+/**
+ * Fetch runtime DSN from system.health (Container App env, no rebuild).
+ * Fail soft on any network/parse error.
+ */
+async function resolveRuntimeDsn(): Promise<string | undefined> {
+  try {
+    const response = await fetch(
+      `/api/trpc/system.health?input=${encodeURIComponent(JSON.stringify({ json: { timestamp: Date.now() } }))}`,
+      {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      }
+    );
+    if (!response.ok) return undefined;
+    const data = await response.json();
+    const config =
+      data?.result?.data?.json?.config ?? data?.result?.data?.config;
+    const dsn = config?.sentryDsn;
+    if (typeof dsn === "string" && dsn.trim() && !dsn.includes("%")) {
+      return dsn.trim();
+    }
+  } catch {
+    // fail soft
+  }
+  return undefined;
 }
 
 /**
  * Log an error to the console and external tracking service
  */
 export function logError(error: Error, context?: ErrorContext) {
-  // Always log to console in development
+  const merged = mergeContext(context);
+
   console.error("[Error]", {
     message: error.message,
     stack: error.stack,
-    context,
+    context: merged,
     timestamp: new Date().toISOString(),
   });
 
-  // In production, send to error tracking service
   if (import.meta.env.PROD) {
-    // TODO: Integrate with Sentry, LogRocket, or similar
-    // Example:
-    // Sentry.captureException(error, {
-    //   contexts: { custom: context },
-    // });
+    captureToSentry(error, merged);
   }
 }
 
@@ -44,62 +242,91 @@ export function logError(error: Error, context?: ErrorContext) {
  */
 export function logBoundaryError(
   error: Error,
-  errorInfo: React.ErrorInfo,
+  errorInfo: ErrorInfo,
   context?: ErrorContext
 ) {
+  const merged = mergeContext(context);
+
   console.error("[ErrorBoundary]", {
     error: error.message,
     componentStack: errorInfo.componentStack,
-    context,
+    context: merged,
     timestamp: new Date().toISOString(),
   });
 
   if (import.meta.env.PROD) {
-    // TODO: Send to error tracking with component stack
-    // Sentry.captureException(error, {
-    //   contexts: {
-    //     react: { componentStack: errorInfo.componentStack },
-    //     custom: context,
-    //   },
-    // });
+    captureToSentry(error, merged, {
+      componentStack: errorInfo.componentStack,
+    });
   }
 }
 
 /**
  * Log an unhandled promise rejection
  */
-export function logUnhandledRejection(reason: any, context?: ErrorContext) {
+export function logUnhandledRejection(reason: unknown, context?: ErrorContext) {
   const error = reason instanceof Error ? reason : new Error(String(reason));
+  const merged = mergeContext(context);
 
   console.error("[UnhandledRejection]", {
     reason: String(reason),
     error: error.message,
-    context,
+    context: merged,
     timestamp: new Date().toISOString(),
   });
 
   if (import.meta.env.PROD) {
-    // TODO: Send to error tracking
+    captureToSentry(error, merged, { unhandledRejection: true });
   }
 }
 
 /**
- * Initialize global error handlers
+ * Initialize global error handlers and (when configured) Sentry.
  */
 export function initializeErrorTracking(context?: Partial<ErrorContext>) {
-  // Handle unhandled promise rejections
+  if (context) {
+    baseContext = { ...baseContext, ...context };
+    applyUserContext(baseContext.user);
+  }
+
+  // Build-time DSN first (local / image baked with VITE_SENTRY_DSN)
+  if (sentryState === "idle") {
+    const buildDsn = readBuildTimeDsn();
+    if (buildDsn) {
+      initSentry(buildDsn);
+    } else {
+      // Runtime DSN from Container App env via system.health — fail soft
+      void resolveRuntimeDsn().then(dsn => {
+        if (dsn) {
+          initSentry(dsn);
+          applyUserContext(baseContext.user);
+        } else if (sentryState === "idle") {
+          sentryState = "disabled";
+          warnMissingDsnOnce();
+        }
+      });
+    }
+  } else if (sentryState === "ready") {
+    applyUserContext(baseContext.user);
+  }
+
+  // Avoid duplicate listeners if AuthContext remounts with a new user
+  if ((initializeErrorTracking as unknown as { _bound?: boolean })._bound) {
+    return;
+  }
+  (initializeErrorTracking as unknown as { _bound?: boolean })._bound = true;
+
   window.addEventListener("unhandledrejection", event => {
     logUnhandledRejection(event.reason, {
-      ...context,
-      route: window.location.pathname,
+      ...baseContext,
+      ...auditContextFromLocation(),
     });
   });
 
-  // Handle global errors
   window.addEventListener("error", event => {
     logError(event.error || new Error(event.message), {
-      ...context,
-      route: window.location.pathname,
+      ...baseContext,
+      ...auditContextFromLocation(),
       metadata: {
         filename: event.filename,
         lineno: event.lineno,
@@ -116,21 +343,19 @@ export function createErrorContext(
   component: string,
   additionalContext?: Partial<ErrorContext>
 ): ErrorContext {
-  return {
+  return mergeContext({
     component,
-    route: window.location.pathname,
     ...additionalContext,
-  };
+  });
 }
 
 /**
  * Wrap an async function with error tracking
  */
-export function withErrorTracking<T extends (...args: any[]) => Promise<any>>(
-  fn: T,
-  context?: ErrorContext
-): T {
-  return (async (...args: any[]) => {
+export function withErrorTracking<
+  T extends (...args: never[]) => Promise<unknown>,
+>(fn: T, context?: ErrorContext): T {
+  return (async (...args: Parameters<T>) => {
     try {
       return await fn(...args);
     } catch (error) {
@@ -147,19 +372,47 @@ export function withErrorTracking<T extends (...args: any[]) => Promise<any>>(
  */
 export function logApiError(
   endpoint: string,
-  error: any,
+  error: unknown,
   context?: Partial<ErrorContext>
 ) {
+  const err =
+    error instanceof Error
+      ? error
+      : new Error(
+          typeof error === "object" &&
+          error &&
+          "message" in error &&
+          typeof (error as { message: unknown }).message === "string"
+            ? (error as { message: string }).message
+            : String(error)
+        );
+  const merged = mergeContext({
+    ...context,
+    action: context?.action || "api",
+    metadata: {
+      ...context?.metadata,
+      endpoint,
+      status:
+        typeof error === "object" && error && "status" in error
+          ? (error as { status: unknown }).status
+          : undefined,
+    },
+  });
+
   console.error("[API Error]", {
     endpoint,
-    error: error?.message || String(error),
-    status: error?.status,
-    data: error?.data,
-    context,
+    error: err.message,
+    status: merged.metadata?.status,
+    context: merged,
     timestamp: new Date().toISOString(),
   });
 
   if (import.meta.env.PROD) {
-    // TODO: Send to error tracking with API-specific tags
+    captureToSentry(err, merged, { api: true, endpoint });
   }
+}
+
+/** Test / diagnostics helper — do not use in UI. */
+export function getErrorTrackingStatus(): SentryInitState {
+  return sentryState;
 }
