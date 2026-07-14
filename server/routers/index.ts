@@ -42,6 +42,11 @@ export {
   resetExportStore,
 } from "./exportsRouter";
 
+export {
+  batchOperationsRouter,
+  type BatchOperationsRouter,
+} from "./batchOperations";
+
 export { templateRouter, type TemplateRouter } from "./templateRouter";
 
 export { analyticsRouter, type AnalyticsRouter } from "./analyticsRouter";

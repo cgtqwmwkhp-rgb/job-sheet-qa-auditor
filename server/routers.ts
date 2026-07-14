@@ -26,6 +26,8 @@ import { auditActionsRouter } from "./routers/auditActionsRouter";
 import { fixPacksRouter } from "./routers/fixPacksRouter";
 import { portalRouter } from "./routers/portalRouter";
 import { commsRouter } from "./routers/commsRouter";
+import { exportsRouter } from "./routers/exportsRouter";
+import { batchOperationsRouter } from "./routers/batchOperations";
 import { TRPCError } from "@trpc/server";
 import {
   enforceRateLimit,
@@ -82,6 +84,10 @@ export const appRouter = router({
   auditActions: auditActionsRouter,
   /** PR-IO-COMMS: email send, FCM device tokens, notification inbox */
   comms: commsRouter,
+  /** PR-IO-EXPORTS: CSV / JSON / bundle export against real audits */
+  exports: exportsRouter,
+  /** PR-IO-EXPORTS: QA-lead bulk approve / waive / status / export */
+  batchOperations: batchOperationsRouter,
 
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
