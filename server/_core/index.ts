@@ -26,6 +26,10 @@ import { hydrateWebhooksFromDb } from "../services/webhooks";
 import { pdfProxyRouter } from "./pdfProxy";
 import { templateSampleProxyRouter } from "./templateSampleProxy";
 import { ingestRouter } from "../services/ingest";
+import {
+  dropIngestRouter,
+  startDropIngestPoller,
+} from "../services/dropIngest/boot";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -188,6 +192,8 @@ async function startServer() {
 
   // Machine ingest API (API key + HMAC — no Entra browser). PR-IO-INGEST.
   app.use("/api/ingest", ingestRouter);
+  // PR-IO-SHAREPOINT: watched-folder / Blob drop status (no Entra; no HMAC router ownership)
+  app.use("/api/drop-ingest", dropIngestRouter);
 
   // tRPC API
   app.use(
@@ -216,6 +222,11 @@ async function startServer() {
     console.log(`  Health:    http://localhost:${port}/healthz`);
     console.log(`  Readiness: http://localhost:${port}/readyz`);
     console.log(`  Metrics:   http://localhost:${port}/metrics`);
+    console.log(
+      `  DropIngest: http://localhost:${port}/api/drop-ingest/health`
+    );
+    // Library drop → signed ingest (fail-safe; no-op unless DROP_INGEST_ENABLED=true)
+    void startDropIngestPoller();
   });
 }
 
