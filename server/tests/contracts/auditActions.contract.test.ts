@@ -159,6 +159,25 @@ describe("Audit Actions Contract (PR-10)", () => {
       expect(pane).toContain('label: "Undo"');
     });
 
+    it("AuditResults wires sheet approve parity with Hold Queue gates", () => {
+      const pagePath = path.resolve(
+        __dirname,
+        "../../../client/src/pages/AuditResults.tsx"
+      );
+      const page = fs.readFileSync(pagePath, "utf-8");
+      expect(page).toContain("auditActions.approveJobSheet");
+      expect(page).toContain("auditActions.undoJobSheetApprove");
+      expect(page).toContain("handleApprove");
+      expect(page).toContain("handleReject");
+      expect(page).toContain("showJobSheetActions");
+      expect(page).toContain("onApproveJobSheet");
+      expect(page).toContain('status === "review_queue"');
+      expect(page).toContain("Approved from audit results");
+      expect(page).toContain('label: "Undo"');
+      // Same mutation surface as Hold Queue (qaLeadProcedure on server).
+      expect(page).not.toContain("onApprove: () => undefined");
+    });
+
     it("HoldQueue wires Approve and Bulk Approve", () => {
       const pagePath = path.resolve(
         __dirname,

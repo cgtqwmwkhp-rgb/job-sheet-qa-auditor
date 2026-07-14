@@ -51,6 +51,8 @@ export function ReviewShortcutsLegend({
 }: ReviewShortcutsLegendProps) {
   const listShortcuts: ShortcutEntry[] = [
     { keys: ["j", "k"], label: "next / prev audit" },
+    { keys: ["a"], label: "approve (in review)" },
+    { keys: ["r"], label: "reject (in review)" },
     { keys: ["Enter"], label: "open audit" },
     { keys: ["?"], label: "toggle this legend" },
   ];
