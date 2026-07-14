@@ -556,3 +556,47 @@ export const userNotifications = mysqlTable("user_notifications", {
 
 export type UserNotificationRow = typeof userNotifications.$inferSelect;
 export type InsertUserNotification = typeof userNotifications.$inferInsert;
+
+/**
+ * Webhook Subscriptions — durable registry (PR-IO-WEBHOOKS)
+ * Write-through from in-memory webhook registry when DATABASE_URL is available.
+ * Restored on boot so subscriptions survive process restarts.
+ */
+export const webhookSubscriptions = mysqlTable("webhook_subscriptions", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  url: text("url").notNull(),
+  secret: varchar("secret", { length: 128 }).notNull(),
+  events: json("events").$type<string[]>().notNull(),
+  active: boolean("active").default(true).notNull(),
+  retryCount: int("retryCount").default(3).notNull(),
+  timeoutMs: int("timeoutMs").default(10000).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type WebhookSubscriptionRow = typeof webhookSubscriptions.$inferSelect;
+export type InsertWebhookSubscription =
+  typeof webhookSubscriptions.$inferInsert;
+
+/**
+ * Webhook Delivery Log — durable signed delivery history (PR-IO-WEBHOOKS)
+ * Stores HMAC signature + payload hash for each delivery attempt so
+ * receivers (and ops) can verify what was signed and sent.
+ */
+export const webhookDeliveryLog = mysqlTable("webhook_delivery_log", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  webhookId: varchar("webhookId", { length: 36 }).notNull(),
+  event: varchar("event", { length: 64 }).notNull(),
+  payloadId: varchar("payloadId", { length: 36 }),
+  success: boolean("success").notNull(),
+  statusCode: int("statusCode"),
+  responseTimeMs: int("responseTimeMs"),
+  error: text("error"),
+  retryCount: int("retryCount").default(0).notNull(),
+  signature: varchar("signature", { length: 80 }).notNull(),
+  payloadHash: varchar("payloadHash", { length: 64 }).notNull(),
+  deliveredAt: timestamp("deliveredAt").defaultNow().notNull(),
+});
+
+export type WebhookDeliveryLogRow = typeof webhookDeliveryLog.$inferSelect;
+export type InsertWebhookDeliveryLog = typeof webhookDeliveryLog.$inferInsert;
