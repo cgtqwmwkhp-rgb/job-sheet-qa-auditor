@@ -78,6 +78,7 @@ describe("systemRouter.health", () => {
       "databaseConfigured",
       "environment",
       "oauthConfigured",
+      "sentryDsn",
     ]);
   });
 });
