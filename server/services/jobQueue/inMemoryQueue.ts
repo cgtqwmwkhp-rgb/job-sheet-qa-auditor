@@ -1,36 +1,17 @@
-export type JobSheetProcessingSource =
-  | "primary"
-  | "reprocess"
-  | "template-reprocess"
-  | "dlq-retry"
-  | "async-queue";
+import type {
+  EnqueueJobSheetProcessingResult,
+  JobQueueBackend,
+  JobSheetProcessingPayload,
+  JobSheetQueueJob,
+} from "./types";
 
-export interface JobSheetProcessingPayload {
-  source?: JobSheetProcessingSource;
-  jobSheetId: number;
-  documentUrl: string;
-  goldSpecId?: number;
-  userId?: number;
-  templateVersionId?: number;
-}
-
-export type JobSheetQueueStatus = "queued" | "running" | "completed" | "failed";
-
-export interface JobSheetQueueJob {
-  id: string;
-  payload: JobSheetProcessingPayload;
-  status: JobSheetQueueStatus;
-  enqueuedAt: Date;
-  startedAt?: Date;
-  finishedAt?: Date;
-  attempts: number;
-  error?: string;
-}
-
-export interface EnqueueJobSheetProcessingResult {
-  job: JobSheetQueueJob;
-  deduped: boolean;
-}
+export type {
+  EnqueueJobSheetProcessingResult,
+  JobSheetProcessingPayload,
+  JobSheetProcessingSource,
+  JobSheetQueueJob,
+  JobSheetQueueStatus,
+} from "./types";
 
 const jobsById = new Map<string, JobSheetQueueJob>();
 const activeJobByJobSheetId = new Map<number, string>();
@@ -123,3 +104,13 @@ export function clearInMemoryJobSheetProcessingQueue(): void {
   queue.length = 0;
   sequence = 0;
 }
+
+export const inMemoryJobQueueBackend: JobQueueBackend = {
+  enqueue: enqueueInMemoryJobSheetProcessing,
+  dequeue: dequeueJobSheetProcessingJob,
+  complete: completeJobSheetProcessingJob,
+  fail: failJobSheetProcessingJob,
+  hasQueued: hasQueuedJobSheetProcessingJobs,
+  get: getJobSheetProcessingJob,
+  clear: clearInMemoryJobSheetProcessingQueue,
+};
