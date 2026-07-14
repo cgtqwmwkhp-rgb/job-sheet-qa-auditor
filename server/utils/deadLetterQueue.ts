@@ -1,14 +1,20 @@
 /**
  * Dead Letter Queue (DLQ) for Failed Processing Jobs
- * Captures failed jobs for manual review and recovery.
  *
- * PR-3: Write-through to `failed_jobs` when getDb() is available.
- * In-memory Map remains the primary store for tests / no-DB environments.
- * Phase 1.10: hydrate from `failed_jobs` on boot; retry via reprocessJobSheet.
+ * `failed_jobs` is the source of truth when getDb() is available.
+ * The in-memory Map is a cache only — after every durable write we re-read
+ * from DB (or evict) so the cache never wins over MySQL.
+ *
+ * Retries are multi-instance safe: claim via conditional UPDATE
+ * (`attempts = attempts + 1` WHERE unresolved + recoverable + under max).
+ * Only one instance gets affectedRows=1.
+ *
+ * When DATABASE_URL / getDb() is unavailable (tests, demo), the Map acts as
+ * a local fallback store with the same claim semantics.
  */
 
 import { v4 as uuidv4 } from "uuid";
-import { eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { failedJobs, type FailedJobRow } from "../../drizzle/schema";
 
@@ -38,14 +44,89 @@ export interface DLQStats {
   oldestJob?: Date;
 }
 
-// In-memory DLQ (always used; DB is write-through when available)
+/** In-memory cache of unresolved failed jobs (DB is SSOT when available). */
 const deadLetterQueue: Map<string, FailedJob> = new Map();
 
-// Maximum jobs to keep in DLQ
+/** Same-process in-flight claim set (pairs with DB CAS for multi-instance). */
+const inFlightClaims: Set<string> = new Set();
+
 const MAX_DLQ_SIZE = 1000;
 
+function cacheUpsert(job: FailedJob): void {
+  if (deadLetterQueue.size >= MAX_DLQ_SIZE && !deadLetterQueue.has(job.id)) {
+    const oldestKey = deadLetterQueue.keys().next().value;
+    if (oldestKey) {
+      deadLetterQueue.delete(oldestKey);
+    }
+  }
+  deadLetterQueue.set(job.id, job);
+}
+
+function cacheEvict(id: string): void {
+  deadLetterQueue.delete(id);
+  inFlightClaims.delete(id);
+}
+
+function rowToFailedJob(row: FailedJobRow): FailedJob {
+  return {
+    id: row.id,
+    jobSheetId: row.jobSheetId,
+    correlationId: row.correlationId ?? undefined,
+    stage: row.stage,
+    error: {
+      message: row.errorMessage,
+      code: row.errorCode ?? undefined,
+      stack: row.errorStack ?? undefined,
+    },
+    attempts: row.attempts,
+    maxAttempts: row.maxAttempts,
+    lastAttemptAt: row.lastAttemptAt,
+    createdAt: row.createdAt,
+    metadata: (row.metadata as Record<string, unknown>) || {},
+    recoverable: row.recoverable,
+  };
+}
+
+function updateAffectedRows(result: unknown): number {
+  const header = Array.isArray(result) ? result[0] : result;
+  const rows = (header as { affectedRows?: number } | undefined)?.affectedRows;
+  return typeof rows === "number" ? rows : 0;
+}
+
 /**
- * Persist a failed job to the durable `failed_jobs` table (best-effort).
+ * Re-read one row from DB into the cache. Evicts if missing/resolved.
+ * Returns the cached job when still unresolved.
+ */
+async function refreshCacheEntryFromDb(
+  id: string
+): Promise<FailedJob | undefined> {
+  try {
+    const db = await getDb();
+    if (!db) return deadLetterQueue.get(id);
+
+    const rows = await db
+      .select()
+      .from(failedJobs)
+      .where(eq(failedJobs.id, id))
+      .limit(1);
+
+    const row = rows[0];
+    if (!row || row.resolvedAt != null) {
+      cacheEvict(id);
+      return undefined;
+    }
+
+    const job = rowToFailedJob(row);
+    cacheUpsert(job);
+    return job;
+  } catch (error) {
+    console.warn(`[DLQ] Failed to refresh cache from DB for ${id}:`, error);
+    return deadLetterQueue.get(id);
+  }
+}
+
+/**
+ * Persist a failed job to `failed_jobs`, then refresh cache from DB (DB wins).
  */
 async function persistFailedJob(job: FailedJob): Promise<void> {
   try {
@@ -67,16 +148,55 @@ async function persistFailedJob(job: FailedJob): Promise<void> {
       recoverable: job.recoverable,
       createdAt: job.createdAt,
     });
+
+    // Challenge bar: DB wins after every write
+    await refreshCacheEntryFromDb(job.id);
   } catch (error) {
     console.warn(
-      "[DLQ] Failed to persist to database (in-memory retained):",
+      "[DLQ] Failed to persist to database (cache retained until DB available):",
       error
     );
   }
 }
 
+async function persistAttemptState(job: FailedJob): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+
+    await db
+      .update(failedJobs)
+      .set({
+        attempts: job.attempts,
+        lastAttemptAt: job.lastAttemptAt,
+        recoverable: job.recoverable,
+      })
+      .where(and(eq(failedJobs.id, job.id), isNull(failedJobs.resolvedAt)));
+
+    await refreshCacheEntryFromDb(job.id);
+  } catch (error) {
+    console.warn("[DLQ] Failed to persist attempt state:", error);
+  }
+}
+
+async function markResolvedInDb(id: string): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    await db
+      .update(failedJobs)
+      .set({ resolvedAt: new Date() })
+      .where(eq(failedJobs.id, id));
+    // DB wins — resolved rows leave the active cache
+    cacheEvict(id);
+  } catch (error) {
+    console.warn("[DLQ] Failed to mark resolved in database:", error);
+  }
+}
+
 /**
- * Add a failed job to the dead letter queue
+ * Add a failed job to the dead letter queue.
+ * Cache is updated immediately; durable insert refreshes cache from DB.
  */
 export function addToDeadLetterQueue(
   jobSheetId: number,
@@ -90,14 +210,6 @@ export function addToDeadLetterQueue(
     recoverable?: boolean;
   } = {}
 ): FailedJob {
-  // Enforce size limit by removing oldest jobs
-  if (deadLetterQueue.size >= MAX_DLQ_SIZE) {
-    const oldestKey = deadLetterQueue.keys().next().value;
-    if (oldestKey) {
-      deadLetterQueue.delete(oldestKey);
-    }
-  }
-
   const failedJob: FailedJob = {
     id: uuidv4(),
     jobSheetId,
@@ -105,7 +217,7 @@ export function addToDeadLetterQueue(
     stage,
     error: {
       message: error.message,
-      code: (error as any).code,
+      code: (error as Error & { code?: string }).code,
       stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
     },
     attempts: options.attempts || 1,
@@ -116,9 +228,7 @@ export function addToDeadLetterQueue(
     recoverable: options.recoverable ?? isRecoverableError(error),
   };
 
-  deadLetterQueue.set(failedJob.id, failedJob);
-
-  // Fire-and-forget durable write-through
+  cacheUpsert(failedJob);
   void persistFailedJob(failedJob);
 
   console.error(`[DLQ] Job added: ${failedJob.id}`, {
@@ -131,9 +241,6 @@ export function addToDeadLetterQueue(
   return failedJob;
 }
 
-/**
- * Determine if an error is potentially recoverable
- */
 function isRecoverableError(error: Error): boolean {
   const recoverablePatterns = [
     "ECONNRESET",
@@ -149,105 +256,110 @@ function isRecoverableError(error: Error): boolean {
     "circuit breaker",
   ];
 
-  const errorString = (error.message + (error as any).code).toLowerCase();
+  const errorString = (
+    error.message + ((error as Error & { code?: string }).code ?? "")
+  ).toLowerCase();
   return recoverablePatterns.some(pattern =>
     errorString.includes(pattern.toLowerCase())
   );
 }
 
-/**
- * Get a failed job by ID
- */
 export function getFailedJob(id: string): FailedJob | undefined {
   return deadLetterQueue.get(id);
 }
 
-/**
- * Get all failed jobs
- */
 export function getAllFailedJobs(): FailedJob[] {
   return Array.from(deadLetterQueue.values());
 }
 
-/**
- * Get failed jobs by stage
- */
 export function getFailedJobsByStage(stage: FailedJob["stage"]): FailedJob[] {
   return getAllFailedJobs().filter(job => job.stage === stage);
 }
 
-/**
- * Get failed jobs for a specific job sheet
- */
 export function getFailedJobsByJobSheetId(jobSheetId: number): FailedJob[] {
   return getAllFailedJobs().filter(job => job.jobSheetId === jobSheetId);
 }
 
-/**
- * Get recoverable failed jobs
- */
 export function getRecoverableJobs(): FailedJob[] {
   return getAllFailedJobs().filter(job => job.recoverable);
 }
 
 /**
- * Remove a job from the DLQ (after successful recovery or manual resolution)
+ * List recoverable unresolved jobs from DB (SSOT), syncing each into the cache.
+ * Falls back to the in-memory cache when DB is unavailable.
  */
-export function removeFromDeadLetterQueue(id: string): boolean {
-  const removed = deadLetterQueue.delete(id);
-  if (removed) {
-    void markResolvedInDb(id);
-  }
-  return removed;
-}
-
-async function markResolvedInDb(id: string): Promise<void> {
+export async function listRecoverableFailedJobs(
+  limit: number = 25
+): Promise<FailedJob[]> {
   try {
     const db = await getDb();
-    if (!db) return;
-    await db
-      .update(failedJobs)
-      .set({ resolvedAt: new Date() })
-      .where(eq(failedJobs.id, id));
+    if (!db) {
+      return getRecoverableJobs().slice(0, limit);
+    }
+
+    const rows = await db
+      .select()
+      .from(failedJobs)
+      .where(
+        and(isNull(failedJobs.resolvedAt), eq(failedJobs.recoverable, true))
+      )
+      .limit(limit);
+
+    const jobs = rows.map(rowToFailedJob);
+    for (const job of jobs) {
+      cacheUpsert(job);
+    }
+    return jobs;
   } catch (error) {
-    console.warn("[DLQ] Failed to mark resolved in database:", error);
+    console.warn(
+      "[DLQ] Failed to list recoverable jobs from DB; using cache:",
+      error
+    );
+    return getRecoverableJobs().slice(0, limit);
   }
 }
 
 /**
- * Mark a job as recovered (remove from DLQ)
+ * Remove a job from the active DLQ (cache + resolve in DB).
  */
+export function removeFromDeadLetterQueue(id: string): boolean {
+  const removed = deadLetterQueue.delete(id);
+  inFlightClaims.delete(id);
+  void markResolvedInDb(id);
+  return removed;
+}
+
 export function markAsRecovered(id: string): boolean {
   const job = deadLetterQueue.get(id);
   if (job) {
     console.log(`[DLQ] Job recovered: ${id}`, { jobSheetId: job.jobSheetId });
     return removeFromDeadLetterQueue(id);
   }
+  // May exist only in DB (cache miss) — still resolve durably
+  void markResolvedInDb(id);
   return false;
 }
 
 /**
- * Update attempt count for a job
+ * Update attempt count (cache + durable write; DB wins after write).
  */
 export function incrementAttempts(id: string): FailedJob | undefined {
   const job = deadLetterQueue.get(id);
-  if (job) {
-    job.attempts++;
-    job.lastAttemptAt = new Date();
-
-    // Mark as unrecoverable if max attempts exceeded
-    if (job.attempts >= job.maxAttempts) {
-      job.recoverable = false;
-    }
-
-    return job;
+  if (!job) {
+    return undefined;
   }
-  return undefined;
+
+  job.attempts++;
+  job.lastAttemptAt = new Date();
+  if (job.attempts >= job.maxAttempts) {
+    job.recoverable = false;
+  }
+
+  cacheUpsert(job);
+  void persistAttemptState(job);
+  return job;
 }
 
-/**
- * Get DLQ statistics
- */
 export function getDLQStats(): DLQStats {
   const jobs = getAllFailedJobs();
 
@@ -279,26 +391,18 @@ export function getDLQStats(): DLQStats {
   };
 }
 
-/**
- * Thin alias used by ops/troubleshooting docs.
- */
 export function getDeadLetterQueueStatus(): DLQStats {
   return getDLQStats();
 }
 
-/**
- * Clear all jobs from the DLQ
- */
 export function clearDeadLetterQueue(): number {
   const count = deadLetterQueue.size;
   deadLetterQueue.clear();
+  inFlightClaims.clear();
   console.log(`[DLQ] Cleared ${count} jobs`);
   return count;
 }
 
-/**
- * Clear old jobs from the DLQ (older than specified hours)
- */
 export function clearOldJobs(maxAgeHours: number = 72): number {
   const cutoff = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
   let cleared = 0;
@@ -306,7 +410,8 @@ export function clearOldJobs(maxAgeHours: number = 72): number {
   const entries = Array.from(deadLetterQueue.entries());
   for (const [id, job] of entries) {
     if (job.createdAt < cutoff) {
-      deadLetterQueue.delete(id);
+      cacheEvict(id);
+      void markResolvedInDb(id);
       cleared++;
     }
   }
@@ -320,21 +425,15 @@ export function clearOldJobs(maxAgeHours: number = 72): number {
   return cleared;
 }
 
-/**
- * Export DLQ for persistence (e.g., before shutdown)
- */
 export function exportDLQ(): FailedJob[] {
   return getAllFailedJobs();
 }
 
-/**
- * Import jobs into DLQ (e.g., after restart)
- */
 export function importDLQ(jobs: FailedJob[]): number {
   let imported = 0;
   for (const job of jobs) {
     if (!deadLetterQueue.has(job.id)) {
-      deadLetterQueue.set(job.id, job);
+      cacheUpsert(job);
       imported++;
     }
   }
@@ -343,31 +442,8 @@ export function importDLQ(jobs: FailedJob[]): number {
 }
 
 /**
- * Map a durable `failed_jobs` row into the in-memory FailedJob shape.
- */
-function rowToFailedJob(row: FailedJobRow): FailedJob {
-  return {
-    id: row.id,
-    jobSheetId: row.jobSheetId,
-    correlationId: row.correlationId ?? undefined,
-    stage: row.stage,
-    error: {
-      message: row.errorMessage,
-      code: row.errorCode ?? undefined,
-      stack: row.errorStack ?? undefined,
-    },
-    attempts: row.attempts,
-    maxAttempts: row.maxAttempts,
-    lastAttemptAt: row.lastAttemptAt,
-    createdAt: row.createdAt,
-    metadata: (row.metadata as Record<string, unknown>) || {},
-    recoverable: row.recoverable,
-  };
-}
-
-/**
- * Hydrate the in-memory DLQ from unresolved `failed_jobs` rows.
- * Fail-safe: returns 0 and never throws when DB is unavailable / table missing.
+ * Hydrate the in-memory cache from unresolved `failed_jobs` rows.
+ * Fail-safe: returns 0 and never throws when DB is unavailable.
  */
 export async function hydrateDeadLetterQueueFromDb(): Promise<number> {
   try {
@@ -389,7 +465,7 @@ export async function hydrateDeadLetterQueueFromDb(): Promise<number> {
     return imported;
   } catch (error) {
     console.warn(
-      "[DLQ] Failed to hydrate from database (continuing with empty in-memory DLQ):",
+      "[DLQ] Failed to hydrate from database (continuing with empty cache):",
       error
     );
     return 0;
@@ -403,19 +479,91 @@ function resolveGoldSpecId(job: FailedJob): number {
     : 1;
 }
 
+function claimInMemory(id: string): FailedJob | null {
+  if (inFlightClaims.has(id)) {
+    return null;
+  }
+  const job = deadLetterQueue.get(id);
+  if (!job || !job.recoverable || job.attempts >= job.maxAttempts) {
+    return null;
+  }
+
+  inFlightClaims.add(id);
+  job.attempts++;
+  job.lastAttemptAt = new Date();
+  if (job.attempts >= job.maxAttempts) {
+    job.recoverable = false;
+  }
+  cacheUpsert(job);
+  return job;
+}
+
 /**
- * Retry a single DLQ job through documentProcessor's orchestration entry.
- * On success the job is marked recovered; on failure attempts are incremented.
- * Uses dynamic import to avoid a circular dependency with documentProcessor.
+ * Multi-instance-safe claim: conditional UPDATE bumps attempts so only one
+ * writer wins. Cache is refreshed from DB after the write (DB wins).
+ */
+export async function claimFailedJobForRetry(
+  id: string
+): Promise<FailedJob | null> {
+  try {
+    const db = await getDb();
+    if (!db) {
+      return claimInMemory(id);
+    }
+
+    if (inFlightClaims.has(id)) {
+      return null;
+    }
+    inFlightClaims.add(id);
+
+    const now = new Date();
+    const result = await db
+      .update(failedJobs)
+      .set({
+        attempts: sql`${failedJobs.attempts} + 1`,
+        lastAttemptAt: now,
+        recoverable: sql`CASE WHEN ${failedJobs.attempts} + 1 >= ${failedJobs.maxAttempts} THEN 0 ELSE ${failedJobs.recoverable} END`,
+      })
+      .where(
+        and(
+          eq(failedJobs.id, id),
+          isNull(failedJobs.resolvedAt),
+          eq(failedJobs.recoverable, true),
+          sql`${failedJobs.attempts} < ${failedJobs.maxAttempts}`
+        )
+      );
+
+    if (updateAffectedRows(result) === 0) {
+      inFlightClaims.delete(id);
+      await refreshCacheEntryFromDb(id);
+      return null;
+    }
+
+    const claimed = await refreshCacheEntryFromDb(id);
+    if (!claimed) {
+      inFlightClaims.delete(id);
+      return null;
+    }
+    return claimed;
+  } catch (error) {
+    inFlightClaims.delete(id);
+    console.warn(`[DLQ] Claim failed for ${id}:`, error);
+    // Fall back to in-memory claim when DB errors mid-flight
+    return claimInMemory(id);
+  }
+}
+
+/**
+ * Retry a single DLQ job through documentProcessor orchestration.
+ * Claims first (multi-instance safe); on success marks recovered; on failure
+ * attempts are already bumped by the claim (no double-count).
  */
 export async function retryDeadLetterJob(id: string): Promise<boolean> {
-  const job = deadLetterQueue.get(id);
+  const job = await claimFailedJobForRetry(id);
   if (!job) {
-    console.warn(`[DLQ] Retry skipped — job not found: ${id}`);
-    return false;
-  }
-  if (!job.recoverable) {
-    console.warn(`[DLQ] Retry skipped — job not recoverable: ${id}`);
+    console.warn(
+      `[DLQ] Retry skipped — claim failed (missing, unrecoverable, or contended): ${id}`
+    );
     return false;
   }
 
@@ -434,9 +582,13 @@ export async function retryDeadLetterJob(id: string): Promise<boolean> {
       jobSheetId: job.jobSheetId,
       goldSpecId,
     });
-    return markAsRecovered(id);
+    const recovered = markAsRecovered(id);
+    inFlightClaims.delete(id);
+    return recovered;
   } catch (error) {
-    incrementAttempts(id);
+    inFlightClaims.delete(id);
+    // Claim already incremented attempts — sync cache from DB (DB wins)
+    await refreshCacheEntryFromDb(id);
     console.warn(`[DLQ] Retry failed for job ${id}:`, error);
     return false;
   }
