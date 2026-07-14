@@ -42,10 +42,23 @@ export interface RoiExtractionResult {
   extracted: boolean;
   value: string | null;
   confidence: number;
-  source: "roi" | "fullpage" | "reprocessed";
+  source: "roi" | "fullpage" | "reprocessed" | "unavailable";
   roiRegion?: RoiRegion;
   reprocessAttempts: number;
   imageQaResult?: ImageQaResult;
+  /** Set when ROI extraction is quarantined — no fabricated field value. */
+  unavailableReason?: string;
+}
+
+/** Canonical reason when crop/re-OCR path is not wired (former mock trap removed). */
+export const ROI_EXTRACTION_QUARANTINED_REASON =
+  "ROI extraction unavailable — crop/re-OCR not configured (mock quarantined)";
+
+export interface RoiExtractResult {
+  value: string | null;
+  confidence: number;
+  unavailable?: boolean;
+  reason?: string;
 }
 
 /**
@@ -155,30 +168,24 @@ export function getMissingCriticalRois(
 }
 
 /**
- * Mock OCR extraction from ROI region
- * In production, this would call actual OCR with ROI coordinates
+ * ROI-targeted extraction entry point.
+ * Quarantined: never fabricates JOB-ROI-001 / 0.92 placeholder values.
+ * Real crop → re-OCR wiring lives in a follow-on PR; until then, unavailable.
  */
 export function extractFromRoi(
   _documentText: string,
-  roi: RoiRegion,
-  fieldId: string
-): { value: string | null; confidence: number } {
-  // Simulate ROI-based extraction with higher confidence
-  // In production: crop image to ROI bounds, run OCR on crop
-
-  // Mock: return placeholder value with high confidence
-  const mockValues: Record<string, string> = {
-    jobReference: "JOB-ROI-001",
-    assetId: "ASSET-ROI-001",
-    date: "2024-01-15",
-    expiryDate: "2025-01-15",
-    tickboxBlock: "all_checked",
-    signatureBlock: "signed",
-  };
+  _roi: RoiRegion,
+  _fieldId: string
+): RoiExtractResult {
+  void _documentText;
+  void _roi;
+  void _fieldId;
 
   return {
-    value: mockValues[fieldId] ?? `extracted-${fieldId}`,
-    confidence: 0.92, // ROI extraction typically has higher confidence
+    value: null,
+    confidence: 0,
+    unavailable: true,
+    reason: ROI_EXTRACTION_QUARANTINED_REASON,
   };
 }
 
@@ -322,46 +329,60 @@ export async function processWithRoi(
     let extracted = false;
     let value: string | null = null;
     let confidence = 0;
-    let source: "roi" | "fullpage" | "reprocessed" = "fullpage";
+    let source: "roi" | "fullpage" | "reprocessed" | "unavailable" =
+      "fullpage";
     let reprocessAttempts = 0;
     let imageQaResult: ImageQaResult | undefined;
+    let unavailableReason: string | undefined;
 
     if (roi) {
-      // ROI exists - extract from region
       const roiResult = extractFromRoi(documentText, roi, fieldId);
-      value = roiResult.value;
-      confidence = roiResult.confidence;
-      source = "roi";
-      extracted = confidence >= caps.minConfidenceThreshold;
 
-      // Run image QA for visual fields
+      if (roiResult.unavailable) {
+        value = null;
+        confidence = 0;
+        source = "unavailable";
+        extracted = false;
+        unavailableReason = roiResult.reason ?? ROI_EXTRACTION_QUARANTINED_REASON;
+        warnings.push(
+          `ROI extraction quarantined for '${fieldId}': ${unavailableReason}`
+        );
+      } else {
+        value = roiResult.value;
+        confidence = roiResult.confidence;
+        source = "roi";
+        extracted = confidence >= caps.minConfidenceThreshold;
+
+        if (
+          !extracted &&
+          totalReprocessAttempts < caps.maxReprocessAttemptsPerDoc
+        ) {
+          while (
+            !extracted &&
+            reprocessAttempts < caps.maxReprocessAttemptsPerRoi &&
+            totalReprocessAttempts < caps.maxReprocessAttemptsPerDoc
+          ) {
+            reprocessAttempts++;
+            totalReprocessAttempts++;
+
+            const reprocessResult = extractFromRoi(documentText, roi, fieldId);
+            if (reprocessResult.unavailable) {
+              break;
+            }
+            value = reprocessResult.value;
+            confidence = reprocessResult.confidence;
+            source = "reprocessed";
+            extracted = confidence >= caps.minConfidenceThreshold;
+          }
+        }
+      }
+
+      // Run image QA for visual fields (disputed when extraction unavailable)
       if (requiresImageQa(fieldId)) {
         imageQaResult = await runImageQa(roi, fieldId as ImageQaField, {
           extractionConfidence: confidence,
           disputed: !extracted,
         });
-      }
-
-      // Reprocess if low confidence (respecting caps)
-      if (
-        !extracted &&
-        totalReprocessAttempts < caps.maxReprocessAttemptsPerDoc
-      ) {
-        while (
-          !extracted &&
-          reprocessAttempts < caps.maxReprocessAttemptsPerRoi &&
-          totalReprocessAttempts < caps.maxReprocessAttemptsPerDoc
-        ) {
-          reprocessAttempts++;
-          totalReprocessAttempts++;
-
-          // Simulate reprocessing with slightly better result
-          const reprocessResult = extractFromRoi(documentText, roi, fieldId);
-          value = reprocessResult.value;
-          confidence = Math.min(reprocessResult.confidence + 0.05, 0.95);
-          source = "reprocessed";
-          extracted = confidence >= caps.minConfidenceThreshold;
-        }
       }
     } else if (isCriticalRoiField(fieldId)) {
       // Critical field without ROI - flag for review
@@ -385,6 +406,7 @@ export async function processWithRoi(
       roiRegion: roi ?? undefined,
       reprocessAttempts,
       imageQaResult,
+      unavailableReason,
     });
   }
 
