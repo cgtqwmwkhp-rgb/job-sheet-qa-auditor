@@ -109,7 +109,9 @@ function clearActiveIndexesForJob(job: JobSheetQueueJob, jobId: string): void {
     activeJobByContentHash.delete(contentHash);
   }
   // Sheets aliased to this job via content-hash dedupe
-  for (const [sheetId, activeId] of Array.from(activeJobByJobSheetId.entries())) {
+  for (const [sheetId, activeId] of Array.from(
+    activeJobByJobSheetId.entries()
+  )) {
     if (activeId === jobId) {
       activeJobByJobSheetId.delete(sheetId);
     }
