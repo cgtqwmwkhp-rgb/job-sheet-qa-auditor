@@ -54,7 +54,7 @@ function resolveFusionFieldIdsForRegion(region: RoiRegion): string[] {
       ids.add(fieldId);
     }
   }
-  return [...ids];
+  return Array.from(ids);
 }
 
 function preExtractedConfidenceToUnit(confidence: number): number {
