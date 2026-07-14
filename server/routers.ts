@@ -24,6 +24,7 @@ import { templateRouter } from "./routers/templateRouter";
 import { analyticsRouter } from "./routers/analyticsRouter";
 import { auditActionsRouter } from "./routers/auditActionsRouter";
 import { fixPacksRouter } from "./routers/fixPacksRouter";
+import { portalRouter } from "./routers/portalRouter";
 import { TRPCError } from "@trpc/server";
 import {
   enforceRateLimit,
@@ -70,6 +71,8 @@ export const appRouter = router({
   system: systemRouter,
   templates: templateRouter,
   analytics: analyticsRouter,
+  /** Technician portal: scorecard + defects for signed-in tech */
+  portal: portalRouter,
   /** Phase 1.9: fix pack export / assign / acknowledge */
   fixPacks: fixPacksRouter,
   /** PR-10: waive / override / flag / approve / undo */
@@ -957,11 +960,46 @@ export const appRouter = router({
       .input(
         z.object({
           auditFindingId: z.number(),
-          reason: z.string(),
+          reason: z.string().min(1).max(4000),
           evidenceUrls: z.array(z.string()).optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
+        const finding = await db.getAuditFindingById(input.auditFindingId);
+        if (!finding) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Audit finding not found",
+          });
+        }
+
+        const audit = await db.getAuditResultById(finding.auditResultId);
+        if (!audit) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Audit result not found",
+          });
+        }
+
+        const jobSheet = await db.getJobSheetById(audit.jobSheetId);
+        if (!jobSheet) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Job sheet not found",
+          });
+        }
+
+        // Technicians may only dispute findings on sheets attributed to them
+        if (ctx.user.role === "technician") {
+          if (jobSheet.technicianId !== ctx.user.id) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message:
+                "You can only dispute findings on job sheets attributed to you",
+            });
+          }
+        }
+
         const result = await db.createDispute({
           auditFindingId: input.auditFindingId,
           raisedBy: ctx.user.id,
