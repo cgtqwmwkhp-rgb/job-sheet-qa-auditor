@@ -8,5 +8,5 @@
  * Live providers: use server/services/interpreterAdapter/
  */
 
-export * from './types';
+export * from "./types";
 // QUARANTINED — do not re-export './router' (simulated confidence, test-only)
