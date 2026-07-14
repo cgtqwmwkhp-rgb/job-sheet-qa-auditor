@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
+import OverturnMetricsCard from "@/components/OverturnMetricsCard";
 import { useAnalyticsFilters } from "@/hooks/useAnalyticsFilters";
 import { cn } from "@/lib/utils";
 
@@ -226,6 +227,8 @@ export default function ExecutiveDashboard() {
             </Card>
           </div>
         </section>
+
+        <OverturnMetricsCard />
 
         <section aria-labelledby="explore-heading">
           <div className="mb-4">

@@ -20,6 +20,8 @@ import {
 import {
   AlertTriangle,
   Clock,
+  ExternalLink,
+  FileText,
   Loader2,
   RefreshCw,
   ShieldAlert,
@@ -48,6 +50,69 @@ function formatHours(h: number): string {
   if (h < 0) return `${Math.abs(Math.round(h))}h overdue`;
   if (h < 24) return `${Math.round(h)}h`;
   return `${Math.round(h / 24)}d`;
+}
+
+function buildTemplateStudioHref(input: {
+  ruleId: string | null;
+  reasonCode: string;
+  severity: string;
+  jobSheetId?: number;
+}): string {
+  const params = new URLSearchParams();
+  if (input.jobSheetId != null) {
+    params.set("fromJobSheet", String(input.jobSheetId));
+  }
+  if (input.ruleId) params.set("focusRule", input.ruleId);
+  params.set("focusReason", input.reasonCode);
+  params.set("severity", input.severity);
+  return `/template-studio?${params.toString()}`;
+}
+
+function WorstRuleActions({
+  rule,
+  jobSheetIds,
+}: {
+  rule: {
+    ruleId: string | null;
+    reasonCode: string;
+    severity: string;
+    sampleFindingIds: number[];
+  };
+  jobSheetIds: number[];
+}) {
+  const primaryJobSheetId = jobSheetIds[0];
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-1.5">
+      {jobSheetIds.length > 0 ? (
+        jobSheetIds.slice(0, 3).map(jobSheetId => (
+          <Link key={jobSheetId} href={`/audits?id=${jobSheetId}`}>
+            <Button size="sm" variant="outline" className="h-7 text-xs">
+              <FileText className="h-3 w-3 mr-1" />
+              JS-{jobSheetId}
+            </Button>
+          </Link>
+        ))
+      ) : rule.sampleFindingIds.length > 0 ? (
+        <span className="text-xs text-muted-foreground">Resolving…</span>
+      ) : (
+        <span className="text-xs text-muted-foreground">No samples</span>
+      )}
+      <Link
+        href={buildTemplateStudioHref({
+          ruleId: rule.ruleId,
+          reasonCode: rule.reasonCode,
+          severity: rule.severity,
+          jobSheetId: primaryJobSheetId,
+        })}
+      >
+        <Button size="sm" variant="secondary" className="h-7 text-xs">
+          <ExternalLink className="h-3 w-3 mr-1" />
+          Studio
+        </Button>
+      </Link>
+    </div>
+  );
 }
 
 export default function DefectAnalysis() {
@@ -88,6 +153,47 @@ export default function DefectAnalysis() {
       })),
     [summary]
   );
+
+  const sampleFindingIds = useMemo(
+    () =>
+      summary
+        ? [
+            ...Array.from(
+              new Set(
+                summary.overturns.worstRules.flatMap(r => r.sampleFindingIds)
+              )
+            ),
+          ]
+        : [],
+    [summary]
+  );
+
+  const { data: sampleAudits } = trpc.auditActions.resolveSampleAudits.useQuery(
+    { findingIds: sampleFindingIds },
+    { enabled: sampleFindingIds.length > 0, staleTime: 60_000 }
+  );
+
+  const jobSheetsByRuleKey = useMemo(() => {
+    const findingToSheet = new Map<number, number>();
+    for (const s of sampleAudits?.samples ?? []) {
+      findingToSheet.set(s.findingId, s.jobSheetId);
+    }
+    const map = new Map<string, number[]>();
+    if (!summary) return map;
+    for (const rule of summary.overturns.worstRules) {
+      const ids: number[] = [];
+      const seen = new Set<number>();
+      for (const fid of rule.sampleFindingIds) {
+        const js = findingToSheet.get(fid);
+        if (js != null && !seen.has(js)) {
+          seen.add(js);
+          ids.push(js);
+        }
+      }
+      map.set(rule.ruleKey, ids);
+    }
+    return map;
+  }, [sampleAudits, summary]);
 
   if (isLoading) {
     return (
@@ -361,6 +467,7 @@ export default function DefectAnalysis() {
                     <TableHead className="text-right">Findings</TableHead>
                     <TableHead className="text-right">Overturned</TableHead>
                     <TableHead className="text-right">Overturn rate</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -381,6 +488,14 @@ export default function DefectAnalysis() {
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {pct(rule.overturnRate)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <WorstRuleActions
+                          rule={rule}
+                          jobSheetIds={
+                            jobSheetsByRuleKey.get(rule.ruleKey) ?? []
+                          }
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
