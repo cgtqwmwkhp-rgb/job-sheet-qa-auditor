@@ -16,6 +16,8 @@ import {
   hasJobSummaryTemplate,
   initializeWastedJourneyTemplate,
   hasWastedJourneyTemplate,
+  hydrateTemplateRegistryFromMysql,
+  assertTemplateRegistryMysqlProdContract,
 } from "../services/templateRegistry";
 import { hydrateDeadLetterQueueFromDb } from "../utils/deadLetterQueue";
 import { hydrateApiCostLedgerFromDb } from "../services/finOps";
@@ -48,6 +50,21 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+  // Prod contract: fail-closed envs expect DB-backed registry (custom activations survive recycle)
+  assertTemplateRegistryMysqlProdContract();
+
+  // Primary load-path: hydrate in-memory registry from MySQL before JSON gold seeds
+  try {
+    const hydrated = await hydrateTemplateRegistryFromMysql();
+    if (hydrated > 0) {
+      console.log(
+        `[Templates] Boot hydrate restored ${hydrated} registry record(s) from MySQL`
+      );
+    }
+  } catch (error) {
+    console.warn("[Templates] Boot hydrate skipped:", error);
+  }
+
   // Initialize default template for document processing
   // This ensures SSOT compliance even in strict mode (production)
   if (!hasDefaultTemplate()) {
@@ -64,7 +81,7 @@ async function startServer() {
     console.log("[Templates] Default template already exists");
   }
 
-  // Gold mobilisation: Job Summary Report (survives pod restart)
+  // Gold mobilisation: Job Summary Report (gap-fill after MySQL hydrate)
   if (!hasJobSummaryTemplate()) {
     console.log("[Templates] Initializing job-summary-v1 gold template...");
     const jsrVersionId = initializeJobSummaryTemplate();

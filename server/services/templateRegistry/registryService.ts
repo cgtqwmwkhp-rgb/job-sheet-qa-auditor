@@ -39,13 +39,15 @@ import {
   type SsotValidationResult,
 } from "./defaultTemplate";
 import {
+  loadTemplateRegistrySnapshotFromMysql,
   persistTemplateActivationToMysqlBestEffort,
   persistTemplateStatusToMysqlBestEffort,
   persistTemplateToMysqlBestEffort,
   persistTemplateVersionToMysqlBestEffort,
+  type TemplateRegistrySnapshot,
 } from "./mysqlPersistence";
 
-// In-memory store for no-secrets CI (production would use DB)
+// In-memory store — hydrated from MySQL at boot when persistence is available
 interface TemplateRecord {
   id: number;
   templateId: string;
@@ -568,6 +570,89 @@ export function getRegistryStats(): { templates: number; versions: number } {
     templates: templateStore.size,
     versions: versionStore.size,
   };
+}
+
+/**
+ * Apply a durable MySQL snapshot into the in-memory registry (boot hydrate).
+ * Uses DB primary keys so activations round-trip across pod recycle.
+ * Does not write back to MySQL.
+ */
+export function applyRegistrySnapshot(
+  snapshot: TemplateRegistrySnapshot
+): number {
+  let applied = 0;
+  let maxTemplateId = nextTemplateId - 1;
+  let maxVersionId = nextVersionId - 1;
+
+  for (const row of snapshot.templates) {
+    const record: TemplateRecord = {
+      id: row.id,
+      templateId: row.templateId,
+      name: row.name,
+      client: row.client,
+      assetType: row.assetType,
+      workType: row.workType,
+      status: row.status,
+      description: row.description,
+      category: null,
+      tags: [],
+      createdBy: row.createdBy,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+    templateStore.set(record.id, record);
+    maxTemplateId = Math.max(maxTemplateId, record.id);
+    applied++;
+  }
+
+  for (const row of snapshot.versions) {
+    const record: VersionRecord = {
+      id: row.id,
+      templateId: row.templateId,
+      version: row.version,
+      hashSha256: row.hashSha256,
+      specJson: row.specJson as SpecJson,
+      selectionConfigJson: row.selectionConfigJson as SelectionConfig,
+      roiJson: (row.roiJson as RoiConfig | null) ?? null,
+      isActive: row.isActive,
+      changeNotes: row.changeNotes,
+      createdBy: row.createdBy,
+      createdAt: row.createdAt,
+    };
+    versionStore.set(record.id, record);
+    maxVersionId = Math.max(maxVersionId, record.id);
+    applied++;
+  }
+
+  nextTemplateId = maxTemplateId + 1;
+  nextVersionId = maxVersionId + 1;
+  return applied;
+}
+
+/**
+ * Boot load-path: hydrate in-memory registry from MySQL when persistence is available.
+ * Fail-safe: returns 0 when DB unavailable / empty / persistence off.
+ */
+export async function hydrateTemplateRegistryFromMysql(): Promise<number> {
+  try {
+    const snapshot = await loadTemplateRegistrySnapshotFromMysql();
+    if (!snapshot) return 0;
+    if (snapshot.templates.length === 0 && snapshot.versions.length === 0) {
+      return 0;
+    }
+    const applied = applyRegistrySnapshot(snapshot);
+    console.log(
+      `[TemplateRegistry] Boot hydrate restored ${snapshot.templates.length} template(s), ` +
+        `${snapshot.versions.length} version(s) from MySQL`
+    );
+    return applied;
+  } catch (error) {
+    console.warn(
+      "[TemplateRegistry] Boot hydrate failed (continuing with seed fallback):",
+      error
+    );
+    return 0;
+  }
 }
 
 // ============================================================================

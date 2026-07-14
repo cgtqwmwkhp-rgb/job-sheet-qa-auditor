@@ -1,8 +1,9 @@
 /**
  * Gold mobilisation templates — boot-seed Job Summary, Wasted Journey (and future families).
  *
- * Staging/prod registry is in-memory; without boot seed, custom templates vanish
- * on pod restart. Import + activate from versioned JSON packs on startup.
+ * Prod load-path: MySQL hydrate runs first (see hydrateTemplateRegistryFromMysql).
+ * JSON packs only fill gaps when a gold template is missing after hydrate — custom
+ * activations survive pod recycle via DB, not seed-only.
  */
 
 import { existsSync, readFileSync } from "fs";
@@ -56,6 +57,7 @@ function bootActivateTemplate(options: {
 }): number | null {
   const { slug, packRelative, label, createdBy = 0, expectedVersion } = options;
 
+  // Prefer already-hydrated / previously activated templates (MySQL or prior seed).
   if (hasActiveTemplate(slug)) {
     if (!expectedVersion) return null;
     const existing = getTemplateBySlug(slug);
@@ -114,7 +116,7 @@ function hasActiveTemplate(slug: string): boolean {
 
 /**
  * Ensure job-summary-v1 is imported and active.
- * Idempotent: no-ops when an active version already exists.
+ * Idempotent: no-ops when an active version already exists (including MySQL hydrate).
  */
 export function initializeJobSummaryTemplate(
   createdBy: number = 0
@@ -133,7 +135,7 @@ export function hasJobSummaryTemplate(): boolean {
 
 /**
  * Ensure wasted-journey-v1 is imported and active.
- * Idempotent: no-ops when an active version already exists.
+ * Idempotent: no-ops when an active version already exists (including MySQL hydrate).
  */
 export function initializeWastedJourneyTemplate(
   createdBy: number = 0
