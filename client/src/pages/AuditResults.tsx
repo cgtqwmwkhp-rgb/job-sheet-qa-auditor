@@ -16,12 +16,14 @@ import {
   Keyboard,
   Loader2,
   Search,
+  XCircle,
 } from "lucide-react";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { ProcessingProgressPanel } from "@/components/ProcessingProgressPanel";
 import { useJobSheetProcessStatus } from "@/hooks/useProcessingWatch";
 import {
@@ -52,6 +54,13 @@ type StatusFilter =
   | "review_queue"
   | "completed"
   | "failed";
+
+type JobSheetStatus =
+  | "pending"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "review_queue";
 
 function JobSheetStatusChip({ status }: { status: string }) {
   const config: Record<
@@ -131,6 +140,11 @@ export default function AuditResults() {
   const [highlightIndex, setHighlightIndex] = useState(0);
   const [showLegend, setShowLegend] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const utils = trpc.useUtils();
+
+  const approveJobSheet = trpc.auditActions.approveJobSheet.useMutation();
+  const undoApprove = trpc.auditActions.undoJobSheetApprove.useMutation();
+  const updateStatus = trpc.jobSheets.updateStatus.useMutation();
 
   const [selectedAuditId, setSelectedAuditId] = useState<number | null>(() => {
     if (typeof window !== "undefined") {
@@ -281,7 +295,89 @@ export default function AuditResults() {
       ? 0
       : Math.min(highlightIndex, filteredJobSheets.length - 1);
 
+  const invalidateAfterSheetAction = usePersistFn(async () => {
+    await Promise.all([
+      utils.jobSheets.list.invalidate(),
+      utils.jobSheets.get.invalidate(),
+      utils.audits.list.invalidate(),
+      utils.audits.getByJobSheet.invalidate(),
+    ]);
+  });
+
+  const showApproveUndo = usePersistFn(
+    (jobSheetId: number, previousStatus: string) => {
+      toast.success("Job sheet approved", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            undoApprove.mutate(
+              {
+                jobSheetId,
+                restoreStatus: previousStatus as JobSheetStatus,
+              },
+              {
+                onSuccess: () => {
+                  void invalidateAfterSheetAction();
+                  toast.success("Approval undone");
+                },
+                onError: err => toast.error(err.message || "Undo failed"),
+              }
+            );
+          },
+        },
+      });
+    }
+  );
+
+  const handleApprove = usePersistFn((jobSheetId: number) => {
+    approveJobSheet.mutate(
+      { jobSheetId, reason: "Approved from audit results" },
+      {
+        onSuccess: result => {
+          void invalidateAfterSheetAction();
+          if (selectedAuditId === jobSheetId) {
+            goBackToList();
+          }
+          showApproveUndo(jobSheetId, result.previousStatus);
+        },
+        onError: err => toast.error(err.message || "Approve failed"),
+      }
+    );
+  });
+
+  const handleReject = usePersistFn((jobSheetId: number) => {
+    updateStatus.mutate(
+      { id: jobSheetId, status: "failed" },
+      {
+        onSuccess: () => {
+          void invalidateAfterSheetAction();
+          if (selectedAuditId === jobSheetId) {
+            goBackToList();
+          }
+          toast.success("Job sheet rejected", {
+            action: {
+              label: "Undo",
+              onClick: () => {
+                updateStatus.mutate(
+                  { id: jobSheetId, status: "review_queue" },
+                  {
+                    onSuccess: () => {
+                      void invalidateAfterSheetAction();
+                      toast.success("Rejection undone");
+                    },
+                  }
+                );
+              },
+            },
+          });
+        },
+        onError: err => toast.error(err.message || "Reject failed"),
+      }
+    );
+  });
+
   const onNext = usePersistFn(() => {
+    if (selectedAuditId != null) return;
     if (filteredJobSheets.length === 0) return;
     setHighlightIndex(i =>
       Math.min(
@@ -291,26 +387,54 @@ export default function AuditResults() {
     );
   });
   const onPrev = usePersistFn(() => {
+    if (selectedAuditId != null) return;
     if (filteredJobSheets.length === 0) return;
     setHighlightIndex(i =>
       Math.max(Math.min(i, filteredJobSheets.length - 1) - 1, 0)
     );
   });
   const onOpenHighlighted = usePersistFn(() => {
+    if (selectedAuditId != null) return;
     const sheet = filteredJobSheets[safeHighlightIndex];
     if (sheet) navigateToAudit(sheet.id);
+  });
+
+  const onApproveHighlighted = usePersistFn(() => {
+    if (selectedAuditId != null) {
+      if (jobSheetData?.status === "review_queue") {
+        handleApprove(selectedAuditId);
+      }
+      return;
+    }
+    const sheet = filteredJobSheets[safeHighlightIndex];
+    if (sheet?.status === "review_queue") {
+      handleApprove(sheet.id);
+    }
+  });
+
+  const onRejectHighlighted = usePersistFn(() => {
+    if (selectedAuditId != null) {
+      if (jobSheetData?.status === "review_queue") {
+        handleReject(selectedAuditId);
+      }
+      return;
+    }
+    const sheet = filteredJobSheets[safeHighlightIndex];
+    if (sheet?.status === "review_queue") {
+      handleReject(sheet.id);
+    }
   });
 
   useReviewQueueKeyboard(
     {
       onNext,
       onPrev,
-      onApprove: () => undefined,
-      onReject: () => undefined,
+      onApprove: onApproveHighlighted,
+      onReject: onRejectHighlighted,
       onToggleLegend: () => setShowLegend(v => !v),
       onFocusPane: onOpenHighlighted,
     },
-    selectedAuditId == null
+    true
   );
 
   if (isLoading && numericId > 0) {
@@ -423,7 +547,8 @@ export default function AuditResults() {
               </h1>
               <p className="text-[#706D6D] mt-1 text-sm">
                 Select an audit to review findings, documentation quality, and
-                reports. Use j/k to move, Enter to open.
+                reports. Use j/k to move, a/r to approve or reject in-review
+                sheets, Enter to open.
               </p>
             </div>
             <Button
@@ -633,6 +758,41 @@ export default function AuditResults() {
                               {outcome.docQualityScore}%
                             </span>
                           )}
+                          {sheet.status === "review_queue" && (
+                            <div
+                              className={cn(
+                                "flex items-center gap-0.5 transition-opacity duration-[var(--duration-fast)]",
+                                isHighlighted
+                                  ? "opacity-100"
+                                  : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+                              )}
+                              onClick={e => e.stopPropagation()}
+                              onKeyDown={e => e.stopPropagation()}
+                            >
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-emerald-700 hover:bg-emerald-50"
+                                onClick={() => handleApprove(sheet.id)}
+                                disabled={approveJobSheet.isPending}
+                                aria-label="Approve"
+                                title="Approve (a)"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-red-600 hover:bg-red-50"
+                                onClick={() => handleReject(sheet.id)}
+                                disabled={updateStatus.isPending}
+                                aria-label="Reject"
+                                title="Reject (r)"
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
                           <span className="text-[11px] text-[#8A8787] tabular-nums hidden sm:inline">
                             {new Date(sheet.createdAt).toLocaleDateString()}
                           </span>
@@ -686,6 +846,8 @@ export default function AuditResults() {
 
   const pdfProxyUrl = `/api/documents/${numericId}/pdf`;
 
+  const canSheetApprove = jobSheetData.status === "review_queue";
+
   return (
     <DashboardLayout>
       <div className="-m-6 h-[calc(100vh-3.5rem)] min-h-0 overflow-hidden">
@@ -694,6 +856,15 @@ export default function AuditResults() {
           auditData={auditData}
           documentUrl={pdfProxyUrl}
           onBack={goBackToList}
+          showJobSheetActions={canSheetApprove}
+          onApproveJobSheet={
+            canSheetApprove ? () => handleApprove(numericId) : undefined
+          }
+          onRejectJobSheet={
+            canSheetApprove ? () => handleReject(numericId) : undefined
+          }
+          approvePending={approveJobSheet.isPending}
+          rejectPending={updateStatus.isPending}
         />
       </div>
     </DashboardLayout>
