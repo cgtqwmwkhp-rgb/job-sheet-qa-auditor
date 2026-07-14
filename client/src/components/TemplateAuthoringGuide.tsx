@@ -20,7 +20,7 @@ const RULES: Array<{ title: string; body: string }> = [
   },
   {
     title: "Hover Draw labels for how-to",
-    body: "Each label in the floating Draw labels panel shows what to look for and whether to box the printed heading with the value, value-only, or the whole tickbox grid.",
+    body: "Each label in the Draw labels dock (left of the PDF) shows what to look for and whether to box the printed heading with the value, value-only, or the whole tickbox grid.",
   },
   {
     title: "Custom labels are remembered",

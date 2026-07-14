@@ -135,6 +135,45 @@ export const ROI_DRAW_GUIDANCE: Record<string, RoiDrawGuidance> = {
     lookFor: '"Serial", "S/N", "Chassis", "Unit No.".',
     ...IDENTITY_VALUE,
   },
+  engineerName: {
+    summary: "Printed engineer / technician name (not the signature stroke).",
+    lookFor: '"Engineer", "Technician", "Operative", "Completed by" name line.',
+    ...IDENTITY_VALUE,
+  },
+  mileageHours: {
+    summary: "Odometer / hour-meter reading on the visit.",
+    lookFor: '"Mileage", "Hours", "Odometer", "Hour Meter", "Km".',
+    ...MEASUREMENT,
+  },
+  status: {
+    summary: "Job / asset outcome status (e.g. VOR, Pass, Fail, Complete).",
+    lookFor: '"Status", "Outcome", "Result", "VOR", Pass/Fail markers.',
+    ...IDENTITY_VALUE,
+  },
+  partsUsed: {
+    summary: "Parts fitted / used on this visit.",
+    lookFor: '"Parts Used", "Parts Fitted", parts table or list.',
+    howToDraw:
+      "Box the Parts Used heading and the list/table body. Keep Parts Required separate.",
+  },
+  partsRequired: {
+    summary: "Parts still required / outstanding.",
+    lookFor: '"Parts Required", "Parts Still Required", outstanding parts list.',
+    howToDraw:
+      "Box the Parts Required heading and the outstanding list/table together.",
+  },
+  recommendations: {
+    summary: "Follow-up recommendations / advice to the customer.",
+    lookFor: '"Recommendations", "Advice", "Further Action".',
+    howToDraw:
+      "Box the recommendations heading and writing area. Keep signatures out.",
+  },
+  notes: {
+    summary: "Free-text notes / comments block.",
+    lookFor: '"Notes", "Comments", "Additional Information".',
+    howToDraw:
+      "Box the notes heading and body. Prefer workDescription for the main work narrative.",
+  },
 };
 
 const MEASUREMENT_HINT =

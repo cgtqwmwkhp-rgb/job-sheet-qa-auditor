@@ -53,19 +53,33 @@ interface RoiConfig {
 }
 
 /**
- * Standard ROI types for job sheets
+ * Built-in Draw labels — common Job Summary / job-sheet regions.
+ * Spec fields and remembered custom labels append after these.
  */
 const STANDARD_ROI_TYPES = [
-  { id: 'header', label: 'Header', color: '#3b82f6', critical: false },
-  { id: 'jobReference', label: 'Job Reference', color: '#10b981', critical: true },
-  { id: 'assetId', label: 'Asset ID', color: '#f59e0b', critical: true },
-  { id: 'date', label: 'Date', color: '#8b5cf6', critical: true },
-  { id: 'expiryDate', label: 'Expiry Date', color: '#ec4899', critical: true },
-  { id: 'tickboxBlock', label: 'Tickbox Block', color: '#06b6d4', critical: true },
-  { id: 'signatureBlock', label: 'Signature Block', color: '#ef4444', critical: true },
-  { id: 'customerSignature', label: 'Customer Signature', color: '#84cc16', critical: false },
-  { id: 'engineerSignature', label: 'Engineer Signature', color: '#f97316', critical: false },
-  { id: 'workDescription', label: 'Work Description', color: '#6366f1', critical: false },
+  { id: "header", label: "Header", color: "#3b82f6", critical: false },
+  { id: "jobReference", label: "Job Reference", color: "#10b981", critical: true },
+  { id: "assetId", label: "Asset ID", color: "#f59e0b", critical: true },
+  { id: "serialNumber", label: "Serial Number", color: "#d97706", critical: false },
+  { id: "makeModel", label: "Make / Model", color: "#ca8a04", critical: false },
+  { id: "date", label: "Date", color: "#8b5cf6", critical: true },
+  { id: "expiryDate", label: "Expiry Date", color: "#ec4899", critical: true },
+  { id: "customerName", label: "Customer Name", color: "#db2777", critical: false },
+  { id: "siteAddress", label: "Site Address", color: "#be185d", critical: false },
+  { id: "siteContact", label: "Site Contact", color: "#9d174d", critical: false },
+  { id: "siteAddressContact", label: "Site Address / Contact", color: "#831843", critical: false },
+  { id: "engineerName", label: "Engineer Name", color: "#ea580c", critical: false },
+  { id: "mileageHours", label: "Mileage / Hours", color: "#c2410c", critical: false },
+  { id: "status", label: "Status / Outcome", color: "#b45309", critical: false },
+  { id: "tickboxBlock", label: "Tickbox Block", color: "#06b6d4", critical: true },
+  { id: "workDescription", label: "Work Description", color: "#6366f1", critical: false },
+  { id: "partsUsed", label: "Parts Used", color: "#4f46e5", critical: false },
+  { id: "partsRequired", label: "Parts Required", color: "#4338ca", critical: false },
+  { id: "recommendations", label: "Recommendations", color: "#3730a3", critical: false },
+  { id: "notes", label: "Notes / Comments", color: "#312e81", critical: false },
+  { id: "signatureBlock", label: "Signature Block", color: "#ef4444", critical: true },
+  { id: "engineerSignature", label: "Engineer Signature", color: "#f97316", critical: false },
+  { id: "customerSignature", label: "Customer Signature", color: "#84cc16", critical: false },
 ] as const;
 
 /**
@@ -1059,16 +1073,336 @@ export function RoiEditorV2({
         style={{ display: 'none' }}
       />
 
-      {/* Canvas and Region List — PDF dominates for placement accuracy */}
+      {/* Labels dock | PDF | Regions — labels never cover the page */}
       <div
         style={{
           display: "flex",
-          gap: "16px",
+          gap: "12px",
           alignItems: "stretch",
           minHeight: "calc(100vh - 260px)",
         }}
       >
-        {/* Canvas with PDF preview + floating draw palette */}
+        {/* Draw labels dock — beside PDF, never overlays the page */}
+        {drawPaletteOpen ? (
+          <div
+            data-testid="roi-draw-palette"
+            style={{
+              flex: "0 0 240px",
+              width: 240,
+              maxWidth: 240,
+              alignSelf: "flex-start",
+              position: "sticky",
+              top: 0,
+              zIndex: 5,
+              maxHeight: "calc(100vh - 200px)",
+              overflow: "auto",
+              backgroundColor: "#fff",
+              border: "1px solid #e2e8f0",
+              borderRadius: "10px",
+              boxShadow: "0 4px 14px rgba(15,23,42,0.08)",
+              padding: "10px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 8,
+                gap: 8,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#1e293b" }}>
+                  Draw labels
+                </div>
+                <div style={{ fontSize: 10, color: "#64748b" }}>
+                  {filteredTypes.length} tools · hover for how to draw · custom
+                  labels remembered next template
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDrawPaletteOpen(false)}
+                style={{
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  borderRadius: 6,
+                  padding: "2px 8px",
+                  fontSize: 11,
+                  cursor: "pointer",
+                  color: "#475569",
+                }}
+                title="Hide panel"
+              >
+                Hide
+              </button>
+            </div>
+
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 11,
+                color: "#64748b",
+                marginBottom: 8,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showCriticalOnly}
+                onChange={e => setShowCriticalOnly(e.target.checked)}
+              />
+              Critical only
+            </label>
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+                marginBottom: 8,
+              }}
+            >
+              {filteredTypes.map(type => {
+                const active = currentTool === type.id;
+                const specMeta = specFields.find(f => f.field === type.id);
+                const guidance = getRoiDrawGuidance(type.id, {
+                  label: type.label,
+                  fieldType: specMeta?.type,
+                });
+                const isRemembered =
+                  !STANDARD_ROI_TYPES.some(t => t.id === type.id) &&
+                  !specFields.some(f => f.field === type.id);
+                return (
+                  <Tooltip key={type.id} delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentTool(type.id);
+                          // Selecting a remembered/custom label binds it into this template
+                          if (
+                            !STANDARD_ROI_TYPES.some(t => t.id === type.id)
+                          ) {
+                            integrateCustomLabel({
+                              id: type.id,
+                              label: type.label,
+                              color: type.color,
+                              critical: type.critical,
+                              type: specMeta?.type ?? "string",
+                            });
+                          }
+                        }}
+                        disabled={readOnly}
+                        aria-label={`${type.label}. ${guidance.summary} How to draw: ${guidance.howToDraw}`}
+                        data-testid={`roi-draw-tool-${type.id}`}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "6px 8px",
+                          borderRadius: 6,
+                          border: active
+                            ? `2px solid ${type.color}`
+                            : "1px solid #e2e8f0",
+                          backgroundColor: active
+                            ? `${type.color}18`
+                            : "#fff",
+                          color: active ? type.color : "#334155",
+                          cursor: readOnly ? "not-allowed" : "pointer",
+                          fontSize: 12,
+                          fontWeight: active ? 700 : 500,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 999,
+                            backgroundColor: type.color,
+                            flexShrink: 0,
+                          }}
+                        />
+                        {type.critical && (
+                          <span
+                            style={{ color: "#dc2626", fontSize: 9 }}
+                          >
+                            ●
+                          </span>
+                        )}
+                        <span style={{ flex: 1 }}>{type.label}</span>
+                        {isRemembered && (
+                          <span
+                            title="Saved from a previous template"
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 700,
+                              color: "#64748b",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.02em",
+                            }}
+                          >
+                            saved
+                          </span>
+                        )}
+                        <span
+                          aria-hidden
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "#94a3b8",
+                            lineHeight: 1,
+                          }}
+                        >
+                          ?
+                        </span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="right"
+                      sideOffset={8}
+                      className="z-[80] max-w-[280px] space-y-1.5 border border-slate-700 bg-slate-900 p-3 text-left text-xs text-slate-50 shadow-lg"
+                    >
+                      <div className="font-semibold text-white">
+                        {type.label}
+                      </div>
+                      <p className="text-slate-200 leading-snug">
+                        {guidance.summary}
+                      </p>
+                      <p className="leading-snug">
+                        <span className="font-semibold text-[#BEDA41]">
+                          Look for:
+                        </span>{" "}
+                        {guidance.lookFor}
+                      </p>
+                      <p className="leading-snug">
+                        <span className="font-semibold text-[#BEDA41]">
+                          How to draw:
+                        </span>{" "}
+                        {guidance.howToDraw}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+
+            {!readOnly && (
+              <div
+                style={{
+                  borderTop: "1px solid #e2e8f0",
+                  paddingTop: 8,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                }}
+              >
+                <input
+                  type="text"
+                  value={customLabelDraft}
+                  onChange={e => setCustomLabelDraft(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addCustomLabel();
+                    }
+                  }}
+                  placeholder="Custom label… (saved for next template)"
+                  style={{
+                    padding: "6px 8px",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    width: "100%",
+                    boxSizing: "border-box",
+                  }}
+                />
+                <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.35 }}>
+                  New labels are stored in browser memory and added to this
+                  template&apos;s fields so ids stay consistent next time.
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      fontSize: 11,
+                      color: "#64748b",
+                      flex: 1,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={customLabelCritical}
+                      onChange={e => setCustomLabelCritical(e.target.checked)}
+                    />
+                    Critical
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addCustomLabel}
+                    disabled={!customLabelDraft.trim()}
+                    style={{
+                      padding: "5px 10px",
+                      borderRadius: 6,
+                      border: "1px solid #BEDA41",
+                      backgroundColor: "#BEDA41",
+                      color: "#1a1f0a",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: customLabelDraft.trim()
+                        ? "pointer"
+                        : "not-allowed",
+                      opacity: customLabelDraft.trim() ? 1 : 0.5,
+                    }}
+                  >
+                    + Add
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            data-testid="roi-draw-palette-show"
+            onClick={() => setDrawPaletteOpen(true)}
+            style={{
+              flex: "0 0 44px",
+              width: 44,
+              alignSelf: "flex-start",
+              position: "sticky",
+              top: 0,
+              writingMode: "vertical-rl",
+              transform: "rotate(180deg)",
+              padding: "12px 8px",
+              borderRadius: 8,
+              border: "1px solid #BEDA41",
+              backgroundColor: "#BEDA41",
+              color: "#1a1f0a",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(15,23,42,0.12)",
+              letterSpacing: "0.04em",
+            }}
+          >
+            Show labels
+          </button>
+        )}
+
+        {/* Canvas with PDF preview */}
         <div style={{ flex: "1 1 auto", minWidth: 0, position: "relative" }}>
           <div style={{
             marginBottom: '8px',
@@ -1110,320 +1444,6 @@ export function RoiEditorV2({
             </div>
           )}
 
-          {/* Floating draw palette — fixed over the viewer while PDF scrolls */}
-          {drawPaletteOpen ? (
-            <div
-              data-testid="roi-draw-palette"
-              style={{
-                position: "absolute",
-                top: 40,
-                left: 12,
-                zIndex: 30,
-                width: 220,
-                maxHeight: "min(70vh, 560px)",
-                overflow: "auto",
-                backgroundColor: "rgba(255,255,255,0.97)",
-                border: "1px solid #e2e8f0",
-                borderRadius: "10px",
-                boxShadow: "0 10px 30px rgba(15,23,42,0.18)",
-                padding: "10px",
-                backdropFilter: "blur(6px)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: 8,
-                  gap: 8,
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1e293b" }}>
-                    Draw labels
-                  </div>
-                  <div style={{ fontSize: 10, color: "#64748b" }}>
-                    ROI = Region of Interest · hover for how to draw · custom
-                    labels are remembered for the next template
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setDrawPaletteOpen(false)}
-                  style={{
-                    border: "1px solid #e2e8f0",
-                    background: "#f8fafc",
-                    borderRadius: 6,
-                    padding: "2px 8px",
-                    fontSize: 11,
-                    cursor: "pointer",
-                    color: "#475569",
-                  }}
-                  title="Hide panel"
-                >
-                  Hide
-                </button>
-              </div>
-
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 11,
-                  color: "#64748b",
-                  marginBottom: 8,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={showCriticalOnly}
-                  onChange={e => setShowCriticalOnly(e.target.checked)}
-                />
-                Critical only
-              </label>
-
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 4,
-                  marginBottom: 8,
-                }}
-              >
-                {filteredTypes.map(type => {
-                  const active = currentTool === type.id;
-                  const specMeta = specFields.find(f => f.field === type.id);
-                  const guidance = getRoiDrawGuidance(type.id, {
-                    label: type.label,
-                    fieldType: specMeta?.type,
-                  });
-                  const isRemembered =
-                    !STANDARD_ROI_TYPES.some(t => t.id === type.id) &&
-                    !specFields.some(f => f.field === type.id);
-                  return (
-                    <Tooltip key={type.id} delayDuration={200}>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCurrentTool(type.id);
-                            // Selecting a remembered/custom label binds it into this template
-                            if (
-                              !STANDARD_ROI_TYPES.some(t => t.id === type.id)
-                            ) {
-                              integrateCustomLabel({
-                                id: type.id,
-                                label: type.label,
-                                color: type.color,
-                                critical: type.critical,
-                                type: specMeta?.type ?? "string",
-                              });
-                            }
-                          }}
-                          disabled={readOnly}
-                          aria-label={`${type.label}. ${guidance.summary} How to draw: ${guidance.howToDraw}`}
-                          data-testid={`roi-draw-tool-${type.id}`}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                            width: "100%",
-                            textAlign: "left",
-                            padding: "6px 8px",
-                            borderRadius: 6,
-                            border: active
-                              ? `2px solid ${type.color}`
-                              : "1px solid #e2e8f0",
-                            backgroundColor: active
-                              ? `${type.color}18`
-                              : "#fff",
-                            color: active ? type.color : "#334155",
-                            cursor: readOnly ? "not-allowed" : "pointer",
-                            fontSize: 12,
-                            fontWeight: active ? 700 : 500,
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: 999,
-                              backgroundColor: type.color,
-                              flexShrink: 0,
-                            }}
-                          />
-                          {type.critical && (
-                            <span
-                              style={{ color: "#dc2626", fontSize: 9 }}
-                            >
-                              ●
-                            </span>
-                          )}
-                          <span style={{ flex: 1 }}>{type.label}</span>
-                          {isRemembered && (
-                            <span
-                              title="Saved from a previous template"
-                              style={{
-                                fontSize: 9,
-                                fontWeight: 700,
-                                color: "#64748b",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.02em",
-                              }}
-                            >
-                              saved
-                            </span>
-                          )}
-                          <span
-                            aria-hidden
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: "#94a3b8",
-                              lineHeight: 1,
-                            }}
-                          >
-                            ?
-                          </span>
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side="right"
-                        sideOffset={8}
-                        className="z-[80] max-w-[280px] space-y-1.5 border border-slate-700 bg-slate-900 p-3 text-left text-xs text-slate-50 shadow-lg"
-                      >
-                        <div className="font-semibold text-white">
-                          {type.label}
-                        </div>
-                        <p className="text-slate-200 leading-snug">
-                          {guidance.summary}
-                        </p>
-                        <p className="leading-snug">
-                          <span className="font-semibold text-[#BEDA41]">
-                            Look for:
-                          </span>{" "}
-                          {guidance.lookFor}
-                        </p>
-                        <p className="leading-snug">
-                          <span className="font-semibold text-[#BEDA41]">
-                            How to draw:
-                          </span>{" "}
-                          {guidance.howToDraw}
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-
-              {!readOnly && (
-                <div
-                  style={{
-                    borderTop: "1px solid #e2e8f0",
-                    paddingTop: 8,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 6,
-                  }}
-                >
-                  <input
-                    type="text"
-                    value={customLabelDraft}
-                    onChange={e => setCustomLabelDraft(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addCustomLabel();
-                      }
-                    }}
-                    placeholder="Custom label… (saved for next template)"
-                    style={{
-                      padding: "6px 8px",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 6,
-                      fontSize: 12,
-                      width: "100%",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                  <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.35 }}>
-                    New labels are stored in browser memory and added to this
-                    template&apos;s fields so ids stay consistent next time.
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    <label
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4,
-                        fontSize: 11,
-                        color: "#64748b",
-                        flex: 1,
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={customLabelCritical}
-                        onChange={e => setCustomLabelCritical(e.target.checked)}
-                      />
-                      Critical
-                    </label>
-                    <button
-                      type="button"
-                      onClick={addCustomLabel}
-                      disabled={!customLabelDraft.trim()}
-                      style={{
-                        padding: "5px 10px",
-                        borderRadius: 6,
-                        border: "1px solid #BEDA41",
-                        backgroundColor: "#BEDA41",
-                        color: "#1a1f0a",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        cursor: customLabelDraft.trim()
-                          ? "pointer"
-                          : "not-allowed",
-                        opacity: customLabelDraft.trim() ? 1 : 0.5,
-                      }}
-                    >
-                      + Add
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <button
-              type="button"
-              data-testid="roi-draw-palette-show"
-              onClick={() => setDrawPaletteOpen(true)}
-              style={{
-                position: "absolute",
-                top: 40,
-                left: 12,
-                zIndex: 30,
-                padding: "8px 12px",
-                borderRadius: 8,
-                border: "1px solid #BEDA41",
-                backgroundColor: "#BEDA41",
-                color: "#1a1f0a",
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-                boxShadow: "0 6px 16px rgba(15,23,42,0.15)",
-              }}
-            >
-              Show labels
-            </button>
-          )}
 
             {/* Accuracy coaching — announce OCR vs generic repeatedly */}
             {regions.length > 0 && (
