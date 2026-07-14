@@ -31,6 +31,15 @@ export const systemRouter = router({
         databaseConfigured: Boolean(ENV.databaseUrl),
         // Use APP_ENV for environment identity
         environment: ENV.appEnvironment,
+        /**
+         * Public browser Sentry DSN (not a secret). Prefer SENTRY_CLIENT_DSN;
+         * SENTRY_DSN accepted as fallback so FlagOps can set one Container App env.
+         * Client fails soft when absent — console-only errors.
+         */
+        sentryDsn:
+          process.env.SENTRY_CLIENT_DSN?.trim() ||
+          process.env.SENTRY_DSN?.trim() ||
+          undefined,
       },
     })),
 
