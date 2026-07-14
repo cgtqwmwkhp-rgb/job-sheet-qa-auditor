@@ -338,12 +338,12 @@ function mapExtractedFieldsToValidated(
   );
 }
 
-function mapReviewQueueReasons(findings: FindingResponse[]): ReviewQueueReasonCode[] {
+function mapReviewQueueReasons(
+  findings: FindingResponse[]
+): ReviewQueueReasonCode[] {
   const codes = new Set<ReviewQueueReasonCode>();
   for (const f of findings) {
-    if (
-      REVIEW_QUEUE_REASON_CODES.includes(f.ruleId as ReviewQueueReasonCode)
-    ) {
+    if (REVIEW_QUEUE_REASON_CODES.includes(f.ruleId as ReviewQueueReasonCode)) {
       codes.add(f.ruleId as ReviewQueueReasonCode);
     }
   }
@@ -363,8 +363,9 @@ function mapDbAuditToExportShape(
   const failedCount = validatedFields.filter(
     f => f.status === "failed" || f.status === "error"
   ).length;
-  const skippedCount = validatedFields.filter(f => f.status === "skipped")
-    .length;
+  const skippedCount = validatedFields.filter(
+    f => f.status === "skipped"
+  ).length;
 
   return {
     id: audit.id,
