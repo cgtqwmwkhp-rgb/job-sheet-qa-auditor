@@ -236,8 +236,8 @@ function normalizeBoundValue(n: number): number {
 }
 
 function clampBounds(b: NormBounds): NormBounds {
-  let x = Math.max(0, Math.min(1, b.x));
-  let y = Math.max(0, Math.min(1, b.y));
+  const x = Math.max(0, Math.min(1, b.x));
+  const y = Math.max(0, Math.min(1, b.y));
   let width = Math.max(0.008, Math.min(1, b.width));
   let height = Math.max(0.008, Math.min(1, b.height));
   if (x + width > 1) width = 1 - x;
