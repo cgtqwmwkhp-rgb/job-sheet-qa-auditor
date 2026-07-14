@@ -12,6 +12,7 @@ export * from "./mistralAdapter";
 export * from "./mockAdapter";
 export * from "./mockAzureDiAdapter";
 export * from "./azureDocumentIntelligenceAdapter";
+export * from "./azureCustomFormAdapter";
 export * from "./resilientOcrAdapter";
 export {
   parseMistralOcrResponse,
@@ -21,6 +22,19 @@ export {
   parseAzureDiResponse,
   polygonToPercentBBox,
 } from "./parseAzureDiResponse";
+export {
+  parseAzureDiCustomForm,
+  customFieldsToPreExtracted,
+  customChecklistFieldsToChoices,
+  normalizeChecklistChoice,
+  PLANTEXPAND_JSR_FIELD_MAP,
+  extractCustomFieldValue,
+} from "./parseAzureDiCustomForm";
+export type {
+  AzureCustomFormField,
+  AzureCustomFieldType,
+  ParsedAzureCustomFormResult,
+} from "./parseAzureDiCustomForm";
 export type {
   AzureSelectionMark,
   AzureSelectionMarkBBox,
