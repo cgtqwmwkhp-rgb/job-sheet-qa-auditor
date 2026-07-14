@@ -237,11 +237,11 @@ export function valueFromCropOcrText(
       /(?:asset(?:\s*id)?|fleet|reg(?:istration)?|plant)\s*[:#-]?\s*([A-Z0-9][\w/-]{2,})/i,
     ],
     date: [
-      /(?:date|visited|completed)\s*[:#-]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{4}-\d{2}-\d{2})/i,
-      /\b(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\b/,
+      /(?:date|visited|completed)\s*[:#-]?\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2})/i,
+      /\b(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\b/,
     ],
     expiryDate: [
-      /(?:expir(?:y|es|ation)|valid\s*until)\s*[:#-]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{4}-\d{2}-\d{2})/i,
+      /(?:expir(?:y|es|ation)|valid\s*until)\s*[:#-]?\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2})/i,
     ],
   };
 

@@ -182,10 +182,10 @@ const FIELD_EVIDENCE_PATTERNS: Record<string, RegExp[]> = {
     /(?:asset(?:\s*id)?|fleet|reg(?:istration)?|plant)\s*[:#-]?\s*([A-Z0-9][\w/-]{2,})/i,
   ],
   date: [
-    /(?:^|\b)(?:date|visited|completed)\s*[:#-]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{4}-\d{2}-\d{2})/im,
+    /(?:^|\b)(?:date|visited|completed)\s*[:#-]?\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2})/im,
   ],
   expiryDate: [
-    /(?:expir(?:y|es|ation)|valid\s*until)\s*[:#-]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{4}-\d{2}-\d{2})/i,
+    /(?:expir(?:y|es|ation)|valid\s*until)\s*[:#-]?\s*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2})/i,
   ],
   tickboxBlock: [/\b(all[_\s-]?checked|tick(?:ed|box)?s?\s*complete)\b/i],
   signatureBlock: [/\b(signed|signature\s*present|sign[_-]?off)\b/i],
