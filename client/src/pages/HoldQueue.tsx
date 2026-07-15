@@ -191,7 +191,7 @@ export default function HoldQueue() {
 
   const holdItems = useMemo(
     () =>
-      (jobSheets || []).map(sheet => {
+      (jobSheets?.items ?? []).map(sheet => {
         const sla = slaById.get(sheet.id);
         return {
           id: sheet.id,

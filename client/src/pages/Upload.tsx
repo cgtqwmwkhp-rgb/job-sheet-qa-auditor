@@ -76,7 +76,7 @@ export default function UploadPage() {
     { limit: 10 },
     {
       refetchInterval: query => {
-        const rows = query.state.data;
+        const rows = query.state.data?.items;
         if (!rows?.length) return false;
         const active =
           rows.some(r => isActiveJobSheetStatus(r.status)) ||
@@ -97,7 +97,9 @@ export default function UploadPage() {
 
   const primaryProcessingId = useMemo(() => {
     if (processingIds.length > 0) return processingIds[0];
-    const fromList = recentUploads?.find(u => isActiveJobSheetStatus(u.status));
+    const fromList = recentUploads?.items.find(u =>
+      isActiveJobSheetStatus(u.status)
+    );
     return fromList?.id ?? null;
   }, [processingIds, recentUploads]);
 
@@ -524,9 +526,9 @@ export default function UploadPage() {
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-[#8A8787]" />
                 </div>
-              ) : recentUploads && recentUploads.length > 0 ? (
+              ) : (recentUploads?.items.length ?? 0) > 0 ? (
                 <div className="space-y-3">
-                  {recentUploads.map(upload => (
+                  {recentUploads!.items.map(upload => (
                     <div
                       key={upload.id}
                       className="flex items-center gap-3 rounded-lg p-2 transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4]"

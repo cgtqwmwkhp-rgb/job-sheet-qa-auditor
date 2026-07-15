@@ -581,8 +581,10 @@ describe("jobSheets", () => {
 
     const result = await caller.jobSheets.list();
 
-    expect(Array.isArray(result)).toBe(true);
-    expect(result.length).toBeGreaterThan(0);
+    expect(Array.isArray(result.items)).toBe(true);
+    expect(result.items.length).toBeGreaterThan(0);
+    expect(result.hasMore).toBe(false);
+    expect(db.getJobSheets).toHaveBeenCalledWith({ limit: 51 });
   });
 
   it("gets a single job sheet by id", async () => {
@@ -615,10 +617,12 @@ describe("audits", () => {
 
     const result = await caller.audits.list();
 
-    expect(Array.isArray(result)).toBe(true);
+    expect(Array.isArray(result.items)).toBe(true);
+    expect(result.hasMore).toBe(false);
     expect(db.getAuditResultList).toHaveBeenCalledOnce();
+    expect(db.getAuditResultList).toHaveBeenCalledWith({ limit: 51 });
     expect(db.getAuditResults).not.toHaveBeenCalled();
-    expect(result[0]).not.toHaveProperty("reportJson");
+    expect(result.items[0]).not.toHaveProperty("reportJson");
   });
 
   it("gets audit result by job sheet id", async () => {

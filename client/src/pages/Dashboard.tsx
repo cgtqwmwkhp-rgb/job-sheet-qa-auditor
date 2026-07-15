@@ -155,7 +155,7 @@ export default function Dashboard() {
   }, [exceptionSummary]);
 
   const recentActivity: Activity[] = useMemo(() => {
-    return (recentJobSheets ?? []).slice(0, 8).map(sheet => ({
+    return (recentJobSheets?.items ?? []).slice(0, 8).map(sheet => ({
       id: sheet.id,
       type:
         sheet.status === "review_queue"
@@ -483,9 +483,9 @@ export default function Dashboard() {
                 <TabsTrigger value="recent">Recent Audits</TabsTrigger>
                 <TabsTrigger value="hold">
                   Hold Queue
-                  {(holdQueueSheets?.length ?? 0) > 0 ? (
+                  {(holdQueueSheets?.items.length ?? 0) > 0 ? (
                     <Badge variant="secondary" className="ml-1.5 h-5 px-1.5">
-                      {holdQueueSheets!.length}
+                      {holdQueueSheets!.items.length}
                     </Badge>
                   ) : null}
                 </TabsTrigger>
@@ -509,7 +509,7 @@ export default function Dashboard() {
                     </div>
                     {!jobSheetsLoading &&
                     recentJobSheets &&
-                    recentJobSheets.length > 0 ? (
+                    recentJobSheets.items.length > 0 ? (
                       <Button asChild variant="ghost" size="sm">
                         <Link href="/audits">View all</Link>
                       </Button>
@@ -531,9 +531,9 @@ export default function Dashboard() {
                           </div>
                         ))}
                       </div>
-                    ) : recentJobSheets && recentJobSheets.length > 0 ? (
+                    ) : recentJobSheets && recentJobSheets.items.length > 0 ? (
                       <div className="space-y-3">
-                        {recentJobSheets.map(sheet => (
+                        {recentJobSheets.items.map(sheet => (
                           <div
                             key={sheet.id}
                             className="flex cursor-pointer items-center justify-between rounded-lg border p-4 transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4]"
@@ -625,9 +625,9 @@ export default function Dashboard() {
                   <CardContent>
                     {holdLoading ? (
                       <ChartSkeleton />
-                    ) : holdQueueSheets && holdQueueSheets.length > 0 ? (
+                    ) : holdQueueSheets && holdQueueSheets.items.length > 0 ? (
                       <div className="space-y-3">
-                        {holdQueueSheets.map(sheet => (
+                        {holdQueueSheets.items.map(sheet => (
                           <div
                             key={sheet.id}
                             className="flex cursor-pointer items-center justify-between rounded-lg border border-l-4 border-l-[#E8A317] p-4 transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4]"
