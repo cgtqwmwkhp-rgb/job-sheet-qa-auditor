@@ -1,5 +1,6 @@
 import { ENV } from "./env";
 import { getMockLlmResponse } from "./mockLlm";
+import { TIMEOUT_CONFIG } from "../utils/timeout";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -417,6 +418,36 @@ function mapGeminiResponseToInvokeResult(
   };
 }
 
+/**
+ * Bound each provider attempt so an upstream stall cannot consume the entire
+ * document-processing budget. The timeout actively aborts the HTTP request,
+ * unlike a Promise.race wrapper which leaves the socket in flight.
+ */
+async function fetchGeminiWithTimeout(
+  url: string,
+  init: RequestInit
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutMs = TIMEOUT_CONFIG.EXTERNAL_API;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      const timeoutError = new Error(
+        `Gemini request timed out after ${timeoutMs}ms`
+      );
+      timeoutError.name = "TimeoutError";
+      (timeoutError as Error & { code?: string }).code = "ETIMEDOUT";
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function invokeGeminiDirect(params: InvokeParams): Promise<InvokeResult> {
   assertApiKey();
 
@@ -445,7 +476,7 @@ async function invokeGeminiDirect(params: InvokeParams): Promise<InvokeResult> {
   void params.toolChoice;
   void params.tool_choice;
 
-  const response = await fetch(url, {
+  const response = await fetchGeminiWithTimeout(url, {
     method: "POST",
     headers: {
       "content-type": "application/json",

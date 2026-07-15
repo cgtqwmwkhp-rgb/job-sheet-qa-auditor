@@ -158,5 +158,32 @@ describe("Direct Gemini Judgment Contract (PR-6)", () => {
       );
       expect(isConfiguredNoKey()).toBe(false);
     });
+
+    it("actively aborts a stalled Gemini request within its attempt budget", async () => {
+      delete process.env.LLM_PROVIDER;
+      process.env.TIMEOUT_API_MS = "10";
+      vi.resetModules();
+
+      const fetchMock = vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              reject(new DOMException("Aborted", "AbortError"));
+            });
+          })
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const { invokeLLM } = await import("../../_core/llm");
+
+      await expect(
+        invokeLLM({
+          messages: [{ role: "user", content: "Analyze this job sheet" }],
+        })
+      ).rejects.toThrow("Gemini request timed out after 10ms");
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+    });
   });
 });
