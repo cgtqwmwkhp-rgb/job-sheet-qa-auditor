@@ -38,6 +38,7 @@ function createMemoryDeps() {
     id: 1,
     auditResultId: 10,
     resolutionStatus: "open",
+    severity: "S0",
     fieldName: "site_name",
     rawSnippet: "Acme Site",
     normalisedSnippet: "Acme Site",
@@ -46,6 +47,7 @@ function createMemoryDeps() {
     id: 2,
     auditResultId: 10,
     resolutionStatus: "open",
+    severity: "S2",
     fieldName: "date",
     rawSnippet: "01/01/2024",
     normalisedSnippet: "01/01/2024",
@@ -118,6 +120,10 @@ function createMemoryDeps() {
     logAction: async data => {
       logs.push(data as unknown as Record<string, unknown>);
     },
+    listFindingsByAuditResultId: async auditResultId =>
+      Array.from(findings.values()).filter(
+        f => f.auditResultId === auditResultId
+      ),
   };
 
   return { deps, findings, audits, waivers, logs, jobSheetStatuses };
@@ -276,7 +282,7 @@ describe("Audit Actions Contract (PR-10)", () => {
       expect(mem.logs.some(l => l.action === "FINDING_OVERRIDE")).toBe(true);
     });
 
-    it("waives a finding and creates a waiver", async () => {
+    it("waives a finding and recalculates sheet from remaining findings", async () => {
       const result = await applyFindingAction(mem.deps, {
         findingId: 1,
         action: "waive",
@@ -286,8 +292,9 @@ describe("Audit Actions Contract (PR-10)", () => {
 
       expect(result.waiverId).toBeDefined();
       expect(mem.waivers.size).toBe(1);
-      expect(mem.audits.get(10)?.result).toBe("waived");
-      expect(result.auditResultStatus).toBe("waived");
+      // Finding 2 (S2) still open → review_queue, not stale fail / blanket waived
+      expect(mem.audits.get(10)?.result).toBe("review_queue");
+      expect(result.auditResultStatus).toBe("review_queue");
     });
 
     it("flags a finding and moves job sheet to review_queue", async () => {

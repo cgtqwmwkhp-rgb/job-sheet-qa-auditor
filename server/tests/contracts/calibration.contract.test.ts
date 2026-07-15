@@ -8,23 +8,24 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { PredictionSample } from "../../services/calibration/types";
 
-function perfectlyCalibratedSamples(): PredictionSample[] {
+function perfectlyCalibratedSamples(totalPerBin = 40): PredictionSample[] {
   const samples: PredictionSample[] = [];
 
   // Each decile bin: avg confidence matches empirical accuracy
   const specs = [
-    { confidence: 0.55, total: 20, correct: 11 },
-    { confidence: 0.65, total: 20, correct: 13 },
-    { confidence: 0.75, total: 20, correct: 15 },
-    { confidence: 0.85, total: 20, correct: 17 },
-    { confidence: 0.95, total: 20, correct: 19 },
+    { confidence: 0.55, accuracy: 0.55 },
+    { confidence: 0.65, accuracy: 0.65 },
+    { confidence: 0.75, accuracy: 0.75 },
+    { confidence: 0.85, accuracy: 0.85 },
+    { confidence: 0.95, accuracy: 0.95 },
   ];
 
   for (const spec of specs) {
-    for (let i = 0; i < spec.total; i++) {
+    const correct = Math.round(spec.accuracy * totalPerBin);
+    for (let i = 0; i < totalPerBin; i++) {
       samples.push({
         confidence: spec.confidence,
-        correct: i < spec.correct,
+        correct: i < correct,
       });
     }
   }
@@ -91,21 +92,34 @@ describe("Calibration Contract (Phase 3.3)", () => {
   });
 
   describe("computeEce", () => {
-    it("returns ECE≈0 for perfectly calibrated samples", async () => {
-      const { computeEce } = await import("../../services/calibration");
+    it("returns ECE≈0 for perfectly calibrated samples at N≥200", async () => {
+      const { computeEce, ECE_MIN_SAMPLES } = await import(
+        "../../services/calibration"
+      );
 
-      const result = computeEce(perfectlyCalibratedSamples());
-      expect(result.ece).toBeLessThan(0.05);
+      const samples = perfectlyCalibratedSamples(40); // 200 samples
+      expect(samples.length).toBeGreaterThanOrEqual(ECE_MIN_SAMPLES);
+
+      const result = computeEce(samples);
+      expect(result.measurementReady).toBe(true);
+      expect(result.ece).not.toBeNull();
+      expect(result.ece!).toBeLessThan(0.05);
       expect(result.bins.length).toBe(10);
       expect(result.bins.some(bin => bin.count > 0)).toBe(true);
     });
 
-    it("returns ECE>0 for miscalibrated samples", async () => {
-      const { computeEce } = await import("../../services/calibration");
+    it("keeps ECE unready below N≥200 and exposes provisionalEce", async () => {
+      const { computeEce, ECE_MIN_SAMPLES } = await import(
+        "../../services/calibration"
+      );
 
       const result = computeEce(miscalibratedSamples());
-      expect(result.ece).toBeGreaterThan(0.1);
+      expect(result.sampleCount).toBeLessThan(ECE_MIN_SAMPLES);
+      expect(result.measurementReady).toBe(false);
+      expect(result.ece).toBeNull();
+      expect(result.provisionalEce).toBeGreaterThan(0.1);
       expect(result.bins.length).toBe(10);
+      expect(result.note).toMatch(/Accumulating review labels/i);
     });
 
     it("does not report ECE=0 for empty samples (not perfect calibration)", async () => {
@@ -114,8 +128,46 @@ describe("Calibration Contract (Phase 3.3)", () => {
       const result = computeEce([]);
       expect(result.ece).toBeNull();
       expect(result.measurementReady).toBe(false);
+      expect(result.sampleCount).toBe(0);
       expect(result.bins).toEqual([]);
       expect(result.note).toMatch(/cannot be measured/i);
+    });
+  });
+
+  describe("review labels → PredictionSample", () => {
+    it("maps approve/override/correction into ECE samples", async () => {
+      const {
+        auditActionsToPredictionSamples,
+        resolvedFindingsToPredictionSamples,
+        computeEce,
+        ECE_MIN_SAMPLES,
+      } = await import("../../services/calibration");
+
+      const fromActions = auditActionsToPredictionSamples([
+        { action: "FINDING_APPROVE", confidenceScore: 90 },
+        { action: "FINDING_OVERRIDE", confidenceScore: 0.85 },
+        { action: "FIELD_CORRECTION", confidenceScore: 70 },
+        { action: "FINDING_FLAG", confidenceScore: 0.5 },
+      ]);
+      expect(fromActions).toEqual([
+        { confidence: 0.9, correct: true },
+        { confidence: 0.85, correct: false },
+        { confidence: 0.7, correct: false },
+      ]);
+
+      const labels = Array.from({ length: ECE_MIN_SAMPLES }, (_, i) => ({
+        resolutionStatus: (i % 3 === 0 ? "approved" : "overridden") as
+          | "approved"
+          | "overridden",
+        confidenceScore: 60 + (i % 40),
+      }));
+      const samples = resolvedFindingsToPredictionSamples(labels);
+      expect(samples.length).toBe(ECE_MIN_SAMPLES);
+
+      const ece = computeEce(samples);
+      expect(ece.measurementReady).toBe(true);
+      expect(ece.ece).not.toBeNull();
+      expect(ece.ece).not.toBe(0);
     });
   });
 

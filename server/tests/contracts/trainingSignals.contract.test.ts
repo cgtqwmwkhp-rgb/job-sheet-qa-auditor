@@ -30,6 +30,7 @@ function createMemoryDeps() {
     id: 1,
     auditResultId: 10,
     resolutionStatus: "open",
+    severity: "S1",
     fieldName: "tyre_psi",
     rawSnippet: "32",
     normalisedSnippet: "32",
@@ -73,6 +74,10 @@ function createMemoryDeps() {
     logAction: async data => {
       logs.push(data as unknown as Record<string, unknown>);
     },
+    listFindingsByAuditResultId: async auditResultId =>
+      Array.from(findings.values()).filter(
+        f => f.auditResultId === auditResultId
+      ),
   };
 
   return { deps, logs, findings, audits };
