@@ -157,11 +157,11 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
       expect(getShadowChallengerConfig()).toEqual(DEFAULT_SHADOW_CONFIG);
     });
 
-    it("enables shadow mode when FEATURE_SHADOW_CHALLENGER=true", () => {
+    it("refuses to enable an always-PASS rule-based challenger", () => {
       process.env[FEATURE_FLAG] = "true";
       const cfg = getShadowChallengerConfig();
-      expect(cfg.enabled).toBe(true);
-      expect(cfg.mode).toBe("shadow");
+      expect(cfg.enabled).toBe(false);
+      expect(cfg.mode).toBe("off");
       expect(cfg.strategy).toBe("rule_based");
       expect(cfg.realModelEnabled).toBe(false);
       expect(isShadowRealModelEnabled()).toBe(false);
@@ -181,9 +181,11 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
 
     it("respects SHADOW_MODE=canary and canary percent", () => {
       process.env[FEATURE_FLAG] = "true";
+      process.env[REAL_MODEL_FEATURE_FLAG] = "true";
       process.env.SHADOW_MODE = "canary";
       process.env.SHADOW_CANARY_PERCENT = "25";
       const cfg = getShadowChallengerConfig();
+      expect(cfg.enabled).toBe(true);
       expect(cfg.mode).toBe("canary");
       expect(cfg.canaryPercent).toBe(25);
     });
@@ -207,6 +209,7 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
     it("reports advisory mode only when enabled in shadow", () => {
       expect(isShadowAdvisoryMode()).toBe(false);
       process.env[FEATURE_FLAG] = "true";
+      process.env[REAL_MODEL_FEATURE_FLAG] = "true";
       process.env.SHADOW_MODE = "shadow";
       expect(isShadowAdvisoryMode()).toBe(true);
       process.env.SHADOW_MODE = "canary";
@@ -396,7 +399,7 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
       expect(result.canaryApplied).toBe(false);
     });
 
-    it("runs rule-based challenger without mutating champion in shadow mode", async () => {
+    it("does not run an always-PASS rule-based challenger in shadow mode", async () => {
       process.env[FEATURE_FLAG] = "true";
       process.env.SHADOW_MODE = "shadow";
       const champion = championFail();
@@ -407,21 +410,39 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
         champion,
         jobSheetId: 7,
       });
-      expect(result.comparison).not.toBeNull();
-      expect(result.comparison!.mode).toBe("shadow");
-      expect(result.comparison!.strategy).toBe("rule_based");
-      expect(result.comparison!.champion.overallResult).toBe("FAIL");
-      // Rule-based challenger PASSes rich content — disagreement expected
-      expect(result.comparison!.challenger.overallResult).toBe("PASS");
-      expect(result.comparison!.resultDisagreement).toBe(true);
+      expect(result.comparison).toBeNull();
       expect(result.canaryApplied).toBe(false);
       expect(result.servedAnalysis).toBeNull();
-      // Champion object unchanged
       expect(champion.overallResult).toBe("FAIL");
     });
 
-    it("applies canary when sampled at 100%", async () => {
+    it("cannot serve rule-based challenger even if an unsafe config is injected", async () => {
       process.env[FEATURE_FLAG] = "true";
+      const result = await evaluateShadowChallenger({
+        extractedText: RICH_TEXT,
+        goldSpec: SAMPLE_SPEC,
+        pageCount: 1,
+        champion: championFail(),
+        jobSheetId: 99,
+        sampleKey: "always",
+        config: {
+          enabled: true,
+          mode: "canary",
+          canaryPercent: 100,
+          strategy: "rule_based",
+          realModelEnabled: false,
+          realModelId: "unused",
+        },
+      });
+      expect(result.comparison).toBeNull();
+      expect(result.canaryApplied).toBe(false);
+      expect(result.servedAnalysis).toBeNull();
+    });
+
+    it("serves an eligible real-model challenger when sampled at 100%", async () => {
+      process.env[FEATURE_FLAG] = "true";
+      process.env[REAL_MODEL_FEATURE_FLAG] = "true";
+      process.env.LLM_PROVIDER = "mock";
       process.env.SHADOW_MODE = "canary";
       process.env.SHADOW_CANARY_PERCENT = "100";
       const result = await evaluateShadowChallenger({
@@ -433,13 +454,17 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
         sampleKey: "always",
       });
       expect(result.canaryApplied).toBe(true);
-      expect(result.servedAnalysis).not.toBeNull();
-      expect(result.servedAnalysis!.model).toBe("shadow-challenger-rule-based");
-      expect(result.comparison!.canaryApplied).toBe(true);
+      expect(result.servedAnalysis?.model).toBe(
+        "gemini-2.0-flash"
+      );
+      expect(result.comparison?.strategy).toBe("real_model");
+      expect(result.comparison?.canaryApplied).toBe(true);
     });
 
     it("never applies canary at 0%", async () => {
       process.env[FEATURE_FLAG] = "true";
+      process.env[REAL_MODEL_FEATURE_FLAG] = "true";
+      process.env.LLM_PROVIDER = "mock";
       process.env.SHADOW_MODE = "canary";
       process.env.SHADOW_CANARY_PERCENT = "0";
       const result = await evaluateShadowChallenger({
@@ -476,7 +501,7 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
       expect(champion.overallResult).toBe("FAIL");
     });
 
-    it("falls back to rule_based in shadow mode when real model has no credentials", async () => {
+    it("does not fall back to rule_based when real model has no credentials", async () => {
       process.env[FEATURE_FLAG] = "true";
       process.env.SHADOW_MODE = "shadow";
       process.env[REAL_MODEL_FEATURE_FLAG] = "true";
@@ -488,11 +513,7 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
         champion,
         jobSheetId: 27,
       });
-      expect(result.comparison).not.toBeNull();
-      expect(result.comparison!.strategy).toBe("rule_based");
-      expect(result.comparison!.challenger.model).toBe(
-        "shadow-challenger-rule-based"
-      );
+      expect(result.comparison).toBeNull();
       expect(result.servedAnalysis).toBeNull();
       expect(result.canaryApplied).toBe(false);
       expect(champion.overallResult).toBe("PASS");
@@ -521,6 +542,7 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
   describe("persistence extraction + summary", () => {
     it("extracts shadowComparison from reportJson fixtures", () => {
       process.env[FEATURE_FLAG] = "true";
+      process.env[REAL_MODEL_FEATURE_FLAG] = "true";
       const comparison = buildShadowComparison({
         mode: "shadow",
         strategy: "rule_based",
@@ -565,7 +587,7 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
       expect(summary.passRate.championPassRate).toBe(100);
       expect(summary.passRate.challengerPassRate).toBe(0);
       expect(summary.passRate.passRatePpDelta).toBe(-100);
-      expect(summary.strategy).toBe("rule_based");
+      expect(summary.strategy).toBe("real_model");
     });
   });
 });
