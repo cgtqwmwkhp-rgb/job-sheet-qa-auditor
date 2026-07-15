@@ -108,6 +108,10 @@ import { evaluateCommentQuality } from "./commentQuality";
 import { buildCommentDeepNoteAdvisory } from "./commentQuality/advisory";
 import { evaluatePartsUsed } from "./partsAssessment";
 import { evaluateEngineerAttribution } from "./engineerAttributionFindings";
+import {
+  isPartsWebVerifyEnabled,
+  verifyPartsCatalogWeb,
+} from "./partsCatalogLookup";
 import { evaluateEvidenceCoherence } from "./evidenceCoherence";
 import { evaluateTyreCompliance } from "./tyreCompliance";
 import { evaluateChecklistCompleteness } from "./checklistCompleteness";
@@ -2522,6 +2526,38 @@ async function processJobSheetWithOptions(
           status: "success",
           durationMs: 0,
         });
+      }
+
+      if (isPartsWebVerifyEnabled()) {
+        try {
+          const catalogResult = await verifyPartsCatalogWeb(jsrText);
+          if (catalogResult.findings.length > 0) {
+            analysisResult = {
+              ...analysisResult,
+              findings: [...analysisResult.findings, ...catalogResult.findings],
+              summary: `${analysisResult.summary} [PARTS_CATALOG_VERIFY] ${catalogResult.summary}`,
+            };
+          }
+          recordStage({
+            stage: "Parts Catalog Verify",
+            status: "success",
+            durationMs: 0,
+          });
+        } catch (err) {
+          console.warn(
+            "[DocumentProcessor] Parts catalog verify failed (non-fatal):",
+            err
+          );
+          recordStage({
+            stage: "Parts Catalog Verify",
+            status: "failed",
+            durationMs: 0,
+            error:
+              err instanceof Error
+                ? err.message
+                : "parts catalog verify failed",
+          });
+        }
       }
 
       // Studio-authored template rules (implies + numeric thresholds)
