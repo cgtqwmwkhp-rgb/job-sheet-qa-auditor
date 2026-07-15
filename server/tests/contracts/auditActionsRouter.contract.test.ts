@@ -110,10 +110,14 @@ describe("Audit actions router error contracts", () => {
     vi.mocked(db.getAuditResultById).mockResolvedValue(undefined);
 
     const input = { findingId: 10, reason: "Reviewer approved" };
-    const first = await createCaller("qa_lead", "approve-replay-10")
-      .auditActions.approve(input);
-    const replay = await createCaller("qa_lead", "approve-replay-10")
-      .auditActions.approve(input);
+    const first = await createCaller(
+      "qa_lead",
+      "approve-replay-10"
+    ).auditActions.approve(input);
+    const replay = await createCaller(
+      "qa_lead",
+      "approve-replay-10"
+    ).auditActions.approve(input);
 
     expect(replay).toEqual(first);
     expect(db.updateFindingResolution).toHaveBeenCalledTimes(1);
