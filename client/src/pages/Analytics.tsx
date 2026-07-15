@@ -29,6 +29,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import OverturnMetricsCard from "@/components/OverturnMetricsCard";
+import TemplateLearningCurveCard from "@/components/TemplateLearningCurveCard";
 
 function TechnicianAnalyticsPreview() {
   const { data, isLoading, error } =
@@ -294,6 +295,7 @@ export default function Analytics() {
 
           <TabsContent value="overview" className="space-y-4">
             <OverturnMetricsCard />
+            <TemplateLearningCurveCard />
             {hasData ? (
               <Card>
                 <CardHeader>

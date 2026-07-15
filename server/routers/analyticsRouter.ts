@@ -1040,6 +1040,22 @@ export const analyticsRouter = router({
   getShadowChallengerConfig: staffProcedure.query(() => {
     return getShadowChallengerConfig();
   }),
+
+  /**
+   * Wave-7: learning curve by template (audit cohorts 1–50 / 51–100 / 101–200).
+   */
+  getTemplateLearningCurve: staffProcedure
+    .input(z.object({ templateId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const { computeTemplateLearningCurve } = await import(
+        "../services/templateMemory/learningCurve"
+      );
+      const curve = await computeTemplateLearningCurve(input.templateId);
+      if (!curve) {
+        return { enabled: false as const, templateId: input.templateId };
+      }
+      return { enabled: true as const, ...curve };
+    }),
 });
 
 export type AnalyticsRouter = typeof analyticsRouter;
