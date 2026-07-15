@@ -912,8 +912,6 @@ function ReviewWorkstationContent({
       toast.error("Select a training reason");
       return;
     }
-    const mutation =
-      actionDialog.action === "waive" ? waiveMutation : overrideMutation;
     const label =
       actionDialog.action === "waive" ? "Finding waived" : "Finding overridden";
     const reason = actionReason.trim();
@@ -945,42 +943,46 @@ function ReviewWorkstationContent({
       focusWorkstationPane();
     }
 
-    mutation.mutate(
-      {
-        findingId,
-        reason,
-        ...(trainingReasonCode
-          ? { trainingReasonCode: trainingReasonCode as TrainingReasonCode }
-          : {}),
+    const onActionSettled = {
+      onSuccess: () => {
+        setPendingActionIds(prev => {
+          const next = new Set(prev);
+          next.delete(findingId);
+          return next;
+        });
+        invalidateFindings();
+        showUndoToast(findingId, label);
+        focusWorkstationPane();
       },
-      {
-        onSuccess: () => {
-          setPendingActionIds(prev => {
-            const next = new Set(prev);
-            next.delete(findingId);
-            return next;
-          });
-          invalidateFindings();
-          showUndoToast(findingId, label);
-          focusWorkstationPane();
+      onError: (err: { message?: string }) => {
+        setOptimisticPassedIds(prev => {
+          const next = new Set(prev);
+          next.delete(finding.id);
+          return next;
+        });
+        setPendingActionIds(prev => {
+          const next = new Set(prev);
+          next.delete(findingId);
+          return next;
+        });
+        toast.error(err.message || "Action failed");
+        setActionDialog({ finding, action: actionKind });
+        setActionReason(reason);
+      },
+    };
+
+    if (actionKind === "override") {
+      overrideMutation.mutate(
+        {
+          findingId,
+          reason,
+          trainingReasonCode: trainingReasonCode as TrainingReasonCode,
         },
-        onError: err => {
-          setOptimisticPassedIds(prev => {
-            const next = new Set(prev);
-            next.delete(finding.id);
-            return next;
-          });
-          setPendingActionIds(prev => {
-            const next = new Set(prev);
-            next.delete(findingId);
-            return next;
-          });
-          toast.error(err.message || "Action failed");
-          setActionDialog({ finding, action: actionKind });
-          setActionReason(reason);
-        },
-      }
-    );
+        onActionSettled
+      );
+    } else {
+      waiveMutation.mutate({ findingId, reason }, onActionSettled);
+    }
   };
 
   const onActionReasonKeyDown = (
@@ -1015,7 +1017,6 @@ function ReviewWorkstationContent({
       action === "approve"
         ? "Confirmed before/after pair catch from workstation"
         : "Overridden before/after pair from workstation";
-    const mutation = action === "approve" ? approveMutation : overrideMutation;
     const label =
       action === "approve" ? "Pair catch confirmed" : "Pair finding overridden";
 
@@ -1025,7 +1026,14 @@ function ReviewWorkstationContent({
         if (findingId == null) {
           return Promise.reject(new Error("Invalid finding id"));
         }
-        return mutation.mutateAsync({ findingId, reason });
+        return action === "override"
+          ? overrideMutation.mutateAsync({
+              findingId,
+              reason,
+              // Pair override: rule false-positive on PHOTO-C012/C013
+              trainingReasonCode: "rule_wrong",
+            })
+          : approveMutation.mutateAsync({ findingId, reason });
       })
     ).then(results => {
       const ok = results.filter(r => r.status === "fulfilled");

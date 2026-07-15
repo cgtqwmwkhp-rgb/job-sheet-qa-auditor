@@ -34,6 +34,10 @@ import {
   resolveJobSheetsForFindings,
 } from "../services/trainingSignals";
 import {
+  isTemplateMemoryApplyEnabled,
+  isTemplateMemoryCaptureEnabled,
+} from "../services/templateMemory";
+import {
   enforceRateLimit,
   RateLimitError,
   RATE_LIMITS,
@@ -139,11 +143,20 @@ async function guardFindingMutation(input: {
   findingId: number;
   userId: number;
   claimToken?: string;
+  /** When set, enforce job-sheet ownership / role access (Wave-7). */
+  user?: { id: number; role: import("../_core/azureRoles").DbUserRole };
 }): Promise<void> {
   const jobSheetId = await resolveJobSheetIdForFinding(input.findingId);
   if (jobSheetId == null) {
     // Missing finding/audit — leave NOT_FOUND to the action path (and tests).
     return;
+  }
+  if (input.user) {
+    const jobSheet = await db.getJobSheetById(jobSheetId);
+    if (jobSheet) {
+      const { enforceJobSheetAccess } = await import("../utils/authorization");
+      enforceJobSheetAccess(jobSheet, input.user);
+    }
   }
   await assertReviewClaimAllowsMutation({
     jobSheetId,
@@ -156,12 +169,14 @@ async function guardFindingsMutation(input: {
   findingIds: number[];
   userId: number;
   claimToken?: string;
+  user?: { id: number; role: import("../_core/azureRoles").DbUserRole };
 }): Promise<void> {
   for (const findingId of input.findingIds) {
     await guardFindingMutation({
       findingId,
       userId: input.userId,
       claimToken: input.claimToken,
+      user: input.user,
     });
   }
 }
@@ -215,6 +230,8 @@ function createDbDeps(tx?: DbExecutor): AuditActionDeps {
         id: row.id,
         jobSheetId: row.jobSheetId,
         result: row.result,
+        templateId: row.templateId ?? null,
+        templateVersionId: row.templateVersionId ?? null,
       };
     },
     updateAuditResultStatus: (id, result) =>
@@ -278,10 +295,10 @@ const waiveFindingInput = findingActionInput.extend({
   expiresAt: z.date().optional(),
 });
 
-const trainingReasonCodeInput = z.enum(TRAINING_REASON_CODES).optional();
+const trainingReasonCodeRequired = z.enum(TRAINING_REASON_CODES);
 
 const overrideActionInput = findingActionInput.extend({
-  trainingReasonCode: trainingReasonCodeInput,
+  trainingReasonCode: trainingReasonCodeRequired,
 });
 
 export const auditActionsRouter = router({
@@ -421,6 +438,7 @@ export const auditActionsRouter = router({
               findingId: input.findingId,
               userId: ctx.user.id,
               claimToken: input.claimToken,
+              user: ctx.user,
             });
             return await waiveFinding({
               ...input,
@@ -449,6 +467,7 @@ export const auditActionsRouter = router({
               findingId: input.findingId,
               userId: ctx.user.id,
               claimToken: input.claimToken,
+              user: ctx.user,
             });
             return await runAuditAction(deps =>
               applyFindingAction(deps, {
@@ -477,6 +496,7 @@ export const auditActionsRouter = router({
           findingId: input.findingId,
           userId: ctx.user.id,
           claimToken: input.claimToken,
+          user: ctx.user,
         });
         return await runAuditAction(deps =>
           applyFindingAction(deps, {
@@ -508,6 +528,7 @@ export const auditActionsRouter = router({
               findingId: input.findingId,
               userId: ctx.user.id,
               claimToken: input.claimToken,
+              user: ctx.user,
             });
             return await runAuditAction(deps =>
               applyFindingAction(deps, {
@@ -539,6 +560,7 @@ export const auditActionsRouter = router({
           findingId: input.findingId,
           userId: ctx.user.id,
           claimToken: input.claimToken,
+          user: ctx.user,
         });
         return await runAuditAction(deps =>
           undoFindingAction(deps, {
@@ -567,6 +589,7 @@ export const auditActionsRouter = router({
           findingIds: input.findingIds,
           userId: ctx.user.id,
           claimToken: input.claimToken,
+          user: ctx.user,
         });
         return await runAuditAction(deps =>
           bulkApproveFindings(deps, {
@@ -603,6 +626,7 @@ export const auditActionsRouter = router({
           findingIds: input.findingIds,
           userId: ctx.user.id,
           claimToken: input.claimToken,
+          user: ctx.user,
         });
         return await runAuditAction(deps =>
           bulkResolveFindings(deps, {
@@ -710,7 +734,7 @@ export const auditActionsRouter = router({
         fieldName: z.string().min(1).max(200).optional(),
         originalValue: z.string().max(4000).optional(),
         correctedValue: z.string().min(1).max(4000),
-        trainingReasonCode: trainingReasonCodeInput,
+        trainingReasonCode: trainingReasonCodeRequired,
         claimToken: z.string().uuid().optional(),
       })
     )
@@ -720,6 +744,7 @@ export const auditActionsRouter = router({
           findingId: input.findingId,
           userId: ctx.user.id,
           claimToken: input.claimToken,
+          user: ctx.user,
         });
         return await runAuditAction(deps =>
           captureFieldCorrection(deps, {
@@ -751,6 +776,7 @@ export const auditActionsRouter = router({
           findingId: input.findingId,
           userId: ctx.user.id,
           claimToken: input.claimToken,
+          user: ctx.user,
         });
         return await runAuditAction(deps =>
           undoFieldCorrection(deps, {
@@ -790,6 +816,8 @@ export const auditActionsRouter = router({
     expectedStatusSupported: true,
     fieldCorrectionSupported: true,
     trainingReasonCodes: [...TRAINING_REASON_CODES],
+    templateMemoryWrite: isTemplateMemoryCaptureEnabled(),
+    templateMemoryApply: isTemplateMemoryApplyEnabled(),
   })),
 });
 

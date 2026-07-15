@@ -5,6 +5,7 @@
  * DB I/O is injected so unit tests run without a live database.
  */
 
+import { createHash } from "crypto";
 import {
   ACTION_TO_STATUS,
   STATUS_TO_ACTION,
@@ -22,8 +23,10 @@ import {
 } from "./sheetTruth";
 import {
   buildTrainingSignal,
+  normalizeTrainingReasonCode,
   withTrainingSignalDetails,
 } from "../trainingSignals";
+import { recordCorrectionEvent } from "../templateMemory";
 
 export {
   deriveSheetResultFromFindings,
@@ -71,6 +74,9 @@ export interface AuditResultRecord {
   id: number;
   jobSheetId: number;
   result: "pass" | "fail" | "review_queue" | "waived";
+  /** Wave-7 lineage — optional on legacy rows */
+  templateId?: number | null;
+  templateVersionId?: number | null;
 }
 
 export interface WaiverRecord {
@@ -280,6 +286,32 @@ export async function applyFindingAction(
     details: logDetails,
   });
 
+  let memory: Awaited<ReturnType<typeof recordCorrectionEvent>> | undefined;
+  if (
+    audit?.jobSheetId != null &&
+    (input.action === "override" ||
+      input.action === "waive" ||
+      input.action === "approve" ||
+      input.action === "flag")
+  ) {
+    memory = await recordCorrectionEvent({
+      correctionType: input.action,
+      trainingReasonCode: normalizeTrainingReasonCode(input.trainingReasonCode),
+      findingId: input.findingId,
+      auditResultId: finding.auditResultId,
+      jobSheetId: audit.jobSheetId,
+      templateId: audit.templateId ?? null,
+      templateVersionId: audit.templateVersionId ?? null,
+      fieldKey: finding.fieldName || "unknown",
+      ruleId: finding.ruleId,
+      originalValue: finding.normalisedSnippet ?? finding.rawSnippet ?? null,
+      correctedValue: null,
+      reviewerId: input.userId,
+      reviewerReason: input.reason,
+      idempotencyKey: `finding:${input.action}:${input.findingId}:${previous}->${next}`,
+    });
+  }
+
   return {
     success: true,
     action: input.action,
@@ -290,6 +322,11 @@ export async function applyFindingAction(
     jobSheetStatus: sideEffects.jobSheetStatus,
     auditResultStatus: sideEffects.auditResultStatus,
     undoToken: buildUndoToken(input.findingId, previous, next),
+    memoryCandidateId: memory?.candidateId ?? undefined,
+    memoryPromotionStatus: memory?.promotionStatus ?? undefined,
+    memoryAgreeCount: memory?.agreeCount ?? undefined,
+    studioConfirmRequired: memory?.studioConfirmRequired ?? undefined,
+    correctionId: memory?.correctionId ?? undefined,
   };
 }
 
@@ -601,12 +638,18 @@ export interface FieldCorrectionResult {
   previousSnippet: string | null;
   correctedValue: string;
   undoToken: string;
+  /** Wave-7 — present when dual-write / capture succeeds */
+  memoryCandidateId?: number;
+  memoryPromotionStatus?: string;
+  memoryAgreeCount?: number;
+  studioConfirmRequired?: boolean;
+  correctionId?: number;
 }
 
 /**
- * Capture a reviewer field correction (PR-13).
- * Persists corrected value to normalisedSnippet + system_audit_log.
- * No new migration / table — overnight-scoped ground truth.
+ * Capture a reviewer field correction (PR-13 + Wave-7).
+ * Persists corrected value to normalisedSnippet + system_audit_log,
+ * and dual-writes review_corrections / template memory when capture flag is on.
  */
 export async function captureFieldCorrection(
   deps: AuditActionDeps,
@@ -676,6 +719,29 @@ export async function captureFieldCorrection(
     ),
   });
 
+  let memory: Awaited<ReturnType<typeof recordCorrectionEvent>> | undefined;
+  if (audit?.jobSheetId != null) {
+    memory = await recordCorrectionEvent({
+      correctionType: "field_correction",
+      trainingReasonCode: normalizeTrainingReasonCode(input.trainingReasonCode),
+      findingId: input.findingId,
+      auditResultId: finding.auditResultId,
+      jobSheetId: audit.jobSheetId,
+      templateId: audit.templateId ?? null,
+      templateVersionId: audit.templateVersionId ?? null,
+      fieldKey: fieldName,
+      ruleId: finding.ruleId,
+      originalValue,
+      correctedValue: corrected,
+      reviewerId: input.userId,
+      reviewerReason: null,
+      idempotencyKey: `fc:${input.findingId}:${createHash("sha256")
+        .update(`${fieldName}\0${corrected}`)
+        .digest("hex")
+        .slice(0, 32)}`,
+    });
+  }
+
   return {
     success: true,
     findingId: input.findingId,
@@ -683,6 +749,11 @@ export async function captureFieldCorrection(
     previousSnippet,
     correctedValue: corrected,
     undoToken: `undo-fc:${input.findingId}:${encodeURIComponent(previousSnippet ?? "")}`,
+    memoryCandidateId: memory?.candidateId ?? undefined,
+    memoryPromotionStatus: memory?.promotionStatus ?? undefined,
+    memoryAgreeCount: memory?.agreeCount ?? undefined,
+    studioConfirmRequired: memory?.studioConfirmRequired ?? undefined,
+    correctionId: memory?.correctionId ?? undefined,
   };
 }
 
