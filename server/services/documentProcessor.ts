@@ -106,6 +106,7 @@ import {
 } from "./photoEvidence";
 import { evaluateCommentQuality } from "./commentQuality";
 import { buildCommentDeepNoteAdvisory } from "./commentQuality/advisory";
+import { evaluatePartsUsed } from "./partsAssessment";
 import { evaluateEvidenceCoherence } from "./evidenceCoherence";
 import { evaluateTyreCompliance } from "./tyreCompliance";
 import { evaluateChecklistCompleteness } from "./checklistCompleteness";
@@ -2500,6 +2501,20 @@ async function processJobSheetWithOptions(
         };
         recordStage({
           stage: "Comment Quality",
+          status: "success",
+          durationMs: 0,
+        });
+      }
+
+      const partsResult = evaluatePartsUsed(jsrText);
+      if (partsResult.findings.length > 0) {
+        analysisResult = {
+          ...analysisResult,
+          findings: [...analysisResult.findings, ...partsResult.findings],
+          summary: `${analysisResult.summary} [PARTS_ASSESSMENT] ${partsResult.summary}`,
+        };
+        recordStage({
+          stage: "Parts Assessment",
           status: "success",
           durationMs: 0,
         });

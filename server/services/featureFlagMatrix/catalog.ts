@@ -157,6 +157,14 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     deploy: unsetBoth,
   },
   {
+    key: "FEATURE_PARTS_LINE_ASSESSMENT",
+    description: "Parts Used PN + description line pairing",
+    defaultWhenUnset: "on",
+    critical: false,
+    parity: "unspecified",
+    deploy: unsetBoth,
+  },
+  {
     key: "FEATURE_CONFIDENCE_BANDS",
     description: "Confidence band mapping",
     defaultWhenUnset: "off",
