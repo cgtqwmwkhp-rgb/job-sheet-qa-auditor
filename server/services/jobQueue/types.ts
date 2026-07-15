@@ -58,4 +58,8 @@ export interface JobQueueBackend {
   clear(): void | Promise<void>;
   /** Reclaim stale running jobs after crash / restart. */
   recover?(): number | Promise<number>;
+  /** Active (queued|running) job for a sheet — used by process outbox resume. */
+  findActiveByJobSheetId?(
+    jobSheetId: number
+  ): JobSheetQueueJob | undefined | Promise<JobSheetQueueJob | undefined>;
 }

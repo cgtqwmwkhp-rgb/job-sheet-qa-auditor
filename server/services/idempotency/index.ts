@@ -1,11 +1,12 @@
 /**
- * Idempotency key module (Phase 3.x) + process/enqueue OCR guard.
+ * Idempotency key module (Phase 3.x) + process/enqueue OCR guard + outbox.
  *
  * Feature flag (default OFF for key emission wiring):
  * - FEATURE_IDEMPOTENCY=true → attach idempotencyKey on enqueue responses
  *
- * Content-hash OCR double-bill protection on `jobSheets.process` is always on
- * when a fileHash is present (PR-OPS-IDEMPOTENT challenge bar).
+ * Always on for `jobSheets.process`:
+ * - Content-hash OCR double-bill protection when fileHash is present
+ * - Durable Idempotency-Key outbox (Wave-4 C2) when the header is supplied
  */
 
 export const FEATURE_FLAG = "FEATURE_IDEMPOTENCY";
@@ -34,3 +35,15 @@ export {
   type ProcessIdempotencyLookup,
   type ProcessIdempotencyReason,
 } from "./processGuard";
+export {
+  clearProcessOutboxForTests,
+  executeProcessOutbox,
+  extractProcessJobSheetId,
+  listProcessOutboxForTests,
+  resumePendingProcessOutbox,
+  seedPendingProcessOutboxForTests,
+  setProcessOutboxBackendForTests,
+  type ProcessOutboxRecord,
+  type ProcessOutboxResumeDeps,
+  type ProcessOutboxStatus,
+} from "./processOutbox";

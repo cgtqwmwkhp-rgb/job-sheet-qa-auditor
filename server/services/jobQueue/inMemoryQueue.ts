@@ -145,6 +145,12 @@ export function getJobSheetProcessingJob(
   return jobsById.get(jobId);
 }
 
+export function findActiveInMemoryJobByJobSheetId(
+  jobSheetId: number
+): JobSheetQueueJob | undefined {
+  return findActiveJob(activeJobByJobSheetId.get(jobSheetId));
+}
+
 export function clearInMemoryJobSheetProcessingQueue(): void {
   jobsById.clear();
   activeJobByJobSheetId.clear();
@@ -161,4 +167,5 @@ export const inMemoryJobQueueBackend: JobQueueBackend = {
   hasQueued: hasQueuedJobSheetProcessingJobs,
   get: getJobSheetProcessingJob,
   clear: clearInMemoryJobSheetProcessingQueue,
+  findActiveByJobSheetId: findActiveInMemoryJobByJobSheetId,
 };

@@ -1,8 +1,9 @@
 /**
- * PR-OPS-IDEMPOTENT — process/enqueue content-hash OCR idempotency.
+ * PR-OPS-IDEMPOTENT + Wave-4 C2 — process/enqueue content-hash OCR idempotency
+ * and durable Idempotency-Key outbox wiring.
  *
  * Fixtures only — no live OCR, LLM, storage, or network.
- * Challenge bar: same content hash cannot double-bill OCR.
+ * Challenge bar: same content hash / same Idempotency-Key cannot double-bill OCR.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -270,6 +271,25 @@ describe("Process OCR idempotency (PR-OPS-IDEMPOTENT)", () => {
       );
       expect(content).toContain("same_sheet_already_processed");
       expect(content).toContain("Use Reprocess on the audit page");
+    });
+
+    it("wraps jobSheets.process in the durable Idempotency-Key outbox", () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), "server/routers.ts"),
+        "utf-8"
+      );
+      expect(content).toContain("executeProcessOutbox");
+      expect(content).toContain("getIdempotencyKey");
+      expect(content).toContain("jobSheets.process:");
+    });
+
+    it("resumes pending process outbox on job-queue boot", () => {
+      const content = fs.readFileSync(
+        path.join(process.cwd(), "server/services/jobQueue/index.ts"),
+        "utf-8"
+      );
+      expect(content).toContain("resumeProcessOutboxAfterRestart");
+      expect(content).toContain("resumePendingProcessOutbox");
     });
   });
 });
