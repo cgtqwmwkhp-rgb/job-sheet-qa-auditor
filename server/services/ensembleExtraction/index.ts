@@ -32,12 +32,13 @@ export const ENSEMBLE_TO_GOLDSPEC: Record<string, string> = {
   customer_name: "customerName",
   engineer_name: "technicianName",
   date: "dateOfService",
-  // Do NOT map technician_signature → customerSignature (caused Present|assetId
-  // conflicts to surface under Customer Signature). Keep unmapped for artifact.
+  // Role-separated signatures — never cross-map tech → customer.
+  technician_signature: "engineerSignOff",
+  customer_signature: "customerSignature",
   engineer_comments: "workDescription",
   make_model: "makeModel",
   mileage_hours: "mileageHours",
-  // safe_to_use, serial_no, technician_signature — artifact-only
+  // safe_to_use, serial_no — artifact-only
 };
 
 export const FEATURE_FLAG = "FEATURE_ENSEMBLE_EXTRACTION";
@@ -188,24 +189,6 @@ function mapFieldDetails(
         !(detail.required === false && isBlankPlaceholder)
       ) {
         conflictFields.push(sourceName);
-      }
-      // Safe remap: technician signature Present → customerSignature hint for Gemini
-      // (handwritten ink is invisible to OCR; label presence is the best text signal).
-      // Do NOT remap Absent/CONFLICT/asset bleed.
-      if (
-        sourceName === "technician_signature" &&
-        detail.value === "Present" &&
-        detail.reasonCode !== "CONFLICT"
-      ) {
-        fieldDetails.customerSignature = {
-          ...artifact,
-          displayName: "Technician Signature",
-        };
-        ensembleExtractedFields.customerSignature = {
-          value: "Present",
-          confidence: Math.max(detail.confidence, 70),
-          pageNumber: 1,
-        };
       }
     }
   }

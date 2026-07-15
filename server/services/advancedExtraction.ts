@@ -237,6 +237,7 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
       "Engineer",
       "Engineer Name",
       "Technician",
+      "Technician Name",
       "Completed By",
       "Service By",
     ],
@@ -337,15 +338,32 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     severity: "S0",
     regexPatterns: [
       /(?:Technician|Engineer)\s*Signature/i,
-      /Signed\s*(?:By)?[:\s]*([^\n]+)/i,
+      /(?:Technician|Engineer)\s*Sign\s*-?\s*Off/i,
     ],
     fuzzyLabels: [
       "Technician Signature",
       "Engineer Signature",
-      "Signed By",
-      "Signature",
+      "Engineer Sign Off",
+      "Technician Sign Off",
     ],
     llmPrompt: "Is there a technician or engineer signature present?",
+  },
+  {
+    name: "customer_signature",
+    displayName: "Customer Signature",
+    required: false,
+    severity: "S1",
+    regexPatterns: [
+      /(?:Customer|Client|Driver)\s*Signature/i,
+      /(?:Customer|Client)\s*Sign\s*-?\s*Off/i,
+    ],
+    fuzzyLabels: [
+      "Customer Signature",
+      "Client Signature",
+      "Driver Signature",
+      "Customer Sign Off",
+    ],
+    llmPrompt: "Is there a customer or client signature present?",
   },
 ];
 

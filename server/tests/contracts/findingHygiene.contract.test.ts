@@ -10,6 +10,8 @@ import {
   MAX_MISSING_FIELD_FINDINGS,
   isFindingHygieneEnabled,
   hasSignatureLabelEvidence,
+  hasTechnicianSignatureLabelEvidence,
+  hasCustomerSignatureLabelEvidence,
   hasVorBannerEvidence,
   hasOnlyInformationalFindings,
   injectPresentFieldFindings,
@@ -158,6 +160,19 @@ describe("findingHygiene", () => {
       hasSignatureLabelEvidence("Technician Signature\n[handwriting]")
     ).toBe(true);
     expect(hasSignatureLabelEvidence("No sign-off section here")).toBe(false);
+  });
+
+  it("separates technician vs customer signature labels", () => {
+    expect(
+      hasTechnicianSignatureLabelEvidence("Technician Signature\nink")
+    ).toBe(true);
+    expect(hasCustomerSignatureLabelEvidence("Technician Signature\nink")).toBe(
+      false
+    );
+    expect(hasCustomerSignatureLabelEvidence("Customer Signature")).toBe(true);
+    expect(hasTechnicianSignatureLabelEvidence("Customer Signature")).toBe(
+      false
+    );
   });
 
   it("drops mileage noise on serialNumber findings", () => {
@@ -359,8 +374,12 @@ BN21ACO_TL Make/Model
     }
   });
 
-  it("does not map technician_signature to customerSignature", () => {
-    expect(ENSEMBLE_TO_GOLDSPEC.technician_signature).toBeUndefined();
+  it("maps technician_signature to engineerSignOff, not customerSignature", () => {
+    expect(ENSEMBLE_TO_GOLDSPEC.technician_signature).toBe("engineerSignOff");
+    expect(ENSEMBLE_TO_GOLDSPEC.customer_signature).toBe("customerSignature");
+    expect(ENSEMBLE_TO_GOLDSPEC.technician_signature).not.toBe(
+      "customerSignature"
+    );
   });
 });
 
@@ -385,6 +404,8 @@ describe("ensemble→Gemini wiring", () => {
     expect(dp).toContain("applyFindingHygiene");
     expect(dp).toContain("Finding Hygiene");
     expect(dp).toContain("hasSignatureLabelEvidence");
+    expect(dp).toContain("hasTechnicianSignatureLabelEvidence");
+    expect(dp).toContain("hasCustomerSignatureLabelEvidence");
     expect(dp).toContain("hasVorBannerEvidence");
     expect(dp).toContain("hasOnlyInformationalFindings");
     expect(dp).toContain("sanitizeExtractedFieldsForSignatures");

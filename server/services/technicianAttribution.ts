@@ -75,30 +75,47 @@ export function extractTechnicianNameFromFields(
     "engineerName",
     "technician_name",
     "performedBy",
-    "engineerSignOff",
     "techName",
     "technician",
     "engineer",
   ];
+  const rejectAsName = /^(yes|no|n\/a|na|true|false|present|absent|signed)$/i;
   for (const key of keys) {
     const found = fieldValue(fields[key]);
-    if (found) {
+    if (found && !rejectAsName.test(found)) {
       const scrubbed = stripLetterheadNoise(found);
-      if (scrubbed && !isLetterheadNoise(scrubbed)) return scrubbed;
+      if (
+        scrubbed &&
+        !isLetterheadNoise(scrubbed) &&
+        !rejectAsName.test(scrubbed)
+      )
+        return scrubbed;
     }
   }
-  // Case-insensitive key scan for OCR variance
+  // Case-insensitive key scan for OCR variance (never signatures / presence flags)
   for (const [key, entry] of Object.entries(fields)) {
     const k = key.toLowerCase();
+    if (
+      k.includes("signature") ||
+      k.includes("signoff") ||
+      k.includes("sign_off")
+    ) {
+      continue;
+    }
     if (
       k.includes("technician") ||
       k.includes("engineer") ||
       k === "performedby"
     ) {
       const found = fieldValue(entry);
-      if (found && !/^(yes|no|n\/a|na|true|false)$/i.test(found)) {
+      if (found && !rejectAsName.test(found)) {
         const scrubbed = stripLetterheadNoise(found);
-        if (scrubbed && !isLetterheadNoise(scrubbed)) return scrubbed;
+        if (
+          scrubbed &&
+          !isLetterheadNoise(scrubbed) &&
+          !rejectAsName.test(scrubbed)
+        )
+          return scrubbed;
       }
     }
   }
@@ -130,6 +147,7 @@ export function extractTechnicianNameFromText(
       .replace(/[,;|].*$/, "")
       .trim();
     if (cleaned.length >= 2 && /[A-Za-z]/.test(cleaned)) {
+      if (/^(present|absent|signed|yes|no)$/i.test(cleaned)) continue;
       const scrubbed = stripLetterheadNoise(cleaned);
       if (scrubbed && !isLetterheadNoise(scrubbed) && scrubbed.length >= 2) {
         return scrubbed;

@@ -65,6 +65,10 @@ const DATE_VALUE_RE =
   /^\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}$|^\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2}$|^\d{4}-\d{2}-\d{2}$/;
 const SIGNATURE_LABEL_RE =
   /(?:technician|engineer|customer|client)?\s*signature|signed\s*by|sign\s*off|signatory/i;
+const TECHNICIAN_SIGNATURE_LABEL_RE =
+  /\b(?:technician|engineer)\s*signature\b|\b(?:technician|engineer)\s*sign\s*-?\s*off\b/i;
+const CUSTOMER_SIGNATURE_LABEL_RE =
+  /\b(?:customer|client|driver)\s*signature\b|\b(?:customer|client)\s*sign\s*-?\s*off\b/i;
 const VOR_BANNER_RE =
   /(?:this\s*)?(?:vehicle|asset)\s*(?:is\s*)?marked\s*as\s*vor|vehicle\s*off\s*road|\bVOR\b/i;
 const WORK_NOTES_FIELD_RE =
@@ -78,9 +82,19 @@ const DEFAULT_OPTIONAL_ALIASES = [
   "workDescription",
 ];
 
-/** True when OCR/extracted text shows a signature label/box (ink may still be invisible). */
+/** True when OCR/extracted text shows any signature label/box (ink may still be invisible). */
 export function hasSignatureLabelEvidence(text: string): boolean {
   return SIGNATURE_LABEL_RE.test(text);
+}
+
+/** Technician/engineer signature label only — never treat as customer ink. */
+export function hasTechnicianSignatureLabelEvidence(text: string): boolean {
+  return TECHNICIAN_SIGNATURE_LABEL_RE.test(text);
+}
+
+/** Customer/client/driver signature label only. */
+export function hasCustomerSignatureLabelEvidence(text: string): boolean {
+  return CUSTOMER_SIGNATURE_LABEL_RE.test(text);
 }
 
 /** True when document text shows a VOR / vehicle-off-road banner. */
@@ -361,7 +375,10 @@ export function sanitizeMakeModelValue(
 ): string | undefined {
   if (!raw) return undefined;
 
-  let value = raw.trim().replace(/^Make\s*[/&]?\s*Model\s*[:.]?\s*/i, "").trim();
+  let value = raw
+    .trim()
+    .replace(/^Make\s*[/&]?\s*Model\s*[:.]?\s*/i, "")
+    .trim();
   if (!value) return undefined;
 
   const inlineBoundary = value.search(MAKE_MODEL_INLINE_BOUNDARY_RE);
