@@ -173,6 +173,14 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     deploy: unsetBoth,
   },
   {
+    key: "FEATURE_PARTS_WEB_VERIFY",
+    description: "Exa parts catalog verify for PN vs description",
+    defaultWhenUnset: "off",
+    critical: false,
+    parity: "unspecified",
+    deploy: unsetBoth,
+  },
+  {
     key: "FEATURE_CONFIDENCE_BANDS",
     description: "Confidence band mapping",
     defaultWhenUnset: "off",

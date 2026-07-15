@@ -411,6 +411,33 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           ],
         },
         {
+          ruleId: "PARTS-C020",
+          label: "Parts Used (Catalog Mismatch)",
+          description:
+            "Exa catalog search did not corroborate part number vs description",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: ["Parts Used", "Parts Catalog Verify"],
+        },
+        {
+          ruleId: "PARTS-C021",
+          label: "Parts Used (Catalog Match)",
+          description:
+            "Exa catalog search corroborates part number and description",
+          failClass: "informational",
+          enabled: true,
+          fieldAliases: ["Parts Used", "Parts Catalog Verify"],
+        },
+        {
+          ruleId: "PARTS-C022",
+          label: "Parts Used (Catalog Unavailable)",
+          description:
+            "Exa catalog verification unavailable — informational, not a pass",
+          failClass: "informational",
+          enabled: true,
+          fieldAliases: ["Parts Used", "Parts Catalog Verify"],
+        },
+        {
           ruleId: "EVIDENCE-C010",
           label: "Evidence Coherence",
           description:
