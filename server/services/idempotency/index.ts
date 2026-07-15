@@ -17,6 +17,12 @@ export function isIdempotencyEnabled(): boolean {
 export * from "./types";
 export { buildIdempotencyKey } from "./key";
 export {
+  ActionResponseStore,
+  auditActionResponseStore,
+  getIdempotencyKey,
+  normalizeIdempotencyKey,
+} from "./actionResponseStore";
+export {
   PROCESS_OCR_SCOPE,
   buildProcessOcrIdempotencyKey,
   isProcessedJobSheetStatus,

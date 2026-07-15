@@ -36,6 +36,10 @@ import {
 } from "../utils/rateLimiter";
 import { TransactionError, withTransaction } from "../utils/transactions";
 import type { DbExecutor } from "../db";
+import {
+  auditActionResponseStore,
+  getIdempotencyKey,
+} from "../services/idempotency";
 
 async function throwIfRateLimited(
   fn: () => unknown | Promise<unknown>
@@ -57,6 +61,26 @@ async function enforceReviewLimit(userId: number): Promise<void> {
   await throwIfRateLimited(() =>
     enforceRateLimit(`user:${userId}:review`, RATE_LIMITS.review)
   );
+}
+
+/**
+ * Replays a completed (or in-flight) high-risk audit mutation when the caller
+ * retries it with the same Idempotency-Key HTTP header. Keys are scoped to the
+ * authenticated user and procedure, and a different request body is rejected.
+ */
+async function runIdempotentAuditAction<T>(input: {
+  userId: number;
+  request: unknown;
+  procedure: string;
+  body: unknown;
+  action: () => Promise<T>;
+}): Promise<T> {
+  return auditActionResponseStore.execute({
+    scope: `audit-action:${input.userId}:${input.procedure}`,
+    key: getIdempotencyKey(input.request),
+    body: input.body,
+    action: input.action,
+  });
 }
 
 function toAuditActionTrpcError(
@@ -191,31 +215,47 @@ export const auditActionsRouter = router({
   waive: adminProcedure
     .input(waiveFindingInput)
     .mutation(async ({ ctx, input }) => {
-      try {
-        return await waiveFinding({ ...input, userId: ctx.user.id });
-      } catch (err) {
-        throw toAuditActionTrpcError(err, "Waive failed");
-      }
+      return runIdempotentAuditAction({
+        userId: ctx.user.id,
+        request: ctx.req,
+        procedure: "waive",
+        body: input,
+        action: async () => {
+          try {
+            return await waiveFinding({ ...input, userId: ctx.user.id });
+          } catch (err) {
+            throw toAuditActionTrpcError(err, "Waive failed");
+          }
+        },
+      });
     }),
 
   /** Override a finding (reviewer overturns the automated result). */
   override: qaLeadProcedure
     .input(overrideActionInput)
     .mutation(async ({ ctx, input }) => {
-      await enforceReviewLimit(ctx.user.id);
-      try {
-        return await runAuditAction(deps =>
-          applyFindingAction(deps, {
-            findingId: input.findingId,
-            action: "override",
-            reason: input.reason,
-            userId: ctx.user.id,
-            trainingReasonCode: input.trainingReasonCode,
-          })
-        );
-      } catch (err) {
-        throw toAuditActionTrpcError(err, "Override failed");
-      }
+      return runIdempotentAuditAction({
+        userId: ctx.user.id,
+        request: ctx.req,
+        procedure: "override",
+        body: input,
+        action: async () => {
+          await enforceReviewLimit(ctx.user.id);
+          try {
+            return await runAuditAction(deps =>
+              applyFindingAction(deps, {
+                findingId: input.findingId,
+                action: "override",
+                reason: input.reason,
+                userId: ctx.user.id,
+                trainingReasonCode: input.trainingReasonCode,
+              })
+            );
+          } catch (err) {
+            throw toAuditActionTrpcError(err, "Override failed");
+          }
+        },
+      });
     }),
 
   /** Flag a finding — moves job sheet into review_queue. */
@@ -241,19 +281,27 @@ export const auditActionsRouter = router({
   approve: qaLeadProcedure
     .input(findingActionInput)
     .mutation(async ({ ctx, input }) => {
-      await enforceReviewLimit(ctx.user.id);
-      try {
-        return await runAuditAction(deps =>
-          applyFindingAction(deps, {
-            findingId: input.findingId,
-            action: "approve",
-            reason: input.reason,
-            userId: ctx.user.id,
-          })
-        );
-      } catch (err) {
-        throw toAuditActionTrpcError(err, "Approve failed");
-      }
+      return runIdempotentAuditAction({
+        userId: ctx.user.id,
+        request: ctx.req,
+        procedure: "approve",
+        body: input,
+        action: async () => {
+          await enforceReviewLimit(ctx.user.id);
+          try {
+            return await runAuditAction(deps =>
+              applyFindingAction(deps, {
+                findingId: input.findingId,
+                action: "approve",
+                reason: input.reason,
+                userId: ctx.user.id,
+              })
+            );
+          } catch (err) {
+            throw toAuditActionTrpcError(err, "Approve failed");
+          }
+        },
+      });
     }),
 
   /** Soft-undo the last finding action (status revert + waiver revocation if needed). */
@@ -299,21 +347,29 @@ export const auditActionsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const sheet = await db.getJobSheetById(input.jobSheetId);
-      if (!sheet) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Job sheet not found",
-        });
-      }
-      return runAuditAction(deps =>
-        approveJobSheet(deps, {
-          jobSheetId: input.jobSheetId,
-          userId: ctx.user.id,
-          reason: input.reason,
-          previousStatus: sheet.status,
-        })
-      );
+      return runIdempotentAuditAction({
+        userId: ctx.user.id,
+        request: ctx.req,
+        procedure: "approveJobSheet",
+        body: input,
+        action: async () => {
+          const sheet = await db.getJobSheetById(input.jobSheetId);
+          if (!sheet) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Job sheet not found",
+            });
+          }
+          return runAuditAction(deps =>
+            approveJobSheet(deps, {
+              jobSheetId: input.jobSheetId,
+              userId: ctx.user.id,
+              reason: input.reason,
+              previousStatus: sheet.status,
+            })
+          );
+        },
+      });
     }),
 
   /** Undo job sheet approve — restore to prior status (default review_queue). */
