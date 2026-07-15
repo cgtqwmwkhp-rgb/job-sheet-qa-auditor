@@ -261,6 +261,7 @@ export default function AuditResults() {
 
   useEffect(() => {
     if (!jobSheetPage) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- offset pages are accumulated from the query cache.
     setAllJobSheets(existing =>
       jobSheetOffset === 0 ? jobSheetPage : mergePage(existing, jobSheetPage)
     );
@@ -268,6 +269,7 @@ export default function AuditResults() {
 
   useEffect(() => {
     if (!auditResultsPage) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- offset pages are accumulated from the query cache.
     setAllAuditResults(existing =>
       auditOffset === 0
         ? auditResultsPage
