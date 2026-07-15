@@ -5,8 +5,8 @@
  * Does NOT call pipelineIntegrator / criticalFieldExtractor.
  *
  * Feature flag: FEATURE_ENSEMBLE_EXTRACTION
- * - unset / "true" → enabled (default on)
- * - "false" / "0" → disabled
+ * - "true" → enabled
+ * - unset or any other value → disabled (default off)
  */
 
 import * as advancedExtraction from "../advancedExtraction";
@@ -43,13 +43,12 @@ export const ENSEMBLE_TO_GOLDSPEC: Record<string, string> = {
 export const FEATURE_FLAG = "FEATURE_ENSEMBLE_EXTRACTION";
 
 /**
- * Default: enabled when unset.
- * Set FEATURE_ENSEMBLE_EXTRACTION=false to disable without revert.
+ * Default: disabled when unset.
+ * Set FEATURE_ENSEMBLE_EXTRACTION=true to opt in.
  */
 export function isEnsembleExtractionEnabled(): boolean {
   const raw = process.env[FEATURE_FLAG];
-  if (raw === undefined || raw === "") return true;
-  return raw !== "false" && raw !== "0";
+  return raw === "true";
 }
 
 export interface EnsembleFieldArtifact {

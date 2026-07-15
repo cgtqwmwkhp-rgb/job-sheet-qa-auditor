@@ -55,7 +55,7 @@ additional provider calls per job sheet.
 
 | Variable                         | Additional provider work                                    | Default                                      |
 | -------------------------------- | ----------------------------------------------------------- | -------------------------------------------- |
-| `FEATURE_ENSEMBLE_EXTRACTION`    | Per-field Gemini fallback when processing settings allow it | on                                           |
+| `FEATURE_ENSEMBLE_EXTRACTION`    | Per-field Gemini fallback when processing settings allow it | off (set `true` to enable)                   |
 | `FEATURE_ROI_CROP_REOCR`         | Mistral OCR call for each eligible configured PDF ROI       | off                                          |
 | `FEATURE_MULTIMODAL_ROI_EXTRACT` | Gemini structured extraction for ROI crops                  | conditional on configured Gemini credentials |
 | `FEATURE_VLM_VERIFICATION`       | Anthropic VLM field / ink verification                      | off                                          |

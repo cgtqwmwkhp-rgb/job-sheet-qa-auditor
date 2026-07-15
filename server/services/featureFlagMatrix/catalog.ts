@@ -189,8 +189,8 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
   },
   {
     key: "FEATURE_ENSEMBLE_EXTRACTION",
-    description: "Ensemble extraction (default on unless false)",
-    defaultWhenUnset: "on",
+    description: "Ensemble extraction (enabled only when true)",
+    defaultWhenUnset: "off",
     critical: false,
     parity: "unspecified",
     deploy: unsetBoth,
