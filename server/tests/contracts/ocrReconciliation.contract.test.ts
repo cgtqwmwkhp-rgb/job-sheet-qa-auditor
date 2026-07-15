@@ -2,15 +2,18 @@
  * OCR Reconciliation Contract Tests
  *
  * Tests for joint OCR reconciliation and confidence calibration.
- * Ensures deterministic, no-provider-calls operation.
+ * Ensures deterministic, no-provider-calls operation by default.
+ * Real crop OCR is injected via options (no simulateReOcr theater).
  */
 
 import { describe, it, expect } from "vitest";
 import {
   reconcileFields,
+  reconcileFieldsWithCropOcr,
   determineReviewRouting,
   generateReconciliationArtifact,
   getDefaultCalibrationTable,
+  regionBBoxToRoi,
   type ExtractedField,
   type CalibrationTable,
 } from "../../services/ocrReconciliation";
@@ -139,6 +142,124 @@ describe("OCR Reconciliation Contract Tests", () => {
       expect(typeof result.summary.averageConfidence).toBe("number");
       expect(result.summary.averageConfidence).toBeGreaterThanOrEqual(0);
       expect(result.summary.averageConfidence).toBeLessThanOrEqual(1);
+    });
+  });
+
+  describe("Real crop OCR vs honest fallback", () => {
+    const lowConfJob: ExtractedField = {
+      fieldName: "jobReference",
+      value: "WEAK-JOB",
+      confidence: 0.4,
+      source: "primary",
+      bbox: { x: 5, y: 10, width: 40, height: 5, pageNumber: 1 },
+    };
+
+    it("applies precomputed crop OCR and marks source reocr", () => {
+      const result = reconcileFields(
+        "doc-crop",
+        [lowConfJob],
+        ["jobReference"],
+        undefined,
+        {
+          cropOcrResults: {
+            jobReference: {
+              value: "JOB-FROM-CROP",
+              confidence: 0.93,
+              method: "crop_ocr",
+            },
+          },
+        }
+      );
+
+      expect(result.reOcrRequests.length).toBe(1);
+      expect(result.reOcrResults[0].success).toBe(true);
+      expect(result.reOcrResults[0].method).toBe("crop_ocr");
+      expect(result.reOcrResults[0].newValue).toBe("JOB-FROM-CROP");
+      const field = result.reconciledFields.find(
+        f => f.fieldName === "jobReference"
+      );
+      expect(field?.value).toBe("JOB-FROM-CROP");
+      expect(field?.source).toBe("reocr");
+      expect(field?.confidence).toBeGreaterThan(0.9);
+      expect(field?.value).not.toBe("JOB-ROI-001");
+    });
+
+    it("does not invent values or bump confidence without crop OCR", () => {
+      const result = reconcileFields("doc-fallback", [lowConfJob], [
+        "jobReference",
+      ]);
+
+      expect(result.reOcrRequests.length).toBe(1);
+      expect(result.reOcrResults[0].success).toBe(false);
+      expect(result.reOcrResults[0].method).toBe("unavailable");
+      expect(result.reOcrResults[0].newValue).toBeNull();
+      const field = result.reconciledFields.find(
+        f => f.fieldName === "jobReference"
+      );
+      // Keep primary — no fake +0.1 confidence theater
+      expect(field?.value).toBe("WEAK-JOB");
+      expect(field?.confidence).toBe(0.4);
+      expect(field?.source).toBe("primary");
+    });
+
+    it("async path uses injected crop OCR runner", async () => {
+      const result = await reconcileFieldsWithCropOcr(
+        "doc-async",
+        [lowConfJob],
+        ["jobReference"],
+        undefined,
+        {
+          pdfBuffer: Buffer.from("%PDF-fake"),
+          cropOcrRunner: async () => ({
+            fieldId: "jobReference",
+            success: true,
+            value: "JOB-RUNNER-99",
+            confidence: 0.91,
+            method: "crop_ocr",
+            processingTimeMs: 1,
+          }),
+          roiByField: {
+            jobReference: regionBBoxToRoi("jobReference", lowConfJob.bbox!),
+          },
+        }
+      );
+
+      expect(result.reOcrResults[0].method).toBe("crop_ocr");
+      expect(result.reconciledFields[0].value).toBe("JOB-RUNNER-99");
+      expect(result.reconciledFields[0].source).toBe("reocr");
+    });
+
+    it("text fallback only extracts evidence from rawText (no placeholders)", () => {
+      const phoneField: ExtractedField = {
+        fieldName: "phoneNumber",
+        value: null,
+        confidence: 0,
+        source: "primary",
+        bbox: { x: 0, y: 0, width: 20, height: 5, pageNumber: 1 },
+        rawText: "Contact: 020 7946 0958",
+      };
+
+      const withEvidence = reconcileFields(
+        "doc-phone",
+        [phoneField],
+        ["phoneNumber"],
+        undefined,
+        { enableTextFallback: true }
+      );
+      expect(withEvidence.reOcrResults[0].success).toBe(true);
+      expect(withEvidence.reOcrResults[0].method).toBe("regex");
+      expect(withEvidence.reconciledFields[0].value).toMatch(/7946/);
+      expect(withEvidence.reconciledFields[0].value).not.toBe("555-0100");
+
+      const noEvidence = reconcileFields(
+        "doc-phone-empty",
+        [{ ...phoneField, rawText: "no digits here" }],
+        ["phoneNumber"],
+        undefined,
+        { enableTextFallback: true }
+      );
+      expect(noEvidence.reOcrResults[0].success).toBe(false);
+      expect(noEvidence.reconciledFields[0].value).toBeNull();
     });
   });
 
@@ -364,7 +485,7 @@ describe("OCR Reconciliation Contract Tests", () => {
 
   describe("No Provider Calls", () => {
     it("should not make external API calls", () => {
-      // This test verifies that reconciliation works without external services
+      // Sync path never calls OCR providers — crop results must be injected
       const fields: ExtractedField[] = [
         {
           fieldName: "test",
@@ -375,11 +496,13 @@ describe("OCR Reconciliation Contract Tests", () => {
         },
       ];
 
-      // Should complete without errors (no network calls)
       const result = reconcileFields("doc-001", fields, ["test"]);
 
-      expect(result.success !== false).toBe(true);
       expect(result.reconciledFields.length).toBe(1);
+      // Without crop OCR: honest unavailable, keep primary
+      expect(result.reOcrResults[0]?.method).toBe("unavailable");
+      expect(result.reconciledFields[0].value).toBe("value");
+      expect(result.reconciledFields[0].source).toBe("primary");
     });
   });
 

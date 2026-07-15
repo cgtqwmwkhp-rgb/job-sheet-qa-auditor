@@ -80,6 +80,10 @@ import {
 } from "./roiSpatialExtraction";
 import { CRITICAL_ROI_FIELDS, processWithRoi } from "./roiProcessor";
 import { isRoiCropReocrEnabled } from "./ocrAdapter/cropOcrAdapter";
+import {
+  reconcileFields,
+  type ExtractedField as ReconcileExtractedField,
+} from "./ocrReconciliation";
 import type { RuleSpec } from "./templateRegistry/types";
 import {
   evaluateWastedJourneyConsistency,
@@ -1459,7 +1463,13 @@ async function processJobSheetWithOptions(
                 : undefined,
           }
         );
+        // Snapshot pre-crop spatial evidence as primary for reconciliation
+        const primarySpatial = { ...roiSpatialFields };
         const cropFields: PreExtractedFieldMap = {};
+        const cropOcrResults: Record<
+          string,
+          { value: string | null; confidence: number; method: "crop_ocr" }
+        > = {};
         for (const r of cropTrace.results) {
           if (!r.value || !r.extracted) continue;
           // Skip pure visual blocks unless OCR produced real text
@@ -1474,7 +1484,64 @@ async function processJobSheetWithOptions(
             confidence: Math.round(Math.min(1, r.confidence) * 100),
             pageNumber: r.roiRegion?.page ?? 1,
           };
+          if (r.source === "crop_ocr" || r.source === "reprocessed") {
+            cropOcrResults[r.fieldId] = {
+              value: r.value,
+              confidence: r.confidence,
+              method: "crop_ocr",
+            };
+          }
         }
+
+        // Feed crop OCR into reconciliation so critical fields can beat
+        // whole-PDF plateau (no simulateReOcr fake confidence bumps).
+        const criticalForReconcile = [
+          "jobReference",
+          "assetId",
+          "date",
+          "expiryDate",
+        ] as const;
+        const primaryFields: ReconcileExtractedField[] =
+          criticalForReconcile.map(fieldName => {
+            const spatial = primarySpatial[fieldName];
+            const region = cropRoiConfig.regions.find(r => r.name === fieldName);
+            return {
+              fieldName,
+              value: spatial?.value ?? null,
+              confidence: spatial
+                ? Math.min(1, Math.max(0, spatial.confidence / 100))
+                : 0,
+              source: "primary" as const,
+              bbox: region
+                ? {
+                    x: region.bounds.x * 100,
+                    y: region.bounds.y * 100,
+                    width: region.bounds.width * 100,
+                    height: region.bounds.height * 100,
+                    pageNumber: region.page,
+                  }
+                : undefined,
+            };
+          });
+        const recon = reconcileFields(
+          String(jobSheetId),
+          primaryFields,
+          [...criticalForReconcile],
+          undefined,
+          { cropOcrResults }
+        );
+        for (const field of recon.reconciledFields) {
+          if (field.source !== "reocr" || !field.value) continue;
+          cropFields[field.fieldName] = {
+            value: field.value,
+            confidence: Math.round(Math.min(1, field.confidence) * 100),
+            pageNumber:
+              cropFields[field.fieldName]?.pageNumber ??
+              primarySpatial[field.fieldName]?.pageNumber ??
+              1,
+          };
+        }
+
         if (Object.keys(cropFields).length > 0) {
           roiSpatialFields = mergeRoiSpatialFields(
             roiSpatialFields,
