@@ -775,10 +775,20 @@ export async function updateAuditResultStatus(
   await db.update(auditResults).set({ result }).where(eq(auditResults.id, id));
 }
 
-export async function deleteWaiver(id: number, tx?: DbExecutor) {
+/**
+ * Revoke a waiver while retaining its auditTrail and creation evidence.
+ */
+export async function revokeWaiver(
+  id: number,
+  revokedBy: number,
+  tx?: DbExecutor
+) {
   const db = await resolveDbClient(tx);
 
-  await db.delete(waivers).where(eq(waivers.id, id));
+  await db
+    .update(waivers)
+    .set({ revokedAt: new Date(), revokedBy })
+    .where(and(eq(waivers.id, id), isNull(waivers.revokedAt)));
 }
 
 // ============ GOLD SPEC QUERIES ============
@@ -951,14 +961,19 @@ export async function createWaiver(data: InsertWaiver, tx?: DbExecutor) {
   return { id: Number(result[0].insertId) };
 }
 
-export async function getWaiverByFindingId(auditFindingId: number) {
-  const db = await getDb();
+export async function getWaiverByFindingId(
+  auditFindingId: number,
+  tx?: DbExecutor
+) {
+  const db = tx ?? (await getDb());
   if (!db) return undefined;
 
   const result = await db
     .select()
     .from(waivers)
-    .where(eq(waivers.auditFindingId, auditFindingId))
+    .where(
+      and(eq(waivers.auditFindingId, auditFindingId), isNull(waivers.revokedAt))
+    )
     .limit(1);
 
   return result.length > 0 ? result[0] : undefined;

@@ -69,7 +69,7 @@ function createMemoryDeps() {
     updateJobSheetStatus: async () => {},
     createWaiver: async data => ({ id: data.auditFindingId }),
     getWaiverByFindingId: async () => undefined,
-    deleteWaiver: async () => {},
+    revokeWaiver: async () => {},
     logAction: async data => {
       logs.push(data as unknown as Record<string, unknown>);
     },
