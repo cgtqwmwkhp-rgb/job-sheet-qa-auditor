@@ -70,6 +70,7 @@ export interface AuditActionDeps {
     auditFindingId: number;
     approverId: number;
     reason: string;
+    expiresAt?: Date;
     auditTrail: unknown;
   }) => Promise<{ id: number }>;
   getWaiverByFindingId: (
@@ -130,6 +131,7 @@ export async function applyFindingAction(
     action: FindingAction;
     reason: string;
     userId: number;
+    expiresAt?: Date;
     /** TrainLoop taxonomy when overturning (override action only). */
     trainingReasonCode?: string | null;
   }
@@ -159,6 +161,7 @@ export async function applyFindingAction(
         auditFindingId: input.findingId,
         approverId: input.userId,
         reason: input.reason,
+        expiresAt: input.expiresAt,
         auditTrail: [
           {
             action: "CREATED",
