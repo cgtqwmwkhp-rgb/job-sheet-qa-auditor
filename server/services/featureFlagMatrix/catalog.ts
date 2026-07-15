@@ -132,14 +132,6 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     deploy: unsetBoth,
   },
   {
-    key: "FEATURE_CIRCUIT_BREAKER",
-    description: "Provider circuit breaker",
-    defaultWhenUnset: "off",
-    critical: false,
-    parity: "unspecified",
-    deploy: unsetBoth,
-  },
-  {
     key: "FEATURE_COHORT_BIAS",
     description: "Cohort bias analysis",
     defaultWhenUnset: "off",

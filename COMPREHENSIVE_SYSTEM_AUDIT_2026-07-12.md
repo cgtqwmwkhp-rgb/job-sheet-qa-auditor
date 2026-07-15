@@ -151,7 +151,6 @@ This comprehensive audit reviewed the entire Job Sheet QA Auditor system across 
 
 9. Migrate documentProcessor logging to `safeLogger`
 10. Surface repeated watchdog poll failures
-11. Wire or remove `FEATURE_CIRCUIT_BREAKER` module
 
 #### UI/UX
 
