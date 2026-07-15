@@ -90,14 +90,7 @@ const ruleSpecSchema = z.object({
   field: z.string(),
   description: z.string(),
   severity: z.enum(["critical", "major", "minor", "info"]),
-  type: z.enum([
-    "required",
-    "format",
-    "range",
-    "pattern",
-    "custom",
-    "implies",
-  ]),
+  type: z.enum(["required", "format", "range", "pattern", "custom", "implies"]),
   pattern: z.string().optional(),
   range: z
     .object({
@@ -105,9 +98,7 @@ const ruleSpecSchema = z.object({
       max: z.union([z.number(), z.string()]).optional(),
     })
     .optional(),
-  boundsMode: z
-    .enum(["between", "under", "at_least", "over"])
-    .optional(),
+  boundsMode: z.enum(["between", "under", "at_least", "over"]).optional(),
   unit: z.string().optional(),
   enabled: z.boolean(),
   tags: z.array(z.string()).optional(),
@@ -1002,7 +993,9 @@ export const templateRouter = router({
             ...(proposal.roiRegions.some(r => r.source === "ocr-layout")
               ? { roiJson: proposal.proposedRoi }
               : {}),
-            changeNotes: proposal.roiRegions.some(r => r.source === "ocr-layout")
+            changeNotes: proposal.roiRegions.some(
+              r => r.source === "ocr-layout"
+            )
               ? "Applied AI/OCR proposal (OCR-placed ROIs)"
               : "Applied AI/OCR proposal (fields/tokens only — ROI left empty pending OCR geometry)",
           });
@@ -1271,11 +1264,17 @@ export const templateRouter = router({
       .mutation(async ({ ctx, input }) => {
         const finding = await db.getAuditFindingById(input.findingId);
         if (!finding) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Finding not found" });
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Finding not found",
+          });
         }
         const audit = await db.getAuditResultById(finding.auditResultId);
         if (!audit) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Audit not found" });
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Audit not found",
+          });
         }
         const jobSheet = await db.getJobSheetById(audit.jobSheetId);
         if (jobSheet) {

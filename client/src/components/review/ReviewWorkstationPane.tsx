@@ -472,8 +472,7 @@ export function ReviewWorkstationPane({
         docQualityPenalties,
         failurePathSignals: failurePathSignalsDerived.signals,
         failurePathSignalSummary: failurePathSignalsDerived.signalSummary,
-        templateId:
-          auditDataProp.templateId ?? auditResult?.templateId ?? null,
+        templateId: auditDataProp.templateId ?? auditResult?.templateId ?? null,
         templateVersionId:
           auditDataProp.templateVersionId ??
           auditResult?.templateVersionId ??
@@ -724,8 +723,7 @@ function ReviewWorkstationContent({
     return {
       collecting: rows.filter(r => r.promotionStatus === "collecting").length,
       shadow: rows.filter(
-        r =>
-          r.promotionStatus === "shadow" || r.promotionStatus === "candidate"
+        r => r.promotionStatus === "shadow" || r.promotionStatus === "candidate"
       ).length,
       approved: rows.filter(r => r.promotionStatus === "approved").length,
     };
@@ -747,13 +745,11 @@ function ReviewWorkstationContent({
     const withMemory = auditData.findings.map(f => {
       const memMatch = (memoryForSheet ?? []).find(
         m =>
-          m.fieldKey === f.field ||
-          (f.ruleId != null && m.ruleId === f.ruleId)
+          m.fieldKey === f.field || (f.ruleId != null && m.ruleId === f.ruleId)
       );
       const appliedMatch = applied.find(
         a =>
-          a.fieldKey === f.field ||
-          (f.ruleId != null && a.ruleId === f.ruleId)
+          a.fieldKey === f.field || (f.ruleId != null && a.ruleId === f.ruleId)
       );
       let memoryBadge: string | null = null;
       if (appliedMatch && versionId != null) {
@@ -1479,8 +1475,8 @@ function ReviewWorkstationContent({
               title="Template memory funnel for this template"
             >
               Memory {memoryPanelCounts.collecting} collecting ·{" "}
-              {memoryPanelCounts.shadow} shadow ·{" "}
-              {memoryPanelCounts.approved} approved
+              {memoryPanelCounts.shadow} shadow · {memoryPanelCounts.approved}{" "}
+              approved
             </span>
           )}
         </div>
@@ -2060,8 +2056,8 @@ function ReviewWorkstationContent({
                   ) : overrideTrainingReason &&
                     AUTO_LEARN_REASONS.has(overrideTrainingReason) ? (
                     <>
-                      Will learn after {TEMPLATE_MEMORY_AGREE_THRESHOLD} agreeing
-                      fixes on this template
+                      Will learn after {TEMPLATE_MEMORY_AGREE_THRESHOLD}{" "}
+                      agreeing fixes on this template
                       {!templateMemoryWrite
                         ? " (memory capture flag is off)"
                         : ""}
