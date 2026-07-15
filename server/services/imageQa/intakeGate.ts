@@ -4,8 +4,12 @@
  * Runs real pixel blur/skew/contrast checks on JPEG/PNG upload buffers
  * BEFORE any OCR spend. Garbage scans are rejected with retake feedback.
  *
- * Fail-open: unexpected errors, empty buffers, or non-raster uploads (PDF)
- * return passed:true + skipped:true — and still never call OCR for quality.
+ * Fail-open (dev/test): unexpected errors, empty buffers, or non-raster
+ * uploads (PDF) return passed:true + skipped:true — and still never call OCR.
+ *
+ * Fail-closed (production/staging): empty buffers and analysis errors reject
+ * (passed:false). Non-raster PDFs still skip pixel QA (unsupported) without
+ * OCR — they are not treated as garbage solely for being PDF.
  *
  * resolveIntakeMarkdownProxy remains available for deterministic unit tests
  * of the fixture map itself — it is not used on the production path.
@@ -20,6 +24,7 @@ import { getDefaultImageQaConfig } from "./types";
 import { analyzeImageBuffer, calculateQualityGrade } from "./detectors";
 import type { OcrPageInput } from "./imageQaService";
 import { buildRetakeFeedback } from "./retakeFeedback";
+import { isFailClosedEnvironment } from "../templateRegistry/defaultTemplate";
 
 const FEATURE_FLAG = "FEATURE_IMAGE_QA_INTAKE";
 
@@ -42,7 +47,6 @@ const CONTENT_MARKERS: Array<{ needle: string; fixture: string }> = [
 ];
 
 function resolveFixtureDir(): string {
-  // Prefer repo-relative path from this file (works in vitest + tsx)
   try {
     const here = dirname(fileURLToPath(import.meta.url));
     const candidate = join(here, "../../tests/fixtures/imageQa");
@@ -82,14 +86,20 @@ export function resolveIntakeMarkdownProxy(input: {
     }
   }
 
-  // Hash-stable fallback: even-hash → good, odd-hash → blurry
   const hash = createHash("sha256").update(input.buffer).digest();
   const fixture = hash[0]! % 2 === 0 ? "good-scan.md" : "blurry-scan.md";
   return [{ pageNumber: 1, markdown: loadFixtureMarkdown(fixture) }];
 }
 
+/**
+ * Intake enabled when FEATURE_IMAGE_QA_INTAKE=true, or by default in
+ * fail-closed environments (unless explicitly FEATURE_IMAGE_QA_INTAKE=false).
+ */
 export function isImageQaIntakeEnabled(): boolean {
-  return process.env[FEATURE_FLAG] === "true";
+  const flag = (process.env[FEATURE_FLAG] ?? "").trim().toLowerCase();
+  if (flag === "false" || flag === "0" || flag === "off") return false;
+  if (flag === "true" || flag === "1" || flag === "on") return true;
+  return isFailClosedEnvironment();
 }
 
 function failOpenResult(
@@ -110,17 +120,43 @@ function failOpenResult(
   };
 }
 
+function failClosedReject(
+  reason: string,
+  analysisMethod?: IntakeGateResult["analysisMethod"]
+): IntakeGateResult {
+  return {
+    passed: false,
+    skipped: false,
+    qualityScore: null,
+    grade: "F",
+    retakeFeedback: [
+      "Upload rejected: quality gate could not verify a readable scan. Retake and retry.",
+    ],
+    requiresReview: true,
+    reviewReasons: [reason],
+    analysisMethod,
+    ocrInvoked: false,
+    error: reason,
+  };
+}
+
 /**
  * Run the intake quality gate on the real upload buffer via pixel analysis.
- * Never throws — fail-open on decode/analysis errors.
- * Never invokes OCR (challenge bar: reject garbage before paying OCR).
+ * Never throws. Never invokes OCR (challenge bar: reject garbage before paying OCR).
+ *
+ * Wave-4 B3: fail-closed in production/staging for empty buffers and analysis errors.
  */
 export async function runIntakeGate(
   input: IntakeGateInput,
   config: ImageQaConfig = getDefaultImageQaConfig()
 ): Promise<IntakeGateResult> {
+  const failClosed = isFailClosedEnvironment();
+
   try {
     if (!input.buffer || input.buffer.length === 0) {
+      if (failClosed) {
+        return failClosedReject("Empty buffer — intake rejected (fail-closed)");
+      }
       return failOpenResult("Empty buffer — intake gate skipped");
     }
 
@@ -176,6 +212,9 @@ export async function runIntakeGate(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown intake gate error";
+    if (failClosed) {
+      return failClosedReject(message, "pixel");
+    }
     return failOpenResult(message);
   }
 }

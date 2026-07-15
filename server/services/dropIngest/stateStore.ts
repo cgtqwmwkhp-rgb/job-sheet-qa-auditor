@@ -1,22 +1,34 @@
 /**
  * Processed-drop state so the poller does not re-POST the same object forever.
  * Memory by default; optional JSON file for durable restarts.
+ *
+ * Tracks accepted / duplicate / poison so retries are idempotent and
+ * poison is never re-submitted (duplicate≈0; poison→DLQ/quarantine).
  */
 
 import { promises as fs } from "fs";
 import path from "path";
+
+export type DropIngestStatus = "accepted" | "duplicate" | "poison";
 
 export interface DropStateRecord {
   key: string;
   contentHash: string;
   processedAt: string;
   externalJobId: string;
-  ingestStatus: "accepted" | "duplicate";
+  ingestStatus: DropIngestStatus;
+  /** Consecutive transient failures before poison quarantine. */
+  attempts?: number;
+  poisonReason?: string;
+  dlqJobId?: string;
 }
 
 export interface DropStateStore {
   has(key: string): boolean;
   get(key: string): DropStateRecord | undefined;
+  /** True when this content hash was already accepted/duplicated/poisoned. */
+  hasContentHash(contentHash: string): boolean;
+  getByContentHash(contentHash: string): DropStateRecord | undefined;
   mark(record: DropStateRecord): Promise<void>;
   size(): number;
   entries(): DropStateRecord[];
@@ -24,6 +36,7 @@ export interface DropStateStore {
 
 export class MemoryDropStateStore implements DropStateStore {
   private readonly map = new Map<string, DropStateRecord>();
+  private readonly byHash = new Map<string, string>();
 
   has(key: string): boolean {
     return this.map.has(key);
@@ -33,8 +46,20 @@ export class MemoryDropStateStore implements DropStateStore {
     return this.map.get(key);
   }
 
+  hasContentHash(contentHash: string): boolean {
+    return this.byHash.has(contentHash.toLowerCase());
+  }
+
+  getByContentHash(contentHash: string): DropStateRecord | undefined {
+    const key = this.byHash.get(contentHash.toLowerCase());
+    return key ? this.map.get(key) : undefined;
+  }
+
   async mark(record: DropStateRecord): Promise<void> {
     this.map.set(record.key, record);
+    if (record.contentHash) {
+      this.byHash.set(record.contentHash.toLowerCase(), record.key);
+    }
   }
 
   size(): number {
@@ -78,6 +103,14 @@ export class FileDropStateStore implements DropStateStore {
 
   get(key: string): DropStateRecord | undefined {
     return this.memory.get(key);
+  }
+
+  hasContentHash(contentHash: string): boolean {
+    return this.memory.hasContentHash(contentHash);
+  }
+
+  getByContentHash(contentHash: string): DropStateRecord | undefined {
+    return this.memory.getByContentHash(contentHash);
   }
 
   async mark(record: DropStateRecord): Promise<void> {

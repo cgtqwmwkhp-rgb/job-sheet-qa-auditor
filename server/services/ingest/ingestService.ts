@@ -1,9 +1,13 @@
 /**
  * Core signed ingest accept logic — idempotent on externalJobId + content hash.
+ *
+ * Wave-4 B3: optional Image QA intake gate (fail-closed in prod/staging) so
+ * garbage raster drops are rejected before storage / OCR spend.
  */
 
 import { randomUUID } from "crypto";
 import { calculateHash } from "../../utils/fileValidation";
+import { isImageQaIntakeEnabled, runIntakeGate } from "../imageQa/intakeGate";
 import type { IngestConfig } from "./config";
 import type { IngestReceiptStore } from "./receiptStore";
 import {
@@ -21,6 +25,8 @@ export interface IngestServiceDeps {
   config: IngestConfig;
   store: IngestReceiptStore;
   persist: IngestPersister;
+  /** Injected for tests — defaults to runIntakeGate when intake is enabled. */
+  runIntake?: typeof runIntakeGate;
 }
 
 function assertUploadShape(input: IngestUploadRequest): void {
@@ -57,7 +63,8 @@ function assertUploadShape(input: IngestUploadRequest): void {
  * 1. Same externalJobId + same contentHash → duplicate (idempotent replay)
  * 2. Same externalJobId + different contentHash → CONFLICT
  * 3. New externalJobId but contentHash already seen → duplicate (hash dedupe)
- * 4. Otherwise persist + store receipt
+ * 4. Intake gate reject (when enabled) → BAD_REQUEST (honest reject)
+ * 5. Otherwise persist + store receipt
  */
 export async function acceptIngestUpload(
   deps: IngestServiceDeps,
@@ -71,6 +78,33 @@ export async function acceptIngestUpload(
   }
 
   assertUploadShape(input);
+
+  if (isImageQaIntakeEnabled()) {
+    const runIntake = deps.runIntake ?? runIntakeGate;
+    const intake = await runIntake({
+      buffer: input.fileBuffer,
+      fileName: input.fileName,
+      mimeType: input.fileType,
+    });
+    if (!intake.passed && !intake.skipped) {
+      throw new IngestError(
+        "BAD_REQUEST",
+        `Intake quality gate rejected upload: ${
+          intake.reviewReasons[0] ?? intake.error ?? "low quality"
+        }`,
+        {
+          intake: {
+            passed: intake.passed,
+            skipped: intake.skipped,
+            qualityScore: intake.qualityScore,
+            grade: intake.grade,
+            retakeFeedback: intake.retakeFeedback,
+            reviewReasons: intake.reviewReasons,
+          },
+        }
+      );
+    }
+  }
 
   const contentHash = calculateHash(input.fileBuffer);
   if (input.contentHash && input.contentHash.toLowerCase() !== contentHash) {

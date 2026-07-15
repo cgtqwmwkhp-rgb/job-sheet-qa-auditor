@@ -33,6 +33,12 @@ export {
 } from "./ingestClient";
 export { DropIngestPoller, type DropPollTickResult } from "./poller";
 export {
+  classifyDropPoison,
+  quarantineDropPoison,
+  type PoisonDecision,
+  type PoisonReason,
+} from "./poison";
+export {
   FolderDropSource,
   BlobDropSource,
   createFolderDropSource,

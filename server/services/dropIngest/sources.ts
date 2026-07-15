@@ -66,7 +66,8 @@ export class FolderDropSource implements DropSource {
         continue;
       }
       if (!stat.isFile()) continue;
-      if (stat.size <= 0 || stat.size > this.options.maxFileBytes) continue;
+      // Zero-byte files are listed so the poller can poison→DLQ (not silently skip).
+      if (stat.size > this.options.maxFileBytes) continue;
 
       const relativeKey = path.relative(root, abs).split(path.sep).join("/");
       const key = `folder:${relativeKey}`;

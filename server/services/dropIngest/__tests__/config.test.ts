@@ -21,6 +21,7 @@ describe("dropIngest config", () => {
     expect(cfg.watchDir).toBe("/tmp/library-drop");
     expect(cfg.deviceId).toBe("sp-sync-1");
     expect(cfg.ingestPath).toBe("/api/ingest/v1/job-sheets");
+    expect(cfg.maxAttempts).toBe(3);
   });
 
   it("auto mode activates folder and/or blob sources", () => {
