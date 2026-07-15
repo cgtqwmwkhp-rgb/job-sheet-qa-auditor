@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  MistralOCRAdapter,
-  resetOCRCircuitBreaker,
-} from "./mistralAdapter";
+import { MistralOCRAdapter, resetOCRCircuitBreaker } from "./mistralAdapter";
 import { TIMEOUT_CONFIG } from "../../utils/timeout";
 
 describe("MistralOCRAdapter request timeout", () => {
@@ -33,9 +30,12 @@ describe("MistralOCRAdapter request timeout", () => {
       apiKey: "test-api-key",
       maxRetries: 0,
     });
-    const extraction = adapter.extractFromUrl("https://example.test/jobsheet.pdf", {
-      skipRetry: true,
-    });
+    const extraction = adapter.extractFromUrl(
+      "https://example.test/jobsheet.pdf",
+      {
+        skipRetry: true,
+      }
+    );
 
     await vi.advanceTimersByTimeAsync(TIMEOUT_CONFIG.OCR_EXTRACTION);
 
