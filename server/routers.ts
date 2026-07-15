@@ -28,7 +28,7 @@ import { validateMistralApiKey } from "./services/ocr";
 import { resolveProcessStatus } from "./services/processStatus";
 import { templateRouter } from "./routers/templateRouter";
 import { analyticsRouter } from "./routers/analyticsRouter";
-import { auditActionsRouter } from "./routers/auditActionsRouter";
+import { auditActionsRouter, waiveFinding } from "./routers/auditActionsRouter";
 import { fixPacksRouter } from "./routers/fixPacksRouter";
 import { portalRouter } from "./routers/portalRouter";
 import { commsRouter } from "./routers/commsRouter";
@@ -1193,39 +1193,32 @@ export const appRouter = router({
 
   // ============ WAIVERS ============
   waivers: router({
+    /**
+     * @deprecated Use auditActions.waive. Retained only for API compatibility;
+     * both endpoints execute the same transactional waiver workflow.
+     */
     create: adminProcedure
       .input(
         z.object({
-          auditFindingId: z.number(),
-          reason: z.string(),
+          auditFindingId: z.number().int().positive(),
+          reason: z.string().min(1).max(2000),
           expiresAt: z.date().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const result = await db.createWaiver({
-          auditFindingId: input.auditFindingId,
-          approverId: ctx.user.id,
-          reason: input.reason,
-          expiresAt: input.expiresAt,
-          auditTrail: [
-            {
-              action: "CREATED",
-              userId: ctx.user.id,
-              timestamp: new Date().toISOString(),
-              reason: input.reason,
-            },
-          ],
-        });
-
-        await db.logAction({
-          userId: ctx.user.id,
-          action: "CREATE_WAIVER",
-          entityType: "waiver",
-          entityId: result.id,
-          details: { auditFindingId: input.auditFindingId },
-        });
-
-        return result;
+        try {
+          return await waiveFinding({
+            findingId: input.auditFindingId,
+            reason: input.reason,
+            expiresAt: input.expiresAt,
+            userId: ctx.user.id,
+          });
+        } catch (err) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: err instanceof Error ? err.message : "Waive failed",
+          });
+        }
       }),
 
     getByFinding: protectedProcedure

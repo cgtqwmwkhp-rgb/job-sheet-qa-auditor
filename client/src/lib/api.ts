@@ -205,17 +205,6 @@ export function useUpdateDisputeStatus() {
   });
 }
 
-// ============ WAIVERS ============
-export function useCreateWaiver() {
-  const utils = trpc.useUtils();
-
-  return trpc.waivers.create.useMutation({
-    onSuccess: () => {
-      utils.audits.list.invalidate();
-    },
-  });
-}
-
 export function useWaiverByFinding(auditFindingId: number) {
   return trpc.waivers.getByFinding.useQuery(
     { auditFindingId },

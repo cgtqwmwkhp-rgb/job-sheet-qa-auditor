@@ -122,9 +122,35 @@ async function runAuditAction<T>(
   return withTransaction(async tx => fn(createDbDeps(tx)));
 }
 
+/**
+ * Single transactional implementation for every waiver entry point.
+ * The legacy waivers.create endpoint delegates here for compatibility.
+ */
+export async function waiveFinding(input: {
+  findingId: number;
+  reason: string;
+  userId: number;
+  expiresAt?: Date;
+}) {
+  await enforceReviewLimit(input.userId);
+  return runAuditAction(deps =>
+    applyFindingAction(deps, {
+      findingId: input.findingId,
+      action: "waive",
+      reason: input.reason,
+      userId: input.userId,
+      expiresAt: input.expiresAt,
+    })
+  );
+}
+
 const findingActionInput = z.object({
   findingId: z.number().int().positive(),
   reason: z.string().min(1).max(2000),
+});
+
+const waiveFindingInput = findingActionInput.extend({
+  expiresAt: z.date().optional(),
 });
 
 const trainingReasonCodeInput = z.enum(TRAINING_REASON_CODES).optional();
@@ -136,21 +162,13 @@ const overrideActionInput = findingActionInput.extend({
 export const auditActionsRouter = router({
   /**
    * Waive a finding (creates waiver row + marks finding waived).
-   * Admin-only — matches existing waivers.create policy.
+   * Admin-only — the canonical waiver entry point.
    */
   waive: adminProcedure
-    .input(findingActionInput)
+    .input(waiveFindingInput)
     .mutation(async ({ ctx, input }) => {
-      await enforceReviewLimit(ctx.user.id);
       try {
-        return await runAuditAction(deps =>
-          applyFindingAction(deps, {
-            findingId: input.findingId,
-            action: "waive",
-            reason: input.reason,
-            userId: ctx.user.id,
-          })
-        );
+        return await waiveFinding({ ...input, userId: ctx.user.id });
       } catch (err) {
         throw new TRPCError({
           code: "BAD_REQUEST",

@@ -769,16 +769,46 @@ describe("disputes", () => {
 });
 
 describe("waivers", () => {
-  it("creates a waiver (admin only)", async () => {
+  it("routes legacy create through the atomic waiver workflow", async () => {
+    const db = await import("./db");
+    vi.mocked(db.createWaiver).mockClear();
+    vi.mocked(db.updateFindingResolution).mockClear();
+    vi.mocked(db.logAction).mockClear();
+    vi.mocked(db.runTransaction).mockClear();
+
     const { ctx } = createAuthContext("admin");
     const caller = appRouter.createCaller(ctx);
 
     const result = await caller.waivers.create({
       auditFindingId: 1,
       reason: "Exception approved by management",
+      expiresAt: new Date("2027-01-01T00:00:00.000Z"),
     });
 
-    expect(result).toHaveProperty("id");
+    expect(result).toMatchObject({
+      success: true,
+      action: "waive",
+      findingId: 1,
+      resolutionStatus: "waived",
+      waiverId: 1,
+    });
+    expect(db.runTransaction).toHaveBeenCalled();
+    expect(db.updateFindingResolution).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ resolutionStatus: "waived" }),
+      expect.anything()
+    );
+    expect(db.createWaiver).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auditFindingId: 1,
+        expiresAt: new Date("2027-01-01T00:00:00.000Z"),
+      }),
+      expect.anything()
+    );
+    expect(db.logAction).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "FINDING_WAIVE" }),
+      expect.objectContaining({ required: true, tx: expect.anything() })
+    );
   });
 
   it("rejects non-admin from creating waivers", async () => {
