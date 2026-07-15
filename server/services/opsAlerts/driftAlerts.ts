@@ -41,7 +41,8 @@ export function buildDriftAlert(input: DriftAlertInput): DriftAlert {
  */
 export function formatAlertForChannel(
   alert: DriftAlert,
-  channel: AlertChannel
+  channel: AlertChannel,
+  pagerDutyRoutingKey?: string
 ): string {
   switch (channel) {
     case "slack":
@@ -62,8 +63,14 @@ export function formatAlertForChannel(
         },
       });
     case "pagerduty":
+      if (!pagerDutyRoutingKey) {
+        throw new Error(
+          "PagerDuty alert formatting requires a configured routing key"
+        );
+      }
+
       return JSON.stringify({
-        routing_key: "PLACEHOLDER",
+        routing_key: pagerDutyRoutingKey,
         event_action: alert.severity === "critical" ? "trigger" : "acknowledge",
         dedup_key: alert.id,
         payload: {

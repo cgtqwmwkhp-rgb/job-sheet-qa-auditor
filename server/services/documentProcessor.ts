@@ -124,9 +124,11 @@ import {
 } from "./calibration";
 import {
   buildDriftAlert,
+  deliverOpsAlert,
   formatAlertForChannel,
   isOpsAlertsEnabled,
   rankAttention,
+  type DriftAlert,
 } from "./opsAlerts";
 import { isRiskRoutingEnabled, routeByRisk } from "./riskRouting";
 import { evaluateStageSlo, isStageSloEnabled } from "./slo";
@@ -287,6 +289,11 @@ function confidenceToUnit(score: number): number {
 
 type FlaggedProcessorArtifacts = Record<string, unknown>;
 
+interface FlaggedProcessorArtifactBuild {
+  artifacts: FlaggedProcessorArtifacts | null;
+  opsAlert: DriftAlert | null;
+}
+
 function buildFlaggedProcessorArtifacts(input: {
   jobSheetId: number;
   ocrResult: OCRResult;
@@ -295,8 +302,9 @@ function buildFlaggedProcessorArtifacts(input: {
   processingSettings: Awaited<ReturnType<typeof db.getProcessingSettings>>;
   selectionResult?: SelectionResult;
   usedTemplateVersionId?: number;
-}): FlaggedProcessorArtifacts | null {
+}): FlaggedProcessorArtifactBuild {
   const artifacts: FlaggedProcessorArtifacts = {};
+  let opsAlert: DriftAlert | null = null;
   const confidence = confidenceToUnit(input.analysisResult.score);
 
   const addArtifact = <T>(
@@ -380,6 +388,7 @@ function buildFlaggedProcessorArtifacts(input: {
             message: `Job sheet ${input.jobSheetId} has elevated processor attention score ${attentionScore.toFixed(2)}`,
           })
         : null;
+    opsAlert = alert;
 
     return {
       attentionQueue,
@@ -451,7 +460,10 @@ function buildFlaggedProcessorArtifacts(input: {
     };
   });
 
-  return Object.keys(artifacts).length > 0 ? artifacts : null;
+  return {
+    artifacts: Object.keys(artifacts).length > 0 ? artifacts : null,
+    opsAlert,
+  };
 }
 
 /**
@@ -2658,15 +2670,20 @@ async function processJobSheetWithOptions(
     );
   }
 
-  const flaggedProcessorArtifacts = buildFlaggedProcessorArtifacts({
-    jobSheetId,
-    ocrResult,
-    analysisResult,
-    stages,
-    processingSettings,
-    selectionResult,
-    usedTemplateVersionId,
-  });
+  const { artifacts: flaggedProcessorArtifacts, opsAlert } =
+    buildFlaggedProcessorArtifacts({
+      jobSheetId,
+      ocrResult,
+      analysisResult,
+      stages,
+      processingSettings,
+      selectionResult,
+      usedTemplateVersionId,
+    });
+
+  if (opsAlert) {
+    await deliverOpsAlert(opsAlert);
+  }
 
   // Stage 3: Store Results
   const storageStartTime = Date.now();

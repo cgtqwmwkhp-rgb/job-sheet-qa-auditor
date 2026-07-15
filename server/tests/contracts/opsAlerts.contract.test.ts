@@ -1,9 +1,8 @@
 /**
  * Ops Alerts Contract Tests (Phase 3.5)
  *
- * Fixtures only — no Slack, PagerDuty, or network I/O.
  * Verifies feature flag default-off, attention ranking, drift alert
- * formatting per channel, and empty queue handling.
+ * formatting and delivery per channel, and empty queue handling.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -115,7 +114,11 @@ describe("Ops Alerts Contract (Phase 3.5)", () => {
       });
 
       for (const channel of CHANNELS) {
-        const payload = formatAlertForChannel(alert, channel);
+        const payload = formatAlertForChannel(
+          alert,
+          channel,
+          channel === "pagerduty" ? "pd-routing-key" : undefined
+        );
         expect(typeof payload).toBe("string");
         expect(payload.length).toBeGreaterThan(0);
         expect(payload).toContain(alert.metric);
@@ -155,8 +158,11 @@ describe("Ops Alerts Contract (Phase 3.5)", () => {
         observedAt: "2026-07-09T11:00:00.000Z",
       });
 
-      const payload = JSON.parse(formatAlertForChannel(alert, "pagerduty"));
+      const payload = JSON.parse(
+        formatAlertForChannel(alert, "pagerduty", "pd-routing-key")
+      );
 
+      expect(payload.routing_key).toBe("pd-routing-key");
       expect(payload.dedup_key).toBe(alert.id);
       expect(payload.event_action).toBe("trigger");
       expect(payload.payload.summary).toContain(alert.metric);
@@ -181,6 +187,83 @@ describe("Ops Alerts Contract (Phase 3.5)", () => {
       expect(payload).toContain(`id=${alert.id}`);
       expect(payload).toContain("severity=info");
       expect(payload).toContain(`metric=${alert.metric}`);
+    });
+  });
+
+  describe("deliverOpsAlert", () => {
+    it("POSTs Slack and PagerDuty payloads when both channels configured", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 202 });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const { buildDriftAlert, deliverOpsAlert } = await import(
+        "../../services/opsAlerts"
+      );
+      const alert = buildDriftAlert({
+        metric: "selection_accuracy",
+        severity: "critical",
+        message: "Selection accuracy breach",
+        observedAt: "2026-07-09T11:00:00.000Z",
+      });
+
+      const result = await deliverOpsAlert(alert, {
+        OPS_ALERTS_SLACK_WEBHOOK_URL: "https://hooks.slack.test/ops",
+        OPS_ALERTS_PAGERDUTY_ROUTING_KEY: "pd-routing-key",
+      });
+
+      expect(result).toEqual([
+        { channel: "slack", delivered: true },
+        { channel: "pagerduty", delivered: true },
+      ]);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        1,
+        "https://hooks.slack.test/ops",
+        expect.objectContaining({ method: "POST" })
+      );
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        "https://events.pagerduty.com/v2/enqueue",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining('"routing_key":"pd-routing-key"'),
+        })
+      );
+    });
+
+    it("logs configured-channel failures without reporting delivery", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.stubGlobal("fetch", fetchMock);
+
+      const { buildDriftAlert, deliverOpsAlert } = await import(
+        "../../services/opsAlerts"
+      );
+      const alert = buildDriftAlert({
+        metric: "field_accuracy",
+        severity: "warn",
+        message: "Field accuracy degraded",
+        observedAt: "2026-07-09T11:00:00.000Z",
+      });
+
+      const result = await deliverOpsAlert(alert, {
+        OPS_ALERTS_SLACK_WEBHOOK_URL: "https://hooks.slack.test/ops",
+      });
+
+      expect(result).toEqual([
+        { channel: "slack", delivered: false, reason: "request_failed" },
+        { channel: "pagerduty", delivered: false, reason: "not_configured" },
+      ]);
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[OpsAlerts] Delivery failed",
+        expect.objectContaining({ channel: "slack", reason: "request_failed" })
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[OpsAlerts] Delivery failed",
+        expect.objectContaining({
+          channel: "pagerduty",
+          reason: "not_configured",
+        })
+      );
     });
   });
 });
