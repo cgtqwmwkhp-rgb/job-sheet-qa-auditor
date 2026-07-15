@@ -158,15 +158,14 @@ describe("Review Workstation Contract (PR-13)", () => {
       expect(router).toContain("fieldCorrectionSupported: true");
     });
 
-    it("does not invent a new migration for corrections", () => {
-      const drizzleDir = path.join(root, "drizzle");
-      const sqlFiles = fs
-        .readdirSync(drizzleDir)
-        .filter(f => f.endsWith(".sql"));
-      for (const f of sqlFiles) {
-        const content = fs.readFileSync(path.join(drizzleDir, f), "utf-8");
-        expect(content.toLowerCase()).not.toContain("field_correction");
-      }
+    it("Wave-7 review_corrections uses field_correction enum (append-only events)", () => {
+      const sql = fs.readFileSync(
+        path.join(root, "drizzle/0012_template_memory.sql"),
+        "utf-8"
+      );
+      expect(sql).toContain("review_corrections");
+      expect(sql).toContain("field_correction");
+      expect(sql).toContain("trainingReasonCode");
     });
   });
   describe("DocumentViewer PDF iframe open params", () => {

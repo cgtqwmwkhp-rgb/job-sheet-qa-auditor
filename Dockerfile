@@ -58,6 +58,7 @@ COPY --from=builder --chown=appuser:nodejs /app/scripts/ensure-failed-jobs-table
 COPY --from=builder --chown=appuser:nodejs /app/scripts/ensure-audit-findings-resolution.mjs ./scripts/ensure-audit-findings-resolution.mjs
 COPY --from=builder --chown=appuser:nodejs /app/scripts/ensure-waiver-revocation.mjs ./scripts/ensure-waiver-revocation.mjs
 COPY --from=builder --chown=appuser:nodejs /app/scripts/ensure-secondary-tables.mjs ./scripts/ensure-secondary-tables.mjs
+COPY --from=builder --chown=appuser:nodejs /app/scripts/ensure-template-memory.mjs ./scripts/ensure-template-memory.mjs
 
 # Migrate-on-start entrypoint (runs drizzle-kit migrate when DATABASE_URL is set)
 COPY scripts/docker-entrypoint.sh /app/docker-entrypoint.sh

@@ -1,4 +1,4 @@
-CREATE TABLE `process_idempotency_outbox` (
+CREATE TABLE IF NOT EXISTS `process_idempotency_outbox` (
 	`id` varchar(64) NOT NULL,
 	`scope` varchar(191) NOT NULL,
 	`idempotencyKey` varchar(255) NOT NULL,
