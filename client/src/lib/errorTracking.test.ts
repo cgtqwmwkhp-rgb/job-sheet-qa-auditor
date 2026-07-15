@@ -58,7 +58,9 @@ describe("telemetry PII redaction", () => {
       },
     };
     const safeContext = redactErrorContext(context);
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
 
     logError(new Error("Failed for alice@example.com"), context);
 
