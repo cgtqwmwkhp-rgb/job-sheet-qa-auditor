@@ -726,12 +726,9 @@ export const reviewCorrections = mysqlTable(
     idempotencyUnique: uniqueIndex(
       "review_corrections_idempotencyKey_unique"
     ).on(table.idempotencyKey),
-    templateFieldRuleIdx: index("review_corrections_template_field_rule_idx").on(
-      table.templateId,
-      table.fieldKey,
-      table.ruleId,
-      table.createdAt
-    ),
+    templateFieldRuleIdx: index(
+      "review_corrections_template_field_rule_idx"
+    ).on(table.templateId, table.fieldKey, table.ruleId, table.createdAt),
   })
 );
 
