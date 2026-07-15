@@ -153,12 +153,7 @@ describe("Calibration Contract (Phase 3.3)", () => {
 
       const labels = Array.from({ length: ECE_MIN_SAMPLES }, (_, i) => ({
         resolutionStatus: (i % 3 === 0 ? "approved" : "overridden") as
-<<<<<<< HEAD
-          | "approved"
-          | "overridden",
-=======
           "approved" | "overridden",
->>>>>>> fd854d7 (style: prettier format A2 changed files for CI lint gate)
         confidenceScore: 60 + (i % 40),
       }));
       const samples = resolvedFindingsToPredictionSamples(labels);
