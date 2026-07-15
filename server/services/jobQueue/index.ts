@@ -28,6 +28,7 @@ import {
   startJobSheetProcessingPoller,
   startJobSheetProcessingWorker,
 } from "./worker";
+import { resumePendingProcessOutbox } from "../idempotency";
 
 let queueInitialization: Promise<void> | null = null;
 
@@ -122,17 +123,96 @@ export async function recoverJobSheetProcessingQueue(): Promise<number> {
 }
 
 /**
+ * Close pending process Idempotency-Key outbox rows after a crash without
+ * starting a second billable OCR when work is already queued/terminal.
+ */
+export async function resumeProcessOutboxAfterRestart(): Promise<number> {
+  const backend = getJobQueueBackend();
+  return resumePendingProcessOutbox({
+    findActiveJob: async jobSheetId => {
+      if (!backend.findActiveByJobSheetId) return null;
+      const job = await backend.findActiveByJobSheetId(jobSheetId);
+      if (!job) return null;
+      return { id: job.id, status: job.status };
+    },
+    getJobSheetStatus: async jobSheetId => {
+      try {
+        const { getJobSheetById } = await import("../../db");
+        const sheet = await getJobSheetById(jobSheetId);
+        return sheet?.status ?? null;
+      } catch {
+        return null;
+      }
+    },
+    reenqueue: async record => {
+      if (record.jobSheetId == null) {
+        return {
+          accepted: true,
+          async: true,
+          deduped: true,
+          reason: "no_sheet",
+        };
+      }
+      try {
+        const { getJobSheetById } = await import("../../db");
+        const sheet = await getJobSheetById(record.jobSheetId);
+        if (!sheet) {
+          return {
+            accepted: true,
+            async: true,
+            deduped: true,
+            jobSheetId: record.jobSheetId,
+            reason: "sheet_missing",
+          };
+        }
+        return await Promise.resolve(
+          enqueueJobSheetProcessing({
+            source: "primary",
+            jobSheetId: record.jobSheetId,
+            documentUrl: sheet.fileUrl,
+            userId: undefined,
+            contentHash: sheet.fileHash ?? undefined,
+            idempotencyKey: record.idempotencyKey,
+          })
+        );
+      } catch (error) {
+        return {
+          accepted: false,
+          async: true,
+          deduped: false,
+          jobSheetId: record.jobSheetId,
+          reason: "reenqueue_failed",
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+  });
+}
+
+/**
  * Boot helper for durable mode: reclaim stale work and start the scale-out poller.
  * Safe to call when durable flag is off (no-op), and concurrent boot callers
  * share one recovery attempt. A failed attempt is left retryable.
+ *
+ * Also resumes pending process Idempotency-Key outbox rows (Wave-4 C2).
  */
 export function initJobSheetProcessingQueue(): Promise<void> {
-  if (!isDurableJobQueueEnabled()) return Promise.resolve();
   if (queueInitialization) return queueInitialization;
 
   queueInitialization = (async () => {
-    await recoverJobSheetProcessingQueue();
-    startJobSheetProcessingPoller();
+    if (isDurableJobQueueEnabled()) {
+      await recoverJobSheetProcessingQueue();
+      startJobSheetProcessingPoller();
+    }
+    // Outbox resume is safe with in-memory or durable backends — pending rows
+    // either complete against an active/terminal sheet or re-enqueue once.
+    const resumed = await resumeProcessOutboxAfterRestart();
+    if (resumed > 0) {
+      startJobSheetProcessingWorker();
+      if (isDurableJobQueueEnabled()) {
+        startJobSheetProcessingPoller();
+      }
+    }
   })().catch(error => {
     queueInitialization = null;
     throw error;

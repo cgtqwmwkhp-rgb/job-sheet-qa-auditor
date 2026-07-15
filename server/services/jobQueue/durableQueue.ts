@@ -42,12 +42,17 @@ export const jobSheetProcessingJobs = mysqlTable(
     attempts: int("attempts").notNull().default(0),
     error: text("error"),
     activeDedupeKey: int("activeDedupeKey"),
+    /** Content-hash active dedupe (primary process) — NULL when terminal. */
+    activeContentHash: varchar("activeContentHash", { length: 128 }),
     lockedBy: varchar("lockedBy", { length: 64 }),
     lockedAt: timestamp("lockedAt"),
   },
   table => ({
     activeDedupe: uniqueIndex("uq_job_sheet_processing_active").on(
       table.activeDedupeKey
+    ),
+    activeContentHash: uniqueIndex("uq_job_sheet_processing_content").on(
+      table.activeContentHash
     ),
   })
 );
@@ -64,12 +69,24 @@ CREATE TABLE IF NOT EXISTS job_sheet_processing_jobs (
   attempts INT NOT NULL DEFAULT 0,
   error TEXT NULL,
   activeDedupeKey INT NULL,
+  activeContentHash VARCHAR(128) NULL,
   lockedBy VARCHAR(64) NULL,
   lockedAt TIMESTAMP NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_job_sheet_processing_active (activeDedupeKey),
+  UNIQUE KEY uq_job_sheet_processing_content (activeContentHash),
   KEY idx_job_sheet_processing_status_enqueued (status, enqueuedAt)
 )
+`;
+
+/** Best-effort migrate for tables created before Wave-4 C2 content-hash dedupe. */
+const DDL_CONTENT_HASH_COLUMN = `
+ALTER TABLE job_sheet_processing_jobs
+  ADD COLUMN activeContentHash VARCHAR(128) NULL
+`;
+const DDL_CONTENT_HASH_INDEX = `
+ALTER TABLE job_sheet_processing_jobs
+  ADD UNIQUE KEY uq_job_sheet_processing_content (activeContentHash)
 `;
 
 let schemaReady: Promise<void> | null = null;
@@ -89,7 +106,8 @@ function isDuplicateKeyError(error: unknown): boolean {
   return (
     code === "ER_DUP_ENTRY" ||
     message.includes("Duplicate entry") ||
-    message.includes("uq_job_sheet_processing_active")
+    message.includes("uq_job_sheet_processing_active") ||
+    message.includes("uq_job_sheet_processing_content")
   );
 }
 
@@ -115,6 +133,13 @@ function rowToJob(row: {
   };
 }
 
+function normalizeContentHash(
+  contentHash: string | undefined
+): string | undefined {
+  const normalized = contentHash?.trim().toLowerCase();
+  return normalized ? normalized : undefined;
+}
+
 async function ensureSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = (async () => {
@@ -125,12 +150,44 @@ async function ensureSchema(): Promise<void> {
         );
       }
       await db.execute(sql.raw(DDL));
+      // Best-effort migrate for deployments that created the table before C2.
+      try {
+        await db.execute(sql.raw(DDL_CONTENT_HASH_COLUMN));
+      } catch {
+        // Column already present — ignore.
+      }
+      try {
+        await db.execute(sql.raw(DDL_CONTENT_HASH_INDEX));
+      } catch {
+        // Index already present — ignore.
+      }
     })().catch(error => {
       schemaReady = null;
       throw error;
     });
   }
   await schemaReady;
+}
+
+async function findActiveJobByContentHash(
+  contentHash: string
+): Promise<JobSheetQueueJob | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const rows = await db
+    .select()
+    .from(jobSheetProcessingJobs)
+    .where(
+      and(
+        eq(jobSheetProcessingJobs.activeContentHash, contentHash),
+        inArray(jobSheetProcessingJobs.status, ["queued", "running"])
+      )
+    )
+    .limit(1);
+
+  const row = rows[0];
+  return row ? rowToJob(row) : undefined;
 }
 
 async function findActiveJob(
@@ -168,9 +225,20 @@ export async function enqueueDurableJobSheetProcessing(
     return { job: existing, deduped: true };
   }
 
+  const contentHash = normalizeContentHash(payload.contentHash);
+  const isPrimary = (payload.source ?? "primary") === "primary";
+  if (isPrimary && contentHash) {
+    const byHash = await findActiveJobByContentHash(contentHash);
+    if (byHash) {
+      return { job: byHash, deduped: true };
+    }
+  }
+
+  const normalizedPayload = contentHash ? { ...payload, contentHash } : payload;
+
   const job: JobSheetQueueJob = {
     id: createJobId(payload.jobSheetId),
-    payload,
+    payload: normalizedPayload,
     status: "queued",
     enqueuedAt: new Date(),
     attempts: 0,
@@ -180,18 +248,21 @@ export async function enqueueDurableJobSheetProcessing(
     await db.insert(jobSheetProcessingJobs).values({
       id: job.id,
       jobSheetId: payload.jobSheetId,
-      payload,
+      payload: normalizedPayload,
       status: "queued",
       enqueuedAt: job.enqueuedAt,
       attempts: 0,
       activeDedupeKey: payload.jobSheetId,
+      activeContentHash: isPrimary && contentHash ? contentHash : null,
       lockedBy: null,
       lockedAt: null,
     });
     return { job, deduped: false };
   } catch (error) {
     if (!isDuplicateKeyError(error)) throw error;
-    const raced = await findActiveJob(payload.jobSheetId);
+    const raced =
+      (await findActiveJob(payload.jobSheetId)) ??
+      (contentHash ? await findActiveJobByContentHash(contentHash) : undefined);
     if (raced) {
       return { job: raced, deduped: true };
     }
@@ -267,6 +338,7 @@ export async function completeDurableJobSheetProcessingJob(
       status: "completed",
       finishedAt: new Date(),
       activeDedupeKey: null,
+      activeContentHash: null,
       lockedBy: null,
       lockedAt: null,
     })
@@ -288,6 +360,7 @@ export async function failDurableJobSheetProcessingJob(
       finishedAt: new Date(),
       error: error instanceof Error ? error.message : String(error),
       activeDedupeKey: null,
+      activeContentHash: null,
       lockedBy: null,
       lockedAt: null,
     })
@@ -383,6 +456,7 @@ export const mysqlDurableJobQueueBackend: JobQueueBackend = {
   get: getDurableJobSheetProcessingJob,
   clear: clearDurableJobSheetProcessingQueue,
   recover: recoverDurableJobSheetProcessingJobs,
+  findActiveByJobSheetId: findActiveJob,
 };
 
 /**
@@ -392,30 +466,49 @@ export const mysqlDurableJobQueueBackend: JobQueueBackend = {
 export function createInProcessDurableBackend(): JobQueueBackend {
   const jobsById = new Map<string, JobSheetQueueJob>();
   const activeByJobSheetId = new Map<number, string>();
+  const activeByContentHash = new Map<string, string>();
   const queuedIds: string[] = [];
   let seq = 0;
 
+  function findActive(jobId: string | undefined): JobSheetQueueJob | undefined {
+    if (!jobId) return undefined;
+    const job = jobsById.get(jobId);
+    if (job && (job.status === "queued" || job.status === "running")) {
+      return job;
+    }
+    return undefined;
+  }
+
   return {
     enqueue(payload) {
-      const existingId = activeByJobSheetId.get(payload.jobSheetId);
-      const existing = existingId ? jobsById.get(existingId) : undefined;
-      if (
-        existing &&
-        (existing.status === "queued" || existing.status === "running")
-      ) {
+      const existing = findActive(activeByJobSheetId.get(payload.jobSheetId));
+      if (existing) {
         return { job: existing, deduped: true };
+      }
+
+      const contentHash = normalizeContentHash(payload.contentHash);
+      const isPrimary = (payload.source ?? "primary") === "primary";
+      if (isPrimary && contentHash) {
+        const byHash = findActive(activeByContentHash.get(contentHash));
+        if (byHash) {
+          activeByJobSheetId.set(payload.jobSheetId, byHash.id);
+          return { job: byHash, deduped: true };
+        }
       }
 
       seq += 1;
       const job: JobSheetQueueJob = {
         id: `durable-${payload.jobSheetId}-${Date.now()}-${seq}`,
-        payload,
+        payload: contentHash ? { ...payload, contentHash } : payload,
         status: "queued",
         enqueuedAt: new Date(),
         attempts: 0,
       };
       jobsById.set(job.id, job);
       activeByJobSheetId.set(payload.jobSheetId, job.id);
+      if (isPrimary && contentHash) {
+        activeByContentHash.set(contentHash, job.id);
+      }
       queuedIds.push(job.id);
       return { job, deduped: false };
     },
@@ -440,6 +533,10 @@ export function createInProcessDurableBackend(): JobQueueBackend {
       if (activeByJobSheetId.get(job.payload.jobSheetId) === jobId) {
         activeByJobSheetId.delete(job.payload.jobSheetId);
       }
+      const contentHash = normalizeContentHash(job.payload.contentHash);
+      if (contentHash && activeByContentHash.get(contentHash) === jobId) {
+        activeByContentHash.delete(contentHash);
+      }
     },
     fail(jobId, error) {
       const job = jobsById.get(jobId);
@@ -449,6 +546,10 @@ export function createInProcessDurableBackend(): JobQueueBackend {
       job.error = error instanceof Error ? error.message : String(error);
       if (activeByJobSheetId.get(job.payload.jobSheetId) === jobId) {
         activeByJobSheetId.delete(job.payload.jobSheetId);
+      }
+      const contentHash = normalizeContentHash(job.payload.contentHash);
+      if (contentHash && activeByContentHash.get(contentHash) === jobId) {
+        activeByContentHash.delete(contentHash);
       }
     },
     hasQueued() {
@@ -460,6 +561,7 @@ export function createInProcessDurableBackend(): JobQueueBackend {
     clear() {
       jobsById.clear();
       activeByJobSheetId.clear();
+      activeByContentHash.clear();
       queuedIds.length = 0;
       seq = 0;
     },
@@ -480,6 +582,9 @@ export function createInProcessDurableBackend(): JobQueueBackend {
         }
       }
       return reclaimed;
+    },
+    findActiveByJobSheetId(jobSheetId) {
+      return findActive(activeByJobSheetId.get(jobSheetId));
     },
   };
 }

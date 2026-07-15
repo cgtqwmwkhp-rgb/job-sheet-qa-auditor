@@ -8,6 +8,7 @@ import {
   json,
   boolean,
   decimal,
+  uniqueIndex,
 } from "drizzle-orm/mysql-core";
 
 /**
@@ -215,11 +216,7 @@ export const auditFindings = mysqlTable("audit_findings", {
 export type AuditFinding = typeof auditFindings.$inferSelect;
 export type InsertAuditFinding = typeof auditFindings.$inferInsert;
 export type FindingResolutionStatus =
-  | "open"
-  | "waived"
-  | "overridden"
-  | "flagged"
-  | "approved";
+  "open" | "waived" | "overridden" | "flagged" | "approved";
 
 /**
  * Disputes - technician challenges to audit findings
@@ -606,3 +603,34 @@ export const webhookDeliveryLog = mysqlTable("webhook_delivery_log", {
 
 export type WebhookDeliveryLogRow = typeof webhookDeliveryLog.$inferSelect;
 export type InsertWebhookDeliveryLog = typeof webhookDeliveryLog.$inferInsert;
+
+/**
+ * Process Idempotency Outbox — durable Idempotency-Key ledger for jobSheets.process (Wave-4 C2).
+ * Runtime also CREATE IF NOT EXISTS via processOutbox.ts (same pattern as job queue).
+ */
+export const processIdempotencyOutbox = mysqlTable(
+  "process_idempotency_outbox",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    scope: varchar("scope", { length: 191 }).notNull(),
+    idempotencyKey: varchar("idempotencyKey", { length: 255 }).notNull(),
+    requestFingerprint: varchar("requestFingerprint", { length: 64 }).notNull(),
+    status: mysqlEnum("status", ["pending", "completed"]).notNull(),
+    jobSheetId: int("jobSheetId"),
+    responseJson: json("responseJson"),
+    createdAt: timestamp("createdAt").notNull(),
+    updatedAt: timestamp("updatedAt").notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+  },
+  table => ({
+    scopeKey: uniqueIndex("uq_process_idempotency_scope_key").on(
+      table.scope,
+      table.idempotencyKey
+    ),
+  })
+);
+
+export type ProcessIdempotencyOutboxRow =
+  typeof processIdempotencyOutbox.$inferSelect;
+export type InsertProcessIdempotencyOutbox =
+  typeof processIdempotencyOutbox.$inferInsert;

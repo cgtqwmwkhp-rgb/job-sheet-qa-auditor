@@ -21,6 +21,8 @@ import {
   isAsyncProcessingEnabled,
 } from "./services/jobQueue";
 import {
+  executeProcessOutbox,
+  getIdempotencyKey,
   resolveProcessIdempotency,
   toProcessDedupeResponse,
 } from "./services/idempotency";
@@ -164,9 +166,8 @@ export const appRouter = router({
         });
 
         // Object-level filtering: regular users only see their own uploads
-        const { filterJobSheetsByAccess } = await import(
-          "./utils/authorization"
-        );
+        const { filterJobSheetsByAccess } =
+          await import("./utils/authorization");
         const accessibleJobSheets = filterJobSheetsByAccess(
           allJobSheets,
           ctx.user
@@ -277,9 +278,8 @@ export const appRouter = router({
         const buffer = Buffer.from(input.fileBase64, "base64");
 
         // Validate file type and size
-        const { validateFile, sanitizeFilename } = await import(
-          "./utils/fileValidation"
-        );
+        const { validateFile, sanitizeFilename } =
+          await import("./utils/fileValidation");
         const validation = validateFile(buffer, input.fileType, {
           maxSizeBytes: 10 * 1024 * 1024, // 10MB
           allowedTypes: ["application/pdf", "image/jpeg", "image/png"],
@@ -411,139 +411,148 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        await throwIfRateLimited(() =>
-          enforceRateLimit(
-            `user:${ctx.user.id}:processing`,
-            RATE_LIMITS.processing
-          )
-        );
+        // Durable Idempotency-Key outbox: double-submit → one billable process.
+        return executeProcessOutbox({
+          scope: `jobSheets.process:${ctx.user.id}`,
+          key: getIdempotencyKey(ctx.req),
+          body: input,
+          action: async () => {
+            await throwIfRateLimited(() =>
+              enforceRateLimit(
+                `user:${ctx.user.id}:processing`,
+                RATE_LIMITS.processing
+              )
+            );
 
-        const jobSheet = await getAuthorizedJobSheet(input.id, ctx.user);
+            const jobSheet = await getAuthorizedJobSheet(input.id, ctx.user);
 
-        // Content-hash OCR idempotency (re-upload / double-click / dual replica).
-        // Same fileHash must not start a second billable OCR on the primary path.
-        const idempotency = await resolveProcessIdempotency({
-          jobSheetId: input.id,
-          status: jobSheet.status,
-          contentHash: jobSheet.fileHash,
-          lookup: {
-            findInFlightByContentHash: db.findInFlightJobSheetByContentHash,
-            findProcessedByContentHash: db.findProcessedJobSheetByContentHash,
-          },
-        });
-
-        if (idempotency.action === "dedupe") {
-          if (idempotency.reason === "same_sheet_processing") {
-            throw new TRPCError({
-              code: "CONFLICT",
-              message:
-                "Cannot process: document is currently being processed. Please wait for the current processing to complete.",
-            });
-          }
-
-          if (idempotency.reason === "same_sheet_already_processed") {
-            throw new TRPCError({
-              code: "CONFLICT",
-              message:
-                "This job sheet was already processed. Use Reprocess on the audit page to run OCR and analysis again.",
-            });
-          }
-
-          await db.logAction({
-            userId: ctx.user.id,
-            action: "PROCESS_JOB_SHEET_DEDUPED",
-            entityType: "job_sheet",
-            entityId: input.id,
-            details: {
-              reason: idempotency.reason,
-              contentHash: idempotency.contentHash,
-              idempotencyKey: idempotency.idempotencyKey,
-              reusedFromJobSheetId: idempotency.reusedFromJobSheetId,
-            },
-          });
-
-          return toProcessDedupeResponse({
-            jobSheetId: input.id,
-            contentHash: idempotency.contentHash,
-            idempotencyKey: idempotency.idempotencyKey,
-            reason: idempotency.reason,
-            reusedFromJobSheetId: idempotency.reusedFromJobSheetId,
-            async: isAsyncProcessingEnabled(),
-            status: "processing",
-          });
-        }
-
-        const contentHash =
-          idempotency.action === "proceed"
-            ? idempotency.contentHash
-            : undefined;
-        const idempotencyKey =
-          idempotency.action === "proceed"
-            ? idempotency.idempotencyKey
-            : undefined;
-
-        // Soft-claim before enqueue/OCR so peer replicas observing the same
-        // fileHash see status=processing. If multiple claimants race, the
-        // lowest jobSheetId wins; losers roll back and return dedupe.
-        if (contentHash) {
-          await db.updateJobSheetStatus(input.id, "processing");
-
-          const claimants =
-            await db.listInFlightJobSheetsByContentHash(contentHash);
-          const winnerId = claimants.reduce(
-            (min, row) => Math.min(min, row.id),
-            input.id
-          );
-
-          if (winnerId !== input.id) {
-            await db.updateJobSheetStatus(input.id, "pending");
-            await db.logAction({
-              userId: ctx.user.id,
-              action: "PROCESS_JOB_SHEET_DEDUPED",
-              entityType: "job_sheet",
-              entityId: input.id,
-              details: {
-                reason: "in_flight",
-                contentHash,
-                idempotencyKey,
-                reusedFromJobSheetId: winnerId,
-                race: true,
+            // Content-hash OCR idempotency (re-upload / double-click / dual replica).
+            // Same fileHash must not start a second billable OCR on the primary path.
+            const idempotency = await resolveProcessIdempotency({
+              jobSheetId: input.id,
+              status: jobSheet.status,
+              contentHash: jobSheet.fileHash,
+              lookup: {
+                findInFlightByContentHash: db.findInFlightJobSheetByContentHash,
+                findProcessedByContentHash:
+                  db.findProcessedJobSheetByContentHash,
               },
             });
-            return toProcessDedupeResponse({
+
+            if (idempotency.action === "dedupe") {
+              if (idempotency.reason === "same_sheet_processing") {
+                throw new TRPCError({
+                  code: "CONFLICT",
+                  message:
+                    "Cannot process: document is currently being processed. Please wait for the current processing to complete.",
+                });
+              }
+
+              if (idempotency.reason === "same_sheet_already_processed") {
+                throw new TRPCError({
+                  code: "CONFLICT",
+                  message:
+                    "This job sheet was already processed. Use Reprocess on the audit page to run OCR and analysis again.",
+                });
+              }
+
+              await db.logAction({
+                userId: ctx.user.id,
+                action: "PROCESS_JOB_SHEET_DEDUPED",
+                entityType: "job_sheet",
+                entityId: input.id,
+                details: {
+                  reason: idempotency.reason,
+                  contentHash: idempotency.contentHash,
+                  idempotencyKey: idempotency.idempotencyKey,
+                  reusedFromJobSheetId: idempotency.reusedFromJobSheetId,
+                },
+              });
+
+              return toProcessDedupeResponse({
+                jobSheetId: input.id,
+                contentHash: idempotency.contentHash,
+                idempotencyKey: idempotency.idempotencyKey,
+                reason: idempotency.reason,
+                reusedFromJobSheetId: idempotency.reusedFromJobSheetId,
+                async: isAsyncProcessingEnabled(),
+                status: "processing",
+              });
+            }
+
+            const contentHash =
+              idempotency.action === "proceed"
+                ? idempotency.contentHash
+                : undefined;
+            const idempotencyKey =
+              idempotency.action === "proceed"
+                ? idempotency.idempotencyKey
+                : undefined;
+
+            // Soft-claim before enqueue/OCR so peer replicas observing the same
+            // fileHash see status=processing. If multiple claimants race, the
+            // lowest jobSheetId wins; losers roll back and return dedupe.
+            if (contentHash) {
+              await db.updateJobSheetStatus(input.id, "processing");
+
+              const claimants =
+                await db.listInFlightJobSheetsByContentHash(contentHash);
+              const winnerId = claimants.reduce(
+                (min, row) => Math.min(min, row.id),
+                input.id
+              );
+
+              if (winnerId !== input.id) {
+                await db.updateJobSheetStatus(input.id, "pending");
+                await db.logAction({
+                  userId: ctx.user.id,
+                  action: "PROCESS_JOB_SHEET_DEDUPED",
+                  entityType: "job_sheet",
+                  entityId: input.id,
+                  details: {
+                    reason: "in_flight",
+                    contentHash,
+                    idempotencyKey,
+                    reusedFromJobSheetId: winnerId,
+                    race: true,
+                  },
+                });
+                return toProcessDedupeResponse({
+                  jobSheetId: input.id,
+                  contentHash,
+                  idempotencyKey: idempotencyKey!,
+                  reason: "in_flight",
+                  reusedFromJobSheetId: winnerId,
+                  async: isAsyncProcessingEnabled(),
+                  status: "processing",
+                });
+              }
+            }
+
+            if (isAsyncProcessingEnabled()) {
+              return enqueueJobSheetProcessing({
+                source: "primary",
+                jobSheetId: input.id,
+                documentUrl: jobSheet.fileUrl,
+                goldSpecId: input.goldSpecId,
+                userId: ctx.user.id,
+                contentHash,
+                idempotencyKey,
+                correlationId: getCorrelationId(),
+              });
+            }
+
+            const result = await orchestrateJobSheetProcessing({
+              source: "primary",
               jobSheetId: input.id,
-              contentHash,
-              idempotencyKey: idempotencyKey!,
-              reason: "in_flight",
-              reusedFromJobSheetId: winnerId,
-              async: isAsyncProcessingEnabled(),
-              status: "processing",
+              documentUrl: jobSheet.fileUrl,
+              goldSpecId: input.goldSpecId,
+              userId: ctx.user.id,
             });
-          }
-        }
 
-        if (isAsyncProcessingEnabled()) {
-          return enqueueJobSheetProcessing({
-            source: "primary",
-            jobSheetId: input.id,
-            documentUrl: jobSheet.fileUrl,
-            goldSpecId: input.goldSpecId,
-            userId: ctx.user.id,
-            contentHash,
-            idempotencyKey,
-            correlationId: getCorrelationId(),
-          });
-        }
-
-        const result = await orchestrateJobSheetProcessing({
-          source: "primary",
-          jobSheetId: input.id,
-          documentUrl: jobSheet.fileUrl,
-          goldSpecId: input.goldSpecId,
-          userId: ctx.user.id,
+            return result;
+          },
         });
-
-        return result;
       }),
 
     /**
@@ -1255,9 +1264,8 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
         // Object-level authorization: users can only access their own profile (unless admin)
-        const { enforceUserProfileAccess } = await import(
-          "./utils/authorization"
-        );
+        const { enforceUserProfileAccess } =
+          await import("./utils/authorization");
         enforceUserProfileAccess(input.id, ctx.user);
 
         return db.getUserById(input.id);

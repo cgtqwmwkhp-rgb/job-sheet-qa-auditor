@@ -125,6 +125,32 @@ describe("Durable job queue — restart + scale-out dedupe", () => {
     expect(orchestrateJobSheetProcessing).toHaveBeenCalledTimes(1);
   });
 
+  it("dedupes primary enqueue by content hash (no double OCR bill)", async () => {
+    const first = await Promise.resolve(
+      shared.enqueue({
+        source: "primary",
+        jobSheetId: 201,
+        documentUrl: "https://example.test/same.pdf",
+        contentHash: "abc123",
+      })
+    );
+    const second = await Promise.resolve(
+      shared.enqueue({
+        source: "primary",
+        jobSheetId: 202,
+        documentUrl: "https://example.test/same.pdf",
+        contentHash: "ABC123",
+      })
+    );
+
+    expect(first.deduped).toBe(false);
+    expect(second.deduped).toBe(true);
+    expect(second.job.id).toBe(first.job.id);
+
+    await drainJobSheetProcessingQueue();
+    expect(orchestrateJobSheetProcessing).toHaveBeenCalledTimes(1);
+  });
+
   it("reclaims stale running jobs after crash", async () => {
     process.env.JOB_QUEUE_STALE_LOCK_MS = "1";
 
