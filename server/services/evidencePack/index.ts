@@ -10,7 +10,9 @@
 export const FEATURE_FLAG = "FEATURE_EVIDENCE_PACK";
 
 export * from "./types";
-export { buildEvidencePack } from "./build";
+import { buildEvidencePack, type BuildEvidencePackInput } from "./build";
+
+export { buildEvidencePack };
 export type { BuildEvidencePackInput } from "./build";
 
 /**
@@ -19,4 +21,16 @@ export type { BuildEvidencePackInput } from "./build";
  */
 export function isEvidencePackEnabled(): boolean {
   return process.env[FEATURE_FLAG] === "true";
+}
+
+/**
+ * Generate an evidence pack only while the feature is explicitly enabled.
+ * Callers should use this entry point at review-generation boundaries.
+ */
+export function generateEvidencePack(
+  input: BuildEvidencePackInput,
+  now?: Date
+) {
+  if (!isEvidencePackEnabled()) return undefined;
+  return buildEvidencePack(input, now);
 }
