@@ -31,6 +31,8 @@ import {
   dropIngestRouter,
   startDropIngestPoller,
 } from "../services/dropIngest/boot";
+import { sdk } from "./sdk";
+import { generateCsrfToken } from "../utils/csrf";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -198,6 +200,20 @@ async function startServer() {
   app.use("/api/ingest", ingestRouter);
   // PR-IO-SHAREPOINT: watched-folder / Blob drop status (no Entra; no HMAC router ownership)
   app.use("/api/drop-ingest", dropIngestRouter);
+
+  // The SPA obtains a session-bound token without exposing it to JavaScript
+  // through a cookie. Easy Auth credentials are included by the same-origin
+  // request, while the token is supplied to subsequent tRPC mutations in a
+  // custom header that cross-site forms cannot set.
+  app.get("/api/csrf-token", async (req, res) => {
+    const user = await sdk.authenticateRequest(req).catch(() => null);
+    if (!user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    res.set("Cache-Control", "no-store");
+    return res.json({ token: generateCsrfToken(`user:${user.id}`) });
+  });
 
   // tRPC API
   app.use(

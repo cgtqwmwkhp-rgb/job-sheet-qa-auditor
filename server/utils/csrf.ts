@@ -5,21 +5,83 @@
  * Protects against unauthorized state-changing requests from malicious sites.
  */
 
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { TRPCError } from "@trpc/server";
+import type { Request } from "express";
 
 /**
  * CSRF token configuration.
  * Tokens are stateless and validated via HMAC signature.
  */
-const CSRF_SECRET = process.env.CSRF_SECRET || process.env.JWT_SECRET || "";
 const TOKEN_LIFETIME_MS = 3600000; // 1 hour
 
-if (!CSRF_SECRET || CSRF_SECRET.length < 32) {
-  console.warn(
-    "[CSRF] CSRF_SECRET not set or too short. CSRF protection disabled. " +
-      "Set CSRF_SECRET environment variable (min 32 chars) for production."
-  );
+function getCsrfSecret(): string {
+  return process.env.CSRF_SECRET || process.env.JWT_SECRET || "";
+}
+
+function csrfError(
+  message: string,
+  code: "BAD_REQUEST" | "FORBIDDEN" = "FORBIDDEN"
+): never {
+  throw new TRPCError({ code, message });
+}
+
+function getHeader(req: Request, name: string): string | undefined {
+  const value = req.headers[name];
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/**
+ * Explicit origins are needed only when the SPA is hosted separately from the
+ * API. Same-origin deployments derive the expected origin from Host, including
+ * Azure's forwarded host/protocol headers.
+ */
+export function getTrustedCsrfOrigins(req: Request): Set<string> {
+  const configured = process.env.CSRF_TRUSTED_ORIGINS?.split(",")
+    .map(origin => {
+      try {
+        return new URL(origin.trim()).origin;
+      } catch {
+        return "";
+      }
+    })
+    .filter(Boolean);
+
+  if (configured?.length) {
+    return new Set(configured);
+  }
+
+  const host = getHeader(req, "x-forwarded-host") || getHeader(req, "host");
+  if (!host) return new Set();
+
+  const forwardedProto = getHeader(req, "x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim();
+  const protocol = forwardedProto || req.protocol || "https";
+  return new Set([`${protocol}://${host}`]);
+}
+
+/**
+ * Origin validation is always active for browser mutations, including when a
+ * CSRF signing secret is unavailable in a local environment. It prevents a
+ * malicious site from sending credentialed cross-site requests.
+ */
+export function validateCsrfOrigin(req: Request): void {
+  const origin = getHeader(req, "origin");
+  if (!origin) {
+    csrfError("CSRF origin required for state-changing requests.");
+  }
+
+  let normalizedOrigin: string;
+  try {
+    normalizedOrigin = new URL(origin).origin;
+  } catch {
+    csrfError("Invalid CSRF origin.");
+  }
+
+  if (!getTrustedCsrfOrigins(req).has(normalizedOrigin)) {
+    csrfError("CSRF origin is not trusted.");
+  }
 }
 
 /**
@@ -30,18 +92,22 @@ if (!CSRF_SECRET || CSRF_SECRET.length < 32) {
  * @returns Base64-encoded CSRF token
  */
 export function generateCsrfToken(sessionId: string): string {
-  if (!CSRF_SECRET) {
+  const csrfSecret = getCsrfSecret();
+  if (!csrfSecret) {
     // In development, return a placeholder token
     return "dev-csrf-token";
   }
 
   const timestamp = Date.now();
   const nonce = randomBytes(16).toString("hex");
-  const payload = `${sessionId}:${timestamp}:${nonce}`;
+  // Session identifiers commonly contain `:` (for example `user:42`), so
+  // encode them before constructing the colon-delimited signed payload.
+  const encodedSessionId = Buffer.from(sessionId).toString("base64url");
+  const payload = `${encodedSessionId}:${timestamp}:${nonce}`;
 
   // Create HMAC signature
   const signature = createHash("sha256")
-    .update(`${CSRF_SECRET}:${payload}`)
+    .update(`${csrfSecret}:${payload}`)
     .digest("hex");
 
   // Combine payload and signature
@@ -58,66 +124,62 @@ export function generateCsrfToken(sessionId: string): string {
  * @throws TRPCError with code FORBIDDEN if invalid
  */
 export function validateCsrfToken(token: string, sessionId: string): void {
-  if (!CSRF_SECRET) {
+  const csrfSecret = getCsrfSecret();
+  if (!csrfSecret) {
     // In development, skip validation
     return;
   }
 
   if (!token) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "CSRF token missing. Please refresh the page and try again.",
-    });
+    csrfError("CSRF token missing. Please refresh the page and try again.");
   }
 
   let decoded: string;
   try {
     decoded = Buffer.from(token, "base64").toString("utf-8");
   } catch {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Invalid CSRF token format.",
-    });
+    csrfError("Invalid CSRF token format.");
   }
 
   const parts = decoded.split(":");
   if (parts.length !== 4) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Invalid CSRF token structure.",
-    });
+    csrfError("Invalid CSRF token structure.");
   }
 
-  const [tokenSessionId, timestampStr, nonce, providedSignature] = parts;
+  const [encodedSessionId, timestampStr, nonce, providedSignature] = parts;
+  let tokenSessionId: string;
+  try {
+    tokenSessionId = Buffer.from(encodedSessionId, "base64url").toString(
+      "utf-8"
+    );
+  } catch {
+    csrfError("Invalid CSRF token session.");
+  }
 
   // Validate session match
   if (tokenSessionId !== sessionId) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "CSRF token session mismatch. Please sign in again.",
-    });
+    csrfError("CSRF token session mismatch. Please sign in again.");
   }
 
   // Validate expiration
   const timestamp = parseInt(timestampStr, 10);
   if (isNaN(timestamp) || Date.now() - timestamp > TOKEN_LIFETIME_MS) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "CSRF token expired. Please refresh the page and try again.",
-    });
+    csrfError("CSRF token expired. Please refresh the page and try again.");
   }
 
   // Validate signature
-  const payload = `${tokenSessionId}:${timestampStr}:${nonce}`;
+  const payload = `${encodedSessionId}:${timestampStr}:${nonce}`;
   const expectedSignature = createHash("sha256")
-    .update(`${CSRF_SECRET}:${payload}`)
+    .update(`${csrfSecret}:${payload}`)
     .digest("hex");
 
-  if (providedSignature !== expectedSignature) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "CSRF token signature invalid.",
-    });
+  const provided = Buffer.from(providedSignature);
+  const expected = Buffer.from(expectedSignature);
+  if (
+    provided.length !== expected.length ||
+    !timingSafeEqual(provided, expected)
+  ) {
+    csrfError("CSRF token signature invalid.");
   }
 }
 
@@ -138,14 +200,14 @@ export function csrfMiddleware() {
   return async function csrfValidation(opts: any) {
     const { ctx, input, next } = opts;
 
-    // Extract CSRF token from input
-    const csrfToken = input?.csrfToken;
+    // tRPC parses input before middleware, so use a request header rather than
+    // adding csrfToken to every mutation's Zod schema. The input fallback keeps
+    // direct callers using the original middleware contract working.
+    const csrfToken = getHeader(ctx.req, "x-csrf-token") || input?.csrfToken;
+    validateCsrfOrigin(ctx.req);
 
     if (!csrfToken) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "CSRF token required for this operation.",
-      });
+      csrfError("CSRF token required for this operation.", "BAD_REQUEST");
     }
 
     // Generate session ID from user context
@@ -153,11 +215,6 @@ export function csrfMiddleware() {
 
     // Validate token
     validateCsrfToken(csrfToken, sessionId);
-
-    // Remove CSRF token from input before passing to procedure
-    if (input) {
-      delete input.csrfToken;
-    }
 
     return next();
   };
@@ -168,7 +225,7 @@ export function csrfMiddleware() {
  * Returns false in development if CSRF_SECRET not set.
  */
 export function isCsrfEnabled(): boolean {
-  return Boolean(CSRF_SECRET && CSRF_SECRET.length >= 32);
+  return getCsrfSecret().length >= 32;
 }
 
 /**
