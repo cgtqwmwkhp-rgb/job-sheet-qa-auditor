@@ -61,9 +61,7 @@ export function applyFieldVote(
 
   const engines = [
     ...(input.primary ? [{ engine: "primary", fields: input.primary }] : []),
-    ...(input.fallback
-      ? [{ engine: "fallback", fields: input.fallback }]
-      : []),
+    ...(input.fallback ? [{ engine: "fallback", fields: input.fallback }] : []),
     ...(input.crop
       ? [
           {
@@ -73,9 +71,7 @@ export function applyFieldVote(
           },
         ]
       : []),
-    ...(input.ensemble
-      ? [{ engine: "ensemble", fields: input.ensemble }]
-      : []),
+    ...(input.ensemble ? [{ engine: "ensemble", fields: input.ensemble }] : []),
     ...(input.selectionMarks
       ? [{ engine: "azure_custom", fields: input.selectionMarks }]
       : []),

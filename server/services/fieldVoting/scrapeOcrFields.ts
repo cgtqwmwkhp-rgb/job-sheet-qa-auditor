@@ -12,16 +12,16 @@ export interface ScrapedField {
 }
 
 const JOB_PATTERNS = [
-  /(?:job\s*(?:number|no\.?|#|ref(?:erence)?))\s*[:.\-]?\s*([A-Z0-9][\w\-/]{2,})/i,
+  /(?:job\s*(?:number|no\.?|#|ref(?:erence)?))\s*[:.-]?\s*([A-Z0-9][\w/-]{2,})/i,
   /\b(?:JS|JOB)[- ]?(\d{4,})\b/i,
 ];
 
 const ASSET_PATTERNS = [
-  /(?:asset\s*(?:number|no\.?|id)|serial\s*(?:number|no\.?))\s*[:.\-]?\s*([A-Z0-9][\w\-/]{2,})/i,
+  /(?:asset\s*(?:number|no\.?|id)|serial\s*(?:number|no\.?))\s*[:.-]?\s*([A-Z0-9][\w/-]{2,})/i,
 ];
 
 const DATE_PATTERNS = [
-  /(?:date\s*(?:of\s*service)?|service\s*date)\s*[:.\-]?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4})/i,
+  /(?:date\s*(?:of\s*service)?|service\s*date)\s*[:.-]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i,
 ];
 
 /**
@@ -31,7 +31,12 @@ export function scrapeCriticalFieldsFromText(text: string): ScrapedField[] {
   const out: ScrapedField[] = [];
   const seen = new Set<string>();
 
-  const push = (fieldId: string, value: string, confidence: number, evidence: string) => {
+  const push = (
+    fieldId: string,
+    value: string,
+    confidence: number,
+    evidence: string
+  ) => {
     if (seen.has(fieldId)) return;
     seen.add(fieldId);
     out.push({ fieldId, value: value.trim(), confidence, evidence });
@@ -89,7 +94,10 @@ export function scrapeCriticalFieldsFromText(text: string): ScrapedField[] {
   }
 
   // Deep OCR signature blocks (if present as markdown markers)
-  if (/type["']?\s*:\s*["']?signature/i.test(text) || /\[signature\]/i.test(text)) {
+  if (
+    /type["']?\s*:\s*["']?signature/i.test(text) ||
+    /\[signature\]/i.test(text)
+  ) {
     const existing = out.find(f => f.fieldId === "engineerSignOff");
     if (existing) {
       existing.confidence = Math.max(existing.confidence, 0.7);

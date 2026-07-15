@@ -5,12 +5,13 @@
  * ink evidence abstains. VLM Present + OCR agreement → high-confidence Present.
  */
 
-import { fuseFieldResults, type OcrFieldResult, type ImageQaResult } from "../imageQaFusion";
 import {
-  voteField,
-  type EngineFieldCandidate,
-  type FieldVoteResult,
-} from "./voteField";
+  fuseFieldResults,
+  type OcrFieldResult,
+  type ImageQaResult,
+} from "../imageQaFusion";
+import { voteField } from "./voteField";
+import type { EngineFieldCandidate, FieldVoteResult } from "./types";
 
 export interface HandwritingVoteInput {
   fieldId: string;

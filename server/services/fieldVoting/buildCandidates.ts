@@ -67,7 +67,7 @@ export function buildCandidateMap(
   }
 
   const byField: Record<string, EngineFieldCandidate[]> = {};
-  for (const fieldId of fieldIds) {
+  for (const fieldId of Array.from(fieldIds)) {
     const cands = collectFieldCandidates(fieldId, engines);
     if (cands.length > 0) byField[fieldId] = cands;
   }

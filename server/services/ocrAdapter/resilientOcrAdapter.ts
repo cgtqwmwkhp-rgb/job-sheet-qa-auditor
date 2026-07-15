@@ -134,7 +134,7 @@ export function buildFieldCrossCheckVotes(
   let fieldsAgreed = 0;
   let fieldsAbstained = 0;
 
-  for (const fieldId of fieldIds) {
+  for (const fieldId of Array.from(fieldIds)) {
     const p = primaryFields.find(f => f.fieldId === fieldId);
     const f = fallbackFields.find(f => f.fieldId === fieldId);
     const candidates = [
@@ -173,9 +173,7 @@ export function buildFieldCrossCheckVotes(
       agreement: !vote.abstained && vote.winningEngines.length >= 2,
       decision: vote.decision,
       reasonCode: vote.reasonCode,
-      ...(vote.value
-        ? { valueHash: hashFieldValue(fieldId, vote.value) }
-        : {}),
+      ...(vote.value ? { valueHash: hashFieldValue(fieldId, vote.value) } : {}),
     };
     fieldVotes.push(summary);
     if (vote.abstained) fieldsAbstained++;

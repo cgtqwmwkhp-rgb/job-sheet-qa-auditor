@@ -43,7 +43,7 @@ export function normalizeVoteValue(
   value: string | null | undefined
 ): string | null {
   if (value == null) return null;
-  let v = value.trim();
+  const v = value.trim();
   if (!v) return null;
 
   if (isSignaturePresenceField(fieldId)) {
@@ -59,7 +59,7 @@ export function normalizeVoteValue(
     fieldId === "job_no"
   ) {
     // Keep alphanumeric identity — do not collapse J12345 vs X12345 to digits-only
-    return v.toUpperCase().replace(/[\s_\-]/g, "");
+    return v.toUpperCase().replace(/[\s_-]/g, "");
   }
 
   if (
@@ -67,7 +67,7 @@ export function normalizeVoteValue(
     fieldId === "dateOfService" ||
     fieldId === "expiryDate"
   ) {
-    return v.replace(/[.\-/]/g, "/").toLowerCase();
+    return v.replace(/[./-]/g, "/").toLowerCase();
   }
 
   return v.toLowerCase().replace(/\s+/g, " ");
@@ -403,9 +403,7 @@ export function singleEngineArgmax(
 ): Array<string | null> {
   return rows.map(cands => {
     if (!cands.length) return null;
-    const best = cands.reduce((a, b) =>
-      a.confidence >= b.confidence ? a : b
-    );
+    const best = cands.reduce((a, b) => (a.confidence >= b.confidence ? a : b));
     return best.value;
   });
 }

@@ -331,7 +331,9 @@ describe("Field voting (Wave-4 B2)", () => {
       });
       const maxEngineF1 = Math.max(...engineF1s);
 
-      const votePreds = rows.map(r => voteField("jobReference", r.engines).value);
+      const votePreds = rows.map(
+        r => voteField("jobReference", r.engines).value
+      );
       const voteF1 = exactMatchF1(votePreds, labels, "jobReference").f1;
 
       const argmaxPreds = singleEngineArgmax(rows.map(r => r.engines));
@@ -349,9 +351,9 @@ describe("Field voting (Wave-4 B2)", () => {
       const fields = scrapeCriticalFieldsFromText(
         "Job Number: 12345\nAsset Number: ASSET-99\nDate of Service: 08/07/2026\nTechnician Signature"
       );
-      expect(fields.some(f => f.fieldId === "jobReference" && f.value === "12345")).toBe(
-        true
-      );
+      expect(
+        fields.some(f => f.fieldId === "jobReference" && f.value === "12345")
+      ).toBe(true);
       expect(fields.some(f => f.fieldId === "assetId")).toBe(true);
       const sig = fields.find(f => f.fieldId === "engineerSignOff");
       expect(sig?.confidence).toBeLessThanOrEqual(0.45);
@@ -439,9 +441,9 @@ describe("Field voting (Wave-4 B2)", () => {
           },
         ],
       });
-      expect(batch.summary.consensus + batch.summary.majority).toBeGreaterThanOrEqual(
-        1
-      );
+      expect(
+        batch.summary.consensus + batch.summary.majority
+      ).toBeGreaterThanOrEqual(1);
       expect(batch.summary.abstained).toBeGreaterThanOrEqual(1);
     });
   });
