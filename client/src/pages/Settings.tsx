@@ -38,6 +38,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link, useSearch } from "wouter";
 import { useMemo, useState } from "react";
+import { trpc } from "@/lib/trpc";
 
 const SETTINGS_TABS = [
   "notifications",
@@ -99,6 +100,8 @@ export default function Settings() {
   const { hasRole } = useAuth();
   const canViewApiCosts = hasRole(["admin", "qa_lead"]);
   const [activeTab, setActiveTab] = useSettingsTabFromUrl(canViewApiCosts);
+  const { data: version } = trpc.system.version.useQuery();
+  const isProdEnvironment = version?.environment === "production";
 
   return (
     <DashboardLayout>
@@ -376,7 +379,7 @@ export default function Settings() {
                     </CardTitle>
                     <CardDescription>
                       Clears this browser&apos;s localStorage only — does not
-                      reset server or shared demo data.
+                      reset server or shared demo data. Disabled in production.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -384,13 +387,16 @@ export default function Settings() {
                       <div className="space-y-0.5">
                         <Label>Clear local browser storage</Label>
                         <p className="text-sm text-muted-foreground">
-                          Removes locally cached preferences and client state,
-                          then reloads the page.
+                          {isProdEnvironment
+                            ? "Not available in production — localStorage reset is a non-prod control."
+                            : "Removes locally cached preferences and client state, then reloads the page."}
                         </p>
                       </div>
                       <Button
                         variant="destructive"
+                        disabled={isProdEnvironment}
                         onClick={() => {
+                          if (isProdEnvironment) return;
                           if (
                             confirm(
                               "Clear this browser's localStorage and reload? Server data is unaffected."

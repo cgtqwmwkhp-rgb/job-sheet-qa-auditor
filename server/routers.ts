@@ -35,7 +35,9 @@ import { fixPacksRouter } from "./routers/fixPacksRouter";
 import { portalRouter } from "./routers/portalRouter";
 import { commsRouter } from "./routers/commsRouter";
 import { exportsRouter } from "./routers/exportsRouter";
+import { webhooksRouter } from "./routers/webhooksRouter";
 import { batchOperationsRouter } from "./routers/batchOperations";
+import { webhookEvents } from "./services/webhooks";
 // PR-PLAT-STAGE5 (retire): Stage-5 phantom audit/pipeline/review-queue
 // routers stay quarantined (in-memory + simulated). Do not mount them.
 // Real processing: jobSheets.process → orchestrateJobSheetProcessing below.
@@ -118,6 +120,8 @@ export const appRouter = router({
   comms: commsRouter,
   /** PR-IO-EXPORTS: CSV / JSON / bundle export against real audits */
   exports: exportsRouter,
+  /** Wave-4 D2: ops webhook subscriptions + audit.completed delivery receipts */
+  webhooks: webhooksRouter,
   /** PR-IO-EXPORTS: QA-lead bulk approve / waive / status / export */
   batchOperations: batchOperationsRouter,
 
@@ -1181,6 +1185,16 @@ export const appRouter = router({
           entityId: result.id,
           details: { auditFindingId: input.auditFindingId },
         });
+
+        // Downstream honesty: emit dispute.created so ops receipts stay in sync
+        void webhookEvents
+          .disputeCreated(result.id, finding.auditResultId, input.reason)
+          .catch(err =>
+            console.warn(
+              "[disputes.create] dispute.created webhook emit failed (non-fatal):",
+              err
+            )
+          );
 
         return result;
       }),

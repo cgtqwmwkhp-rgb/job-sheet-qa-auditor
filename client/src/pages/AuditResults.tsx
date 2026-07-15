@@ -311,6 +311,12 @@ export default function AuditResults() {
     { enabled: !!auditResult?.id }
   );
 
+  const { data: deliveryReceipt, isError: deliveryReceiptError } =
+    trpc.webhooks.auditCompletedReceipt.useQuery(
+      { auditId: auditResult?.id || 0 },
+      { enabled: !!auditResult?.id, retry: false }
+    );
+
   const trpcUtils = trpc.useUtils();
 
   const handleAuditExport = useCallback(
@@ -957,9 +963,38 @@ export default function AuditResults() {
       <div className="-m-6 h-[calc(100vh-3.5rem)] min-h-0 overflow-hidden flex flex-col">
         {auditResult?.id ? (
           <div
-            className="shrink-0 flex items-center justify-end gap-2 border-b border-[#EBE8E8] bg-white px-4 py-2"
+            className="shrink-0 flex items-center justify-between gap-2 border-b border-[#EBE8E8] bg-white px-4 py-2"
             data-testid="audit-export-toolbar"
           >
+            <div
+              className="min-w-0 text-xs text-muted-foreground"
+              data-testid="audit-completed-delivery-receipt"
+            >
+              {deliveryReceiptError ||
+              (deliveryReceipt && !deliveryReceipt.available) ? (
+                <span>Webhook delivery receipts unavailable</span>
+              ) : deliveryReceipt?.status === "none" ? (
+                <span>
+                  audit.completed delivery: none recorded
+                  {deliveryReceipt.auditCompletedSubscriberCount === 0
+                    ? " (no subscribers)"
+                    : ""}
+                </span>
+              ) : deliveryReceipt?.status === "delivered" ? (
+                <span className="text-green-700">
+                  audit.completed delivery: {deliveryReceipt.receiptCount}{" "}
+                  receipt
+                  {deliveryReceipt.receiptCount === 1 ? "" : "s"}
+                </span>
+              ) : deliveryReceipt?.status === "partial_or_failed" ? (
+                <span className="text-amber-700">
+                  audit.completed delivery: partial or failed (
+                  {deliveryReceipt.receiptCount})
+                </span>
+              ) : (
+                <span>audit.completed delivery: loading…</span>
+              )}
+            </div>
             <ExportButton
               auditId={auditResult.id}
               onExport={handleAuditExport}

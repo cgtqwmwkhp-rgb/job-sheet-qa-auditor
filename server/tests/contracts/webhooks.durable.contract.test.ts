@@ -125,6 +125,7 @@ describe("Durable Webhooks Contract (PR-IO-WEBHOOKS)", () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]?.success).toBe(true);
+    expect(results[0]?.auditId).toBe(42);
     expect(results[0]?.signature).toMatch(/^[a-f0-9]{64}$/);
     expect(results[0]?.payloadHash).toMatch(/^[a-f0-9]{64}$/);
 
@@ -138,6 +139,7 @@ describe("Durable Webhooks Contract (PR-IO-WEBHOOKS)", () => {
     expect(restored.signature).toBe(results[0]?.signature);
     expect(restored.payloadHash).toBe(results[0]?.payloadHash);
     expect(restored.event).toBe("audit.completed");
+    expect(restored.auditId).toBe(42);
   });
 
   it("hydrateWebhooksFromDb is fail-safe when getDb returns null", async () => {

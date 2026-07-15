@@ -32,6 +32,7 @@ import {
   RefreshCw,
   Server,
   Zap,
+  Webhook,
 } from "lucide-react";
 import {
   BarChart,
@@ -112,6 +113,15 @@ export default function Monitoring() {
       { windowHours: 48, dayLimit: 14 },
       { enabled: canFinOps, retry: false }
     );
+
+  const {
+    data: deliveryReceipts,
+    isError: deliveryReceiptsError,
+    refetch: refetchReceipts,
+  } = trpc.webhooks.deliveryReceipts.useQuery(
+    { limit: 15, event: "audit.completed" },
+    { enabled: canFinOps, retry: false }
+  );
 
   const { data: allSheets, refetch: refetchSheets } =
     trpc.jobSheets.list.useQuery({
@@ -207,7 +217,10 @@ export default function Monitoring() {
       void refetchAlerts();
       void refetchSheets();
       if (isAdmin) void refetchDlq();
-      if (canFinOps) void refetchCosts();
+      if (canFinOps) {
+        void refetchCosts();
+        void refetchReceipts();
+      }
     }, 30000);
 
     return () => clearInterval(interval);
@@ -221,6 +234,7 @@ export default function Monitoring() {
     refetchSheets,
     refetchDlq,
     refetchCosts,
+    refetchReceipts,
     isAdmin,
     canFinOps,
   ]);
@@ -234,7 +248,10 @@ export default function Monitoring() {
     void refetchAlerts();
     void refetchSheets();
     if (isAdmin) void refetchDlq();
-    if (canFinOps) void refetchCosts();
+    if (canFinOps) {
+      void refetchCosts();
+      void refetchReceipts();
+    }
   };
 
   const systemHealthy = health?.ok === true;
@@ -646,6 +663,95 @@ export default function Monitoring() {
                         ))
                       )}
                     </div>
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="ops-webhook-delivery-receipts">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Webhook className="h-5 w-5" />
+                      audit.completed delivery receipts
+                    </CardTitle>
+                    <CardDescription>
+                      Downstream webhook attempts for completed audits — empty
+                      is honest, not a fake success.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {!canFinOps ? (
+                      <p className="text-sm text-muted-foreground">
+                        Delivery receipts require QA lead or admin access.
+                      </p>
+                    ) : deliveryReceiptsError ? (
+                      <p className="text-sm text-destructive">
+                        Delivery receipts unavailable — could not load the
+                        webhook log.
+                      </p>
+                    ) : deliveryReceipts && !deliveryReceipts.available ? (
+                      <p className="text-sm text-destructive">
+                        Delivery receipts unavailable
+                        {deliveryReceipts.unavailableReason
+                          ? `: ${deliveryReceipts.unavailableReason}`
+                          : "."}
+                      </p>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <Badge variant="secondary">
+                            Subscribers:{" "}
+                            {deliveryReceipts?.auditCompletedSubscriberCount ??
+                              "—"}
+                          </Badge>
+                          <Badge variant="outline">
+                            Receipts shown:{" "}
+                            {deliveryReceipts?.receiptCount ?? 0}
+                          </Badge>
+                        </div>
+                        {(deliveryReceipts?.receiptCount ?? 0) === 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                            {deliveryReceipts?.auditCompletedSubscriberCount ===
+                            0
+                              ? "No active audit.completed subscribers — nothing to deliver yet."
+                              : "No audit.completed deliveries recorded yet."}
+                          </p>
+                        ) : (
+                          <ul className="space-y-2 max-h-56 overflow-y-auto text-sm">
+                            {deliveryReceipts?.receipts.map(r => (
+                              <li
+                                key={r.id}
+                                className="flex items-start justify-between gap-2 border-b border-border/60 pb-2 last:border-0"
+                              >
+                                <div className="min-w-0">
+                                  <p className="font-medium truncate">
+                                    Audit{" "}
+                                    {r.auditId != null ? `#${r.auditId}` : "—"}
+                                    {r.statusCode != null
+                                      ? ` · HTTP ${r.statusCode}`
+                                      : ""}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {new Date(r.deliveredAt).toLocaleString()}
+                                    {r.error ? ` · ${r.error}` : ""}
+                                  </p>
+                                </div>
+                                {r.success ? (
+                                  <Badge className="shrink-0 bg-green-100 text-green-800 hover:bg-green-100">
+                                    Delivered
+                                  </Badge>
+                                ) : (
+                                  <Badge
+                                    variant="destructive"
+                                    className="shrink-0"
+                                  >
+                                    Failed
+                                  </Badge>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
+                    )}
                   </CardContent>
                 </Card>
 
