@@ -597,9 +597,23 @@ function ReviewWorkstationContent({
   );
   const localPaneRef = useRef<HTMLDivElement>(null);
   const resolvedPaneRef = paneRef ?? localPaneRef;
+  const templateOverrideTriggerRef = useRef<HTMLElement | null>(null);
+  const feedbackTriggerRef = useRef<HTMLElement | null>(null);
+  const actionDialogTriggerRef = useRef<HTMLElement | null>(null);
+  const correctionDialogTriggerRef = useRef<HTMLElement | null>(null);
 
   const focusWorkstationPane = usePersistFn(() => {
     resolvedPaneRef.current?.focus({ preventScroll: true });
+  });
+
+  const restoreFocus = usePersistFn((trigger: HTMLElement | null) => {
+    requestAnimationFrame(() => {
+      if (trigger?.isConnected && !trigger.hasAttribute("disabled")) {
+        trigger.focus({ preventScroll: true });
+      } else {
+        focusWorkstationPane();
+      }
+    });
   });
 
   // Arm keyboard path as soon as the workstation mounts (J-AUD-02/03).
@@ -717,7 +731,15 @@ function ReviewWorkstationContent({
     );
   };
 
-  const openOverrideForFinding = (finding: Finding) => {
+  const openOverrideForFinding = (
+    finding: Finding,
+    trigger?: HTMLElement | null
+  ) => {
+    actionDialogTriggerRef.current =
+      trigger ??
+      (document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null);
     setActionDialog({ finding, action: "override" });
     setActionReason("");
     setOverrideTrainingReason("");
@@ -727,7 +749,15 @@ function ReviewWorkstationContent({
     });
   };
 
-  const openCorrectForFinding = (finding: Finding) => {
+  const openCorrectForFinding = (
+    finding: Finding,
+    trigger?: HTMLElement | null
+  ) => {
+    correctionDialogTriggerRef.current =
+      trigger ??
+      (document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null);
     setCorrectionDialog(finding);
     setCorrectedValue(finding.message || finding.value || "");
     setCorrectionTrainingReason("");
@@ -735,12 +765,12 @@ function ReviewWorkstationContent({
 
   const handleOverrideClick = (finding: Finding, e: MouseEvent) => {
     e.stopPropagation();
-    openOverrideForFinding(finding);
+    openOverrideForFinding(finding, e.currentTarget as HTMLElement);
   };
 
   const handleCorrectClick = (finding: Finding, e: MouseEvent) => {
     e.stopPropagation();
-    openCorrectForFinding(finding);
+    openCorrectForFinding(finding, e.currentTarget as HTMLElement);
   };
 
   const submitCorrection = () => {
@@ -772,7 +802,7 @@ function ReviewWorkstationContent({
           setCorrectionDialog(null);
           setCorrectedValue("");
           setCorrectionTrainingReason("");
-          focusWorkstationPane();
+          restoreFocus(correctionDialogTriggerRef.current);
           toast.success("Correction saved", {
             action: {
               label: "Undo",
@@ -1143,6 +1173,7 @@ function ReviewWorkstationContent({
 
   const handleReportIssue = (finding: Finding, e: MouseEvent) => {
     e.stopPropagation();
+    feedbackTriggerRef.current = e.currentTarget as HTMLElement;
     setSelectedFinding(finding);
     setFeedbackOpen(true);
   };
@@ -1160,6 +1191,7 @@ function ReviewWorkstationContent({
           toast.success("Feedback submitted successfully");
           setFeedbackOpen(false);
           setFeedbackComment("");
+          restoreFocus(feedbackTriggerRef.current);
         },
         onError: () => {
           toast.error("Failed to submit feedback");
@@ -1303,7 +1335,12 @@ function ReviewWorkstationContent({
                 Reprocess
               </DropdownMenuItem>
               {canOverrideTemplate && (
-                <DropdownMenuItem onClick={() => setOverrideOpen(true)}>
+                <DropdownMenuItem
+                  onClick={event => {
+                    templateOverrideTriggerRef.current = event.currentTarget;
+                    setOverrideOpen(true);
+                  }}
+                >
                   <FileText className="w-4 h-4 mr-2" />
                   Override template + reprocess
                 </DropdownMenuItem>
@@ -1526,7 +1563,13 @@ function ReviewWorkstationContent({
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      <Dialog open={overrideOpen} onOpenChange={setOverrideOpen}>
+      <Dialog
+        open={overrideOpen}
+        onOpenChange={open => {
+          setOverrideOpen(open);
+          if (!open) restoreFocus(templateOverrideTriggerRef.current);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Override template + reprocess</DialogTitle>
@@ -1619,6 +1662,7 @@ function ReviewWorkstationContent({
                         );
                       }
                       setOverrideOpen(false);
+                      restoreFocus(templateOverrideTriggerRef.current);
                       setOverrideReason("");
                       utils.jobSheets.get.invalidate({ id: jobSheetId });
                       invalidateFindings();
@@ -1638,7 +1682,13 @@ function ReviewWorkstationContent({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+      <Dialog
+        open={feedbackOpen}
+        onOpenChange={open => {
+          setFeedbackOpen(open);
+          if (!open) restoreFocus(feedbackTriggerRef.current);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Report Issue with Finding</DialogTitle>
@@ -1690,7 +1740,7 @@ function ReviewWorkstationContent({
             setActionDialog(null);
             setActionReason("");
             setOverrideTrainingReason("");
-            focusWorkstationPane();
+            restoreFocus(actionDialogTriggerRef.current);
           }
         }}
       >
@@ -1776,7 +1826,7 @@ function ReviewWorkstationContent({
                 setActionDialog(null);
                 setActionReason("");
                 setOverrideTrainingReason("");
-                focusWorkstationPane();
+                restoreFocus(actionDialogTriggerRef.current);
               }}
             >
               Cancel
@@ -1806,6 +1856,7 @@ function ReviewWorkstationContent({
             setCorrectionDialog(null);
             setCorrectedValue("");
             setCorrectionTrainingReason("");
+            restoreFocus(correctionDialogTriggerRef.current);
           }
         }}
       >
@@ -1867,6 +1918,7 @@ function ReviewWorkstationContent({
                 setCorrectionDialog(null);
                 setCorrectedValue("");
                 setCorrectionTrainingReason("");
+                restoreFocus(correctionDialogTriggerRef.current);
               }}
             >
               Cancel
