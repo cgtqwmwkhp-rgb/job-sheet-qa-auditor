@@ -113,11 +113,7 @@ function mapFindingRow(
     id: row.id,
     auditResultId: row.auditResultId,
     resolutionStatus: (row.resolutionStatus ?? "open") as
-      | "open"
-      | "waived"
-      | "overridden"
-      | "flagged"
-      | "approved",
+      "open" | "waived" | "overridden" | "flagged" | "approved",
     resolutionReason: row.resolutionReason,
     resolvedBy: row.resolvedBy,
     resolvedAt: row.resolvedAt,

@@ -129,11 +129,7 @@ export async function resolveFindingsBatch(
           id: row.id,
           auditResultId: row.auditResultId,
           resolutionStatus: (row.resolutionStatus ?? "open") as
-            | "open"
-            | "waived"
-            | "overridden"
-            | "flagged"
-            | "approved",
+            "open" | "waived" | "overridden" | "flagged" | "approved",
           severity: row.severity,
           fieldName: row.fieldName,
           rawSnippet: row.rawSnippet,
@@ -149,11 +145,7 @@ export async function resolveFindingsBatch(
           id: row.id,
           auditResultId: row.auditResultId,
           resolutionStatus: (row.resolutionStatus ?? "open") as
-            | "open"
-            | "waived"
-            | "overridden"
-            | "flagged"
-            | "approved",
+            "open" | "waived" | "overridden" | "flagged" | "approved",
           severity: row.severity,
         };
       },

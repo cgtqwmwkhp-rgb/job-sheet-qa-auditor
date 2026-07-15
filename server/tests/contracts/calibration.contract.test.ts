@@ -76,26 +76,23 @@ describe("Calibration Contract (Phase 3.3)", () => {
 
   describe("feature flag", () => {
     it("is disabled by default when FEATURE_CALIBRATION unset", async () => {
-      const { isCalibrationEnabled } = await import(
-        "../../services/calibration"
-      );
+      const { isCalibrationEnabled } =
+        await import("../../services/calibration");
       expect(isCalibrationEnabled()).toBe(false);
     });
 
     it("is enabled when FEATURE_CALIBRATION=true", async () => {
       process.env.FEATURE_CALIBRATION = "true";
-      const { isCalibrationEnabled } = await import(
-        "../../services/calibration"
-      );
+      const { isCalibrationEnabled } =
+        await import("../../services/calibration");
       expect(isCalibrationEnabled()).toBe(true);
     });
   });
 
   describe("computeEce", () => {
     it("returns ECE≈0 for perfectly calibrated samples at N≥200", async () => {
-      const { computeEce, ECE_MIN_SAMPLES } = await import(
-        "../../services/calibration"
-      );
+      const { computeEce, ECE_MIN_SAMPLES } =
+        await import("../../services/calibration");
 
       const samples = perfectlyCalibratedSamples(40); // 200 samples
       expect(samples.length).toBeGreaterThanOrEqual(ECE_MIN_SAMPLES);
@@ -109,9 +106,8 @@ describe("Calibration Contract (Phase 3.3)", () => {
     });
 
     it("keeps ECE unready below N≥200 and exposes provisionalEce", async () => {
-      const { computeEce, ECE_MIN_SAMPLES } = await import(
-        "../../services/calibration"
-      );
+      const { computeEce, ECE_MIN_SAMPLES } =
+        await import("../../services/calibration");
 
       const result = computeEce(miscalibratedSamples());
       expect(result.sampleCount).toBeLessThan(ECE_MIN_SAMPLES);
@@ -157,8 +153,12 @@ describe("Calibration Contract (Phase 3.3)", () => {
 
       const labels = Array.from({ length: ECE_MIN_SAMPLES }, (_, i) => ({
         resolutionStatus: (i % 3 === 0 ? "approved" : "overridden") as
+<<<<<<< HEAD
           | "approved"
           | "overridden",
+=======
+          "approved" | "overridden",
+>>>>>>> fd854d7 (style: prettier format A2 changed files for CI lint gate)
         confidenceScore: 60 + (i % 40),
       }));
       const samples = resolvedFindingsToPredictionSamples(labels);
@@ -218,9 +218,8 @@ describe("Calibration Contract (Phase 3.3)", () => {
     });
 
     it("handles empty samples", async () => {
-      const { suggestThreshold, DEFAULT_CURRENT_THRESHOLD } = await import(
-        "../../services/calibration"
-      );
+      const { suggestThreshold, DEFAULT_CURRENT_THRESHOLD } =
+        await import("../../services/calibration");
 
       const suggestion = suggestThreshold([]);
       expect(suggestion.currentThreshold).toBe(DEFAULT_CURRENT_THRESHOLD);

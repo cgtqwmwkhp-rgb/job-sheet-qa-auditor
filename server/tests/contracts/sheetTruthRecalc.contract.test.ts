@@ -200,8 +200,12 @@ describe("Sheet truth recalculation (Wave-4 A2)", () => {
     it("human labels accumulate and unlock measurement at N≥200", () => {
       const rows = Array.from({ length: ECE_MIN_SAMPLES }, (_, i) => ({
         resolutionStatus: (i % 4 === 0 ? "approved" : "overridden") as
+<<<<<<< HEAD
           | "approved"
           | "overridden",
+=======
+          "approved" | "overridden",
+>>>>>>> fd854d7 (style: prettier format A2 changed files for CI lint gate)
         confidenceScore: 50 + (i % 50),
       }));
 
