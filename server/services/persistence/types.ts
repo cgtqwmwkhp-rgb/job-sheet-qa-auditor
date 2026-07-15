@@ -173,6 +173,18 @@ export interface RetentionAuditEntry {
 }
 
 /**
+ * Current production readiness of retention and legal-hold operations.
+ *
+ * Exposed so operator-facing surfaces can avoid representing in-memory
+ * scaffolding as a durable compliance control.
+ */
+export interface RetentionOperationalStatus {
+  retentionNote: string;
+  isPersistent: false;
+  isEnforced: false;
+}
+
+/**
  * Determinism checksum record
  */
 export interface DeterminismChecksumRecord {
@@ -259,6 +271,11 @@ export interface IPersistenceService {
  * Retention service interface
  */
 export interface IRetentionService {
+  /**
+   * Describe whether retention and legal holds are durable/enforced.
+   */
+  getOperationalStatus(): Promise<RetentionOperationalStatus>;
+
   /**
    * Create retention policy
    */

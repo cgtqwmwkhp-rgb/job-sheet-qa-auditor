@@ -333,6 +333,16 @@ describe('Stage 4: Persistence + Retention', () => {
   });
 
   describe('Retention Policies', () => {
+    it('discloses that retention and legal holds are not durable or enforced', async () => {
+      const status = await retentionService.getOperationalStatus();
+
+      expect(status.isPersistent).toBe(false);
+      expect(status.isEnforced).toBe(false);
+      expect(status.retentionNote).toContain('in-memory scaffolding only');
+      expect(status.retentionNote).toContain('not persisted across restarts');
+      expect(status.retentionNote).toContain('not enforced against archival or deletion');
+    });
+
     it('should create retention policy', async () => {
       const policy = await retentionService.createPolicy({
         name: 'extraction-artifacts-90d',

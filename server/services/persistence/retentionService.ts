@@ -11,7 +11,12 @@ import type {
   RetentionAuditEntry,
   RetentionAction,
   IRetentionService,
+  RetentionOperationalStatus,
 } from './types';
+
+export const RETENTION_LEGAL_HOLD_NOTE =
+  'Retention policies and legal holds are in-memory scaffolding only. ' +
+  'They are not persisted across restarts and are not enforced against archival or deletion.';
 
 /**
  * In-memory storage for retention data
@@ -56,6 +61,14 @@ export function resetRetentionStore(): void {
  * In-memory retention service implementation
  */
 export class InMemoryRetentionService implements IRetentionService {
+  async getOperationalStatus(): Promise<RetentionOperationalStatus> {
+    return {
+      retentionNote: RETENTION_LEGAL_HOLD_NOTE,
+      isPersistent: false,
+      isEnforced: false,
+    };
+  }
+
   async createPolicy(
     policy: Omit<RetentionPolicyRecord, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<RetentionPolicyRecord> {

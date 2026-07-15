@@ -16,6 +16,7 @@ export type {
   LegalHoldRecord,
   RetentionAuditEntry,
   RetentionAction,
+  RetentionOperationalStatus,
   DeterminismChecksumRecord,
   IPersistenceService,
   IRetentionService,
@@ -39,4 +40,5 @@ export {
   getRetentionService,
   resetRetentionService,
   resetRetentionStore,
+  RETENTION_LEGAL_HOLD_NOTE,
 } from './retentionService';
