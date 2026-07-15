@@ -5,6 +5,7 @@ import { auditActionsRouter } from "../../routers/auditActionsRouter";
 vi.mock("../../db", () => ({
   getAuditFindingById: vi.fn(),
   getJobSheetById: vi.fn(),
+  runTransaction: vi.fn(async fn => fn({})),
 }));
 
 import * as db from "../../db";
@@ -33,7 +34,7 @@ function createCaller(role: "admin" | "qa_lead" = "qa_lead") {
 
 describe("Audit actions router error contracts", () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
   });
 
   it("returns NOT_FOUND when a target finding is missing", async () => {

@@ -34,7 +34,7 @@ import {
   RateLimitError,
   RATE_LIMITS,
 } from "../utils/rateLimiter";
-import { withTransaction } from "../utils/transactions";
+import { TransactionError, withTransaction } from "../utils/transactions";
 import type { DbExecutor } from "../db";
 
 async function throwIfRateLimited(
@@ -63,14 +63,16 @@ function toAuditActionTrpcError(
   error: unknown,
   fallbackMessage: string
 ): TRPCError {
-  if (error instanceof TRPCError) {
-    return error;
+  const cause = error instanceof TransactionError ? error.cause : error;
+
+  if (cause instanceof TRPCError) {
+    return cause;
   }
 
-  if (error instanceof AuditActionError) {
+  if (cause instanceof AuditActionError) {
     return new TRPCError({
-      code: error.code,
-      message: error.message,
+      code: cause.code,
+      message: cause.message,
     });
   }
 
