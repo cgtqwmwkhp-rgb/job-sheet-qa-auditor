@@ -1504,7 +1504,9 @@ async function processJobSheetWithOptions(
         const primaryFields: ReconcileExtractedField[] =
           criticalForReconcile.map(fieldName => {
             const spatial = primarySpatial[fieldName];
-            const region = cropRoiConfig.regions.find(r => r.name === fieldName);
+            const region = cropRoiConfig.regions.find(
+              r => r.name === fieldName
+            );
             return {
               fieldName,
               value: spatial?.value ?? null,

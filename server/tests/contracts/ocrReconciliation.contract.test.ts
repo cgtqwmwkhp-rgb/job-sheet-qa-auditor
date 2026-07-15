@@ -185,9 +185,11 @@ describe("OCR Reconciliation Contract Tests", () => {
     });
 
     it("does not invent values or bump confidence without crop OCR", () => {
-      const result = reconcileFields("doc-fallback", [lowConfJob], [
-        "jobReference",
-      ]);
+      const result = reconcileFields(
+        "doc-fallback",
+        [lowConfJob],
+        ["jobReference"]
+      );
 
       expect(result.reOcrRequests.length).toBe(1);
       expect(result.reOcrResults[0].success).toBe(false);

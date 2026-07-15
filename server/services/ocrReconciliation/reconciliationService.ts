@@ -173,11 +173,10 @@ export async function reconcileFieldsWithCropOcr(
     }
   }
 
-  const reOcrResults = processReOcrRequests(
-    reOcrRequests,
-    originalFields,
-    { ...options, cropOcrResults }
-  );
+  const reOcrResults = processReOcrRequests(reOcrRequests, originalFields, {
+    ...options,
+    cropOcrResults,
+  });
 
   const reconciledFields = mergeResults(originalFields, reOcrResults);
   const summary = calculateSummary(
