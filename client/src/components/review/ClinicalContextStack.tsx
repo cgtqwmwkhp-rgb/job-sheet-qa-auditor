@@ -20,6 +20,17 @@ import {
   type CommentQualitySignals,
 } from "@/components/review/CommentQualityPanel";
 import {
+  PartsContextPanel,
+  partsContextIsActionable,
+  type PartsAssessmentSignals,
+  type PartsCatalogSignals,
+} from "@/components/review/PartsContextPanel";
+import {
+  AttrContextPanel,
+  attrContextIsActionable,
+  type AttributionStamp,
+} from "@/components/review/AttrContextPanel";
+import {
   BeforeAfterComparePane,
   photoPairHasActionableFail,
   type PhotoPairCompareArtifact,
@@ -36,6 +47,14 @@ export interface ClinicalContextStackProps {
   failurePathSignalSummary?: string | null;
   commentSignals: CommentQualitySignals | null;
   commentSummary?: string | null;
+  partsAssessmentSignals?: PartsAssessmentSignals | null;
+  partsCatalogSignals?: PartsCatalogSignals | null;
+  partsAssessmentSummary?: string | null;
+  partsCatalogSummary?: string | null;
+  makeModel?: string | null;
+  hasPartsFindings?: boolean;
+  attribution?: AttributionStamp | null;
+  hasAttrFindings?: boolean;
   photoPairCompare: PhotoPairCompareArtifact | null;
   deepNoteAnalysis: DeepNoteAnalysisData | null;
   documentUrl?: string;
@@ -50,6 +69,11 @@ export function buildClinicalContextSummary(
     ClinicalContextStackProps,
     | "failurePathSignals"
     | "commentSignals"
+    | "partsAssessmentSignals"
+    | "partsCatalogSignals"
+    | "hasPartsFindings"
+    | "attribution"
+    | "hasAttrFindings"
     | "photoPairCompare"
     | "deepNoteAnalysis"
   >
@@ -62,6 +86,18 @@ export function buildClinicalContextSummary(
     !props.commentSignals.coherent
   ) {
     parts.push("comments need coach");
+  }
+  if (
+    partsContextIsActionable(
+      props.partsAssessmentSignals,
+      props.partsCatalogSignals,
+      props.hasPartsFindings
+    )
+  ) {
+    parts.push("parts need review");
+  }
+  if (attrContextIsActionable(props.attribution, props.hasAttrFindings)) {
+    parts.push("attribution gap");
   }
   const pairCount = props.photoPairCompare?.pairs?.length ?? 0;
   if (photoPairHasActionableFail(props.photoPairCompare)) {
@@ -77,13 +113,29 @@ export function buildClinicalContextSummary(
 }
 
 export function hasActionableClinicalContext(
-  props: Pick<ClinicalContextStackProps, "commentSignals" | "photoPairCompare">
+  props: Pick<
+    ClinicalContextStackProps,
+    | "commentSignals"
+    | "partsAssessmentSignals"
+    | "partsCatalogSignals"
+    | "hasPartsFindings"
+    | "attribution"
+    | "hasAttrFindings"
+    | "photoPairCompare"
+  >
 ): boolean {
   const commentsNeedCoach = Boolean(
     props.commentSignals?.onFailurePath && !props.commentSignals?.coherent
   );
   return (
-    commentsNeedCoach || photoPairHasActionableFail(props.photoPairCompare)
+    commentsNeedCoach ||
+    partsContextIsActionable(
+      props.partsAssessmentSignals,
+      props.partsCatalogSignals,
+      props.hasPartsFindings
+    ) ||
+    attrContextIsActionable(props.attribution, props.hasAttrFindings) ||
+    photoPairHasActionableFail(props.photoPairCompare)
   );
 }
 
@@ -92,11 +144,20 @@ export function ClinicalContextStack(props: ClinicalContextStackProps) {
   const actionable = hasActionableClinicalContext(props);
   const summary = buildClinicalContextSummary(props);
 
+  const showPartsPanel = Boolean(
+    props.hasPartsFindings ||
+      props.partsAssessmentSignals ||
+      props.partsCatalogSignals
+  );
+  const showAttrPanel = Boolean(props.hasAttrFindings || props.attribution);
+
   const hasAny =
     props.selectionTrace ||
     props.selectionMarks ||
     props.failurePathSignals ||
     commentOnFailurePath ||
+    showPartsPanel ||
+    showAttrPanel ||
     (props.photoPairCompare &&
       Array.isArray(props.photoPairCompare.pairs) &&
       props.photoPairCompare.pairs.length > 0) ||
@@ -148,6 +209,33 @@ export function ClinicalContextStack(props: ClinicalContextStackProps) {
         )}
         className="shadow-none border-muted"
       />
+      {showPartsPanel ? (
+        <PartsContextPanel
+          assessmentSignals={props.partsAssessmentSignals}
+          catalogSignals={props.partsCatalogSignals}
+          makeModel={props.makeModel}
+          assessmentSummary={props.partsAssessmentSummary}
+          catalogSummary={props.partsCatalogSummary}
+          hasFindings={props.hasPartsFindings}
+          defaultOpen={partsContextIsActionable(
+            props.partsAssessmentSignals,
+            props.partsCatalogSignals,
+            props.hasPartsFindings
+          )}
+          className="shadow-none border-muted"
+        />
+      ) : null}
+      {showAttrPanel ? (
+        <AttrContextPanel
+          attribution={props.attribution}
+          hasFindings={props.hasAttrFindings}
+          defaultOpen={attrContextIsActionable(
+            props.attribution,
+            props.hasAttrFindings
+          )}
+          className="shadow-none border-muted"
+        />
+      ) : null}
       <BeforeAfterComparePane
         artifact={props.photoPairCompare}
         documentUrl={props.documentUrl}

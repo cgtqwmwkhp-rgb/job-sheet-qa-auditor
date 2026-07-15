@@ -9,6 +9,9 @@ import {
   photoPairHasActionableFail,
 } from "../review/BeforeAfterComparePane";
 import { mapCommentQualityFromReport } from "../review/CommentQualityPanel";
+import { mapPartsContextFromReport } from "../review/PartsContextPanel";
+import { mapAttributionFromReport } from "../review/AttrContextPanel";
+import { mapMakeModelFromReport } from "../review/mapReportContext";
 import { mapDeepNoteFromReport } from "../DeepNoteAnalysis";
 
 describe("Evidence AI reportJson mapper crash guards", () => {
@@ -65,6 +68,40 @@ describe("Evidence AI reportJson mapper crash guards", () => {
     expect(note).not.toBeNull();
     expect(Array.isArray(note!.flags)).toBe(true);
     expect(note!.flags).toEqual([]);
+  });
+
+  it("mapPartsContextFromReport coerces missing signal fields", () => {
+    const { assessmentSignals, catalogSignals } = mapPartsContextFromReport({
+      partsAssessmentSignals: { partsImplied: true, lineCount: 2 },
+      partsCatalogSignals: { enabled: true, mismatchCount: 1 },
+    });
+    expect(assessmentSignals).not.toBeNull();
+    expect(assessmentSignals!.incompleteCount).toBe(0);
+    expect(catalogSignals).not.toBeNull();
+    expect(catalogSignals!.matchCount).toBe(0);
+  });
+
+  it("mapAttributionFromReport reads attribution stamp", () => {
+    const stamp = mapAttributionFromReport({
+      attribution: {
+        extractedName: "Jane Doe",
+        technicianId: 9,
+        confidence: "exact",
+      },
+    });
+    expect(stamp).not.toBeNull();
+    expect(stamp!.extractedName).toBe("Jane Doe");
+    expect(stamp!.technicianId).toBe(9);
+  });
+
+  it("mapMakeModelFromReport reads extractedFields.makeModel.value", () => {
+    expect(
+      mapMakeModelFromReport({
+        extractedFields: {
+          makeModel: { value: "JCB 3CX", confidence: 90 },
+        },
+      })
+    ).toBe("JCB 3CX");
   });
 
   it("photoPairHasActionableFail is safe on null / empty", () => {

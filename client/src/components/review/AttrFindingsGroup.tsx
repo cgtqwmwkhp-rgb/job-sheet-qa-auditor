@@ -1,5 +1,5 @@
 /**
- * CommentFindingsGroup — clusters COMMENT-C* findings in the Issues rail.
+ * AttrFindingsGroup — clusters ATTR-C* engineer attribution findings.
  */
 
 import { useState, type MouseEvent } from "react";
@@ -12,57 +12,66 @@ import {
   ChevronRight,
   Eye,
   MessageSquare,
-  MessageSquareText,
   Pencil,
+  UserRound,
 } from "lucide-react";
 import type { Finding } from "./ReviewWorkstationPane";
 
-export interface CommentFindingsGroupProps {
+export interface AttrFindingsGroupProps {
   findings: Finding[];
   activeBoxId: string | number | null;
+  extractedName?: string | null;
   onFindingClick: (id: string | number) => void;
   onReportIssue: (finding: Finding, e: MouseEvent) => void;
   onOverride: (finding: Finding, e: MouseEvent) => void;
   onCorrect: (finding: Finding, e: MouseEvent) => void;
 }
 
-export function isCommentQualityFinding(finding: Finding): boolean {
-  return Boolean(
-    finding.ruleId?.startsWith("COMMENT-C") || finding.ruleId === "FAULT-C010"
-  );
+export function isAttrFinding(finding: Finding): boolean {
+  return Boolean(finding.ruleId?.startsWith("ATTR-C"));
 }
 
-export function CommentFindingsGroup({
+export function AttrFindingsGroup({
   findings,
   activeBoxId,
+  extractedName,
   onFindingClick,
   onReportIssue,
   onOverride,
   onCorrect,
-}: CommentFindingsGroupProps) {
+}: AttrFindingsGroupProps) {
   const [expanded, setExpanded] = useState(true);
 
   if (findings.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50/30 overflow-hidden">
+    <div className="rounded-lg border border-violet-200 bg-violet-50/30 overflow-hidden">
       <button
         type="button"
-        className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-amber-50/60 transition-colors"
+        className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-violet-50/60 transition-colors"
         onClick={() => setExpanded(v => !v)}
       >
         {expanded ? (
-          <ChevronDown className="w-4 h-4 text-amber-700 shrink-0" />
+          <ChevronDown className="w-4 h-4 text-violet-700 shrink-0" />
         ) : (
-          <ChevronRight className="w-4 h-4 text-amber-700 shrink-0" />
+          <ChevronRight className="w-4 h-4 text-violet-700 shrink-0" />
         )}
-        <MessageSquareText className="w-4 h-4 text-amber-700 shrink-0" />
-        <span className="text-xs font-semibold text-amber-800">
-          Engineer comments
+        <UserRound className="w-4 h-4 text-violet-700 shrink-0" />
+        <span className="text-xs font-semibold text-violet-800">
+          Engineer attribution
         </span>
+        {extractedName ? (
+          <Badge
+            variant="outline"
+            className="text-[10px] px-1.5 bg-white/70 text-violet-900 border-violet-200 truncate max-w-[140px]"
+            title={extractedName}
+          >
+            {extractedName}
+          </Badge>
+        ) : null}
         <Badge
           variant="secondary"
-          className="ml-auto text-[10px] px-1.5 bg-amber-100 text-amber-800 border-amber-200"
+          className="ml-auto text-[10px] px-1.5 bg-violet-100 text-violet-800 border-violet-200"
         >
           {findings.length}
         </Badge>
@@ -132,8 +141,14 @@ export function CommentFindingsGroup({
               </div>
 
               {finding.message && (
-                <p className="text-xs leading-snug text-amber-950/80">
+                <p className="text-xs leading-snug text-violet-950/80">
                   {finding.message}
+                </p>
+              )}
+
+              {finding.whyItMatters && (
+                <p className="mt-1 text-[11px] text-muted-foreground leading-snug line-clamp-2">
+                  {finding.whyItMatters}
                 </p>
               )}
 

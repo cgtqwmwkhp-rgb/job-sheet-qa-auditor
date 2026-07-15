@@ -125,6 +125,8 @@ describe("Review Workstation Contract (PR-13)", () => {
       expect(pane).toContain("Needs review");
       expect(pane).toContain("ErrorBoundary");
       expect(pane).toContain("CommentFindingsGroup");
+      expect(pane).toContain("PartsFindingsGroup");
+      expect(pane).toContain("AttrFindingsGroup");
       expect(pane).toContain("PhotoEvidenceFindingsGroup");
       expect(pane).toContain('defaultValue="issues"');
       expect(pane).toContain('value="context"');

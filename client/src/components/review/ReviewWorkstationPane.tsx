@@ -114,9 +114,27 @@ import {
   isCommentQualityFinding,
 } from "@/components/review/CommentFindingsGroup";
 import {
+  PartsFindingsGroup,
+  isPartsFinding,
+} from "@/components/review/PartsFindingsGroup";
+import {
+  AttrFindingsGroup,
+  isAttrFinding,
+} from "@/components/review/AttrFindingsGroup";
+import {
   PhotoEvidenceFindingsGroup,
   isPhotoPairFinding,
 } from "@/components/review/PhotoEvidenceFindingsGroup";
+import { mapMakeModelFromReport } from "@/components/review/mapReportContext";
+import {
+  mapPartsContextFromReport,
+  type PartsAssessmentSignals,
+  type PartsCatalogSignals,
+} from "@/components/review/PartsContextPanel";
+import {
+  mapAttributionFromReport,
+  type AttributionStamp,
+} from "@/components/review/AttrContextPanel";
 import { ReviewShortcutsLegend } from "@/components/review/ReviewShortcutsLegend";
 import {
   mapFailurePathSignalsFromReport,
@@ -415,6 +433,11 @@ export function ReviewWorkstationPane({
   const commentQualityDerived = mapCommentQualityFromReport(
     auditResult?.reportJson
   );
+  const partsContextDerived = mapPartsContextFromReport(
+    auditResult?.reportJson
+  );
+  const attributionStamp = mapAttributionFromReport(auditResult?.reportJson);
+  const makeModel = mapMakeModelFromReport(auditResult?.reportJson);
   const photoPairCompare = mapPhotoPairCompareFromReport(
     auditResult?.reportJson
   );
@@ -521,6 +544,9 @@ export function ReviewWorkstationPane({
         paneRef={paneRef}
         onBack={onBack}
         commentQualityDerived={commentQualityDerived}
+        partsContextDerived={partsContextDerived}
+        attributionStamp={attributionStamp}
+        makeModel={makeModel}
         photoPairCompare={photoPairCompare}
         deepNoteAnalysis={deepNoteAnalysis}
       />
@@ -541,6 +567,9 @@ function ReviewWorkstationContent({
   paneRef,
   onBack,
   commentQualityDerived,
+  partsContextDerived,
+  attributionStamp,
+  makeModel,
   photoPairCompare,
   deepNoteAnalysis,
 }: {
@@ -559,6 +588,14 @@ function ReviewWorkstationContent({
     signals: CommentQualitySignals | null;
     summary: string | null;
   };
+  partsContextDerived: {
+    assessmentSignals: PartsAssessmentSignals | null;
+    catalogSignals: PartsCatalogSignals | null;
+    assessmentSummary: string | null;
+    catalogSummary: string | null;
+  };
+  attributionStamp: AttributionStamp | null;
+  makeModel: string | null;
   photoPairCompare: PhotoPairCompareArtifact | null;
   deepNoteAnalysis: DeepNoteAnalysisData | null;
 }) {
@@ -1202,6 +1239,10 @@ function ReviewWorkstationContent({
 
   const passedFindings = displayFindings.filter(f => f.status === "passed");
   const failedFindings = displayFindings.filter(f => f.status !== "passed");
+  const hasPartsFindings = failedFindings.some(isPartsFinding);
+  const hasAttrFindings = failedFindings.some(isAttrFinding);
+  const extractedEngineerName =
+    attributionStamp?.displayName ?? attributionStamp?.extractedName ?? null;
 
   const hasMajor =
     Boolean(auditData.hasMajorFails) ||
@@ -1479,6 +1520,12 @@ function ReviewWorkstationContent({
                     Context
                     {hasActionableClinicalContext({
                       commentSignals: commentQualityDerived.signals,
+                      partsAssessmentSignals:
+                        partsContextDerived.assessmentSignals,
+                      partsCatalogSignals: partsContextDerived.catalogSignals,
+                      hasPartsFindings,
+                      attribution: attributionStamp,
+                      hasAttrFindings,
                       photoPairCompare,
                     }) ? (
                       <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-destructive" />
@@ -1495,6 +1542,8 @@ function ReviewWorkstationContent({
                   findings={failedFindings}
                   activeBoxId={activeBoxId}
                   pendingActionIds={pendingActionIds}
+                  makeModel={makeModel}
+                  extractedEngineerName={extractedEngineerName}
                   onFindingClick={handleFindingClick}
                   onReportIssue={handleReportIssue}
                   onOverride={handleOverrideClick}
@@ -1546,6 +1595,18 @@ function ReviewWorkstationContent({
                     }
                     commentSignals={commentQualityDerived.signals}
                     commentSummary={commentQualityDerived.summary}
+                    partsAssessmentSignals={
+                      partsContextDerived.assessmentSignals
+                    }
+                    partsCatalogSignals={partsContextDerived.catalogSignals}
+                    partsAssessmentSummary={
+                      partsContextDerived.assessmentSummary
+                    }
+                    partsCatalogSummary={partsContextDerived.catalogSummary}
+                    makeModel={makeModel}
+                    hasPartsFindings={hasPartsFindings}
+                    attribution={attributionStamp}
+                    hasAttrFindings={hasAttrFindings}
                     photoPairCompare={photoPairCompare}
                     deepNoteAnalysis={deepNoteAnalysis}
                     documentUrl={documentUrl}
@@ -2149,11 +2210,16 @@ function IssuesTabContent({
   findings,
   activeBoxId,
   pendingActionIds,
+  makeModel,
+  extractedEngineerName,
   onFindingClick,
   onReportIssue,
   onOverride,
   onCorrect,
-}: FindingsListProps) {
+}: FindingsListProps & {
+  makeModel?: string | null;
+  extractedEngineerName?: string | null;
+}) {
   const relationshipFindings = findings.filter(isRelationshipFinding);
   const tyreFindings = findings.filter(
     f => !isRelationshipFinding(f) && isTyreComplianceFinding(f)
@@ -2164,11 +2230,28 @@ function IssuesTabContent({
       !isTyreComplianceFinding(f) &&
       isCommentQualityFinding(f)
   );
+  const partsFindings = findings.filter(
+    f =>
+      !isRelationshipFinding(f) &&
+      !isTyreComplianceFinding(f) &&
+      !isCommentQualityFinding(f) &&
+      isPartsFinding(f)
+  );
+  const attrFindings = findings.filter(
+    f =>
+      !isRelationshipFinding(f) &&
+      !isTyreComplianceFinding(f) &&
+      !isCommentQualityFinding(f) &&
+      !isPartsFinding(f) &&
+      isAttrFinding(f)
+  );
   const photoFindings = findings.filter(
     f =>
       !isRelationshipFinding(f) &&
       !isTyreComplianceFinding(f) &&
       !isCommentQualityFinding(f) &&
+      !isPartsFinding(f) &&
+      !isAttrFinding(f) &&
       isPhotoPairFinding(f)
   );
   const otherFindings = findings.filter(
@@ -2176,6 +2259,8 @@ function IssuesTabContent({
       !isRelationshipFinding(f) &&
       !isTyreComplianceFinding(f) &&
       !isCommentQualityFinding(f) &&
+      !isPartsFinding(f) &&
+      !isAttrFinding(f) &&
       !isPhotoPairFinding(f)
   );
 
@@ -2219,6 +2304,28 @@ function IssuesTabContent({
           <CommentFindingsGroup
             findings={commentFindings}
             activeBoxId={activeBoxId}
+            onFindingClick={onFindingClick}
+            onReportIssue={onReportIssue}
+            onOverride={onOverride}
+            onCorrect={onCorrect}
+          />
+        )}
+        {partsFindings.length > 0 && (
+          <PartsFindingsGroup
+            findings={partsFindings}
+            activeBoxId={activeBoxId}
+            makeModel={makeModel}
+            onFindingClick={onFindingClick}
+            onReportIssue={onReportIssue}
+            onOverride={onOverride}
+            onCorrect={onCorrect}
+          />
+        )}
+        {attrFindings.length > 0 && (
+          <AttrFindingsGroup
+            findings={attrFindings}
+            activeBoxId={activeBoxId}
+            extractedName={extractedEngineerName}
             onFindingClick={onFindingClick}
             onReportIssue={onReportIssue}
             onOverride={onOverride}
