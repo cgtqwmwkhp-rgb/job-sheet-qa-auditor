@@ -112,13 +112,13 @@ curl -s "$PRODUCTION_URL/api/trpc/system.version"
 
 The new modules can be enabled via environment variables:
 
-| Flag                               | Description                                     | Default                                             |
-| ---------------------------------- | ----------------------------------------------- | --------------------------------------------------- |
-| `FEATURE_CRITICAL_FIELD_EXTRACTOR` | Enable critical field extraction engine         | `false`                                             |
-| `FEATURE_IMAGE_QA_FUSION`          | Enable OCR + Image QA fusion                    | `false`                                             |
-| `FEATURE_DETERMINISTIC_CACHE`      | Enable deterministic caching                    | `false`                                             |
-| `FEATURE_ENGINEER_FEEDBACK`        | Enable engineer feedback generation             | `false`                                             |
-| `FEATURE_ENSEMBLE_EXTRACTION`      | Stage 1.75 ensemble consensus extraction (PR-8) | `false` (default when unset; set `true` to enable)  |
+| Flag                               | Description                                     | Default                                            |
+| ---------------------------------- | ----------------------------------------------- | -------------------------------------------------- |
+| `FEATURE_CRITICAL_FIELD_EXTRACTOR` | Enable critical field extraction engine         | `false`                                            |
+| `FEATURE_IMAGE_QA_FUSION`          | Enable OCR + Image QA fusion                    | `false`                                            |
+| `FEATURE_DETERMINISTIC_CACHE`      | Enable deterministic caching                    | `false`                                            |
+| `FEATURE_ENGINEER_FEEDBACK`        | Enable engineer feedback generation             | `false`                                            |
+| `FEATURE_ENSEMBLE_EXTRACTION`      | Stage 1.75 ensemble consensus extraction (PR-8) | `false` (default when unset; set `true` to enable) |
 
 To enable in staging:
 
