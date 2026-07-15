@@ -1,8 +1,13 @@
 import mysql from "mysql2/promise";
+import crypto from "crypto";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 /**
  * Idempotent repair for Wave-7 template memory lineage columns/tables + backfill.
  * Handles environments where 0012 partially applied or ALTER hits ER_DUP_FIELDNAME.
+ * Marks 0012 applied in __drizzle_migrations when schema already matches.
  */
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -160,6 +165,28 @@ try {
   console.log(
     `[DB repair] lineage backfill from reportJson: ${bf2.affectedRows ?? 0} rows`
   );
+
+  // Sync drizzle journal when columns/tables already exist (avoids ER_DUP_FIELDNAME)
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const migrationPath = path.resolve(here, "../drizzle/0012_template_memory.sql");
+  if (fs.existsSync(migrationPath)) {
+    const sql = fs.readFileSync(migrationPath, "utf8");
+    const hash = crypto.createHash("sha256").update(sql).digest("hex");
+    const [migs] = await connection.query(
+      "SELECT `hash` FROM `__drizzle_migrations`"
+    );
+    const hashes = new Set(migs.map(r => r.hash));
+    if (!hashes.has(hash)) {
+      await connection.query(
+        "INSERT INTO `__drizzle_migrations` (`hash`, `created_at`) VALUES (?, ?)",
+        [hash, Date.now()]
+      );
+      console.log(
+        "[DB repair] marked 0012_template_memory applied:",
+        hash.slice(0, 12)
+      );
+    }
+  }
 
   console.log("[DB repair] template memory lineage verified");
 } finally {
