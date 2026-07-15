@@ -1,0 +1,16 @@
+{
+  "report": {
+    "extractedFields": {
+      "engineerSignOff": { "value": "Present", "confidence": 90 }
+    },
+    "extractedText": "Job Summary Report\nEngineer Comments: Coupling cracked."
+  },
+  "candidates": [
+    {
+      "id": 9,
+      "name": "Richard Newton",
+      "email": "richard.newton@example.com",
+      "role": "technician"
+    }
+  ]
+}

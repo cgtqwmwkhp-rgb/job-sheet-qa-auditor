@@ -101,6 +101,22 @@ jobs:
             exit 1
           fi
 
+      - name: Wave-5/6 rules slice
+        id: wave5_rules
+        run: |
+          set +e
+          pnpm eval:wave5-rules
+          CODE=$?
+          set -e
+          echo "exit_code=$CODE" >> "$GITHUB_OUTPUT"
+          if [ "$CODE" -eq 0 ]; then
+            echo "Wave-5/6 rules slice PASS"
+          elif [ "$CODE" -eq 2 ]; then
+            echo "::warning::Wave-5/6 rules slice UNAVAILABLE (fitment module not merged) — not treated as greenwash pass"
+          else
+            echo "::warning::Wave-5/6 rules slice FAIL — non-blocking in weekly eval"
+          fi
+
       - name: Upload evaluation report
         uses: actions/upload-artifact@v4
         with:

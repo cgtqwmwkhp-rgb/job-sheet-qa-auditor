@@ -2,6 +2,9 @@
 /**
  * Field exact-match F1 gate CLI (Wave-4 A3)
  *
+ * Note: the field-F1 fixture uses pre-labelled expected/predicted pairs — this is
+ * NOT live production OCR F1.
+ *
  * Loads the labelled field-F1 corpus and evaluates the challenge bar.
  * Exit codes:
  *   0 — pass
