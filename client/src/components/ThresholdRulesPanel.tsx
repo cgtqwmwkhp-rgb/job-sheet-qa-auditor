@@ -168,6 +168,7 @@ export function upsertRangeRuleInSpec(
 interface ThresholdRulesPanelProps {
   specJsonText: string;
   onSpecJsonChange: (next: string) => void;
+  focusRuleId?: string | null;
   /** Prefill field when opened from an ROI region */
   defaultField?: string;
   /** Extra field options (e.g. ROI region names) */
@@ -179,6 +180,7 @@ interface ThresholdRulesPanelProps {
 export function ThresholdRulesPanel({
   specJsonText,
   onSpecJsonChange,
+  focusRuleId,
   defaultField,
   extraFields = [],
   compact = false,
@@ -728,7 +730,16 @@ export function ThresholdRulesPanel({
           {rangeRules.map(rule => (
             <li
               key={String(rule.ruleId)}
-              className="flex items-start justify-between gap-2 rounded border bg-white px-3 py-2 text-xs"
+              className={`flex items-start justify-between gap-2 rounded border bg-white px-3 py-2 text-xs ${
+                String(rule.ruleId) === focusRuleId
+                  ? "border-2 border-[#BEDA41] ring-2 ring-[#BEDA41]/30"
+                  : ""
+              }`}
+              data-testid={
+                String(rule.ruleId) === focusRuleId
+                  ? "studio-focused-rule-item"
+                  : undefined
+              }
             >
               <div>
                 <div className="font-medium text-[#333030]">

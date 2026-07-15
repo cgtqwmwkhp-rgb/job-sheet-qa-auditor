@@ -73,6 +73,25 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+function readSearchParam(search: string, name: string): string | null {
+  const value = new URLSearchParams(search).get(name)?.trim();
+  return value || null;
+}
+
+function findRuleById(specJsonText: string, ruleId: string | null) {
+  if (!ruleId) return null;
+  try {
+    const parsed = JSON.parse(specJsonText || "{}") as {
+      rules?: Array<Record<string, unknown>>;
+    };
+    return (
+      parsed.rules?.find(rule => String(rule.ruleId ?? "") === ruleId) ?? null
+    );
+  } catch {
+    return null;
+  }
+}
+
 export default function TemplateStudio() {
   const { hasRole } = useAuth();
   const canAuthor = hasRole(["admin", "qa_lead"]);
@@ -83,6 +102,14 @@ export default function TemplateStudio() {
     const n = raw ? Number(raw) : NaN;
     return Number.isFinite(n) && n > 0 ? n : null;
   }, [search]);
+  const focusRuleParam = useMemo(
+    () => readSearchParam(search, "focusRule"),
+    [search]
+  );
+  const focusReasonParam = useMemo(
+    () => readSearchParam(search, "focusReason"),
+    [search]
+  );
   const bootstrappedJobRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -177,6 +204,10 @@ export default function TemplateStudio() {
   );
 
   const stepIndex = useMemo(() => STEPS.findIndex(s => s.id === step), [step]);
+  const focusedRule = useMemo(
+    () => findRuleById(specJsonText, focusRuleParam),
+    [specJsonText, focusRuleParam]
+  );
 
   const loadVersionIntoEditors = (v: NonNullable<typeof version>) => {
     setSpecJsonText(JSON.stringify(v.specJson, null, 2));
@@ -332,6 +363,7 @@ export default function TemplateStudio() {
           "Teaching from job sheet",
           `Job #${fromJobSheetParam} loaded into Studio`
         );
+        if (focusRuleParam) setStep("fields");
       })
       .catch(err => {
         showErrorToast(
@@ -342,7 +374,11 @@ export default function TemplateStudio() {
       })
       .finally(() => setQuickStarting(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot deep-link
-  }, [canAuthor, fromJobSheetParam]);
+  }, [canAuthor, fromJobSheetParam, focusRuleParam]);
+
+  useEffect(() => {
+    if (focusRuleParam && versionId != null) setStep("fields");
+  }, [focusRuleParam, versionId]);
 
   const openTemplate = (id: number, activeVersionId: number | null) => {
     setTemplateId(id);
@@ -765,74 +801,74 @@ export default function TemplateStudio() {
         {step === "upload" && (
           <div className="space-y-4">
             <TemplateAuthoringGuide defaultOpen />
-          <div
-            className={`relative overflow-hidden rounded-xl border-2 border-dashed transition ${
-              dragOver
-                ? "border-[#BEDA41] bg-[rgba(190,218,65,0.12)]"
-                : "border-[#EBE8E8] bg-gradient-to-b from-[#F7F9EC] to-white"
-            }`}
-            onDragOver={e => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={e => {
-              e.preventDefault();
-              setDragOver(false);
-              const file = e.dataTransfer.files?.[0];
-              if (file) void handleQuickStartFile(file);
-            }}
-          >
-            <div className="flex flex-col items-center justify-center gap-4 px-6 py-20 text-center">
-              {quickStarting || bootstrapJob.isPending ? (
-                <>
-                  <Loader2 className="h-10 w-10 animate-spin text-[#6B7A1A]" />
-                  <p className="text-sm font-medium text-[#333030]">
-                    Creating draft, reading sample, proposing fields…
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#BEDA41]/20">
-                    <Upload className="h-7 w-7 text-[#6B7A1A]" />
-                  </div>
-                  <div>
-                    <p className="text-lg font-semibold text-[#333030]">
-                      Drop a form PDF here
+            <div
+              className={`relative overflow-hidden rounded-xl border-2 border-dashed transition ${
+                dragOver
+                  ? "border-[#BEDA41] bg-[rgba(190,218,65,0.12)]"
+                  : "border-[#EBE8E8] bg-gradient-to-b from-[#F7F9EC] to-white"
+              }`}
+              onDragOver={e => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={e => {
+                e.preventDefault();
+                setDragOver(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) void handleQuickStartFile(file);
+              }}
+            >
+              <div className="flex flex-col items-center justify-center gap-4 px-6 py-20 text-center">
+                {quickStarting || bootstrapJob.isPending ? (
+                  <>
+                    <Loader2 className="h-10 w-10 animate-spin text-[#6B7A1A]" />
+                    <p className="text-sm font-medium text-[#333030]">
+                      Creating draft, reading sample, proposing fields…
                     </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Or choose a file — one pass from sample to proposal.
-                    </p>
-                  </div>
-                  <Button
-                    size="lg"
-                    className="bg-[#BEDA41] text-[#1a1f0a] hover:bg-[#a8c238]"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={quickStart.isPending}
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    Choose PDF
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="application/pdf,image/png,image/jpeg"
-                    className="hidden"
-                    onChange={e => {
-                      const file = e.target.files?.[0];
-                      if (file) void handleQuickStartFile(file);
-                      e.target.value = "";
-                    }}
-                  />
-                  {fromJobSheetParam != null && (
-                    <p className="text-xs text-muted-foreground">
-                      Deep-link from job sheet #{fromJobSheetParam}
-                    </p>
-                  )}
-                </>
-              )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#BEDA41]/20">
+                      <Upload className="h-7 w-7 text-[#6B7A1A]" />
+                    </div>
+                    <div>
+                      <p className="text-lg font-semibold text-[#333030]">
+                        Drop a form PDF here
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Or choose a file — one pass from sample to proposal.
+                      </p>
+                    </div>
+                    <Button
+                      size="lg"
+                      className="bg-[#BEDA41] text-[#1a1f0a] hover:bg-[#a8c238]"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={quickStart.isPending}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Choose PDF
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="application/pdf,image/png,image/jpeg"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) void handleQuickStartFile(file);
+                        e.target.value = "";
+                      }}
+                    />
+                    {fromJobSheetParam != null && (
+                      <p className="text-xs text-muted-foreground">
+                        Deep-link from job sheet #{fromJobSheetParam}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-          </div>
           </div>
         )}
 
@@ -1335,16 +1371,16 @@ export default function TemplateStudio() {
 
               {proposalPreview?.roiProvenance?.mode === "ocr-layout" &&
                 (proposalPreview.roiProvenance.ocrPlacedCount ?? 0) > 0 && (
-                <div
-                  className="rounded-md border-2 border-emerald-500 bg-emerald-50 px-3 py-2 text-xs text-emerald-950"
-                  data-testid="studio-roi-ocr-banner"
-                >
-                  <strong>OCR-placed regions loaded.</strong>{" "}
-                  {proposalPreview.roiProvenance.ocrPlacedCount} boxes from
+                  <div
+                    className="rounded-md border-2 border-emerald-500 bg-emerald-50 px-3 py-2 text-xs text-emerald-950"
+                    data-testid="studio-roi-ocr-banner"
+                  >
+                    <strong>OCR-placed regions loaded.</strong>{" "}
+                    {proposalPreview.roiProvenance.ocrPlacedCount} boxes from
                   layout evidence — still drag/resize any that miss the printed
                   field.
-                </div>
-              )}
+                  </div>
+                )}
 
               {!ocrMapping &&
                 !roiLayoutError &&
@@ -1451,6 +1487,32 @@ export default function TemplateStudio() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {focusRuleParam && (
+                <div
+                  className="rounded-md border-2 border-[#BEDA41] bg-[#F7F9EC] px-4 py-3 text-sm"
+                  data-testid="studio-focused-rule"
+                >
+                  <p className="font-semibold text-[#333030]">
+                    Reviewing rule {focusRuleParam}
+                  </p>
+                  {focusReasonParam && (
+                    <p className="mt-1 text-muted-foreground">
+                      {focusReasonParam}
+                    </p>
+                  )}
+                  {focusedRule ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {String(focusedRule.description ?? "Rule loaded")}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs text-amber-800">
+                      This rule is not present in the current draft. Check the
+                      rule ID or choose the template version that raised the
+                      exception.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Selection tokens (any)</Label>
                 <Input
@@ -1461,10 +1523,12 @@ export default function TemplateStudio() {
               <ConditionalRulesPanel
                 specJsonText={specJsonText}
                 onSpecJsonChange={setSpecJsonText}
+                focusRuleId={focusRuleParam}
               />
               <ThresholdRulesPanel
                 specJsonText={specJsonText}
                 onSpecJsonChange={setSpecJsonText}
+                focusRuleId={focusRuleParam}
                 extraFields={
                   (roiDraft?.regions ?? []).map(r => r.name) as string[]
                 }
