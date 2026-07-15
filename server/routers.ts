@@ -53,6 +53,7 @@ import {
   type IntakeGateResult,
 } from "./services/imageQa";
 import { getModelRegistry } from "./services/modelRegistry";
+import { enforceJobSheetAccess } from "./utils/authorization";
 
 async function throwIfRateLimited(
   fn: () => unknown | Promise<unknown>
@@ -69,6 +70,26 @@ async function throwIfRateLimited(
     }
     throw error;
   }
+}
+
+/**
+ * Load a job sheet only after checking the caller may act on that specific
+ * resource. Keep object authorization adjacent to the lookup so mutations
+ * cannot accidentally operate on arbitrary IDs.
+ */
+async function getAuthorizedJobSheet(
+  jobSheetId: number,
+  currentUser: Parameters<typeof enforceJobSheetAccess>[1]
+) {
+  const jobSheet = await db.getJobSheetById(jobSheetId);
+  if (!jobSheet) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Job sheet not found",
+    });
+  }
+  enforceJobSheetAccess(jobSheet, currentUser);
+  return jobSheet;
 }
 
 function bumpPatchVersion(version: string): string {
@@ -176,7 +197,8 @@ export const appRouter = router({
     /** PR-11: pollable per-stage processing progress (live → report → status). */
     processStatus: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ ctx, input }) => {
+        await getAuthorizedJobSheet(input.id, ctx.user);
         const status = await resolveProcessStatus(input.id);
         if (!status) {
           throw new TRPCError({
@@ -383,13 +405,7 @@ export const appRouter = router({
           )
         );
 
-        const jobSheet = await db.getJobSheetById(input.id);
-        if (!jobSheet) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Job sheet not found",
-          });
-        }
+        const jobSheet = await getAuthorizedJobSheet(input.id, ctx.user);
 
         // Content-hash OCR idempotency (re-upload / double-click / dual replica).
         // Same fileHash must not start a second billable OCR on the primary path.
@@ -528,13 +544,7 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const jobSheet = await db.getJobSheetById(input.id);
-        if (!jobSheet) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Job sheet not found",
-          });
-        }
+        await getAuthorizedJobSheet(input.id, ctx.user);
         if (input.technicianId != null) {
           const user = await db.getUserById(input.technicianId);
           if (!user) {
@@ -900,13 +910,7 @@ export const appRouter = router({
           )
         );
 
-        const jobSheet = await db.getJobSheetById(input.id);
-        if (!jobSheet) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Job sheet not found",
-          });
-        }
+        const jobSheet = await getAuthorizedJobSheet(input.id, ctx.user);
 
         if (jobSheet.status === "processing") {
           throw new TRPCError({

@@ -5,6 +5,8 @@
 
 import { describe, expect, it } from "vitest";
 import { TRPCError } from "@trpc/server";
+import fs from "fs";
+import path from "path";
 import {
   enforceJobSheetAccess,
   resolveResourceOwnerId,
@@ -22,6 +24,12 @@ describe("enforceJobSheetAccess", () => {
   it("allows qa_lead for any sheet", () => {
     expect(() =>
       enforceJobSheetAccess({ uploadedBy: 99 }, { id: 1, role: "qa_lead" })
+    ).not.toThrow();
+  });
+
+  it("allows admin for any sheet", () => {
+    expect(() =>
+      enforceJobSheetAccess({ uploadedBy: 99 }, { id: 1, role: "admin" })
     ).not.toThrow();
   });
 
@@ -54,6 +62,27 @@ describe("enforceJobSheetAccess", () => {
       )
     ).toThrow(TRPCError);
   });
+});
+
+describe("job sheet processing authorization wiring", () => {
+  const routersSource = fs.readFileSync(
+    path.resolve(__dirname, "../../routers.ts"),
+    "utf-8"
+  );
+
+  it.each(["processStatus", "process", "reprocess", "assignTechnician"])(
+    "%s loads the sheet through the object-access guard",
+    entryPoint => {
+      const entryPointSource = routersSource.match(
+        new RegExp(
+          `${entryPoint}:\\s*[\\s\\S]*?(?=\\n    [a-zA-Z]\\w*:\\s|\\n  \\}\\),)`
+        )
+      );
+      expect(entryPointSource?.[0]).toContain(
+        "getAuthorizedJobSheet(input.id, ctx.user)"
+      );
+    }
+  );
 });
 
 describe("filterJobSheetsByAccess", () => {
