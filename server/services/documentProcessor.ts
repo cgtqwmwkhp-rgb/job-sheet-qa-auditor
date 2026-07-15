@@ -61,6 +61,8 @@ import {
 import {
   applyFindingHygiene,
   hasSignatureLabelEvidence,
+  hasTechnicianSignatureLabelEvidence,
+  hasCustomerSignatureLabelEvidence,
   hasVorBannerEvidence,
   hasOnlyInformationalFindings,
   sanitizeExtractedFieldsForSignatures,
@@ -1731,24 +1733,38 @@ async function processJobSheetWithOptions(
               )
             ),
           });
-          // Text-layer signature label → Present hint for Gemini (ink not in OCR)
+          // Role-separated signature hints (never copy tech → customer).
           if (
-            hasSignatureLabelEvidence(extractedText) &&
-            !withRoi.customerSignature &&
+            hasTechnicianSignatureLabelEvidence(extractedText) &&
             !withRoi.engineerSignOff
           ) {
-            const present = {
+            withRoi.engineerSignOff = {
               value: "Present",
               confidence: 75,
               pageNumber: 1,
             };
-            withRoi.customerSignature = present;
-            withRoi.engineerSignOff = present;
           }
-          // Anthropic VLM ink result overrides / strengthens signature hint
+          if (
+            hasCustomerSignatureLabelEvidence(extractedText) &&
+            !withRoi.customerSignature
+          ) {
+            withRoi.customerSignature = {
+              value: "Present",
+              confidence: 75,
+              pageNumber: 1,
+            };
+          }
+          // VLM ink is technician/sign-off oriented unless customer label is present.
           if (vlmInkResult?.preExtractedHint) {
-            withRoi.customerSignature = vlmInkResult.preExtractedHint;
-            withRoi.engineerSignOff = vlmInkResult.preExtractedHint;
+            if (!withRoi.engineerSignOff) {
+              withRoi.engineerSignOff = vlmInkResult.preExtractedHint;
+            }
+            if (
+              hasCustomerSignatureLabelEvidence(extractedText) &&
+              !withRoi.customerSignature
+            ) {
+              withRoi.customerSignature = vlmInkResult.preExtractedHint;
+            }
           }
           if (hasVorBannerEvidence(extractedText) && !withRoi.vorStatus) {
             withRoi.vorStatus = {
@@ -1781,21 +1797,35 @@ async function processJobSheetWithOptions(
             }
           );
           if (
-            hasSignatureLabelEvidence(extractedText) &&
-            !fields.customerSignature &&
+            hasTechnicianSignatureLabelEvidence(extractedText) &&
             !fields.engineerSignOff
           ) {
-            const present = {
+            fields.engineerSignOff = {
               value: "Present",
               confidence: 75,
               pageNumber: 1,
             };
-            fields.customerSignature = present;
-            fields.engineerSignOff = present;
+          }
+          if (
+            hasCustomerSignatureLabelEvidence(extractedText) &&
+            !fields.customerSignature
+          ) {
+            fields.customerSignature = {
+              value: "Present",
+              confidence: 75,
+              pageNumber: 1,
+            };
           }
           if (vlmInkResult?.preExtractedHint) {
-            fields.customerSignature = vlmInkResult.preExtractedHint;
-            fields.engineerSignOff = vlmInkResult.preExtractedHint;
+            if (!fields.engineerSignOff) {
+              fields.engineerSignOff = vlmInkResult.preExtractedHint;
+            }
+            if (
+              hasCustomerSignatureLabelEvidence(extractedText) &&
+              !fields.customerSignature
+            ) {
+              fields.customerSignature = vlmInkResult.preExtractedHint;
+            }
           }
           if (hasVorBannerEvidence(extractedText) && !fields.vorStatus) {
             fields.vorStatus = {
@@ -2107,8 +2137,10 @@ async function processJobSheetWithOptions(
         ...(multimodalRoiResult?.preExtractedFields ?? {}),
         ...(vlmInkResult?.preExtractedHint
           ? {
-              customerSignature: vlmInkResult.preExtractedHint,
               engineerSignOff: vlmInkResult.preExtractedHint,
+              ...(hasCustomerSignatureLabelEvidence(extractedText)
+                ? { customerSignature: vlmInkResult.preExtractedHint }
+                : {}),
             }
           : {}),
         ...(hasVorBannerEvidence(extractedText)

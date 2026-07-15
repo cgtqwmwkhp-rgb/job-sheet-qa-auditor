@@ -127,4 +127,19 @@ describe("technicianAttribution", () => {
       "attribution:richard-newton"
     );
   });
+
+  it("rejects Present signature values as technician names", () => {
+    expect(
+      extractTechnicianNameFromFields({
+        engineerSignOff: { value: "Present", confidence: 90 },
+        customerSignature: { value: "Present", confidence: 90 },
+      })
+    ).toBeNull();
+    expect(
+      extractTechnicianNameFromFields({
+        technicianName: { value: "harry.barrett", confidence: 90 },
+        engineerSignOff: { value: "Present", confidence: 90 },
+      })
+    ).toBe("harry.barrett");
+  });
 });

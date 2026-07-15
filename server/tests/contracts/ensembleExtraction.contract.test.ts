@@ -383,3 +383,54 @@ Customer Name: Acme Corp
     });
   });
 });
+
+describe("signature role separation", () => {
+  const prevFlag = process.env.FEATURE_ENSEMBLE_EXTRACTION;
+
+  beforeEach(() => {
+    process.env.FEATURE_ENSEMBLE_EXTRACTION = "true";
+    process.env.LLM_PROVIDER = "mock";
+    delete process.env.GEMINI_API_KEY;
+  });
+
+  afterEach(() => {
+    if (prevFlag === undefined) delete process.env.FEATURE_ENSEMBLE_EXTRACTION;
+    else process.env.FEATURE_ENSEMBLE_EXTRACTION = prevFlag;
+  });
+
+  it("maps technician signature Present to engineerSignOff only", async () => {
+    const text = `
+Technician Name: harry.barrett
+Technician Signature
+Signature:
+`;
+    const result = await runEnsembleExtraction(text, {
+      useLlm: false,
+      llmConfidenceThreshold: 70,
+    });
+    expect(result).not.toBeNull();
+    expect(result!.ensembleExtractedFields.engineerSignOff?.value).toBe(
+      "Present"
+    );
+    expect(result!.ensembleExtractedFields.customerSignature).toBeUndefined();
+    expect(result!.ensembleExtractedFields.technicianName?.value).toMatch(
+      /harry\.barrett/i
+    );
+  });
+
+  it("maps customer signature Present without claiming technician ink", async () => {
+    const text = `
+Customer Signature
+Client Signature:
+`;
+    const result = await runEnsembleExtraction(text, {
+      useLlm: false,
+      llmConfidenceThreshold: 70,
+    });
+    expect(result).not.toBeNull();
+    expect(result!.ensembleExtractedFields.customerSignature?.value).toBe(
+      "Present"
+    );
+    expect(result!.ensembleExtractedFields.engineerSignOff).toBeUndefined();
+  });
+});
