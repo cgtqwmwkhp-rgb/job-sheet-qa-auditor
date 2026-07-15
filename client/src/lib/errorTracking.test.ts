@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { auditContextFromLocation } from "./errorTracking";
+import { describe, expect, it, vi } from "vitest";
+import {
+  auditContextFromLocation,
+  logError,
+  redactErrorContext,
+} from "./errorTracking";
 
 describe("auditContextFromLocation", () => {
   it("extracts job sheet / audit id from /audits?id=", () => {
@@ -33,5 +37,50 @@ describe("auditContextFromLocation", () => {
     ).toEqual({
       route: "/audits",
     });
+  });
+});
+
+describe("telemetry PII redaction", () => {
+  it("removes PII from contexts, error messages, and console output", () => {
+    const context = {
+      user: {
+        id: 17,
+        email: "alice@example.com",
+        role: "auditor",
+      },
+      metadata: {
+        reporterEmail: "reporter@example.com",
+        phone: "+44 7700 900123",
+        nested: {
+          contactName: "Alice Example",
+          note: "Contact alice@example.com for details",
+        },
+      },
+    };
+    const safeContext = redactErrorContext(context);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    logError(new Error("Failed for alice@example.com"), context);
+
+    expect(safeContext).toEqual({
+      user: { id: 17, role: "auditor" },
+      metadata: {
+        reporterEmail: "[REDACTED]",
+        phone: "[REDACTED]",
+        nested: {
+          contactName: "[REDACTED]",
+          note: "Contact [REDACTED] for details",
+        },
+      },
+    });
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain(
+      "alice@example.com"
+    );
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain(
+      "reporter@example.com"
+    );
+    consoleError.mockRestore();
   });
 });

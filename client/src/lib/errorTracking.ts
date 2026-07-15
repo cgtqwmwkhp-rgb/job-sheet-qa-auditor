@@ -31,6 +31,55 @@ let sentryState: SentryInitState = "idle";
 let baseContext: Partial<ErrorContext> = {};
 let warnedMissingDsn = false;
 
+const REDACTED = "[REDACTED]";
+const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+const SENSITIVE_FIELD_PATTERN =
+  /email|phone|mobile|(?:first|last|contact)[_-]?name|(?:^|[_-])name(?:$|[_-])|address|postcode|postal|dob|birth|ssn|national|passport|token|password|secret|cookie|authorization/i;
+
+function redactString(value: string): string {
+  return value.replace(EMAIL_PATTERN, REDACTED);
+}
+
+function redactTelemetryValue(
+  value: unknown,
+  seen = new WeakSet<object>()
+): unknown {
+  if (typeof value === "string") return redactString(value);
+  if (!value || typeof value !== "object") return value;
+  if (seen.has(value)) return REDACTED;
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    return value.map(item => redactTelemetryValue(item, seen));
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, nestedValue]) => [
+      key,
+      SENSITIVE_FIELD_PATTERN.test(key)
+        ? REDACTED
+        : redactTelemetryValue(nestedValue, seen),
+    ])
+  );
+}
+
+/**
+ * Remove PII from error context before it crosses a telemetry boundary.
+ * Keep the internal user id and role for triage, but never include email.
+ */
+export function redactErrorContext(context: ErrorContext): ErrorContext {
+  const { email: _email, ...safeUser } = context.user ?? {};
+  const safeMetadata = redactTelemetryValue(context.metadata) as
+    | Record<string, unknown>
+    | undefined;
+
+  return {
+    ...context,
+    user: context.user ? (safeUser as ErrorContext["user"]) : undefined,
+    metadata: safeMetadata,
+  };
+}
+
 function readBuildTimeDsn(): string | undefined {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
   if (typeof dsn !== "string" || !dsn.trim()) return undefined;
@@ -100,7 +149,6 @@ function applyUserContext(user?: ErrorContext["user"]) {
   if (!user || sentryState !== "ready") return;
   Sentry.setUser({
     id: String(user.id),
-    email: user.email,
   });
   Sentry.setTag("user.role", user.role);
 }
@@ -111,35 +159,41 @@ function captureToSentry(
   extras?: Record<string, unknown>
 ) {
   if (sentryState !== "ready") return;
+  const safeContext = redactErrorContext(context);
+  const safeExtras = redactTelemetryValue(extras) as
+    | Record<string, unknown>
+    | undefined;
+  const safeError = new Error(redactString(error.message));
+  safeError.name = error.name;
+  safeError.stack = error.stack ? redactString(error.stack) : undefined;
 
   Sentry.withScope(scope => {
-    if (context.user) {
+    if (safeContext.user) {
       scope.setUser({
-        id: String(context.user.id),
-        email: context.user.email,
+        id: String(safeContext.user.id),
       });
-      scope.setTag("user.role", context.user.role);
+      scope.setTag("user.role", safeContext.user.role);
     }
 
-    if (context.route) scope.setTag("route", context.route);
-    if (context.component) scope.setTag("component", context.component);
-    if (context.action) scope.setTag("action", context.action);
-    if (context.auditId != null) {
-      scope.setTag("auditId", String(context.auditId));
+    if (safeContext.route) scope.setTag("route", safeContext.route);
+    if (safeContext.component) scope.setTag("component", safeContext.component);
+    if (safeContext.action) scope.setTag("action", safeContext.action);
+    if (safeContext.auditId != null) {
+      scope.setTag("auditId", String(safeContext.auditId));
       scope.setContext("audit", {
-        auditId: context.auditId,
-        jobSheetId: context.jobSheetId ?? context.auditId,
+        auditId: safeContext.auditId,
+        jobSheetId: safeContext.jobSheetId ?? safeContext.auditId,
       });
-    } else if (context.jobSheetId != null) {
-      scope.setTag("jobSheetId", String(context.jobSheetId));
-      scope.setContext("audit", { jobSheetId: context.jobSheetId });
+    } else if (safeContext.jobSheetId != null) {
+      scope.setTag("jobSheetId", String(safeContext.jobSheetId));
+      scope.setContext("audit", { jobSheetId: safeContext.jobSheetId });
     }
 
-    if (context.metadata || extras) {
-      scope.setContext("app", { ...context.metadata, ...extras });
+    if (safeContext.metadata || safeExtras) {
+      scope.setContext("app", { ...safeContext.metadata, ...safeExtras });
     }
 
-    Sentry.captureException(error);
+    Sentry.captureException(safeError);
   });
 }
 
@@ -174,9 +228,9 @@ export function initSentry(dsn?: string): boolean {
       release: readRelease(),
       // Keep noise down; we primarily report explicit exceptions.
       tracesSampleRate: 0,
-      // Fail soft: never break the app if Sentry transport fails.
+      // Defense in depth for automatic Sentry events and future call sites.
       beforeSend(event) {
-        return event;
+        return redactTelemetryValue(event) as typeof event;
       },
     });
     sentryState = "ready";
@@ -224,11 +278,12 @@ async function resolveRuntimeDsn(): Promise<string | undefined> {
  */
 export function logError(error: Error, context?: ErrorContext) {
   const merged = mergeContext(context);
+  const safeContext = redactErrorContext(merged);
 
   console.error("[Error]", {
-    message: error.message,
-    stack: error.stack,
-    context: merged,
+    message: redactString(error.message),
+    stack: error.stack ? redactString(error.stack) : undefined,
+    context: safeContext,
     timestamp: new Date().toISOString(),
   });
 
@@ -246,11 +301,12 @@ export function logBoundaryError(
   context?: ErrorContext
 ) {
   const merged = mergeContext(context);
+  const safeContext = redactErrorContext(merged);
 
   console.error("[ErrorBoundary]", {
-    error: error.message,
+    error: redactString(error.message),
     componentStack: errorInfo.componentStack,
-    context: merged,
+    context: safeContext,
     timestamp: new Date().toISOString(),
   });
 
@@ -267,11 +323,12 @@ export function logBoundaryError(
 export function logUnhandledRejection(reason: unknown, context?: ErrorContext) {
   const error = reason instanceof Error ? reason : new Error(String(reason));
   const merged = mergeContext(context);
+  const safeContext = redactErrorContext(merged);
 
   console.error("[UnhandledRejection]", {
-    reason: String(reason),
-    error: error.message,
-    context: merged,
+    reason: redactString(String(reason)),
+    error: redactString(error.message),
+    context: safeContext,
     timestamp: new Date().toISOString(),
   });
 
@@ -398,12 +455,13 @@ export function logApiError(
           : undefined,
     },
   });
+  const safeContext = redactErrorContext(merged);
 
   console.error("[API Error]", {
-    endpoint,
-    error: err.message,
-    status: merged.metadata?.status,
-    context: merged,
+    endpoint: redactString(endpoint),
+    error: redactString(err.message),
+    status: safeContext.metadata?.status,
+    context: safeContext,
     timestamp: new Date().toISOString(),
   });
 
