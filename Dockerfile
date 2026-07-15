@@ -56,6 +56,8 @@ COPY --from=builder --chown=appuser:nodejs /app/drizzle.config.ts ./drizzle.conf
 COPY --from=builder --chown=appuser:nodejs /app/data ./data
 COPY --from=builder --chown=appuser:nodejs /app/scripts/ensure-failed-jobs-table.mjs ./scripts/ensure-failed-jobs-table.mjs
 COPY --from=builder --chown=appuser:nodejs /app/scripts/ensure-audit-findings-resolution.mjs ./scripts/ensure-audit-findings-resolution.mjs
+COPY --from=builder --chown=appuser:nodejs /app/scripts/ensure-waiver-revocation.mjs ./scripts/ensure-waiver-revocation.mjs
+COPY --from=builder --chown=appuser:nodejs /app/scripts/ensure-secondary-tables.mjs ./scripts/ensure-secondary-tables.mjs
 
 # Migrate-on-start entrypoint (runs drizzle-kit migrate when DATABASE_URL is set)
 COPY scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
