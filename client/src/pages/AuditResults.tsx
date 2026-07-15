@@ -12,7 +12,6 @@ import {
 } from "@/components/audit/ExportButton";
 import {
   AlertCircle,
-  AlertTriangle,
   CheckCircle2,
   ChevronRight,
   Clock,
@@ -77,8 +76,6 @@ function downloadTextFile(
 
 interface AuditOutcomeSummary {
   result: string;
-  docQualityScore: number | null;
-  hasMajorFails: boolean;
 }
 
 type StatusFilter =
@@ -288,17 +285,8 @@ export default function AuditResults() {
     const map = new Map<number, AuditOutcomeSummary>();
     if (!allAuditResults) return map;
     for (const ar of allAuditResults) {
-      const reportJson = ar.reportJson as Record<string, unknown> | null;
-      const docScore =
-        typeof (reportJson as Record<string, unknown>)
-          ?.documentationQualityScore === "number"
-          ? ((reportJson as Record<string, unknown>)
-              .documentationQualityScore as number)
-          : null;
       map.set(ar.jobSheetId, {
         result: ar.result,
-        docQualityScore: docScore,
-        hasMajorFails: mapHasMajorFailsFromReport(reportJson),
       });
     }
     return map;
@@ -835,15 +823,6 @@ export default function AuditResults() {
                               {sheet.referenceNumber || `JS-${sheet.id}`}
                             </p>
                             <JobSheetStatusChip status={sheet.status} />
-                            {outcome?.hasMajorFails && (
-                              <Badge
-                                variant="destructive"
-                                className="gap-1 h-5 text-[10px] bg-[#BA3737] hover:bg-[#962C2C]"
-                              >
-                                <AlertTriangle className="w-3 h-3" />
-                                Major
-                              </Badge>
-                            )}
                           </div>
                           <p className="text-xs text-[#706D6D] truncate mt-0.5">
                             {sheet.fileName}
@@ -863,21 +842,6 @@ export default function AuditResults() {
                               showDocsHint={false}
                             />
                           ) : null}
-                          {outcome?.docQualityScore != null && (
-                            <span
-                              className={cn(
-                                "text-[11px] font-semibold tabular-nums px-2 py-0.5 rounded border",
-                                outcome.docQualityScore >= 80
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                  : outcome.docQualityScore >= 50
-                                    ? "bg-amber-50 text-amber-700 border-amber-200"
-                                    : "bg-red-50 text-red-700 border-red-200"
-                              )}
-                              title="Documentation quality score"
-                            >
-                              {outcome.docQualityScore}%
-                            </span>
-                          )}
                           {sheet.status === "review_queue" && (
                             <div
                               className={cn(

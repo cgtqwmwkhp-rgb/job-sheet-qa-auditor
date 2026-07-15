@@ -982,7 +982,7 @@ export const appRouter = router({
           .optional()
       )
       .query(async ({ ctx, input }) => {
-        const allAudits = await db.getAuditResults(input);
+        const allAudits = await db.getAuditResultList(input);
 
         // Object-level filtering: regular users only see audits for their own uploads
         // First, get all job sheets they have access to

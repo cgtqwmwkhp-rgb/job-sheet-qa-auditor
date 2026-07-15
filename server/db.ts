@@ -649,6 +649,44 @@ export async function getAuditResultByJobSheetId(jobSheetId: number) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+/**
+ * Scalar audit fields suitable for queue and archive listings. Keep reportJson
+ * on detail queries only: it can be substantially larger than list row data.
+ */
+export const auditResultListSelection = {
+  id: auditResults.id,
+  jobSheetId: auditResults.jobSheetId,
+  goldSpecId: auditResults.goldSpecId,
+  runId: auditResults.runId,
+  result: auditResults.result,
+  confidenceScore: auditResults.confidenceScore,
+  documentStrategy: auditResults.documentStrategy,
+  ocrEngineVersion: auditResults.ocrEngineVersion,
+  pipelineVersion: auditResults.pipelineVersion,
+  processingTimeMs: auditResults.processingTimeMs,
+  createdAt: auditResults.createdAt,
+} as const;
+
+export async function getAuditResultList(options?: {
+  result?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+
+  let query = db.select(auditResultListSelection).from(auditResults);
+
+  if (options?.result) {
+    query = query.where(eq(auditResults.result, options.result as any)) as any;
+  }
+
+  return query
+    .orderBy(desc(auditResults.createdAt))
+    .limit(options?.limit ?? 50)
+    .offset(options?.offset ?? 0);
+}
+
 export async function getAuditResults(options?: {
   result?: string;
   limit?: number;

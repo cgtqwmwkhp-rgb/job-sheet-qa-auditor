@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { appRouter } from "./routers";
+import * as db from "./db";
 import { COOKIE_NAME } from "../shared/const";
 import type { TrpcContext } from "./_core/context";
 
@@ -36,6 +37,11 @@ vi.mock("./db", () => ({
   createJobSheet: vi.fn().mockResolvedValue({ id: 3 }),
   updateJobSheetStatus: vi.fn().mockResolvedValue(undefined),
   getAuditResults: vi
+    .fn()
+    .mockResolvedValue([
+      { id: 1, jobSheetId: 1, result: "pass", runId: "run-123" },
+    ]),
+  getAuditResultList: vi
     .fn()
     .mockResolvedValue([
       { id: 1, jobSheetId: 1, result: "pass", runId: "run-123" },
@@ -610,6 +616,9 @@ describe("audits", () => {
     const result = await caller.audits.list();
 
     expect(Array.isArray(result)).toBe(true);
+    expect(db.getAuditResultList).toHaveBeenCalledOnce();
+    expect(db.getAuditResults).not.toHaveBeenCalled();
+    expect(result[0]).not.toHaveProperty("reportJson");
   });
 
   it("gets audit result by job sheet id", async () => {
