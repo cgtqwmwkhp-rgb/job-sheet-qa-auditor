@@ -1,0 +1,65 @@
+{
+  "version": "1.0.0",
+  "description": "Wave-5/6 deterministic rule slice fixtures (FAULT, PARTS L1, ATTR, PARTS fitment)",
+  "cases": [
+    {
+      "id": "fault-c010-placeholder",
+      "evaluator": "faultReason",
+      "fixture": "fault-placeholder.txt",
+      "input": { "faultReason": "Reason" },
+      "expectedRuleIds": ["FAULT-C010"],
+      "flags": { "FEATURE_FAULT_REASON_PLACEHOLDER": "true" }
+    },
+    {
+      "id": "parts-c010-pn-only",
+      "evaluator": "partsUsed",
+      "fixture": "parts-pn-only.txt",
+      "expectedRuleIds": ["PARTS-C010", "PARTS-C012"],
+      "flags": { "FEATURE_PARTS_LINE_ASSESSMENT": "true" }
+    },
+    {
+      "id": "parts-c011-desc-only",
+      "evaluator": "partsUsed",
+      "fixture": "parts-desc-only.txt",
+      "expectedRuleIds": ["PARTS-C011", "PARTS-C012"],
+      "flags": { "FEATURE_PARTS_LINE_ASSESSMENT": "true" }
+    },
+    {
+      "id": "parts-c013-complete",
+      "evaluator": "partsUsed",
+      "fixture": "parts-complete.txt",
+      "expectedRuleIds": ["PARTS-C013"],
+      "flags": { "FEATURE_PARTS_LINE_ASSESSMENT": "true" }
+    },
+    {
+      "id": "attr-c010-no-name",
+      "evaluator": "engineerAttribution",
+      "fixture": "attr-no-name.json",
+      "expectedRuleIds": ["ATTR-C010"],
+      "flags": { "FEATURE_ENGINEER_ATTR_FINDING": "true" }
+    },
+    {
+      "id": "fitment-c030-missing-make",
+      "evaluator": "partsAssetFitment",
+      "fixture": "fitment-no-make.txt",
+      "expectedRuleIds": ["PARTS-C030"],
+      "flags": { "FEATURE_PARTS_ASSET_FITMENT": "true" },
+      "mockExa": { "results": [] }
+    },
+    {
+      "id": "fitment-c031-conflict",
+      "evaluator": "partsAssetFitment",
+      "fixture": "fitment-conflict.txt",
+      "expectedRuleIds": ["PARTS-C031"],
+      "flags": { "FEATURE_PARTS_ASSET_FITMENT": "true" },
+      "mockExa": {
+        "results": [
+          {
+            "title": "WT158 wheel bearing kit",
+            "highlights": ["Automotive wheel replacement part WT158"]
+          }
+        ]
+      }
+    }
+  ]
+}
