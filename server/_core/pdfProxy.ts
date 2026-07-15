@@ -24,10 +24,78 @@ const logger = createSafeLogger("PDFProxy");
 // Metrics counters (in-memory for now, can be exported to Prometheus)
 export const pdfProxyMetrics = {
   rangeRequestsCount: 0,
+  cacheHitCount: 0,
   accessDeniedCount: 0,
   successCount: 0,
   errorCount: 0,
 };
+
+const PDF_RANGE_CACHE_TTL_MS = 30_000;
+const PDF_RANGE_CACHE_MAX_ENTRIES = 100;
+const PDF_RANGE_CACHE_MAX_ENTRY_BYTES = 5 * 1024 * 1024;
+
+interface CachedPdfRangeResponse {
+  body: Buffer;
+  contentType: string;
+  contentRange: string | null;
+  acceptRanges: string | null;
+  status: number;
+  expiresAt: number;
+}
+
+const pdfRangeCache = new Map<string, CachedPdfRangeResponse>();
+
+export function getCachedPdfRangeResponse(
+  cacheKey: string
+): CachedPdfRangeResponse | undefined {
+  const cached = pdfRangeCache.get(cacheKey);
+  if (!cached) {
+    return undefined;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    pdfRangeCache.delete(cacheKey);
+    return undefined;
+  }
+
+  // Refresh insertion order so capacity eviction removes the least-recently used entry.
+  pdfRangeCache.delete(cacheKey);
+  pdfRangeCache.set(cacheKey, cached);
+  pdfProxyMetrics.cacheHitCount++;
+  return cached;
+}
+
+export function cachePdfRangeResponse(
+  cacheKey: string,
+  response: Omit<CachedPdfRangeResponse, "expiresAt">
+): void {
+  if (response.body.byteLength > PDF_RANGE_CACHE_MAX_ENTRY_BYTES) {
+    return;
+  }
+
+  while (pdfRangeCache.size >= PDF_RANGE_CACHE_MAX_ENTRIES) {
+    const oldestKey = pdfRangeCache.keys().next().value;
+    if (oldestKey === undefined) {
+      break;
+    }
+    pdfRangeCache.delete(oldestKey);
+  }
+
+  pdfRangeCache.set(cacheKey, {
+    ...response,
+    expiresAt: Date.now() + PDF_RANGE_CACHE_TTL_MS,
+  });
+}
+
+/** Test-only reset hook for the process-local range cache and counters. */
+export function resetPdfProxyCacheForTests(): void {
+  pdfRangeCache.clear();
+  pdfProxyMetrics.rangeRequestsCount = 0;
+  pdfProxyMetrics.cacheHitCount = 0;
+  pdfProxyMetrics.accessDeniedCount = 0;
+  pdfProxyMetrics.successCount = 0;
+  pdfProxyMetrics.errorCount = 0;
+}
 
 /**
  * Authenticate via the same Easy Auth / session path as tRPC (sdk.authenticateRequest).
@@ -161,8 +229,13 @@ router.get(
       const fileName = jobSheet.fileName || `document-${jobSheetId}.pdf`;
       const disposition = isDownload ? "attachment" : "inline";
 
-      // Fetch the file from storage
+      // Cache only bounded range responses. Authorization has already completed above,
+      // and clients still receive no-store headers, so bytes are never shared via a browser
+      // cache or served before RBAC is checked.
       const rangeHeader = req.headers.range;
+      const rangeCacheKey = rangeHeader
+        ? `${jobSheet.fileKey || url}\n${rangeHeader}`
+        : null;
 
       const fetchOptions: RequestInit = {
         method: "GET",
@@ -174,6 +247,32 @@ router.get(
         pdfProxyMetrics.rangeRequestsCount++;
         (fetchOptions.headers as Record<string, string>)["Range"] = rangeHeader;
         logger.debug("Range request", { correlationId, range: rangeHeader });
+      }
+
+      if (rangeCacheKey) {
+        const cached = getCachedPdfRangeResponse(rangeCacheKey);
+        if (cached) {
+          res.setHeader("Content-Type", cached.contentType);
+          res.setHeader(
+            "Content-Disposition",
+            `${disposition}; filename="${fileName}"`
+          );
+          res.setHeader("Accept-Ranges", cached.acceptRanges || "bytes");
+          res.setHeader("Cache-Control", "private, no-store");
+          res.setHeader("X-Correlation-Id", correlationId);
+          res.setHeader("Content-Length", cached.body.byteLength);
+          if (cached.contentRange) {
+            res.setHeader("Content-Range", cached.contentRange);
+          }
+
+          res.status(cached.status).send(cached.body);
+          pdfProxyMetrics.successCount++;
+          logger.info("PDF range served from cache", {
+            correlationId,
+            jobSheetId,
+          });
+          return;
+        }
       }
 
       const response = await fetch(url, fetchOptions);
@@ -215,6 +314,34 @@ router.get(
         res.status(206);
       } else {
         res.status(response.status);
+      }
+
+      // Ranges are normally small. Buffering bounded responses lets PDF.js retries
+      // avoid another Blob fetch without changing streaming for full-document downloads.
+      const responseLength = contentLength ? Number(contentLength) : NaN;
+      if (
+        rangeCacheKey &&
+        response.body &&
+        Number.isFinite(responseLength) &&
+        responseLength <= PDF_RANGE_CACHE_MAX_ENTRY_BYTES
+      ) {
+        const body = Buffer.from(await response.arrayBuffer());
+        cachePdfRangeResponse(rangeCacheKey, {
+          body,
+          contentType,
+          contentRange,
+          acceptRanges,
+          status: contentRange ? 206 : response.status,
+        });
+        res.send(body);
+        pdfProxyMetrics.successCount++;
+        const duration = Date.now() - startTime;
+        logger.info("PDF range cached and sent successfully", {
+          correlationId,
+          jobSheetId,
+          durationMs: duration,
+        });
+        return;
       }
 
       // Stream the response body
