@@ -73,9 +73,11 @@ test.describe("Core Workflow Smoke Test", () => {
     const healthz = await page.goto("/healthz");
     expect(healthz?.status()).toBe(200);
 
-    // Test /readyz
+    // Test /readyz — infra readiness; AI signal lives in checks.ai
     const readyz = await page.goto("/readyz");
     expect(readyz?.status()).toBe(200);
+    const readyzBody = await readyz?.json();
+    expect(readyzBody?.checks?.ai?.status).toBeTruthy();
 
     console.log("✅ Health endpoints OK");
   });

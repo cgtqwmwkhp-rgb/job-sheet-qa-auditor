@@ -76,6 +76,12 @@ export default defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
+    // Functional E2E does not exercise live OCR; keep /readyz infra-green with
+    // honest AI checks via the mock provider.
+    env: {
+      ...process.env,
+      OCR_PROVIDER: 'mock',
+    },
   },
   
   // Global timeout for each test
