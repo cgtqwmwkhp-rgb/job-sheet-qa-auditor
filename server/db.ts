@@ -650,6 +650,21 @@ export async function getAuditResultByJobSheetId(jobSheetId: number) {
 }
 
 /**
+ * Resolve a regular user's ownership scope before querying a paginated audit
+ * list. The resulting IDs are applied to the audit query before its limit and
+ * offset.
+ */
+export async function getJobSheetIdsByUploader(uploadedBy: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db
+    .select({ id: jobSheets.id })
+    .from(jobSheets)
+    .where(eq(jobSheets.uploadedBy, uploadedBy));
+}
+
+/**
  * Scalar audit fields suitable for queue and archive listings. Keep reportJson
  * on detail queries only: it can be substantially larger than list row data.
  */
@@ -671,14 +686,29 @@ export async function getAuditResultList(options?: {
   result?: string;
   limit?: number;
   offset?: number;
+  /** Ownership scope for a regular user, applied before pagination. */
+  jobSheetIds?: number[];
 }) {
   const db = await getDb();
   if (!db) return [];
 
+  if (options?.jobSheetIds?.length === 0) return [];
+
   let query = db.select(auditResultListSelection).from(auditResults);
 
-  if (options?.result) {
+  if (options?.result && options.jobSheetIds) {
+    query = query.where(
+      and(
+        eq(auditResults.result, options.result as any),
+        inArray(auditResults.jobSheetId, options.jobSheetIds)
+      )
+    ) as any;
+  } else if (options?.result) {
     query = query.where(eq(auditResults.result, options.result as any)) as any;
+  } else if (options?.jobSheetIds) {
+    query = query.where(
+      inArray(auditResults.jobSheetId, options.jobSheetIds)
+    ) as any;
   }
 
   return query
