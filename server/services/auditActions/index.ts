@@ -10,6 +10,7 @@ import {
   STATUS_TO_ACTION,
   type AuditActionResult,
   type BulkApproveResult,
+  type BulkResolveResult,
   type FindingAction,
   type ResolutionStatus,
 } from "./types";
@@ -162,6 +163,9 @@ export function parseUndoToken(token: string): {
 
 /**
  * Apply a finding-level action. Soft-undoable via previousResolutionStatus.
+ *
+ * Wave-4 D1: optional `expectedStatus` provides optimistic concurrency —
+ * reject when another reviewer already changed the finding.
  */
 export async function applyFindingAction(
   deps: AuditActionDeps,
@@ -173,6 +177,13 @@ export async function applyFindingAction(
     expiresAt?: Date;
     /** TrainLoop taxonomy when overturning (override action only). */
     trainingReasonCode?: string | null;
+    /**
+     * Optimistic concurrency: must match current resolutionStatus.
+     * Mirrors audit-policy version checks.
+     */
+    expectedStatus?: ResolutionStatus;
+    /** Skip per-finding sheet recalc (bulk resolve recalculates once). */
+    skipSheetRecalc?: boolean;
   }
 ): Promise<AuditActionResult> {
   const finding = await deps.getFinding(input.findingId);
@@ -180,6 +191,16 @@ export async function applyFindingAction(
     throw new AuditActionError(
       "NOT_FOUND",
       `Finding ${input.findingId} not found`
+    );
+  }
+
+  if (
+    input.expectedStatus != null &&
+    finding.resolutionStatus !== input.expectedStatus
+  ) {
+    throw new AuditActionError(
+      "CONFLICT",
+      `Finding ${input.findingId} was modified by another reviewer. Please refresh and retry.`
     );
   }
 
@@ -219,10 +240,12 @@ export async function applyFindingAction(
     }
   }
 
-  const sideEffects = await applySideEffects(deps, {
-    finding,
-    action: input.action,
-  });
+  const sideEffects = input.skipSheetRecalc
+    ? {}
+    : await applySideEffects(deps, {
+        finding,
+        action: input.action,
+      });
 
   const audit = await deps.getAuditResult(finding.auditResultId);
   const logDetails: Record<string, unknown> = {
@@ -346,6 +369,7 @@ export async function undoFindingAction(
 
 /**
  * Bulk-approve multiple findings (same reason). Skips already-approved.
+ * Wave-4 D1: single sheet-truth recalc after all mutations.
  */
 export async function bulkApproveFindings(
   deps: AuditActionDeps,
@@ -353,11 +377,57 @@ export async function bulkApproveFindings(
     findingIds: number[];
     reason: string;
     userId: number;
+    expectedStatus?: ResolutionStatus;
   }
 ): Promise<BulkApproveResult> {
-  const approvedIds: number[] = [];
+  const result = await bulkResolveFindings(deps, {
+    findingIds: input.findingIds,
+    action: "approve",
+    reason: input.reason,
+    userId: input.userId,
+    expectedStatus: input.expectedStatus,
+  });
+
+  return {
+    success: true,
+    approvedIds: result.resolvedIds,
+    skippedIds: result.skippedIds,
+    undoTokens: result.undoTokens,
+    auditResultId: result.auditResultId,
+    auditResultStatus: result.auditResultStatus,
+    jobSheetStatus: result.jobSheetStatus,
+  };
+}
+
+/**
+ * Atomic bulk resolve — apply the same action to many findings, then
+ * recalculate sheet truth once (Wave-4 D1 challenge bar).
+ *
+ * Pre-validates expectedStatus / same-audit constraints before any write
+ * so conflicts are all-or-nothing even outside a DB transaction.
+ */
+export async function bulkResolveFindings(
+  deps: AuditActionDeps,
+  input: {
+    findingIds: number[];
+    action: FindingAction;
+    reason: string;
+    userId: number;
+    expiresAt?: Date;
+    /**
+     * When set, every finding must currently match this status
+     * (all-or-nothing optimistic concurrency).
+     */
+    expectedStatus?: ResolutionStatus;
+  }
+): Promise<BulkResolveResult> {
+  const resolvedIds: number[] = [];
   const skippedIds: number[] = [];
   const undoTokens: string[] = [];
+  let auditResultId: number | undefined;
+  const targetStatus = mapActionToStatus(input.action);
+
+  const loaded: Array<{ id: number; finding: FindingRecord }> = [];
 
   for (const findingId of input.findingIds) {
     const finding = await deps.getFinding(findingId);
@@ -365,26 +435,89 @@ export async function bulkApproveFindings(
       skippedIds.push(findingId);
       continue;
     }
-    if (finding.resolutionStatus === "approved") {
+
+    if (auditResultId == null) {
+      auditResultId = finding.auditResultId;
+    } else if (finding.auditResultId !== auditResultId) {
+      throw new AuditActionError(
+        "CONFLICT",
+        "Bulk resolve requires all findings to belong to the same audit result"
+      );
+    }
+
+    if (finding.resolutionStatus === targetStatus) {
       skippedIds.push(findingId);
       continue;
     }
 
+    if (
+      input.expectedStatus != null &&
+      finding.resolutionStatus !== input.expectedStatus
+    ) {
+      throw new AuditActionError(
+        "CONFLICT",
+        `Finding ${findingId} was modified by another reviewer. Please refresh and retry.`
+      );
+    }
+
+    loaded.push({ id: findingId, finding });
+  }
+
+  for (const { id: findingId } of loaded) {
     const result = await applyFindingAction(deps, {
       findingId,
-      action: "approve",
+      action: input.action,
       reason: input.reason,
       userId: input.userId,
+      expiresAt: input.expiresAt,
+      expectedStatus: input.expectedStatus,
+      skipSheetRecalc: true,
     });
-    approvedIds.push(findingId);
+    resolvedIds.push(findingId);
     undoTokens.push(result.undoToken);
+  }
+
+  let sideEffects: { jobSheetStatus?: string; auditResultStatus?: string } = {};
+  if (auditResultId != null && resolvedIds.length > 0) {
+    if (input.action === "flag") {
+      const audit = await deps.getAuditResult(auditResultId);
+      if (audit) {
+        await deps.updateJobSheetStatus(audit.jobSheetId, "review_queue");
+        if (audit.result !== "review_queue" && audit.result !== "waived") {
+          await deps.updateAuditResultStatus(audit.id, "review_queue");
+        }
+        sideEffects = {
+          jobSheetStatus: "review_queue",
+          auditResultStatus: "review_queue",
+        };
+      }
+    } else {
+      sideEffects = await recalculateSheetTruth(deps, auditResultId);
+    }
+
+    await deps.logAction({
+      userId: input.userId,
+      action: `FINDING_BULK_${input.action.toUpperCase()}`,
+      entityType: "audit_result",
+      entityId: auditResultId,
+      details: {
+        action: input.action,
+        resolvedIds,
+        skippedIds,
+        reason: input.reason,
+        ...sideEffects,
+      },
+    });
   }
 
   return {
     success: true,
-    approvedIds,
+    resolvedIds,
     skippedIds,
     undoTokens,
+    auditResultId,
+    auditResultStatus: sideEffects.auditResultStatus,
+    jobSheetStatus: sideEffects.jobSheetStatus,
   };
 }
 

@@ -59,4 +59,18 @@ export interface BulkApproveResult {
   approvedIds: number[];
   skippedIds: number[];
   undoTokens: string[];
+  /** Sheet truth after one atomic recalc (Wave-4 D1). */
+  auditResultStatus?: string;
+  jobSheetStatus?: string;
+  auditResultId?: number;
+}
+
+export interface BulkResolveResult {
+  success: true;
+  resolvedIds: number[];
+  skippedIds: number[];
+  auditResultId?: number;
+  auditResultStatus?: string;
+  jobSheetStatus?: string;
+  undoTokens: string[];
 }

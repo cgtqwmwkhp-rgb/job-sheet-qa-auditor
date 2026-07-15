@@ -31,7 +31,7 @@ export const batchOperationsRouter = router({
         });
       }
 
-      await resolveFindingsBatch(input.findingIds, {
+      const result = await resolveFindingsBatch(input.findingIds, {
         status: "approved",
         reason: input.reason || "Bulk approval by QA lead",
         resolvedBy: ctx.user.id,
@@ -46,12 +46,18 @@ export const batchOperationsRouter = router({
           count: input.findingIds.length,
           findingIds: input.findingIds,
           reason: input.reason,
+          sheetResult: result.sheetResult,
+          jobSheetStatus: result.jobSheetStatus,
         },
       });
 
       return {
         success: true,
-        count: input.findingIds.length,
+        count: result.resolvedIds.length,
+        skipped: result.skippedIds.length,
+        auditResultId: result.auditResultId,
+        sheetResult: result.sheetResult,
+        jobSheetStatus: result.jobSheetStatus,
       };
     }),
 
@@ -82,27 +88,12 @@ export const batchOperationsRouter = router({
         });
       }
 
-      await resolveFindingsBatch(input.findingIds, {
+      const result = await resolveFindingsBatch(input.findingIds, {
         status: "waived",
         reason: input.reason,
         resolvedBy: ctx.user.id,
+        expiresAt: input.expiresAt,
       });
-
-      // Create waiver records
-      for (const findingId of input.findingIds) {
-        await db.createWaiver({
-          auditFindingId: findingId,
-          approverId: ctx.user.id,
-          reason: input.reason,
-          expiresAt: input.expiresAt,
-          auditTrail: {
-            createdBy: ctx.user.id,
-            createdAt: new Date().toISOString(),
-            action: "batch_waive",
-            reason: input.reason,
-          },
-        });
-      }
 
       await db.logAction({
         userId: ctx.user.id,
@@ -114,12 +105,18 @@ export const batchOperationsRouter = router({
           findingIds: input.findingIds,
           reason: input.reason,
           expiresAt: input.expiresAt?.toISOString(),
+          sheetResult: result.sheetResult,
+          jobSheetStatus: result.jobSheetStatus,
         },
       });
 
       return {
         success: true,
-        count: input.findingIds.length,
+        count: result.resolvedIds.length,
+        skipped: result.skippedIds.length,
+        auditResultId: result.auditResultId,
+        sheetResult: result.sheetResult,
+        jobSheetStatus: result.jobSheetStatus,
       };
     }),
 

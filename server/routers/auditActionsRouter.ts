@@ -17,6 +17,7 @@ import {
   applyFindingAction,
   undoFindingAction,
   bulkApproveFindings,
+  bulkResolveFindings,
   approveJobSheet,
   undoJobSheetApprove,
   captureFieldCorrection,
@@ -24,7 +25,10 @@ import {
   AuditActionError,
   type AuditActionDeps,
 } from "../services/auditActions";
-import { FINDING_ACTIONS } from "../services/auditActions/types";
+import {
+  FINDING_ACTIONS,
+  RESOLUTION_STATUSES,
+} from "../services/auditActions/types";
 import {
   TRAINING_REASON_CODES,
   resolveJobSheetsForFindings,
@@ -40,6 +44,15 @@ import {
   auditActionResponseStore,
   getIdempotencyKey,
 } from "../services/idempotency";
+import {
+  assertReviewClaimAllowsMutation,
+  claimReview,
+  getReviewClaim,
+  heartbeatReviewClaim,
+  isClaimActive,
+  releaseReviewClaim,
+  ReviewClaimError,
+} from "../services/reviewClaim";
 
 async function throwIfRateLimited(
   fn: () => unknown | Promise<unknown>
@@ -93,6 +106,13 @@ function toAuditActionTrpcError(
     return cause;
   }
 
+  if (cause instanceof ReviewClaimError) {
+    return new TRPCError({
+      code: cause.code,
+      message: cause.message,
+    });
+  }
+
   if (cause instanceof AuditActionError) {
     return new TRPCError({
       code: cause.code,
@@ -104,6 +124,46 @@ function toAuditActionTrpcError(
     code: "BAD_REQUEST",
     message: error instanceof Error ? error.message : fallbackMessage,
   });
+}
+
+async function resolveJobSheetIdForFinding(
+  findingId: number
+): Promise<number | null> {
+  const finding = await db.getAuditFindingById(findingId);
+  if (!finding) return null;
+  const audit = await db.getAuditResultById(finding.auditResultId);
+  return audit?.jobSheetId ?? null;
+}
+
+async function guardFindingMutation(input: {
+  findingId: number;
+  userId: number;
+  claimToken?: string;
+}): Promise<void> {
+  const jobSheetId = await resolveJobSheetIdForFinding(input.findingId);
+  if (jobSheetId == null) {
+    // Missing finding/audit — leave NOT_FOUND to the action path (and tests).
+    return;
+  }
+  await assertReviewClaimAllowsMutation({
+    jobSheetId,
+    userId: input.userId,
+    claimToken: input.claimToken,
+  });
+}
+
+async function guardFindingsMutation(input: {
+  findingIds: number[];
+  userId: number;
+  claimToken?: string;
+}): Promise<void> {
+  for (const findingId of input.findingIds) {
+    await guardFindingMutation({
+      findingId,
+      userId: input.userId,
+      claimToken: input.claimToken,
+    });
+  }
 }
 
 function mapFindingRow(
@@ -190,6 +250,7 @@ export async function waiveFinding(input: {
   reason: string;
   userId: number;
   expiresAt?: Date;
+  expectedStatus?: "open" | "waived" | "overridden" | "flagged" | "approved";
 }) {
   await enforceReviewLimit(input.userId);
   return runAuditAction(deps =>
@@ -199,6 +260,7 @@ export async function waiveFinding(input: {
       reason: input.reason,
       userId: input.userId,
       expiresAt: input.expiresAt,
+      expectedStatus: input.expectedStatus,
     })
   );
 }
@@ -206,6 +268,10 @@ export async function waiveFinding(input: {
 const findingActionInput = z.object({
   findingId: z.number().int().positive(),
   reason: z.string().min(1).max(2000),
+  /** Optimistic concurrency — must match current resolutionStatus. */
+  expectedStatus: z.enum(RESOLUTION_STATUSES).optional(),
+  /** Optional sheet claim token when a review lease is held. */
+  claimToken: z.string().uuid().optional(),
 });
 
 const waiveFindingInput = findingActionInput.extend({
@@ -220,6 +286,124 @@ const overrideActionInput = findingActionInput.extend({
 
 export const auditActionsRouter = router({
   /**
+   * Claim exclusive review lease on a job sheet (Wave-4 D1).
+   * Heartbeat to keep; conflict when another reviewer holds a live lease.
+   */
+  claimReview: qaLeadProcedure
+    .input(
+      z.object({
+        jobSheetId: z.number().int().positive(),
+        force: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const sheet = await db.getJobSheetById(input.jobSheetId);
+        if (!sheet) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Job sheet not found",
+          });
+        }
+        const claim = await claimReview({
+          jobSheetId: input.jobSheetId,
+          userId: ctx.user.id,
+          force: input.force,
+        });
+        await db.logAction({
+          userId: ctx.user.id,
+          action: "REVIEW_CLAIM",
+          entityType: "job_sheet",
+          entityId: input.jobSheetId,
+          details: {
+            claimToken: claim.claimToken,
+            expiresAt: new Date(claim.expiresAt).toISOString(),
+          },
+        });
+        return {
+          jobSheetId: claim.jobSheetId,
+          claimToken: claim.claimToken,
+          claimedBy: claim.claimedBy,
+          expiresAt: new Date(claim.expiresAt),
+        };
+      } catch (err) {
+        throw toAuditActionTrpcError(err, "Claim failed");
+      }
+    }),
+
+  /** Extend an active review lease. */
+  heartbeatClaim: qaLeadProcedure
+    .input(
+      z.object({
+        jobSheetId: z.number().int().positive(),
+        claimToken: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const claim = await heartbeatReviewClaim({
+          jobSheetId: input.jobSheetId,
+          userId: ctx.user.id,
+          claimToken: input.claimToken,
+        });
+        return {
+          jobSheetId: claim.jobSheetId,
+          claimToken: claim.claimToken,
+          claimedBy: claim.claimedBy,
+          expiresAt: new Date(claim.expiresAt),
+        };
+      } catch (err) {
+        throw toAuditActionTrpcError(err, "Heartbeat failed");
+      }
+    }),
+
+  /** Release an active review lease. */
+  releaseClaim: qaLeadProcedure
+    .input(
+      z.object({
+        jobSheetId: z.number().int().positive(),
+        claimToken: z.string().uuid().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const result = await releaseReviewClaim({
+          jobSheetId: input.jobSheetId,
+          userId: ctx.user.id,
+          claimToken: input.claimToken,
+        });
+        if (result.released) {
+          await db.logAction({
+            userId: ctx.user.id,
+            action: "REVIEW_CLAIM_RELEASE",
+            entityType: "job_sheet",
+            entityId: input.jobSheetId,
+            details: {},
+          });
+        }
+        return result;
+      } catch (err) {
+        throw toAuditActionTrpcError(err, "Release failed");
+      }
+    }),
+
+  /** Read current claim state (active or null). */
+  getClaim: protectedProcedure
+    .input(z.object({ jobSheetId: z.number().int().positive() }))
+    .query(async ({ input }) => {
+      const claim = await getReviewClaim(input.jobSheetId);
+      if (!isClaimActive(claim)) return { claim: null };
+      return {
+        claim: {
+          jobSheetId: claim.jobSheetId,
+          claimedBy: claim.claimedBy,
+          expiresAt: new Date(claim.expiresAt),
+          // Token only returned to the holder via claimReview/heartbeat.
+        },
+      };
+    }),
+
+  /**
    * Waive a finding (creates waiver row + marks finding waived).
    * Admin-only — the canonical waiver entry point.
    */
@@ -233,7 +417,15 @@ export const auditActionsRouter = router({
         body: input,
         action: async () => {
           try {
-            return await waiveFinding({ ...input, userId: ctx.user.id });
+            await guardFindingMutation({
+              findingId: input.findingId,
+              userId: ctx.user.id,
+              claimToken: input.claimToken,
+            });
+            return await waiveFinding({
+              ...input,
+              userId: ctx.user.id,
+            });
           } catch (err) {
             throw toAuditActionTrpcError(err, "Waive failed");
           }
@@ -253,6 +445,11 @@ export const auditActionsRouter = router({
         action: async () => {
           await enforceReviewLimit(ctx.user.id);
           try {
+            await guardFindingMutation({
+              findingId: input.findingId,
+              userId: ctx.user.id,
+              claimToken: input.claimToken,
+            });
             return await runAuditAction(deps =>
               applyFindingAction(deps, {
                 findingId: input.findingId,
@@ -260,6 +457,7 @@ export const auditActionsRouter = router({
                 reason: input.reason,
                 userId: ctx.user.id,
                 trainingReasonCode: input.trainingReasonCode,
+                expectedStatus: input.expectedStatus,
               })
             );
           } catch (err) {
@@ -275,12 +473,18 @@ export const auditActionsRouter = router({
     .mutation(async ({ ctx, input }) => {
       await enforceReviewLimit(ctx.user.id);
       try {
+        await guardFindingMutation({
+          findingId: input.findingId,
+          userId: ctx.user.id,
+          claimToken: input.claimToken,
+        });
         return await runAuditAction(deps =>
           applyFindingAction(deps, {
             findingId: input.findingId,
             action: "flag",
             reason: input.reason,
             userId: ctx.user.id,
+            expectedStatus: input.expectedStatus,
           })
         );
       } catch (err) {
@@ -300,12 +504,18 @@ export const auditActionsRouter = router({
         action: async () => {
           await enforceReviewLimit(ctx.user.id);
           try {
+            await guardFindingMutation({
+              findingId: input.findingId,
+              userId: ctx.user.id,
+              claimToken: input.claimToken,
+            });
             return await runAuditAction(deps =>
               applyFindingAction(deps, {
                 findingId: input.findingId,
                 action: "approve",
                 reason: input.reason,
                 userId: ctx.user.id,
+                expectedStatus: input.expectedStatus,
               })
             );
           } catch (err) {
@@ -317,9 +527,19 @@ export const auditActionsRouter = router({
 
   /** Soft-undo the last finding action (status revert + waiver revocation if needed). */
   undo: qaLeadProcedure
-    .input(z.object({ findingId: z.number().int().positive() }))
+    .input(
+      z.object({
+        findingId: z.number().int().positive(),
+        claimToken: z.string().uuid().optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       try {
+        await guardFindingMutation({
+          findingId: input.findingId,
+          userId: ctx.user.id,
+          claimToken: input.claimToken,
+        });
         return await runAuditAction(deps =>
           undoFindingAction(deps, {
             findingId: input.findingId,
@@ -337,16 +557,66 @@ export const auditActionsRouter = router({
       z.object({
         findingIds: z.array(z.number().int().positive()).min(1).max(100),
         reason: z.string().min(1).max(2000).default("Bulk approved"),
+        expectedStatus: z.enum(RESOLUTION_STATUSES).optional(),
+        claimToken: z.string().uuid().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      return runAuditAction(deps =>
-        bulkApproveFindings(deps, {
+      try {
+        await guardFindingsMutation({
           findingIds: input.findingIds,
-          reason: input.reason,
           userId: ctx.user.id,
-        })
-      );
+          claimToken: input.claimToken,
+        });
+        return await runAuditAction(deps =>
+          bulkApproveFindings(deps, {
+            findingIds: input.findingIds,
+            reason: input.reason,
+            userId: ctx.user.id,
+            expectedStatus: input.expectedStatus,
+          })
+        );
+      } catch (err) {
+        throw toAuditActionTrpcError(err, "Bulk approve failed");
+      }
+    }),
+
+  /**
+   * Atomic bulk resolve + single sheet-truth recalc (Wave-4 D1).
+   * Challenge bar: waive last S0/S1 → sheet flips in one transaction.
+   */
+  bulkResolve: qaLeadProcedure
+    .input(
+      z.object({
+        findingIds: z.array(z.number().int().positive()).min(1).max(100),
+        action: z.enum(FINDING_ACTIONS),
+        reason: z.string().min(1).max(2000),
+        expiresAt: z.date().optional(),
+        expectedStatus: z.enum(RESOLUTION_STATUSES).optional(),
+        claimToken: z.string().uuid().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await enforceReviewLimit(ctx.user.id);
+        await guardFindingsMutation({
+          findingIds: input.findingIds,
+          userId: ctx.user.id,
+          claimToken: input.claimToken,
+        });
+        return await runAuditAction(deps =>
+          bulkResolveFindings(deps, {
+            findingIds: input.findingIds,
+            action: input.action,
+            reason: input.reason,
+            userId: ctx.user.id,
+            expiresAt: input.expiresAt,
+            expectedStatus: input.expectedStatus,
+          })
+        );
+      } catch (err) {
+        throw toAuditActionTrpcError(err, "Bulk resolve failed");
+      }
     }),
 
   /** Approve a job sheet out of the hold queue. */
@@ -355,6 +625,7 @@ export const auditActionsRouter = router({
       z.object({
         jobSheetId: z.number().int().positive(),
         reason: z.string().min(1).max(2000).optional(),
+        claimToken: z.string().uuid().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -371,14 +642,23 @@ export const auditActionsRouter = router({
               message: "Job sheet not found",
             });
           }
-          return runAuditAction(deps =>
-            approveJobSheet(deps, {
+          try {
+            await assertReviewClaimAllowsMutation({
               jobSheetId: input.jobSheetId,
               userId: ctx.user.id,
-              reason: input.reason,
-              previousStatus: sheet.status,
-            })
-          );
+              claimToken: input.claimToken,
+            });
+            return await runAuditAction(deps =>
+              approveJobSheet(deps, {
+                jobSheetId: input.jobSheetId,
+                userId: ctx.user.id,
+                reason: input.reason,
+                previousStatus: sheet.status,
+              })
+            );
+          } catch (err) {
+            throw toAuditActionTrpcError(err, "Approve job sheet failed");
+          }
         },
       });
     }),
@@ -397,16 +677,26 @@ export const auditActionsRouter = router({
             "review_queue",
           ])
           .default("review_queue"),
+        claimToken: z.string().uuid().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      return runAuditAction(deps =>
-        undoJobSheetApprove(deps, {
+      try {
+        await assertReviewClaimAllowsMutation({
           jobSheetId: input.jobSheetId,
           userId: ctx.user.id,
-          restoreStatus: input.restoreStatus,
-        })
-      );
+          claimToken: input.claimToken,
+        });
+        return await runAuditAction(deps =>
+          undoJobSheetApprove(deps, {
+            jobSheetId: input.jobSheetId,
+            userId: ctx.user.id,
+            restoreStatus: input.restoreStatus,
+          })
+        );
+      } catch (err) {
+        throw toAuditActionTrpcError(err, "Undo job sheet approve failed");
+      }
     }),
 
   /**
@@ -421,10 +711,16 @@ export const auditActionsRouter = router({
         originalValue: z.string().max(4000).optional(),
         correctedValue: z.string().min(1).max(4000),
         trainingReasonCode: trainingReasonCodeInput,
+        claimToken: z.string().uuid().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        await guardFindingMutation({
+          findingId: input.findingId,
+          userId: ctx.user.id,
+          claimToken: input.claimToken,
+        });
         return await runAuditAction(deps =>
           captureFieldCorrection(deps, {
             findingId: input.findingId,
@@ -446,10 +742,16 @@ export const auditActionsRouter = router({
       z.object({
         findingId: z.number().int().positive(),
         previousSnippet: z.string().max(4000).nullable(),
+        claimToken: z.string().uuid().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        await guardFindingMutation({
+          findingId: input.findingId,
+          userId: ctx.user.id,
+          claimToken: input.claimToken,
+        });
         return await runAuditAction(deps =>
           undoFieldCorrection(deps, {
             findingId: input.findingId,
@@ -483,6 +785,9 @@ export const auditActionsRouter = router({
     findingActions: [...FINDING_ACTIONS],
     undoSupported: true,
     bulkApproveSupported: true,
+    bulkResolveSupported: true,
+    reviewClaimSupported: true,
+    expectedStatusSupported: true,
     fieldCorrectionSupported: true,
     trainingReasonCodes: [...TRAINING_REASON_CODES],
   })),
