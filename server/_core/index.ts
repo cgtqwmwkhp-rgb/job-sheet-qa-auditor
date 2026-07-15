@@ -23,7 +23,10 @@ import { hydrateDeadLetterQueueFromDb } from "../utils/deadLetterQueue";
 import { hydrateApiCostLedgerFromDb } from "../services/finOps";
 import { assertSharedLimitsReplicaSafety } from "../utils/rateLimiter";
 import { hydrateWebhooksFromDb } from "../services/webhooks";
-import { correlationContextMiddleware } from "../utils/context";
+import {
+  correlationContextMiddleware,
+  getCorrelationId,
+} from "../utils/context";
 import { pdfProxyRouter } from "./pdfProxy";
 import { templateSampleProxyRouter } from "./templateSampleProxy";
 import { ingestRouter } from "../services/ingest";
@@ -33,6 +36,12 @@ import {
 } from "../services/dropIngest/boot";
 import { sdk } from "./sdk";
 import { generateCsrfToken } from "../utils/csrf";
+import {
+  captureExpressException,
+  captureServerException,
+  captureTrpcException,
+  initServerErrorTracking,
+} from "../utils/serverErrorTracking";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -54,6 +63,9 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // SENTRY_DSN is optional: without it all reporting calls are intentional no-ops.
+  initServerErrorTracking();
+
   // In-memory rate limits / live processStatus are unsafe across replicas.
   // Multi-replica requires Redis (SHARED_LIMITS_REDIS_URL / REDIS_URL).
   assertSharedLimitsReplicaSafety();
@@ -221,6 +233,14 @@ async function startServer() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
+      onError({ error, path, type, ctx }) {
+        captureTrpcException(error, {
+          correlationId:
+            getCorrelationId() ?? ctx?.req.get("X-Correlation-ID")?.trim(),
+          procedure: path,
+          procedureType: type,
+        });
+      },
     })
   );
   // development mode uses Vite, production mode uses static files
@@ -229,6 +249,9 @@ async function startServer() {
   } else {
     serveStatic(app);
   }
+  // Keep Sentry fail-open: this only observes errors and delegates to Express's
+  // existing error response path.
+  app.use(captureExpressException);
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
@@ -250,4 +273,7 @@ async function startServer() {
   });
 }
 
-startServer().catch(console.error);
+startServer().catch(error => {
+  captureServerException(error, { boundary: "startup" });
+  console.error(error);
+});
