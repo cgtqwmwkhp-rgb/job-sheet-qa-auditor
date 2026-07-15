@@ -29,6 +29,8 @@ import {
   startJobSheetProcessingWorker,
 } from "./worker";
 
+let queueInitialization: Promise<void> | null = null;
+
 export interface EnqueueJobSheetProcessingResponse {
   accepted: true;
   async: true;
@@ -121,12 +123,22 @@ export async function recoverJobSheetProcessingQueue(): Promise<number> {
 
 /**
  * Boot helper for durable mode: reclaim stale work and start the scale-out poller.
- * Safe to call when durable flag is off (no-op).
+ * Safe to call when durable flag is off (no-op), and concurrent boot callers
+ * share one recovery attempt. A failed attempt is left retryable.
  */
-export async function initJobSheetProcessingQueue(): Promise<void> {
-  if (!isDurableJobQueueEnabled()) return;
-  await recoverJobSheetProcessingQueue();
-  startJobSheetProcessingPoller();
+export function initJobSheetProcessingQueue(): Promise<void> {
+  if (!isDurableJobQueueEnabled()) return Promise.resolve();
+  if (queueInitialization) return queueInitialization;
+
+  queueInitialization = (async () => {
+    await recoverJobSheetProcessingQueue();
+    startJobSheetProcessingPoller();
+  })().catch(error => {
+    queueInitialization = null;
+    throw error;
+  });
+
+  return queueInitialization;
 }
 
 // Wired from jobSheets.process when FEATURE_ASYNC_PROCESSING=true.
