@@ -609,6 +609,12 @@ Respond with ONLY a JSON object:
 
     const result = await invokeLLM({
       messages: [{ role: "user", content: prompt }],
+      // This call is the per-field Gemini fallback used by the ensemble stage.
+      // Keep its spend separate from the final judgment model in FinOps rollups.
+      costMeta: {
+        stage: "ensemble",
+        tool: "gemini_ensemble_extraction",
+      },
     });
 
     const response = result.choices[0]?.message?.content;

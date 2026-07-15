@@ -29,6 +29,10 @@ import {
   resetMockLlm,
 } from "../../_core/mockLlm";
 import type { InvokeParams } from "../../_core/llm";
+import {
+  clearApiCostLedger,
+  summarizeApiCosts,
+} from "../../services/finOps";
 
 const CONSENSUS_OCR = `
 --- Page 1 ---
@@ -56,6 +60,7 @@ describe("Ensemble Extraction Contract Tests", () => {
     delete process.env.GEMINI_API_KEY;
     process.env.FEATURE_ENSEMBLE_EXTRACTION = "true";
     resetMockLlm();
+    clearApiCostLedger();
   });
 
   afterEach(() => {
@@ -70,6 +75,7 @@ describe("Ensemble Extraction Contract Tests", () => {
       process.env.LLM_PROVIDER = prevProvider;
     }
     resetMockLlm();
+    clearApiCostLedger();
     vi.restoreAllMocks();
   });
 
@@ -158,6 +164,32 @@ describe("Ensemble Extraction Contract Tests", () => {
       // With fuzzy disabled, fewer strategies may agree
       expect(withoutFuzzy.consensusCount ?? 0).toBeLessThanOrEqual(
         withFuzzy.consensusCount ?? 0
+      );
+    });
+  });
+
+  describe("FinOps cost attribution", () => {
+    it("records Gemini fallback spend against the ensemble stage", async () => {
+      const assetField = FIELD_DEFINITIONS.find(f => f.name === "asset_no")!;
+
+      await ensembleExtract(
+        "This free-form note contains no asset number or matching field label.",
+        assetField,
+        { useLlm: true, fuzzyMatchingEnabled: false }
+      );
+      // Cost recording is a fail-safe lazy import, so allow it to settle.
+      await new Promise(resolve => setImmediate(resolve));
+
+      const summary = summarizeApiCosts({ windowHours: null });
+      expect(summary.byStage).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ key: "ensemble", count: 1 }),
+        ])
+      );
+      expect(summary.byTool).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ key: "gemini_ensemble_extraction" }),
+        ])
       );
     });
   });
