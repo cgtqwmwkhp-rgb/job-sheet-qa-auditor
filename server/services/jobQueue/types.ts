@@ -1,5 +1,9 @@
 export type JobSheetProcessingSource =
-  "primary" | "reprocess" | "template-reprocess" | "dlq-retry" | "async-queue";
+  | "primary"
+  | "reprocess"
+  | "template-reprocess"
+  | "dlq-retry"
+  | "async-queue";
 
 export interface JobSheetProcessingPayload {
   source?: JobSheetProcessingSource;
@@ -42,7 +46,9 @@ export interface JobQueueBackend {
     payload: JobSheetProcessingPayload
   ): EnqueueJobSheetProcessingResult | Promise<EnqueueJobSheetProcessingResult>;
   dequeue():
-    JobSheetQueueJob | undefined | Promise<JobSheetQueueJob | undefined>;
+    | JobSheetQueueJob
+    | undefined
+    | Promise<JobSheetQueueJob | undefined>;
   complete(jobId: string): void | Promise<void>;
   fail(jobId: string, error: unknown): void | Promise<void>;
   hasQueued(): boolean | Promise<boolean>;
