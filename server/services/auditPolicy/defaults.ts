@@ -318,6 +318,27 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           fieldAliases: ["Engineer Comments (Clinical)", "Engineer Comments"],
         },
         {
+          ruleId: "COMMENT-C042",
+          label: "Engineer Comments (Fault Clarity)",
+          description:
+            "Comments lack defect/root-cause clarity (work-done list only)",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: [
+            "Engineer Comments (Fault Clarity)",
+            "Engineer Comments",
+          ],
+        },
+        {
+          ruleId: "FAULT-C010",
+          label: "Fault Reason (Placeholder)",
+          description:
+            "Fault Reason is a form label/placeholder (e.g. Reason), not a real category",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: ["Fault Reason", "fault_reason"],
+        },
+        {
           ruleId: "EVIDENCE-C010",
           label: "Evidence Coherence",
           description:

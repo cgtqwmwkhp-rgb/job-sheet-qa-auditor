@@ -148,6 +148,15 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     deploy: unsetBoth,
   },
   {
+    key: "FEATURE_FAULT_REASON_PLACEHOLDER",
+    description:
+      "Flag placeholder Fault Reason values as FAULT-C010 (default on)",
+    defaultWhenUnset: "on",
+    critical: false,
+    parity: "unspecified",
+    deploy: unsetBoth,
+  },
+  {
     key: "FEATURE_CONFIDENCE_BANDS",
     description: "Confidence band mapping",
     defaultWhenUnset: "off",
