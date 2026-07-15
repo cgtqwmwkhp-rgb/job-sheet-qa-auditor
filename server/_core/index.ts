@@ -23,6 +23,7 @@ import { hydrateDeadLetterQueueFromDb } from "../utils/deadLetterQueue";
 import { hydrateApiCostLedgerFromDb } from "../services/finOps";
 import { assertSharedLimitsReplicaSafety } from "../utils/rateLimiter";
 import { hydrateWebhooksFromDb } from "../services/webhooks";
+import { correlationContextMiddleware } from "../utils/context";
 import { pdfProxyRouter } from "./pdfProxy";
 import { templateSampleProxyRouter } from "./templateSampleProxy";
 import { ingestRouter } from "../services/ingest";
@@ -57,6 +58,9 @@ async function startServer() {
 
   const app = express();
   const server = createServer(app);
+  // Establish one correlation ID for every HTTP entry point, including ingest
+  // and tRPC requests, before they create asynchronous work.
+  app.use(correlationContextMiddleware);
   // Configure body parser with larger size limit for file uploads.
   // Stash rawBody for HMAC verification on machine ingest (PR-IO-INGEST).
   app.use(

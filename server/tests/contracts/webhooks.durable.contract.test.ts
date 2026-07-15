@@ -21,6 +21,7 @@ import {
   emitWebhookEvent,
   type WebhookDeliveryResult,
 } from "../../services/webhooks";
+import { createRequestContext, runWithContext } from "../../utils/context";
 
 describe("Durable Webhooks Contract (PR-IO-WEBHOOKS)", () => {
   beforeEach(() => {
@@ -72,6 +73,38 @@ describe("Durable Webhooks Contract (PR-IO-WEBHOOKS)", () => {
 
     expect(capturedBody).toContain("[EMAIL_REDACTED]");
     expect(capturedBody).not.toContain("engineer@example.com");
+  });
+
+  it("includes the active correlation ID in webhook payloads and headers", async () => {
+    registerWebhook("https://example.test/hooks", ["audit.completed"], {
+      secret: "whsec_test_secret_for_signing_123456",
+    });
+
+    let capturedBody = "";
+    let capturedCorrelationHeader = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        capturedBody = String(init?.body ?? "");
+        capturedCorrelationHeader = String(
+          (init?.headers as Record<string, string>)["X-Correlation-ID"]
+        );
+        return new Response("ok", { status: 200 });
+      })
+    );
+
+    await runWithContext(createRequestContext("corr-webhook-e2e"), () =>
+      emitWebhookEvent("audit.completed", {
+        auditId: 42,
+        result: "PASS",
+        score: 0.95,
+      })
+    );
+
+    expect(JSON.parse(capturedBody)).toMatchObject({
+      correlationId: "corr-webhook-e2e",
+    });
+    expect(capturedCorrelationHeader).toBe("corr-webhook-e2e");
   });
 
   it("signed delivery log retains signature + payloadHash after restart import", async () => {

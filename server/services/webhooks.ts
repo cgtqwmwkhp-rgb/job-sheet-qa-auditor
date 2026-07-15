@@ -561,6 +561,7 @@ export async function emitWebhookEvent(
       console.error(`[Webhooks] Delivery failed`, {
         webhookId: result.webhookId,
         event: result.event,
+        correlationId,
         error: result.error,
       });
     }

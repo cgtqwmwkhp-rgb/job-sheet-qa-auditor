@@ -19,6 +19,8 @@ export interface JobSheetProcessingPayload {
   contentHash?: string;
   /** Deterministic process-ocr idempotency key derived from contentHash. */
   idempotencyKey?: string;
+  /** Request trace ID retained when asynchronous processing leaves HTTP scope. */
+  correlationId?: string;
 }
 
 export type JobSheetQueueStatus = "queued" | "running" | "completed" | "failed";
