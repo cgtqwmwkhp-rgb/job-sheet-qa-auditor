@@ -45,6 +45,21 @@ import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
 import { perfMark, PERF_MARKS, perfClear } from "@/lib/perf";
 import { useReviewQueueKeyboard } from "@/hooks/useReviewQueueKeyboard";
 import { usePersistFn } from "@/hooks/usePersistFn";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../../server/routers";
+
+const JOB_SHEET_PAGE_SIZE = 50;
+const AUDIT_PAGE_SIZE = 100;
+
+type JobSheetListItem =
+  inferRouterOutputs<AppRouter>["jobSheets"]["list"][number];
+type AuditListItem = inferRouterOutputs<AppRouter>["audits"]["list"][number];
+
+function mergePage<T extends { id: number }>(existing: T[], page: T[]): T[] {
+  const rows = new Map(existing.map(row => [row.id, row]));
+  for (const row of page) rows.set(row.id, row);
+  return Array.from(rows.values());
+}
 
 function downloadTextFile(
   content: string,
@@ -155,6 +170,10 @@ export default function AuditResults() {
   const [, setLocation] = useLocation();
   const [listSearch, setListSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [jobSheetOffset, setJobSheetOffset] = useState(0);
+  const [auditOffset, setAuditOffset] = useState(0);
+  const [allJobSheets, setAllJobSheets] = useState<JobSheetListItem[]>([]);
+  const [allAuditResults, setAllAuditResults] = useState<AuditListItem[]>([]);
   const [highlightIndex, setHighlightIndex] = useState(0);
   const [showLegend, setShowLegend] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -219,21 +238,49 @@ export default function AuditResults() {
       isActiveJobSheetStatus(jobSheetData.status),
   });
 
-  const { data: allJobSheets, isLoading: listLoading } =
-    trpc.jobSheets.list.useQuery(
-      { limit: 50 },
-      {
-        refetchInterval: query => {
-          const rows = query.state.data;
-          if (!rows?.length) return false;
-          return rows.some(r => isActiveJobSheetStatus(r.status))
-            ? 2000
-            : false;
-        },
-      }
-    );
+  const {
+    data: jobSheetPage,
+    isLoading: listLoading,
+    isFetching: jobSheetsFetching,
+  } = trpc.jobSheets.list.useQuery(
+    { limit: JOB_SHEET_PAGE_SIZE, offset: jobSheetOffset },
+    {
+      refetchInterval: query => {
+        const rows = query.state.data;
+        if (!rows?.length) return false;
+        return rows.some(r => isActiveJobSheetStatus(r.status)) ? 2000 : false;
+      },
+    }
+  );
 
-  const { data: allAuditResults } = trpc.audits.list.useQuery({ limit: 100 });
+  const { data: auditResultsPage, isFetching: auditsFetching } =
+    trpc.audits.list.useQuery({
+      limit: AUDIT_PAGE_SIZE,
+      offset: auditOffset,
+    });
+
+  useEffect(() => {
+    if (!jobSheetPage) return;
+    setAllJobSheets(existing =>
+      jobSheetOffset === 0 ? jobSheetPage : mergePage(existing, jobSheetPage)
+    );
+  }, [jobSheetOffset, jobSheetPage]);
+
+  useEffect(() => {
+    if (!auditResultsPage) return;
+    setAllAuditResults(existing =>
+      auditOffset === 0
+        ? auditResultsPage
+        : mergePage(existing, auditResultsPage)
+    );
+  }, [auditOffset, auditResultsPage]);
+
+  const hasMoreJobSheets = jobSheetPage?.length === JOB_SHEET_PAGE_SIZE;
+  const loadMoreAudits = () => {
+    if (!hasMoreJobSheets || jobSheetsFetching || auditsFetching) return;
+    setJobSheetOffset(offset => offset + JOB_SHEET_PAGE_SIZE);
+    setAuditOffset(offset => offset + AUDIT_PAGE_SIZE);
+  };
 
   const auditOutcomeMap = useMemo(() => {
     const map = new Map<number, AuditOutcomeSummary>();
@@ -313,13 +360,13 @@ export default function AuditResults() {
 
   const statusCounts = useMemo(() => {
     const counts: Record<StatusFilter, number> = {
-      all: allJobSheets?.length ?? 0,
+      all: allJobSheets.length,
       processing: 0,
       review_queue: 0,
       completed: 0,
       failed: 0,
     };
-    for (const sheet of allJobSheets ?? []) {
+    for (const sheet of allJobSheets) {
       if (sheet.status === "processing" || sheet.status === "pending") {
         counts.processing += 1;
       } else if (sheet.status in counts) {
@@ -331,7 +378,7 @@ export default function AuditResults() {
 
   const filteredJobSheets = useMemo(() => {
     const q = listSearch.trim().toLowerCase();
-    return (allJobSheets ?? []).filter(sheet => {
+    return allJobSheets.filter(sheet => {
       if (statusFilter !== "all") {
         if (statusFilter === "processing") {
           if (sheet.status !== "processing" && sheet.status !== "pending") {
@@ -682,7 +729,7 @@ export default function AuditResults() {
             <Card className="border-[#EBE8E8] bg-white overflow-hidden">
               <AuditListSkeleton />
             </Card>
-          ) : !allJobSheets || allJobSheets.length === 0 ? (
+          ) : allJobSheets.length === 0 ? (
             <Card className="border-[#EBE8E8] bg-white p-4">
               <EmptyState
                 icon={FileText}
@@ -706,6 +753,19 @@ export default function AuditResults() {
                   },
                 }}
               />
+              {hasMoreJobSheets ? (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={loadMoreAudits}
+                    disabled={jobSheetsFetching || auditsFetching}
+                  >
+                    {jobSheetsFetching || auditsFetching
+                      ? "Loading more…"
+                      : `Load ${JOB_SHEET_PAGE_SIZE} more audits`}
+                  </Button>
+                </div>
+              ) : null}
             </Card>
           ) : (
             <Card className="border-[#EBE8E8] bg-white overflow-hidden">
@@ -714,8 +774,8 @@ export default function AuditResults() {
                   {filteredJobSheets.length} audit
                   {filteredJobSheets.length === 1 ? "" : "s"}
                   {filteredJobSheets.length !== allJobSheets.length
-                    ? ` · ${allJobSheets.length} total`
-                    : ""}
+                    ? ` · ${allJobSheets.length} loaded`
+                    : " loaded"}
                 </CardTitle>
               </CardHeader>
               <ScrollArea className="h-[calc(100vh-18rem)]">
@@ -859,6 +919,23 @@ export default function AuditResults() {
                       </div>
                     );
                   })}
+                  {hasMoreJobSheets ? (
+                    <div className="px-2 pt-3 pb-1 text-center">
+                      <p className="mb-2 text-xs text-[#706D6D]">
+                        Showing {allJobSheets.length} loaded audits. Load more
+                        to see older results.
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={loadMoreAudits}
+                        disabled={jobSheetsFetching || auditsFetching}
+                      >
+                        {jobSheetsFetching || auditsFetching
+                          ? "Loading more…"
+                          : `Load ${JOB_SHEET_PAGE_SIZE} more audits`}
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               </ScrollArea>
             </Card>
