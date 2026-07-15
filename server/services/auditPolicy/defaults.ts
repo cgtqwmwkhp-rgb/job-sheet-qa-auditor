@@ -339,6 +339,42 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           fieldAliases: ["Fault Reason", "fault_reason"],
         },
         {
+          ruleId: "PARTS-C010",
+          label: "Parts Used (Missing Description)",
+          description:
+            "Part number recorded without description on a Parts Used line",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: ["Parts Used", "Parts Assessment"],
+        },
+        {
+          ruleId: "PARTS-C011",
+          label: "Parts Used (Missing Part Number)",
+          description:
+            "Description recorded without part number on a Parts Used line",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: ["Parts Used", "Parts Assessment"],
+        },
+        {
+          ruleId: "PARTS-C012",
+          label: "Parts Used (Incomplete Listing)",
+          description:
+            "Parts implied but no complete part number + description lines",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: ["Parts Used", "Parts Assessment"],
+        },
+        {
+          ruleId: "PARTS-C013",
+          label: "Parts Used (Complete)",
+          description:
+            "All Parts Used lines include part number and description",
+          failClass: "informational",
+          enabled: true,
+          fieldAliases: ["Parts Used", "Parts Assessment"],
+        },
+        {
           ruleId: "EVIDENCE-C010",
           label: "Evidence Coherence",
           description:
