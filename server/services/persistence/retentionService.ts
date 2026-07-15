@@ -1,6 +1,6 @@
 /**
  * Retention Service Implementation
- * 
+ *
  * Manages data retention policies and legal holds.
  * In-memory implementation for testing and development.
  */
@@ -11,7 +11,12 @@ import type {
   RetentionAuditEntry,
   RetentionAction,
   IRetentionService,
-} from './types';
+  RetentionOperationalStatus,
+} from "./types";
+
+export const RETENTION_LEGAL_HOLD_NOTE =
+  "Retention policies and legal holds are in-memory scaffolding only. " +
+  "They are not persisted across restarts and are not enforced against archival or deletion.";
 
 /**
  * In-memory storage for retention data
@@ -56,8 +61,16 @@ export function resetRetentionStore(): void {
  * In-memory retention service implementation
  */
 export class InMemoryRetentionService implements IRetentionService {
+  async getOperationalStatus(): Promise<RetentionOperationalStatus> {
+    return {
+      retentionNote: RETENTION_LEGAL_HOLD_NOTE,
+      isPersistent: false,
+      isEnforced: false,
+    };
+  }
+
   async createPolicy(
-    policy: Omit<RetentionPolicyRecord, 'id' | 'createdAt' | 'updatedAt'>
+    policy: Omit<RetentionPolicyRecord, "id" | "createdAt" | "updatedAt">
   ): Promise<RetentionPolicyRecord> {
     const id = retentionStore.nextIds.policy++;
     const now = new Date();
@@ -73,10 +86,12 @@ export class InMemoryRetentionService implements IRetentionService {
     return stored;
   }
 
-  async getPoliciesForEntity(entityType: string): Promise<RetentionPolicyRecord[]> {
+  async getPoliciesForEntity(
+    entityType: string
+  ): Promise<RetentionPolicyRecord[]> {
     const allPolicies = Array.from(retentionStore.policies.values());
     const policies = allPolicies.filter(
-      (policy) => policy.entityType === entityType && policy.isActive
+      policy => policy.entityType === entityType && policy.isActive
     );
 
     // Return in deterministic order (by ID)
@@ -84,7 +99,10 @@ export class InMemoryRetentionService implements IRetentionService {
   }
 
   async placeLegalHold(
-    hold: Omit<LegalHoldRecord, 'id' | 'placedAt' | 'releasedAt' | 'releasedBy' | 'releaseReason'>
+    hold: Omit<
+      LegalHoldRecord,
+      "id" | "placedAt" | "releasedAt" | "releasedBy" | "releaseReason"
+    >
   ): Promise<LegalHoldRecord> {
     const id = retentionStore.nextIds.hold++;
 
@@ -98,7 +116,7 @@ export class InMemoryRetentionService implements IRetentionService {
 
     // Log the action
     await this.logRetentionAction({
-      action: 'HOLD_PLACED',
+      action: "HOLD_PLACED",
       entityType: hold.entityType,
       entityId: hold.entityId,
       performedBy: hold.placedBy,
@@ -131,7 +149,7 @@ export class InMemoryRetentionService implements IRetentionService {
 
     // Log the action
     await this.logRetentionAction({
-      action: 'HOLD_RELEASED',
+      action: "HOLD_RELEASED",
       entityType: hold.entityType,
       entityId: hold.entityId,
       performedBy: releasedBy,
@@ -142,10 +160,13 @@ export class InMemoryRetentionService implements IRetentionService {
     });
   }
 
-  async hasActiveLegalHold(entityType: string, entityId: number): Promise<boolean> {
+  async hasActiveLegalHold(
+    entityType: string,
+    entityId: number
+  ): Promise<boolean> {
     const allHolds = Array.from(retentionStore.legalHolds.values());
     return allHolds.some(
-      (hold) =>
+      hold =>
         hold.entityType === entityType &&
         hold.entityId === entityId &&
         !hold.releasedAt
@@ -168,7 +189,7 @@ export class InMemoryRetentionService implements IRetentionService {
   }
 
   async logRetentionAction(
-    entry: Omit<RetentionAuditEntry, 'id' | 'createdAt'>
+    entry: Omit<RetentionAuditEntry, "id" | "createdAt">
   ): Promise<void> {
     const id = retentionStore.nextIds.audit++;
 
@@ -186,32 +207,40 @@ export class InMemoryRetentionService implements IRetentionService {
     entityId: number
   ): Promise<RetentionAuditEntry[]> {
     const entries = retentionStore.auditLog.filter(
-      (e) => e.entityType === entityType && e.entityId === entityId
+      e => e.entityType === entityType && e.entityId === entityId
     );
 
     // Return in chronological order
-    return entries.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    return entries.sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+    );
   }
 
   /**
    * Get all policies (for testing)
    */
   async getAllPolicies(): Promise<RetentionPolicyRecord[]> {
-    return Array.from(retentionStore.policies.values()).sort((a, b) => a.id - b.id);
+    return Array.from(retentionStore.policies.values()).sort(
+      (a, b) => a.id - b.id
+    );
   }
 
   /**
    * Get all legal holds (for testing)
    */
   async getAllLegalHolds(): Promise<LegalHoldRecord[]> {
-    return Array.from(retentionStore.legalHolds.values()).sort((a, b) => a.id - b.id);
+    return Array.from(retentionStore.legalHolds.values()).sort(
+      (a, b) => a.id - b.id
+    );
   }
 
   /**
    * Get full audit log (for testing)
    */
   async getFullAuditLog(): Promise<RetentionAuditEntry[]> {
-    return [...retentionStore.auditLog].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    return [...retentionStore.auditLog].sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+    );
   }
 }
 
