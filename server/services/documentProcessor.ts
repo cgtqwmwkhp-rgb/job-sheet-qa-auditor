@@ -107,6 +107,7 @@ import {
 import { evaluateCommentQuality } from "./commentQuality";
 import { buildCommentDeepNoteAdvisory } from "./commentQuality/advisory";
 import { evaluatePartsUsed } from "./partsAssessment";
+import { evaluateEngineerAttribution } from "./engineerAttributionFindings";
 import { evaluateEvidenceCoherence } from "./evidenceCoherence";
 import { evaluateTyreCompliance } from "./tyreCompliance";
 import { evaluateChecklistCompleteness } from "./checklistCompleteness";
@@ -2411,6 +2412,9 @@ async function processJobSheetWithOptions(
   > = null;
   let evidenceCoherenceSummary: string | null = null;
   let evidenceFileHashToPersist: string | null = null;
+  let engineerAttributionStamp:
+    | ReturnType<typeof evaluateEngineerAttribution>["attribution"]
+    | null = null;
   {
     const selectedSlug =
       buildSelectionCohortMeta(selectionResult, usedTemplateVersionId)
@@ -2731,6 +2735,42 @@ async function processJobSheetWithOptions(
       };
       recordStage({
         stage: "Checklist Completeness",
+        status: "success",
+        durationMs: 0,
+      });
+    }
+  }
+
+  // Engineer attribution gap (ATTR-C*) — name extraction + user match
+  {
+    const attrExtractedFields = ensembleResult
+      ? mergeExtractedFields(
+          analysisResult.extractedFields,
+          ensembleResult.ensembleExtractedFields
+        )
+      : analysisResult.extractedFields;
+    const users = await db.getAllUsers();
+    const attrResult = evaluateEngineerAttribution({
+      report: {
+        extractedFields: attrExtractedFields,
+        extractedText,
+      },
+      candidates: users.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+      })),
+    });
+    engineerAttributionStamp = attrResult.attribution;
+    if (attrResult.findings.length > 0) {
+      analysisResult = {
+        ...analysisResult,
+        findings: [...analysisResult.findings, ...attrResult.findings],
+        summary: `${analysisResult.summary} [ENGINEER_ATTRIBUTION] ${attrResult.summary}`,
+      };
+      recordStage({
+        stage: "Engineer Attribution",
         status: "success",
         durationMs: 0,
       });
@@ -3164,6 +3204,9 @@ async function processJobSheetWithOptions(
             }
           : {}),
         ...(commentDeepNote ? { commentDeepNote } : {}),
+        ...(engineerAttributionStamp
+          ? { attribution: engineerAttributionStamp }
+          : {}),
         ...(photoEvidenceArtifact
           ? {
               photoEvidence: {

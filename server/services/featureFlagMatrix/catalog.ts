@@ -285,6 +285,14 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     deploy: unsetBoth,
   },
   {
+    key: "FEATURE_ENGINEER_ATTR_FINDING",
+    description: "Engineer name attribution gap findings (ATTR-C010–C012)",
+    defaultWhenUnset: "on",
+    critical: false,
+    parity: "unspecified",
+    deploy: unsetBoth,
+  },
+  {
     key: "FEATURE_HOLD_SLA",
     description: "Hold-queue SLA helpers",
     defaultWhenUnset: "off",

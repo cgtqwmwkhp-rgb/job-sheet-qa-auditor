@@ -375,6 +375,42 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           fieldAliases: ["Parts Used", "Parts Assessment"],
         },
         {
+          ruleId: "ATTR-C010",
+          label: "Engineer Attribution (Missing Name)",
+          description: "No usable extracted engineer/technician name",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: [
+            "Engineer Attribution",
+            "Technician Name",
+            "technicianName",
+            "engineer_name",
+          ],
+        },
+        {
+          ruleId: "ATTR-C011",
+          label: "Engineer Attribution (Unmatched)",
+          description: "Engineer name extracted but no user match",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: [
+            "Engineer Attribution (Unmatched)",
+            "Engineer Attribution",
+            "Technician Name",
+          ],
+        },
+        {
+          ruleId: "ATTR-C012",
+          label: "Engineer Attribution (Matched)",
+          description: "Extracted engineer name matched to technician user",
+          failClass: "informational",
+          enabled: true,
+          fieldAliases: [
+            "Engineer Attribution (Matched)",
+            "Engineer Attribution",
+          ],
+        },
+        {
           ruleId: "EVIDENCE-C010",
           label: "Evidence Coherence",
           description:
