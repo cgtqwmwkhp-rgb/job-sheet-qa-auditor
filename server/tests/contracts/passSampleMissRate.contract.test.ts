@@ -10,7 +10,12 @@ import {
   evaluatePassSampleMissRate,
   isSamplingPolicyEnabled,
   FEATURE_FLAG,
+  buildPassSampleMissRateArtifact,
+  derivePassSampleOutcomes,
+  extractPassSampleRowFromReport,
+  reviewRowToPassSampleOutcome,
   type PassSampleReviewOutcome,
+  type PassSampleReviewRow,
 } from "../../services/samplingPolicy";
 import * as fs from "fs";
 import * as path from "path";
@@ -99,6 +104,65 @@ describe("PASS Sample Miss-Rate Contract (Wave-4 A3)", () => {
     });
   });
 
+  describe("missRateReport consumer", () => {
+    it("maps review rows to sampled PASS outcomes", () => {
+      const rows: PassSampleReviewRow[] = [
+        {
+          modelResult: "PASS",
+          humanSampleRequested: true,
+          humanFoundDefect: true,
+        },
+        { modelResult: "PASS", humanSampleRequested: false },
+        { modelResult: "FAIL", humanSampleRequested: true },
+      ];
+      const outcomes = derivePassSampleOutcomes(rows);
+      expect(outcomes).toHaveLength(2);
+      expect(outcomes[0]).toEqual({
+        sampled: true,
+        humanFoundDefect: true,
+      });
+      expect(outcomes[1]).toEqual({
+        sampled: false,
+        humanFoundDefect: false,
+      });
+    });
+
+    it("buildPassSampleMissRateArtifact wraps evaluatePassSampleMissRate", () => {
+      const outcomes = Array.from({ length: 40 }, (_, i) => ({
+        sampled: true,
+        humanFoundDefect: i < 1,
+      }));
+      const artifact = buildPassSampleMissRateArtifact(outcomes, {
+        asOf: "2026-07-15T12:00:00.000Z",
+      });
+      expect(artifact.status).toBe("pass");
+      expect(artifact.asOf).toBe("2026-07-15T12:00:00.000Z");
+      expect(artifact.metrics.missRate).toBeCloseTo(0.025, 5);
+    });
+
+    it("extracts sampling rows from persisted reportJson", () => {
+      const row = extractPassSampleRowFromReport({
+        featureFlagArtifacts: {
+          samplingPolicy: {
+            humanSampleRequested: true,
+            overallResult: "PASS",
+          },
+        },
+      });
+      expect(row).toEqual({
+        modelResult: "PASS",
+        humanSampleRequested: true,
+      });
+      expect(
+        reviewRowToPassSampleOutcome({
+          modelResult: "PASS",
+          humanSampleRequested: true,
+          humanFoundDefect: false,
+        })
+      ).toEqual({ sampled: true, humanFoundDefect: false });
+    });
+  });
+
   describe("documentProcessor wiring", () => {
     it("emits samplingPolicy artifact path when FEATURE_SAMPLING_POLICY is on", () => {
       expect(isSamplingPolicyEnabled()).toBe(false);
@@ -109,8 +173,12 @@ describe("PASS Sample Miss-Rate Contract (Wave-4 A3)", () => {
       const source = fs.readFileSync(processorPath, "utf-8");
       expect(source).toContain("decidePassSampling");
       expect(source).toContain('addArtifact("samplingPolicy"');
+      expect(source).toMatch(/addArtifact\(\s*"samplingMissRate"/);
       expect(source).toContain("isSamplingPolicyEnabled()");
       expect(source).toContain("humanSampleRequested");
+      expect(source).toContain("buildPassSampleMissRateArtifact");
+      expect(source).toContain("samplingMissRate:");
+      expect(source).toContain("listPassSampleReviewRows");
     });
   });
 });

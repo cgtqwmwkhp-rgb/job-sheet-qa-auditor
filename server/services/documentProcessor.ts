@@ -145,6 +145,7 @@ import {
 } from "./pipelineIntegration";
 import {
   computeEce,
+  describeEceReadiness,
   isCalibrationEnabled,
   loadReviewLabelSamples,
   suggestThreshold,
@@ -160,7 +161,14 @@ import {
 } from "./opsAlerts";
 import { isRiskRoutingEnabled, routeByRisk } from "./riskRouting";
 import { evaluateStageSlo, isStageSloEnabled } from "./slo";
-import { decidePassSampling, isSamplingPolicyEnabled } from "./samplingPolicy";
+import {
+  buildPassSampleMissRateArtifact,
+  decidePassSampling,
+  isSamplingPolicyEnabled,
+  loadPassSampleOutcomes,
+  type PassSampleMissRateArtifact,
+  type PassSampleReviewOutcome,
+} from "./samplingPolicy";
 import {
   checkCollision,
   isTemplateCollisionEnabled,
@@ -333,6 +341,8 @@ function buildFlaggedProcessorArtifacts(input: {
   usedTemplateVersionId?: number;
   /** Human review labels loaded for ECE (Wave-4 A2). */
   labelledSamples?: PredictionSample[];
+  /** Accumulated PASS sample outcomes for miss-rate (Wave-6 P5). */
+  passSampleOutcomes?: PassSampleReviewOutcome[];
 }): FlaggedProcessorArtifactBuild {
   const artifacts: FlaggedProcessorArtifacts = {};
   let opsAlert: DriftAlert | null = null;
@@ -361,6 +371,10 @@ function buildFlaggedProcessorArtifacts(input: {
     );
     const labelledSamples = input.labelledSamples ?? [];
     const eceResult = computeEce(labelledSamples);
+    const eceReadiness = describeEceReadiness({
+      labelledCount: labelledSamples.length,
+      calibrationEnabled: true,
+    });
     // Empty or below N≥200 → unmeasurable (ece null). Never theater ECE=0.
     const calibrationMeasurement =
       labelledSamples.length === 0 || !eceResult.measurementReady
@@ -374,6 +388,7 @@ function buildFlaggedProcessorArtifacts(input: {
       sampleCount: labelledSamples.length,
       ece: calibrationMeasurement.ece,
       measurementReady: calibrationMeasurement.measurementReady,
+      eceReadiness,
       minSamplesRequired: eceResult.minSamplesRequired,
       provisionalEce: eceResult.provisionalEce,
       bins: eceResult.bins,
@@ -476,6 +491,15 @@ function buildFlaggedProcessorArtifacts(input: {
       humanSampleRequested: decision.sample === true,
     };
   });
+
+  const sampledOutcomes = (input.passSampleOutcomes ?? []).filter(
+    o => o.sampled
+  );
+  addArtifact(
+    "samplingMissRate",
+    isSamplingPolicyEnabled() && sampledOutcomes.length > 0,
+    () => buildPassSampleMissRateArtifact(input.passSampleOutcomes ?? [])
+  );
 
   addArtifact("templateCollision", isTemplateCollisionEnabled(), () => {
     const version = input.usedTemplateVersionId
@@ -3106,6 +3130,26 @@ async function processJobSheetWithOptions(
     }
   }
 
+  let passSampleOutcomes: PassSampleReviewOutcome[] = [];
+  let passSampleMissRateReport: PassSampleMissRateArtifact | null = null;
+  if (isSamplingPolicyEnabled()) {
+    try {
+      passSampleOutcomes = await loadPassSampleOutcomes({
+        listPassSampleReviewRows: () => db.listPassSampleReviewRows(),
+      });
+      const sampledCount = passSampleOutcomes.filter(o => o.sampled).length;
+      if (sampledCount > 0) {
+        passSampleMissRateReport =
+          buildPassSampleMissRateArtifact(passSampleOutcomes);
+      }
+    } catch (error) {
+      console.warn(
+        "[DocumentProcessor] Failed to load PASS sample miss-rate (non-fatal):",
+        error
+      );
+    }
+  }
+
   const { artifacts: flaggedProcessorArtifacts, opsAlert } =
     buildFlaggedProcessorArtifacts({
       jobSheetId,
@@ -3116,6 +3160,7 @@ async function processJobSheetWithOptions(
       selectionResult,
       usedTemplateVersionId,
       labelledSamples,
+      passSampleOutcomes,
     });
 
   if (opsAlert) {
@@ -3362,6 +3407,9 @@ async function processJobSheetWithOptions(
         ...(shadowComparison ? { shadowComparison } : {}),
         ...(flaggedProcessorArtifacts
           ? { featureFlagArtifacts: flaggedProcessorArtifacts }
+          : {}),
+        ...(passSampleMissRateReport
+          ? { samplingMissRate: passSampleMissRateReport }
           : {}),
         ...ocrResilienceReportFields(ocrResult),
         ...(selectionResult ? { selectionResult } : {}),

@@ -76,7 +76,7 @@ describe("Feature Flag Matrix Contract (PR-OPS-FLAGS)", () => {
       const mustMatch = FEATURE_FLAG_CATALOG.filter(
         e => e.critical && e.parity === "must_match"
       );
-      expect(mustMatch.length).toBeGreaterThanOrEqual(5);
+      expect(mustMatch.length).toBeGreaterThanOrEqual(8);
       for (const entry of mustMatch) {
         expect(entry.deploy.staging).toBe(entry.deploy.production);
       }
@@ -84,20 +84,48 @@ describe("Feature Flag Matrix Contract (PR-OPS-FLAGS)", () => {
       expect(keys).toContain("FEATURE_OVERTURN_METRICS");
       expect(keys).toContain("FEATURE_PHOTO_PAIR_COMPARE");
       expect(keys).toContain("FEATURE_SELECTION_MARKS");
+      expect(keys).toContain("FEATURE_VLM_VERIFICATION");
+      expect(keys).toContain("FEATURE_IMAGE_QA_INTAKE");
+      expect(keys).toContain("FEATURE_GEMINI_MULTIMODAL");
+      expect(keys).toContain("FEATURE_OCR_CROSS_CHECK");
+      expect(keys).toContain("FEATURE_OCR_FAILOVER");
     });
 
-    it("documents intentional staging/prod divergence for prod-only AI flags", async () => {
+    it("documents Wave-5/6 parts flags as default-off with deploy unset", async () => {
       const { FEATURE_FLAG_CATALOG } = await import(
         "../../services/featureFlagMatrix"
       );
-      const divergent = FEATURE_FLAG_CATALOG.filter(
-        e => e.critical && e.parity === "intentionally_divergent"
+      const byKey = Object.fromEntries(
+        FEATURE_FLAG_CATALOG.map(e => [e.key, e])
       );
-      const byKey = Object.fromEntries(divergent.map(e => [e.key, e]));
-      expect(byKey.FEATURE_VLM_VERIFICATION?.deploy.staging).toBe("unset");
-      expect(byKey.FEATURE_VLM_VERIFICATION?.deploy.production).toBe("true");
-      expect(byKey.FEATURE_IMAGE_QA_INTAKE?.deploy.production).toBe("true");
-      expect(byKey.FEATURE_GEMINI_MULTIMODAL?.deploy.production).toBe("true");
+      for (const key of [
+        "FEATURE_PARTS_WEB_VERIFY",
+        "FEATURE_PARTS_ASSET_FITMENT",
+      ] as const) {
+        expect(byKey[key]?.defaultWhenUnset).toBe("off");
+        expect(byKey[key]?.deploy.staging).toBe("unset");
+        expect(byKey[key]?.deploy.production).toBe("unset");
+      }
+    });
+
+    it("documents azure-deploy true/true for AI + OCR flags", async () => {
+      const { FEATURE_FLAG_CATALOG } = await import(
+        "../../services/featureFlagMatrix"
+      );
+      const byKey = Object.fromEntries(
+        FEATURE_FLAG_CATALOG.map(e => [e.key, e])
+      );
+      for (const key of [
+        "FEATURE_VLM_VERIFICATION",
+        "FEATURE_IMAGE_QA_INTAKE",
+        "FEATURE_GEMINI_MULTIMODAL",
+        "FEATURE_OCR_CROSS_CHECK",
+        "FEATURE_OCR_FAILOVER",
+      ] as const) {
+        expect(byKey[key]?.deploy.staging).toBe("true");
+        expect(byKey[key]?.deploy.production).toBe("true");
+        expect(byKey[key]?.parity).toBe("must_match");
+      }
     });
   });
 
@@ -126,8 +154,8 @@ describe("Feature Flag Matrix Contract (PR-OPS-FLAGS)", () => {
 
       const vlm = snap.flags.find(f => f.key === "FEATURE_VLM_VERIFICATION");
       expect(vlm?.raw).toBeNull();
-      // staging contract: unset
-      expect(vlm?.matchesDeployContract).toBe(true);
+      // staging contract: true in azure-deploy
+      expect(vlm?.matchesDeployContract).toBe(false);
 
       expect(
         snap.deployMatrix.some(r => r.key === "FEATURE_OVERTURN_METRICS")

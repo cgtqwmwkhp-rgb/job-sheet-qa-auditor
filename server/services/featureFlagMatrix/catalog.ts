@@ -84,17 +84,17 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     },
   },
 
-  // ── Critical: intentionally divergent (prod promotion) ─────────────────
+  // ── Critical: must match staging ↔ production (azure-deploy true both) ─
   {
     key: "FEATURE_VLM_VERIFICATION",
     description: "VLM ink / field verification",
     defaultWhenUnset: "off",
     critical: true,
-    parity: "intentionally_divergent",
+    parity: "must_match",
     deploy: {
-      staging: "unset",
+      staging: "true",
       production: "true",
-      note: "Production-only in azure-deploy; staging omits until promoted",
+      note: "Set unconditionally in azure-deploy Set environment variables",
     },
   },
   {
@@ -102,11 +102,11 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     description: "Image QA intake gate",
     defaultWhenUnset: "off",
     critical: true,
-    parity: "intentionally_divergent",
+    parity: "must_match",
     deploy: {
-      staging: "unset",
+      staging: "true",
       production: "true",
-      note: "Production-only in azure-deploy; staging omits until promoted",
+      note: "Set unconditionally in azure-deploy Set environment variables",
     },
   },
   {
@@ -114,11 +114,35 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     description: "Gemini multimodal ink path",
     defaultWhenUnset: "off",
     critical: true,
-    parity: "intentionally_divergent",
+    parity: "must_match",
     deploy: {
-      staging: "unset",
+      staging: "true",
       production: "true",
-      note: "Production-only in azure-deploy; staging omits until promoted",
+      note: "Set unconditionally in azure-deploy Set environment variables",
+    },
+  },
+  {
+    key: "FEATURE_OCR_CROSS_CHECK",
+    description: "OCR cross-check",
+    defaultWhenUnset: "off",
+    critical: true,
+    parity: "must_match",
+    deploy: {
+      staging: "true",
+      production: "true",
+      note: "Set unconditionally in azure-deploy Set environment variables",
+    },
+  },
+  {
+    key: "FEATURE_OCR_FAILOVER",
+    description: "OCR provider failover",
+    defaultWhenUnset: "off",
+    critical: true,
+    parity: "must_match",
+    deploy: {
+      staging: "true",
+      production: "true",
+      note: "Set unconditionally in azure-deploy Set environment variables",
     },
   },
 
@@ -174,19 +198,27 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
   },
   {
     key: "FEATURE_PARTS_WEB_VERIFY",
-    description: "Exa parts catalog verify for PN vs description",
+    description:
+      "Exa parts catalog verify for PN vs description (Wave-5 P2 L2)",
     defaultWhenUnset: "off",
     critical: false,
     parity: "unspecified",
-    deploy: unsetBoth,
+    deploy: {
+      ...unsetBoth,
+      note: "Wave-5 opt-in; unset in azure-deploy — default off when unset",
+    },
   },
   {
     key: "FEATURE_PARTS_ASSET_FITMENT",
-    description: "Exa parts asset fitment verify for PN vs make/model",
+    description:
+      "Exa parts asset fitment verify for PN vs make/model (Wave-6 P2 L3)",
     defaultWhenUnset: "off",
     critical: false,
     parity: "unspecified",
-    deploy: unsetBoth,
+    deploy: {
+      ...unsetBoth,
+      note: "Wave-6 opt-in; unset in azure-deploy — default off when unset",
+    },
   },
   {
     key: "FEATURE_PARTS_WEB_OEM_ALLOWLIST",
@@ -351,22 +383,6 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
   {
     key: "FEATURE_LATENCY_BUDGET",
     description: "Latency budget tracking",
-    defaultWhenUnset: "off",
-    critical: false,
-    parity: "unspecified",
-    deploy: unsetBoth,
-  },
-  {
-    key: "FEATURE_OCR_CROSS_CHECK",
-    description: "OCR cross-check",
-    defaultWhenUnset: "off",
-    critical: false,
-    parity: "unspecified",
-    deploy: unsetBoth,
-  },
-  {
-    key: "FEATURE_OCR_FAILOVER",
-    description: "OCR provider failover",
     defaultWhenUnset: "off",
     critical: false,
     parity: "unspecified",
