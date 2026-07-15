@@ -22,11 +22,10 @@ const require = createRequire(import.meta.url);
 
 export const FEATURE_ROI_CROP_REOCR = "FEATURE_ROI_CROP_REOCR";
 
-/** Default-on unless explicitly disabled — critical-field crop path. */
+/** Opt-in to avoid multiplying OCR calls for every configured ROI. */
 export function isRoiCropReocrEnabled(): boolean {
-  const raw = (process.env[FEATURE_ROI_CROP_REOCR] ?? "true").toLowerCase();
-  if (raw === "false" || raw === "0" || raw === "off") return false;
-  return true;
+  const raw = (process.env[FEATURE_ROI_CROP_REOCR] ?? "").toLowerCase();
+  return raw === "true" || raw === "1" || raw === "on";
 }
 
 export interface RoiCropImage {

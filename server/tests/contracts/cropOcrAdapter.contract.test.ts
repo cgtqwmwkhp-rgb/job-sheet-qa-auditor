@@ -71,18 +71,18 @@ function fakeAdapter(markdown: string, success = true): OCRAdapter {
 
 describe("cropOcrAdapter — PR-AI-05", () => {
   describe("feature flag", () => {
-    it("defaults enabled when unset", () => {
+    it("defaults disabled when unset", () => {
       const prev = process.env[FEATURE_ROI_CROP_REOCR];
       delete process.env[FEATURE_ROI_CROP_REOCR];
-      expect(isRoiCropReocrEnabled()).toBe(true);
+      expect(isRoiCropReocrEnabled()).toBe(false);
       if (prev === undefined) delete process.env[FEATURE_ROI_CROP_REOCR];
       else process.env[FEATURE_ROI_CROP_REOCR] = prev;
     });
 
-    it("can be disabled", () => {
+    it("enables only when explicitly set", () => {
       const prev = process.env[FEATURE_ROI_CROP_REOCR];
-      process.env[FEATURE_ROI_CROP_REOCR] = "false";
-      expect(isRoiCropReocrEnabled()).toBe(false);
+      process.env[FEATURE_ROI_CROP_REOCR] = "true";
+      expect(isRoiCropReocrEnabled()).toBe(true);
       if (prev === undefined) delete process.env[FEATURE_ROI_CROP_REOCR];
       else process.env[FEATURE_ROI_CROP_REOCR] = prev;
     });
