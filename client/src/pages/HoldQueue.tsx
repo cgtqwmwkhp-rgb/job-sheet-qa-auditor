@@ -619,7 +619,12 @@ export default function HoldQueue() {
 
         {error && (
           <Card className="p-12 border-[#EBE8E8]">
-            <div className="flex flex-col items-center justify-center text-destructive">
+            <div
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              className="flex flex-col items-center justify-center text-destructive"
+            >
               <AlertCircle className="h-16 w-16 mb-4" />
               <p className="font-semibold">Failed to load review queue</p>
               <p className="text-sm text-[#706D6D]">{error.message}</p>
@@ -629,11 +634,13 @@ export default function HoldQueue() {
 
         {!isLoading && !error && holdItems.length === 0 && (
           <Card className="p-4 border-[#EBE8E8] bg-white">
-            <EmptyState
-              icon={Inbox}
-              title="Review Queue Empty"
-              description="No job sheets are currently awaiting review. All documents have been processed successfully."
-            />
+            <div role="status" aria-live="polite" aria-atomic="true">
+              <EmptyState
+                icon={Inbox}
+                title="Review Queue Empty"
+                description="No job sheets are currently awaiting review. All documents have been processed successfully."
+              />
+            </div>
           </Card>
         )}
 
@@ -654,19 +661,21 @@ export default function HoldQueue() {
               </CardHeader>
               <CardContent className="p-0 flex-1 overflow-y-auto">
                 {sortedFilteredItems.length === 0 ? (
-                  <EmptyState
-                    compact
-                    icon={Filter}
-                    title="No items match"
-                    description="Try clearing the search or filter."
-                    action={{
-                      label: "Clear filters",
-                      onClick: () => {
-                        setFilterChip("all");
-                        setSearchQuery("");
-                      },
-                    }}
-                  />
+                  <div role="status" aria-live="polite" aria-atomic="true">
+                    <EmptyState
+                      compact
+                      icon={Filter}
+                      title="No items match"
+                      description="Try clearing the search or filter."
+                      action={{
+                        label: "Clear filters",
+                        onClick: () => {
+                          setFilterChip("all");
+                          setSearchQuery("");
+                        },
+                      }}
+                    />
+                  </div>
                 ) : (
                   <ul className="divide-y divide-[#EBE8E8]">
                     {sortedFilteredItems.map((item, index) => {
