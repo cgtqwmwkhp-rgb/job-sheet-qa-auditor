@@ -11,6 +11,7 @@ import type {
   InsertAuditResult,
   InsertAuditFinding,
 } from "../../drizzle/schema";
+import type { DbTx } from "../db";
 
 /**
  * Create audit result with findings atomically.
@@ -24,35 +25,30 @@ export async function createAuditWithFindings(
   auditData: InsertAuditResult,
   findingsData: InsertAuditFinding[]
 ): Promise<{ auditId: number; findingIds: number[] }> {
-  const dbClient = await getDb();
-  if (!dbClient) throw new Error("Database not available");
+  return db.runTransaction(tx =>
+    createAuditWithFindingsInTransaction(tx, auditData, findingsData)
+  );
+}
 
-  // Create audit result
-  const auditResult = await db.createAuditResult(auditData);
+async function createAuditWithFindingsInTransaction(
+  tx: DbTx,
+  auditData: InsertAuditResult,
+  findingsData: InsertAuditFinding[]
+): Promise<{ auditId: number; findingIds: number[] }> {
+  const auditResult = await db.createAuditResult(auditData, tx);
   const auditId = auditResult.id;
 
-  try {
-    // Create all findings at once
-    const findingsWithAuditId = findingsData.map(f => ({
-      ...f,
-      auditResultId: auditId,
-    }));
-    const findings = await db.createAuditFindings(findingsWithAuditId);
-    const findingIds = findings
-      .map(f => f.id)
-      .filter((id): id is number => id !== undefined);
+  // Create all findings at once
+  const findingsWithAuditId = findingsData.map(f => ({
+    ...f,
+    auditResultId: auditId,
+  }));
+  const findings = await db.createAuditFindings(findingsWithAuditId, tx);
+  const findingIds = findings
+    .map(f => f.id)
+    .filter((id): id is number => id !== undefined);
 
-    return { auditId, findingIds };
-  } catch (error) {
-    // If findings fail, we should ideally roll back the audit
-    // For now, log the error and re-throw
-    // TODO: Implement proper transaction with db.transaction() when Drizzle supports it
-    console.error(
-      `[Transaction] Failed to create findings for audit ${auditId}:`,
-      error
-    );
-    throw error;
-  }
+  return { auditId, findingIds };
 }
 
 /**
@@ -65,18 +61,15 @@ export async function completeJobSheetProcessing(
   auditData?: InsertAuditResult,
   findingsData?: InsertAuditFinding[]
 ): Promise<{ auditId?: number; findingIds?: number[] }> {
-  const dbClient = await getDb();
-  if (!dbClient) throw new Error("Database not available");
+  return db.runTransaction(async tx => {
+    await db.updateJobSheetStatus(jobSheetId, status, tx);
 
-  // Update job sheet status
-  await db.updateJobSheetStatus(jobSheetId, status);
+    if (status === "completed" && auditData && findingsData) {
+      return createAuditWithFindingsInTransaction(tx, auditData, findingsData);
+    }
 
-  // If successful and we have audit data, create the audit
-  if (status === "completed" && auditData && findingsData) {
-    return await createAuditWithFindings(auditData, findingsData);
-  }
-
-  return {};
+    return {};
+  });
 }
 
 /**

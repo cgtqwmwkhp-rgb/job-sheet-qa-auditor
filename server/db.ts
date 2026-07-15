@@ -627,9 +627,11 @@ export async function getPriorFileHashesForJobSheet(
 
 // ============ AUDIT RESULT QUERIES ============
 
-export async function createAuditResult(data: InsertAuditResult) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+export async function createAuditResult(
+  data: InsertAuditResult,
+  tx?: DbExecutor
+) {
+  const db = await resolveDbClient(tx);
 
   const result = await db.insert(auditResults).values(data);
   return { id: Number(result[0].insertId) };
@@ -739,9 +741,11 @@ export async function getAuditResults(options?: {
 
 // ============ AUDIT FINDING QUERIES ============
 
-export async function createAuditFindings(data: InsertAuditFinding[]) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+export async function createAuditFindings(
+  data: InsertAuditFinding[],
+  tx?: DbExecutor
+) {
+  const db = await resolveDbClient(tx);
 
   if (data.length === 0) return [];
 
