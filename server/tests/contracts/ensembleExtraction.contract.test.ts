@@ -29,10 +29,7 @@ import {
   resetMockLlm,
 } from "../../_core/mockLlm";
 import type { InvokeParams } from "../../_core/llm";
-import {
-  clearApiCostLedger,
-  summarizeApiCosts,
-} from "../../services/finOps";
+import { clearApiCostLedger, summarizeApiCosts } from "../../services/finOps";
 
 const CONSENSUS_OCR = `
 --- Page 1 ---
