@@ -47,6 +47,26 @@ Enterprise-grade document auditing system for job sheet validation with OCR extr
 | `GEMINI_MODEL`            | Gemini model identifier (interpreter role) | `gemini-2.5-pro` |
 | `ENABLE_RAW_OCR_INSIGHTS` | Include raw OCR in Gemini input            | `false`          |
 
+### Cost-affecting feature controls
+
+These flags are visible to admins and QA leads at `/ops/feature-flags`. Enable
+them deliberately and monitor the FinOps ledger; an enabled path can create
+additional provider calls per job sheet.
+
+| Variable                         | Additional provider work                                    | Default                                      |
+| -------------------------------- | ----------------------------------------------------------- | -------------------------------------------- |
+| `FEATURE_ENSEMBLE_EXTRACTION`    | Per-field Gemini fallback when processing settings allow it | on                                           |
+| `FEATURE_ROI_CROP_REOCR`         | Mistral OCR call for each eligible configured PDF ROI       | off                                          |
+| `FEATURE_MULTIMODAL_ROI_EXTRACT` | Gemini structured extraction for ROI crops                  | conditional on configured Gemini credentials |
+| `FEATURE_VLM_VERIFICATION`       | Anthropic VLM field / ink verification                      | off                                          |
+| `FEATURE_GEMINI_MULTIMODAL`      | Gemini multimodal image-verification path                   | off                                          |
+| `FEATURE_SHADOW_REAL_MODEL`      | Gemini challenger evaluation on the selected shadow traffic | off                                          |
+
+`FEATURE_ROI_CROP_REOCR=true` is required to turn on crop re-OCR. Set it in
+both staging and production only after establishing a FinOps baseline; setting
+it to `false` immediately short-circuits crop OCR while retaining text-based
+ROI extraction.
+
 ### Model Registry (PR-9)
 
 Pinned models are exposed via `system.modelCurrency` / `ai.modelRegistry` (no secrets).
