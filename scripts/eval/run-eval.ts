@@ -96,9 +96,7 @@ function loadFixtureDocuments(): EvalDocument[] {
         fieldId: f.ruleId,
         fieldName: f.field,
         expectedValue: f.value,
-        actualValue: f.value, // In fixture mode, we simulate correct extraction
         extractionConfidence: f.confidence,
-        isCorrect: true,
         severity: f.severity as "S0" | "S1" | "S2" | "S3",
         isCritical: f.severity === "S0" || f.severity === "S1",
       })),
@@ -112,12 +110,15 @@ function loadFixtureDocuments(): EvalDocument[] {
  * Live runs use an injected DB-backed collector instead.
  */
 function evaluateDocument(doc: EvalDocument): EvalDocumentResult {
-  const selectionCorrect = doc.templateId === doc.expectedTemplateId;
+  const simulated = doc.source === "fixture" || doc.source === "synthetic";
+  const selectionCorrect =
+    !simulated && doc.templateId === doc.expectedTemplateId;
   const fieldResults = doc.fields.map(field => {
-    const actualValue = field.actualValue ?? field.expectedValue;
+    const actualValue = field.actualValue ?? null;
     const isCorrect =
-      field.isCorrect ??
-      JSON.stringify(actualValue) === JSON.stringify(field.expectedValue);
+      !simulated &&
+      (field.isCorrect ??
+        JSON.stringify(actualValue) === JSON.stringify(field.expectedValue));
 
     return {
       fieldId: field.fieldId,
@@ -131,16 +132,9 @@ function evaluateDocument(doc: EvalDocument): EvalDocumentResult {
   });
 
   const fusionResults = (
-    doc.fusionExpectations && doc.fusionExpectations.length > 0
+    !simulated && doc.fusionExpectations && doc.fusionExpectations.length > 0
       ? doc.fusionExpectations
-      : doc.fields.slice(0, 3).map(field => ({
-          fieldId: field.fieldId,
-          ocrValue: field.actualValue ?? field.expectedValue,
-          imageQaValue: field.actualValue ?? field.expectedValue,
-          expectedAgreement: true,
-          actualAgreement: true,
-          fusionDecision: "merged" as const,
-        }))
+      : []
   ).map(fusion => {
     const agreed = fusion.actualAgreement ?? fusion.expectedAgreement;
     return {
@@ -167,9 +161,11 @@ function evaluateDocument(doc: EvalDocument): EvalDocumentResult {
     source: doc.source,
     selection: {
       expectedTemplateId: doc.expectedTemplateId,
-      actualTemplateId: selectionCorrect
-        ? doc.expectedTemplateId
-        : "wrong-template",
+      actualTemplateId: simulated
+        ? null
+        : selectionCorrect
+          ? doc.expectedTemplateId
+          : "wrong-template",
       isCorrect: selectionCorrect,
       confidence:
         doc.fields.length > 0
@@ -179,7 +175,7 @@ function evaluateDocument(doc: EvalDocument): EvalDocumentResult {
             ) / doc.fields.length
           : 0,
       runnerUpDelta: selectionCorrect ? 1 : 0,
-      isAmbiguous: !selectionCorrect,
+      isAmbiguous: simulated || !selectionCorrect,
     },
     fields: fieldResults,
     fusionResults,
@@ -281,6 +277,7 @@ async function runEvaluation(
     runId,
     timestamp: new Date().toISOString(),
     environment: options.environment ?? "local",
+    simulated: !options.live,
     documentSummary: {
       total: results.length,
       fixtures: results.filter(d => d.source === "fixture").length,
@@ -346,6 +343,11 @@ function printSummary(report: EvalReport): void {
   console.log(
     `📄 Documents: ${report.documentSummary.total} (${report.documentSummary.fixtures} fixtures)`
   );
+  if (report.simulated) {
+    console.log(
+      "⚠️ Simulated fixture run: metrics are not live accuracy and are excluded from accuracy gates."
+    );
+  }
 
   console.log("\n📈 METRICS:");
   console.log(
@@ -379,6 +381,10 @@ function printSummary(report: EvalReport): void {
   }
 
   console.log("\n" + "═".repeat(60));
+}
+
+export function shouldEnforceAccuracyGate(report: EvalReport): boolean {
+  return !report.simulated;
 }
 
 /**
@@ -451,12 +457,16 @@ Options:
   printSummary(report);
 
   // Exit with appropriate code
-  if (report.overallScore < 0.8) {
+  if (shouldEnforceAccuracyGate(report) && report.overallScore < 0.8) {
     console.log("\n⚠️ Warning: Overall score below 80%");
     process.exit(1);
   }
 
-  console.log("\n✅ Evaluation complete");
+  if (report.simulated) {
+    console.log("\n✅ Simulated evaluation complete (accuracy gate skipped)");
+  } else {
+    console.log("\n✅ Evaluation complete");
+  }
 }
 
 // Run if executed directly

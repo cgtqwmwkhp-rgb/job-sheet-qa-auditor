@@ -3,7 +3,10 @@ import {
   collectLiveDriftMetricsFromRows,
   collectLiveEvalResultsFromRows,
 } from "../../../scripts/lib/liveMetrics";
-import { runEvaluation } from "../../../scripts/eval/run-eval";
+import {
+  runEvaluation,
+  shouldEnforceAccuracyGate,
+} from "../../../scripts/eval/run-eval";
 import { DEFAULT_EVAL_CONFIG } from "../../../scripts/eval/types";
 import { runDriftDetection } from "../../../scripts/drift/run-drift-check";
 import { DEFAULT_DRIFT_CONFIG } from "../../../scripts/drift/types";
@@ -13,6 +16,26 @@ import type {
 } from "../../services/driftAnalytics";
 
 describe("live eval/drift CLI adapters", () => {
+  it("marks fixture evaluation as simulated and excludes it from accuracy gates", async () => {
+    const report = await runEvaluation(DEFAULT_EVAL_CONFIG);
+
+    expect(report.simulated).toBe(true);
+    expect(shouldEnforceAccuracyGate(report)).toBe(false);
+    expect(report.documentResults).toHaveLength(
+      report.documentSummary.fixtures
+    );
+    expect(
+      report.documentResults.every(result => !result.selection.isCorrect)
+    ).toBe(true);
+    expect(
+      report.documentResults
+        .flatMap(result => result.fields)
+        .every(field => {
+          return field.actualValue === null && !field.isCorrect;
+        })
+    ).toBe(true);
+  });
+
   const documents: DriftDocumentRow[] = [
     {
       jobSheetId: 101,
@@ -71,6 +94,8 @@ describe("live eval/drift CLI adapters", () => {
     });
 
     expect(report.environment).toBe("staging");
+    expect(report.simulated).toBe(false);
+    expect(shouldEnforceAccuracyGate(report)).toBe(true);
     expect(report.documentSummary).toEqual({
       total: 3,
       fixtures: 0,
