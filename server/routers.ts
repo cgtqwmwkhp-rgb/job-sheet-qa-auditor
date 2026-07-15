@@ -597,12 +597,16 @@ export const appRouter = router({
           startDate: input?.startDate ? new Date(input.startDate) : undefined,
           endDate: input?.endDate ? new Date(input.endDate) : undefined,
         });
+        const latestReportsByJobSheet =
+          await db.getLatestAuditReportJsonsForJobSheets(
+            sheets.map(sheet => sheet.id)
+          );
 
         const withNames: Array<{ id: number; extractedName: string | null }> =
           [];
         let noNameCount = 0;
         for (const sheet of sheets) {
-          const report = await db.getLatestAuditReportJson(sheet.id);
+          const report = latestReportsByJobSheet[sheet.id] ?? null;
           const name = extractTechnicianNameFromReport(report);
           withNames.push({ id: sheet.id, extractedName: name });
           if (!name) noNameCount++;
@@ -674,14 +678,19 @@ export const appRouter = router({
           startDate: input?.startDate ? new Date(input.startDate) : undefined,
           endDate: input?.endDate ? new Date(input.endDate) : undefined,
         });
+        const latestReportsByJobSheet =
+          await db.getLatestAuditReportJsonsForJobSheets(
+            sheets.map(sheet => sheet.id)
+          );
 
         const withNames: Array<{ id: number; extractedName: string | null }> =
           [];
         for (const sheet of sheets) {
-          const report = await db.getLatestAuditReportJson(sheet.id);
           withNames.push({
             id: sheet.id,
-            extractedName: extractTechnicianNameFromReport(report),
+            extractedName: extractTechnicianNameFromReport(
+              latestReportsByJobSheet[sheet.id] ?? null
+            ),
           });
         }
 
@@ -810,10 +819,14 @@ export const appRouter = router({
           startDate: input.startDate ? new Date(input.startDate) : undefined,
           endDate: input.endDate ? new Date(input.endDate) : undefined,
         });
+        const latestReportsByJobSheet =
+          await db.getLatestAuditReportJsonsForJobSheets(
+            sheets.map(sheet => sheet.id)
+          );
 
         let assigned = 0;
         for (const sheet of sheets) {
-          const report = await db.getLatestAuditReportJson(sheet.id);
+          const report = latestReportsByJobSheet[sheet.id] ?? null;
           const name = extractTechnicianNameFromReport(report);
           if (!name) continue;
           if (canonicalizePersonName(name) !== target) continue;
@@ -872,8 +885,12 @@ export const appRouter = router({
             startDate: input.startDate ? new Date(input.startDate) : undefined,
             endDate: input.endDate ? new Date(input.endDate) : undefined,
           });
+          const latestReportsByJobSheet =
+            await db.getLatestAuditReportJsonsForJobSheets(
+              sheets.map(sheet => sheet.id)
+            );
           for (const sheet of sheets) {
-            const report = await db.getLatestAuditReportJson(sheet.id);
+            const report = latestReportsByJobSheet[sheet.id] ?? null;
             const name = extractTechnicianNameFromReport(report);
             if (!name) continue;
             if (canonicalizePersonName(name) !== target) continue;
