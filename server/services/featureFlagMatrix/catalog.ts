@@ -40,6 +40,14 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     },
   },
   {
+    key: "FEATURE_PHOTO_PAIR_GEMINI",
+    description: "Gemini multimodal before/after pair axes compare",
+    defaultWhenUnset: "off",
+    critical: false,
+    parity: "unspecified",
+    deploy: unsetBoth,
+  },
+  {
     key: "FEATURE_SELECTION_MARKS",
     description: "Azure DI selection-marks / checklist pass",
     defaultWhenUnset: "conditional",

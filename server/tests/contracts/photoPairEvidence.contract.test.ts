@@ -12,6 +12,7 @@ import {
   runPhotoPairCompare,
   parsePairAxesFromText,
   FEATURE_PHOTO_PAIR_COMPARE,
+  FEATURE_PHOTO_PAIR_GEMINI,
   PHOTO_PAIR_USE_VLM,
 } from "../../services/photoEvidence/pairCompare";
 import { evaluateEvidenceCoherence } from "../../services/evidenceCoherence";
@@ -88,18 +89,24 @@ describe("photoEvidence hints", () => {
 describe("pairCompare", () => {
   const envKeys = [
     FEATURE_PHOTO_PAIR_COMPARE,
+    FEATURE_PHOTO_PAIR_GEMINI,
     PHOTO_PAIR_USE_VLM,
     "FEATURE_VLM_VERIFICATION",
     "VLM_PROVIDER",
+    "LLM_PROVIDER",
+    "GEMINI_API_KEY",
     "ANTHROPIC_API_KEY",
   ] as const;
   const prev: Record<string, string | undefined> = {};
   beforeEach(() => {
     for (const k of envKeys) prev[k] = process.env[k];
     process.env[FEATURE_PHOTO_PAIR_COMPARE] = "true";
+    delete process.env[FEATURE_PHOTO_PAIR_GEMINI];
     delete process.env[PHOTO_PAIR_USE_VLM];
     delete process.env.FEATURE_VLM_VERIFICATION;
     delete process.env.VLM_PROVIDER;
+    delete process.env.LLM_PROVIDER;
+    delete process.env.GEMINI_API_KEY;
   });
   afterEach(() => {
     for (const k of envKeys) {
@@ -118,7 +125,7 @@ describe("pairCompare", () => {
     expect(art.pairs[0].axes.work_done).toBe("fail");
   });
 
-  it("emits PHOTO-C012 from pair fail artifact", () => {
+  it("emits PHOTO-C012 from VLM/mock pair fail artifact", () => {
     const art = runHeuristicPairCompare({
       text: WITH_HINTS,
       totalPages: 3,
@@ -128,7 +135,26 @@ describe("pairCompare", () => {
       totalPages: 3,
       pairCompare: art,
     });
-    expect(result.findings.some(f => f.ruleId === "PHOTO-C012")).toBe(true);
+    const c012 = result.findings.find(f => f.ruleId === "PHOTO-C012");
+    expect(c012).toBeDefined();
+    expect(c012!.severity).toBe("S1");
+  });
+
+  it("heuristic path with parts present emits PHOTO-C014 S2 inconclusive", () => {
+    const art = runHeuristicPairCompare({
+      text: WITH_HINTS,
+      totalPages: 3,
+    });
+    expect(art.provider).toBe("heuristic");
+    expect(art.pairs[0]?.axes.work_done).toBe("inconclusive");
+    const result = evaluatePhotoEvidenceConsistency(WITH_HINTS, {
+      totalPages: 3,
+      pairCompare: art,
+    });
+    const c014 = result.findings.find(f => f.ruleId === "PHOTO-C014");
+    expect(c014).toBeDefined();
+    expect(c014!.severity).toBe("S2");
+    expect(result.findings.some(f => f.ruleId === "PHOTO-C012")).toBe(false);
   });
 
   it("runPhotoPairCompare returns null when flag off", async () => {
@@ -168,7 +194,7 @@ describe("pairCompare", () => {
     expect(art!.summary).toMatch(/VLM paired/i);
   });
 
-  it("VLM path fail-soft returns heuristic artifact", async () => {
+  it("VLM path fail-soft returns inconclusive heuristic artifact", async () => {
     process.env.PHOTO_PAIR_USE_VLM = "true";
     process.env.VLM_PROVIDER = "anthropic";
     delete process.env.ANTHROPIC_API_KEY;
@@ -181,6 +207,31 @@ describe("pairCompare", () => {
     expect(art!.provider).toBe("heuristic");
     expect(art!.model).toBe("heuristic-page-roles-v1");
     expect(art!.pairs.length).toBeGreaterThan(0);
+    expect(art!.pairs[0].axes.work_done).toBe("inconclusive");
+    expect(art!.pairs[0].confidenceBand).toBe("low");
+    const result = evaluatePhotoEvidenceConsistency(WITH_HINTS, {
+      totalPages: 3,
+      pairCompare: art,
+    });
+    expect(result.findings.find(f => f.ruleId === "PHOTO-C014")?.severity).toBe(
+      "S2"
+    );
+  });
+
+  it("Gemini mock path returns axes artifact when PDF present", async () => {
+    process.env[FEATURE_PHOTO_PAIR_GEMINI] = "true";
+    process.env.LLM_PROVIDER = "mock";
+    const art = await runPhotoPairCompare({
+      text: WITH_HINTS,
+      totalPages: 3,
+      documentPdfBase64: Buffer.from("%PDF-1.4 mock").toString("base64"),
+    });
+    expect(art).not.toBeNull();
+    expect(art!.provider).toBe("mock");
+    expect(art!.model).toBe("mock-gemini-pair-v1");
+    expect(art!.pairs.length).toBeGreaterThan(0);
+    expect(art!.pairs[0].axes.work_done).toBe("pass");
+    expect(art!.summary).toMatch(/Gemini paired/i);
   });
 
   it("parsePairAxesFromText reads nested axes JSON", () => {
@@ -267,9 +318,10 @@ describe("evidence ROI analytics", () => {
 });
 
 describe("policy seeds for photo/evidence", () => {
-  it("seeds PHOTO-C012 major and EVIDENCE-C010", () => {
+  it("seeds PHOTO-C012 major, PHOTO-C014 minor, and EVIDENCE-C010", () => {
     const rules = DEFAULT_AUDIT_POLICY.forms["job-summary-v1"].rules;
     expect(rules.find(r => r.ruleId === "PHOTO-C012")!.failClass).toBe("major");
+    expect(rules.find(r => r.ruleId === "PHOTO-C014")!.failClass).toBe("minor");
     expect(rules.find(r => r.ruleId === "EVIDENCE-C010")!.failClass).toBe(
       "major"
     );

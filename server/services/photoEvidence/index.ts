@@ -5,7 +5,7 @@
  * PHOTO-C011 Informational — Labels / Photo-N / multi-page / before-after hints present
  * PHOTO-C012 Major — Pair compare fails work_done or repaired_properly (high conf)
  * PHOTO-C013 Minor — Cleanliness fail (high conf)
- * PHOTO-C014 Informational — Inconclusive / unpaired pages
+ * PHOTO-C014 Minor — Inconclusive / unverified before-after (no VLM/Gemini)
  * PHOTO-C015 Informational — Duplicate fileHash warning (same pack re-uploaded)
  */
 
@@ -17,7 +17,9 @@ import {
 import type { PhotoPairCompareArtifact } from "./pairCompare";
 export {
   FEATURE_PHOTO_PAIR_COMPARE,
+  FEATURE_PHOTO_PAIR_GEMINI,
   isPhotoPairCompareEnabled,
+  isPhotoPairGeminiEnabled,
   runPhotoPairCompare,
   runHeuristicPairCompare,
 } from "./pairCompare";
@@ -220,6 +222,7 @@ export function evaluatePhotoEvidenceConsistency(
 
       if (
         high &&
+        pair.provider !== "heuristic" &&
         (axes.work_done === "fail" || axes.repaired_properly === "fail")
       ) {
         findings.push({
@@ -241,7 +244,7 @@ export function evaluatePhotoEvidenceConsistency(
         });
       }
 
-      if (high && axes.clean === "fail") {
+      if (high && pair.provider !== "heuristic" && axes.clean === "fail") {
         findings.push({
           ruleId: `${PHOTO_EVIDENCE_RULE_PREFIX}013`,
           fieldName: "Before/After Cleanliness",
@@ -259,21 +262,29 @@ export function evaluatePhotoEvidenceConsistency(
         });
       }
 
-      if (p.confidenceBand === "low" || axes.work_done === "inconclusive") {
+      const unverified =
+        pair.provider === "heuristic" ||
+        p.confidenceBand === "low" ||
+        axes.work_done === "inconclusive" ||
+        axes.repaired_properly === "inconclusive";
+
+      if (unverified) {
         findings.push({
           ruleId: `${PHOTO_EVIDENCE_RULE_PREFIX}014`,
           fieldName: "Before/After Pair Compare",
-          severity: "S3",
+          severity: "S2",
           reasonCode: "LOW_CONFIDENCE",
           rawSnippet: p.reasoning.slice(0, 300),
           normalisedSnippet:
-            "Before/after pair compare was inconclusive or unpaired.",
+            pair.provider === "heuristic"
+              ? "Before/after labels present but visual pair compare was not verified by VLM."
+              : "Before/after pair compare was inconclusive or unpaired.",
           confidence: Math.round((p.confidence ?? 0.4) * 100),
           pageNumber: p.beforePage ?? 1,
           whyItMatters:
-            "Inconclusive pairs need human eyes — do not treat as proven repair.",
+            "Inconclusive or unverified pairs need human eyes — do not treat as proven repair.",
           suggestedFix:
-            "Label pages Before/After clearly and ensure both pages show the same repair area.",
+            "Label pages Before/After clearly, ensure both pages show the same repair area, and enable VLM pair compare.",
         });
       }
     }
@@ -281,7 +292,7 @@ export function evaluatePhotoEvidenceConsistency(
     findings.push({
       ruleId: `${PHOTO_EVIDENCE_RULE_PREFIX}014`,
       fieldName: "Before/After Pair Compare",
-      severity: "S3",
+      severity: "S2",
       reasonCode: "LOW_CONFIDENCE",
       rawSnippet: pair.summary.slice(0, 300),
       normalisedSnippet: "No before/after pairs could be formed from the pack.",
