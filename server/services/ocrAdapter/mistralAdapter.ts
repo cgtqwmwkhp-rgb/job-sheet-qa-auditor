@@ -18,6 +18,7 @@ import {
 import { getCorrelationId, addContextMetadata } from "../../utils/context";
 import { redactExtractedText } from "../../utils/piiRedaction";
 import { addToDeadLetterQueue } from "../../utils/deadLetterQueue";
+import { TIMEOUT_CONFIG, TimeoutError } from "../../utils/timeout";
 import type {
   OCRAdapter,
   OCRResult,
@@ -108,15 +109,31 @@ export class MistralOCRAdapter implements OCRAdapter {
       includeDeepFeatures: deepFeatures,
     });
 
-    const response = await fetch(MISTRAL_OCR_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.config.apiKey}`,
-        ...(correlationId && { "X-Correlation-ID": correlationId }),
-      },
-      body: JSON.stringify(payload),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort(
+        new TimeoutError(
+          `Mistral OCR request exceeded timeout of ${TIMEOUT_CONFIG.OCR_EXTRACTION}ms`,
+          TIMEOUT_CONFIG.OCR_EXTRACTION
+        )
+      );
+    }, TIMEOUT_CONFIG.OCR_EXTRACTION);
+
+    let response: Response;
+    try {
+      response = await fetch(MISTRAL_OCR_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.config.apiKey}`,
+          ...(correlationId && { "X-Correlation-ID": correlationId }),
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const processingTimeMs = Date.now() - startTime;
 
