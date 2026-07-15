@@ -110,14 +110,29 @@ describe("Image QA Intake Gate Contract Tests", () => {
   });
 
   describe("feature flag", () => {
-    it("defaults to disabled when unset", () => {
+    it("defaults to disabled when unset outside fail-closed envs", () => {
       delete process.env.FEATURE_IMAGE_QA_INTAKE;
+      delete process.env.APP_ENV;
+      const prevNode = process.env.NODE_ENV;
+      process.env.NODE_ENV = "test";
       expect(isImageQaIntakeEnabled()).toBe(false);
+      process.env.NODE_ENV = prevNode;
     });
 
     it("enables when FEATURE_IMAGE_QA_INTAKE=true", () => {
       process.env.FEATURE_IMAGE_QA_INTAKE = "true";
       expect(isImageQaIntakeEnabled()).toBe(true);
+    });
+
+    it("enables by default in fail-closed production unless explicitly false", () => {
+      delete process.env.FEATURE_IMAGE_QA_INTAKE;
+      const prevApp = process.env.APP_ENV;
+      process.env.APP_ENV = "production";
+      expect(isImageQaIntakeEnabled()).toBe(true);
+      process.env.FEATURE_IMAGE_QA_INTAKE = "false";
+      expect(isImageQaIntakeEnabled()).toBe(false);
+      if (prevApp === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = prevApp;
     });
   });
 
@@ -253,7 +268,12 @@ describe("Image QA Intake Gate Contract Tests", () => {
       expect(result.retakeFeedback.length).toBeGreaterThan(0);
     });
 
-    it("fail-opens on empty buffer (skipped:true, passed:true) without OCR", async () => {
+    it("fail-opens on empty buffer (skipped:true, passed:true) without OCR outside fail-closed", async () => {
+      const prevApp = process.env.APP_ENV;
+      const prevNode = process.env.NODE_ENV;
+      delete process.env.APP_ENV;
+      process.env.NODE_ENV = "test";
+
       const result = await runIntakeGate({
         buffer: Buffer.alloc(0),
         fileName: "empty.pdf",
@@ -266,6 +286,29 @@ describe("Image QA Intake Gate Contract Tests", () => {
       expect(result.error).toBeDefined();
       expect(result.ocrInvoked).toBe(false);
       expect(extractTextFromBase64Mock).not.toHaveBeenCalled();
+
+      if (prevApp === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = prevApp;
+      process.env.NODE_ENV = prevNode;
+    });
+
+    it("fail-closes on empty buffer in production", async () => {
+      const prevApp = process.env.APP_ENV;
+      process.env.APP_ENV = "production";
+
+      const result = await runIntakeGate({
+        buffer: Buffer.alloc(0),
+        fileName: "empty.pdf",
+      });
+
+      expect(result.passed).toBe(false);
+      expect(result.skipped).toBe(false);
+      expect(result.requiresReview).toBe(true);
+      expect(result.retakeFeedback.length).toBeGreaterThan(0);
+      expect(result.ocrInvoked).toBe(false);
+
+      if (prevApp === undefined) delete process.env.APP_ENV;
+      else process.env.APP_ENV = prevApp;
     });
 
     it("fail-opens on PDF without invoking OCR", async () => {

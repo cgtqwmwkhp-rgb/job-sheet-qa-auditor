@@ -188,7 +188,7 @@ export interface IntakeGateInput {
 
 /**
  * Result of the upload-time Image QA intake gate.
- * Fail-open: on unexpected errors, passed=true and skipped=true.
+ * Fail-open in dev/test on unexpected errors; fail-closed in production/staging.
  */
 export interface IntakeGateResult {
   passed: boolean;

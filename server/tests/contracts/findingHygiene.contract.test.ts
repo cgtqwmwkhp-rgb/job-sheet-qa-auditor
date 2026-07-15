@@ -304,6 +304,18 @@ Technician Signature
     expect(hasOnlyInformationalFindings(cleaned)).toBe(true);
   });
 
+  it("hasOnlyInformationalFindings is false when S2 LOW_CONFIDENCE remains", () => {
+    expect(
+      hasOnlyInformationalFindings([
+        finding({
+          fieldName: "OCR Confidence",
+          reasonCode: "LOW_CONFIDENCE",
+          severity: "S2",
+        }),
+      ])
+    ).toBe(false);
+  });
+
   it("hasOnlyInformationalFindings is false when S1 MISSING remains", () => {
     expect(
       hasOnlyInformationalFindings([
@@ -410,7 +422,10 @@ describe("ensemble→Gemini wiring", () => {
     expect(dp).toContain("hasOnlyInformationalFindings");
     expect(dp).toContain("sanitizeExtractedFieldsForSignatures");
     expect(dp).toContain("optionalTemplateFields");
+    expect(dp).toContain("canPromoteAutoPass");
+    expect(dp).toContain("runDeterministicValidation");
     expect(dp).toContain("[AUTO_PASS]");
+    expect(dp).toContain("[DETERMINISTIC_VALIDATION]");
   });
 
   it("analyzer prompt path accepts preExtractedHintsBlock", () => {

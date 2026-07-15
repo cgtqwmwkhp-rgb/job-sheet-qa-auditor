@@ -17,6 +17,7 @@
  * - DROP_INGEST_ARCHIVE_DIR          Optional folder to move processed local files into
  * - DROP_INGEST_STATE_PATH           Optional durable processed-key state file
  * - DROP_INGEST_MAX_FILE_BYTES       Max file size (default 45mb)
+ * - DROP_INGEST_MAX_ATTEMPTS         Transient failures before poison→DLQ (default 3)
  * - INGEST_API_KEY / INGEST_HMAC_SECRET  Same secrets as PR-IO-INGEST client
  */
 
@@ -35,6 +36,8 @@ export interface DropIngestConfig {
   archiveDir: string | null;
   statePath: string | null;
   maxFileBytes: number;
+  /** Transient ingest failures before poison→DLQ quarantine. */
+  maxAttempts: number;
   apiKey: string;
   hmacSecret: string;
   ingestPath: string;
@@ -90,6 +93,7 @@ export function loadDropIngestConfig(
       env.DROP_INGEST_MAX_FILE_BYTES,
       45 * 1024 * 1024
     ),
+    maxAttempts: parsePositiveInt(env.DROP_INGEST_MAX_ATTEMPTS, 3),
     apiKey,
     hmacSecret,
     ingestPath: "/api/ingest/v1/job-sheets",

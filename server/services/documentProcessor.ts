@@ -109,6 +109,10 @@ import { buildCommentDeepNoteAdvisory } from "./commentQuality/advisory";
 import { evaluateEvidenceCoherence } from "./evidenceCoherence";
 import { evaluateTyreCompliance } from "./tyreCompliance";
 import { evaluateChecklistCompleteness } from "./checklistCompleteness";
+import {
+  canPromoteAutoPass,
+  runDeterministicValidation,
+} from "./validation/goldSpecBridge";
 import { applyAuditPolicy, resolveAuditFormFamily } from "./auditPolicy";
 import {
   runSelectionMarkDetection,
@@ -2699,20 +2703,84 @@ async function processJobSheetWithOptions(
     }
   }
 
-  // Promote REVIEW_QUEUE → PASS when only informational S3 findings remain
-  // (e.g. OCR Confidence soft-gate + Present field injections) and score is strong.
+  // Wave-4 B3: wire orphaned deterministic validator into judgment before AUTO_PASS.
+  let deterministicValidationPassed = true;
+  {
+    const validationStart = Date.now();
+    try {
+      const extractedForValidation = analysisResult.extractedFields ?? {};
+      const deterministic = runDeterministicValidation({
+        spec,
+        extractedFields: extractedForValidation,
+      });
+      deterministicValidationPassed = deterministic.passed;
+      if (deterministic.findings.length > 0) {
+        analysisResult = {
+          ...analysisResult,
+          findings: [...analysisResult.findings, ...deterministic.findings],
+          summary:
+            `${analysisResult.summary} ` +
+            `[DETERMINISTIC_VALIDATION] passed=${deterministic.passed} ` +
+            `failures=${deterministic.result.summary.failedRules} ` +
+            `(critical=${deterministic.result.summary.criticalFailures} ` +
+            `major=${deterministic.result.summary.majorFailures}).`,
+        };
+        if (!deterministic.passed && analysisResult.overallResult === "PASS") {
+          analysisResult = {
+            ...analysisResult,
+            overallResult: "REVIEW_QUEUE",
+          };
+        }
+      }
+      recordStage({
+        stage: "Deterministic Validation",
+        status: deterministic.passed ? "success" : "failed",
+        durationMs: Date.now() - validationStart,
+        error: deterministic.passed
+          ? undefined
+          : `${deterministic.result.summary.criticalFailures} critical / ${deterministic.result.summary.majorFailures} major rule failure(s)`,
+      });
+    } catch (validationError) {
+      // Fail-closed: do not AUTO_PASS when the validator itself errors.
+      deterministicValidationPassed = false;
+      console.warn(
+        "[DocumentProcessor] Deterministic validation failed (blocking AUTO_PASS):",
+        validationError
+      );
+      recordStage({
+        stage: "Deterministic Validation",
+        status: "failed",
+        durationMs: Date.now() - validationStart,
+        error:
+          validationError instanceof Error
+            ? validationError.message
+            : "Deterministic validation error",
+      });
+    }
+  }
+
+  // Promote REVIEW_QUEUE → PASS only when findings are S3-only, deterministic
+  // validation passed, score is strong, and no blocking fail marks.
+  // Wave-4 B3: never promote when S2+ could be a real defect (tightened AUTO_PASS).
   if (
-    analysisResult.overallResult === "REVIEW_QUEUE" &&
-    analysisResult.score >= llmThreshold &&
-    hasOnlyInformationalFindings(analysisResult.findings) &&
-    !hasBlockingFailMarks(selectionMarksResult?.artifact)
+    canPromoteAutoPass({
+      overallResult: analysisResult.overallResult,
+      score: analysisResult.score,
+      threshold: llmThreshold,
+      findings: analysisResult.findings,
+      validationPassed: deterministicValidationPassed,
+      hasBlockingFailMarks: hasBlockingFailMarks(
+        selectionMarksResult?.artifact
+      ),
+      onlyInformational: hasOnlyInformationalFindings(analysisResult.findings),
+    })
   ) {
     analysisResult = {
       ...analysisResult,
       overallResult: "PASS",
       summary:
         `${analysisResult.summary} ` +
-        `[AUTO_PASS] Only informational findings remain after hygiene; promoted to PASS.`,
+        `[AUTO_PASS] Only informational S3 findings remain after hygiene + deterministic validation; promoted to PASS.`,
     };
     recordStage({
       stage: "Informational Pass Promotion",

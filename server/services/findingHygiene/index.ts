@@ -779,16 +779,15 @@ export function applyFindingHygiene(
 }
 
 /**
- * True when findings are informational only (S3 / LOW_CONFIDENCE soft notes).
+ * True when findings are informational only (S3 soft notes).
  * Used to promote REVIEW_QUEUE → PASS after hygiene.
+ *
+ * Wave-4 B3: S2+ (including LOW_CONFIDENCE soft-gates) must NOT auto-pass —
+ * those can be real defects without a human sample.
  */
 export function hasOnlyInformationalFindings(findings: Finding[]): boolean {
   if (findings.length === 0) return true;
-  return findings.every(f => {
-    if (f.severity === "S3") return true;
-    if (f.severity === "S2" && f.reasonCode === "LOW_CONFIDENCE") return true;
-    return false;
-  });
+  return findings.every(f => f.severity === "S3");
 }
 
 /**
