@@ -71,6 +71,13 @@
       "when": 1784077140000,
       "tag": "0009_waiver_revocation",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1784100000000,
+      "tag": "0011_review_claims",
+      "breakpoints": true
     }
   ]
 }

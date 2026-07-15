@@ -8,6 +8,7 @@ import {
   json,
   boolean,
   decimal,
+  index,
   uniqueIndex,
 } from "drizzle-orm/mysql-core";
 
@@ -607,6 +608,33 @@ export const webhookDeliveryLog = mysqlTable("webhook_delivery_log", {
 
 export type WebhookDeliveryLogRow = typeof webhookDeliveryLog.$inferSelect;
 export type InsertWebhookDeliveryLog = typeof webhookDeliveryLog.$inferInsert;
+
+/**
+ * Review Claims — exclusive reviewer lease on a job sheet (Wave-4 D1).
+ * Runtime also CREATE IF NOT EXISTS via reviewClaim/store.ts.
+ */
+export const reviewClaims = mysqlTable(
+  "review_claims",
+  {
+    jobSheetId: int("jobSheetId")
+      .primaryKey()
+      .references(() => jobSheets.id),
+    claimedBy: int("claimedBy")
+      .notNull()
+      .references(() => users.id),
+    claimToken: varchar("claimToken", { length: 64 }).notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+    createdAt: timestamp("createdAt").notNull(),
+    updatedAt: timestamp("updatedAt").notNull(),
+  },
+  table => ({
+    expiresIdx: index("idx_review_claims_expires").on(table.expiresAt),
+    claimedByIdx: index("idx_review_claims_claimed_by").on(table.claimedBy),
+  })
+);
+
+export type ReviewClaimRow = typeof reviewClaims.$inferSelect;
+export type InsertReviewClaim = typeof reviewClaims.$inferInsert;
 
 /**
  * Process Idempotency Outbox — durable Idempotency-Key ledger for jobSheets.process (Wave-4 C2).

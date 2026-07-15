@@ -12,6 +12,12 @@ import type {
   InsertAuditFinding,
 } from "../../drizzle/schema";
 import type { DbTx } from "../db";
+import {
+  bulkResolveFindings,
+  type AuditActionDeps,
+  type FindingRecord,
+} from "../services/auditActions";
+import type { FindingAction } from "../services/auditActions/types";
 
 /**
  * Create audit result with findings atomically.
@@ -72,9 +78,68 @@ export async function completeJobSheetProcessing(
   });
 }
 
+function mapFindingRow(
+  row: NonNullable<Awaited<ReturnType<typeof db.getAuditFindingById>>>
+): FindingRecord {
+  return {
+    id: row.id,
+    auditResultId: row.auditResultId,
+    resolutionStatus: (row.resolutionStatus ??
+      "open") as FindingRecord["resolutionStatus"],
+    resolutionReason: row.resolutionReason,
+    resolvedBy: row.resolvedBy,
+    resolvedAt: row.resolvedAt,
+    previousResolutionStatus: row.previousResolutionStatus as
+      | FindingRecord["previousResolutionStatus"]
+      | null
+      | undefined,
+    severity: row.severity,
+    fieldName: row.fieldName,
+    rawSnippet: row.rawSnippet,
+    normalisedSnippet: row.normalisedSnippet,
+    ruleId: row.ruleId,
+    reasonCode: row.reasonCode,
+  };
+}
+
+function createTxDeps(tx: DbTx): AuditActionDeps {
+  return {
+    getFinding: async id => {
+      const row = await db.getAuditFindingById(id);
+      if (!row) return undefined;
+      return mapFindingRow(row);
+    },
+    updateFindingResolution: (id, data) =>
+      db.updateFindingResolution(id, data, tx),
+    getAuditResult: async id => {
+      const row = await db.getAuditResultById(id);
+      if (!row) return undefined;
+      return {
+        id: row.id,
+        jobSheetId: row.jobSheetId,
+        result: row.result,
+      };
+    },
+    updateAuditResultStatus: (id, result) =>
+      db.updateAuditResultStatus(id, result, tx),
+    updateJobSheetStatus: (id, status) =>
+      db.updateJobSheetStatus(id, status, tx),
+    createWaiver: data => db.createWaiver(data, tx),
+    getWaiverByFindingId: id => db.getWaiverByFindingId(id, tx),
+    revokeWaiver: (id, revokedBy) => db.revokeWaiver(id, revokedBy, tx),
+    logAction: async data => {
+      await db.logAction(data, { tx, required: true });
+    },
+    listFindingsByAuditResultId: async auditResultId => {
+      const rows = await db.getAuditFindingsByResultId(auditResultId);
+      return rows.map(mapFindingRow);
+    },
+  };
+}
+
 /**
- * Resolve multiple findings atomically and recalculate audit result.
- * Used when QA lead approves/waives findings in bulk.
+ * Resolve multiple findings atomically and recalculate audit result once.
+ * Wave-4 D1: all-or-nothing transaction + single sheet-truth recalc.
  */
 export async function resolveFindingsBatch(
   findingIds: number[],
@@ -82,89 +147,47 @@ export async function resolveFindingsBatch(
     status: "waived" | "overridden" | "flagged" | "approved";
     reason?: string;
     resolvedBy: number;
+    expectedStatus?: "open" | "waived" | "overridden" | "flagged" | "approved";
+    expiresAt?: Date;
   }
-): Promise<{ auditResultId?: number; sheetResult?: string }> {
-  const dbClient = await getDb();
-  if (!dbClient) throw new Error("Database not available");
-
-  const timestamp = new Date();
-  let auditResultId: number | undefined;
-
-  // Update all findings
-  for (const findingId of findingIds) {
-    const finding = await db.getAuditFindingById(findingId);
-    if (finding && auditResultId == null) {
-      auditResultId = finding.auditResultId;
-    }
-    await db.updateFindingResolution(findingId, {
-      resolutionStatus: resolution.status,
-      resolutionReason: resolution.reason,
-      resolvedBy: resolution.resolvedBy,
-      resolvedAt: timestamp,
-    });
-  }
-
-  if (auditResultId == null) {
-    return {};
-  }
-
-  const { recalculateSheetTruth } = await import("../services/auditActions");
-  const sideEffects = await recalculateSheetTruth(
-    {
-      getAuditResult: async id => {
-        const row = await db.getAuditResultById(id);
-        if (!row) return undefined;
-        return {
-          id: row.id,
-          jobSheetId: row.jobSheetId,
-          result: row.result,
-        };
-      },
-      updateAuditResultStatus: (id, result) =>
-        db.updateAuditResultStatus(id, result),
-      updateJobSheetStatus: (id, status) => db.updateJobSheetStatus(id, status),
-      listFindingsByAuditResultId: async id => {
-        const rows = await db.getAuditFindingsByResultId(id);
-        return rows.map(row => ({
-          id: row.id,
-          auditResultId: row.auditResultId,
-          resolutionStatus: (row.resolutionStatus ?? "open") as
-            | "open"
-            | "waived"
-            | "overridden"
-            | "flagged"
-            | "approved",
-          severity: row.severity,
-          fieldName: row.fieldName,
-          rawSnippet: row.rawSnippet,
-          normalisedSnippet: row.normalisedSnippet,
-          ruleId: row.ruleId,
-          reasonCode: row.reasonCode,
-        }));
-      },
-      getFinding: async id => {
-        const row = await db.getAuditFindingById(id);
-        if (!row) return undefined;
-        return {
-          id: row.id,
-          auditResultId: row.auditResultId,
-          resolutionStatus: (row.resolutionStatus ?? "open") as
-            | "open"
-            | "waived"
-            | "overridden"
-            | "flagged"
-            | "approved",
-          severity: row.severity,
-        };
-      },
-    },
-    auditResultId
-  );
-
-  return {
-    auditResultId,
-    sheetResult: sideEffects.auditResultStatus,
+): Promise<{
+  auditResultId?: number;
+  sheetResult?: string;
+  jobSheetStatus?: string;
+  resolvedIds: number[];
+  skippedIds: number[];
+}> {
+  const actionByStatus: Record<
+    "waived" | "overridden" | "flagged" | "approved",
+    FindingAction
+  > = {
+    waived: "waive",
+    overridden: "override",
+    flagged: "flag",
+    approved: "approve",
   };
+
+  const action = actionByStatus[resolution.status];
+
+  return db.runTransaction(async tx => {
+    const deps = createTxDeps(tx);
+    const result = await bulkResolveFindings(deps, {
+      findingIds,
+      action,
+      reason: resolution.reason ?? `Bulk ${resolution.status}`,
+      userId: resolution.resolvedBy,
+      expectedStatus: resolution.expectedStatus,
+      expiresAt: resolution.expiresAt,
+    });
+
+    return {
+      auditResultId: result.auditResultId,
+      sheetResult: result.auditResultStatus,
+      jobSheetStatus: result.jobSheetStatus,
+      resolvedIds: result.resolvedIds,
+      skippedIds: result.skippedIds,
+    };
+  });
 }
 
 /**
