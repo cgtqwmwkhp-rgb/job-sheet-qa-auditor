@@ -76,7 +76,10 @@ export function RelationshipFindingsGroup({
             <div
               key={finding.id}
               id={`finding-${finding.id}`}
-              className={`p-3 rounded-md border cursor-pointer transition-all ${
+              role="button"
+              tabIndex={0}
+              aria-label={`View finding: ${finding.field}`}
+              className={`p-3 rounded-md border cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-primary ${
                 activeBoxId === finding.id
                   ? "ring-2 ring-primary border-primary bg-primary/5"
                   : "hover:bg-white/80"
@@ -88,6 +91,13 @@ export function RelationshipFindingsGroup({
                     : "bg-green-50/60 border-green-200"
               }`}
               onClick={() => onFindingClick(finding.id)}
+              onKeyDown={e => {
+                if (e.currentTarget !== e.target) return;
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onFindingClick(finding.id);
+                }
+              }}
             >
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1.5 min-w-0">
