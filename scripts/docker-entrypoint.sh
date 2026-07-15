@@ -7,6 +7,8 @@ if [ -n "$DATABASE_URL" ]; then
   node /app/scripts/ensure-waiver-revocation.mjs
   echo "Verifying secondary tables (cost/comms/webhooks)..."
   node /app/scripts/ensure-secondary-tables.mjs
+  echo "Verifying process idempotency outbox / journal..."
+  node /app/scripts/ensure-process-idempotency.mjs
   echo "Verifying template memory lineage..."
   node /app/scripts/ensure-template-memory.mjs
   echo "Running database migrations..."
