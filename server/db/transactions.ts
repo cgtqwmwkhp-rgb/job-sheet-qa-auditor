@@ -83,14 +83,19 @@ export async function resolveFindingsBatch(
     reason?: string;
     resolvedBy: number;
   }
-): Promise<void> {
+): Promise<{ auditResultId?: number; sheetResult?: string }> {
   const dbClient = await getDb();
   if (!dbClient) throw new Error("Database not available");
 
   const timestamp = new Date();
+  let auditResultId: number | undefined;
 
   // Update all findings
   for (const findingId of findingIds) {
+    const finding = await db.getAuditFindingById(findingId);
+    if (finding && auditResultId == null) {
+      auditResultId = finding.auditResultId;
+    }
     await db.updateFindingResolution(findingId, {
       resolutionStatus: resolution.status,
       resolutionReason: resolution.reason,
@@ -99,9 +104,67 @@ export async function resolveFindingsBatch(
     });
   }
 
-  // TODO: Recalculate audit result based on resolved findings
-  // This would require checking all findings for the audit and determining
-  // if the overall result should change from fail → pass, etc.
+  if (auditResultId == null) {
+    return {};
+  }
+
+  const { recalculateSheetTruth } = await import("../services/auditActions");
+  const sideEffects = await recalculateSheetTruth(
+    {
+      getAuditResult: async id => {
+        const row = await db.getAuditResultById(id);
+        if (!row) return undefined;
+        return {
+          id: row.id,
+          jobSheetId: row.jobSheetId,
+          result: row.result,
+        };
+      },
+      updateAuditResultStatus: (id, result) =>
+        db.updateAuditResultStatus(id, result),
+      updateJobSheetStatus: (id, status) => db.updateJobSheetStatus(id, status),
+      listFindingsByAuditResultId: async id => {
+        const rows = await db.getAuditFindingsByResultId(id);
+        return rows.map(row => ({
+          id: row.id,
+          auditResultId: row.auditResultId,
+          resolutionStatus: (row.resolutionStatus ?? "open") as
+            | "open"
+            | "waived"
+            | "overridden"
+            | "flagged"
+            | "approved",
+          severity: row.severity,
+          fieldName: row.fieldName,
+          rawSnippet: row.rawSnippet,
+          normalisedSnippet: row.normalisedSnippet,
+          ruleId: row.ruleId,
+          reasonCode: row.reasonCode,
+        }));
+      },
+      getFinding: async id => {
+        const row = await db.getAuditFindingById(id);
+        if (!row) return undefined;
+        return {
+          id: row.id,
+          auditResultId: row.auditResultId,
+          resolutionStatus: (row.resolutionStatus ?? "open") as
+            | "open"
+            | "waived"
+            | "overridden"
+            | "flagged"
+            | "approved",
+          severity: row.severity,
+        };
+      },
+    },
+    auditResultId
+  );
+
+  return {
+    auditResultId,
+    sheetResult: sideEffects.auditResultStatus,
+  };
 }
 
 /**

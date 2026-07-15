@@ -764,6 +764,64 @@ export async function getAuditFindingsByResultId(auditResultId: number) {
     .orderBy(auditFindings.severity, auditFindings.reasonCode);
 }
 
+/**
+ * Human-reviewed findings with parent audit confidence for ECE calibration.
+ * Caps at 10k rows — enough to accumulate toward N≥200 readiness.
+ */
+export async function listReviewedFindingsForCalibration(options?: {
+  limit?: number;
+}): Promise<
+  Array<{
+    resolutionStatus: "waived" | "overridden" | "approved";
+    confidenceScore: number | null;
+  }>
+> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const limit = options?.limit ?? 10000;
+  const rows = await db
+    .select({
+      resolutionStatus: auditFindings.resolutionStatus,
+      confidenceScore: auditResults.confidenceScore,
+    })
+    .from(auditFindings)
+    .innerJoin(
+      auditResults,
+      eq(auditFindings.auditResultId, auditResults.id)
+    )
+    .where(
+      inArray(auditFindings.resolutionStatus, [
+        "waived",
+        "overridden",
+        "approved",
+      ])
+    )
+    .orderBy(desc(auditFindings.resolvedAt))
+    .limit(limit);
+
+  return rows
+    .filter(
+      (
+        row
+      ): row is {
+        resolutionStatus: "waived" | "overridden" | "approved";
+        confidenceScore: string | null;
+      } =>
+        row.resolutionStatus === "waived" ||
+        row.resolutionStatus === "overridden" ||
+        row.resolutionStatus === "approved"
+    )
+    .map(row => {
+      const conf =
+        row.confidenceScore != null ? Number(row.confidenceScore) : null;
+      return {
+        resolutionStatus: row.resolutionStatus,
+        confidenceScore: conf != null && Number.isFinite(conf) ? conf : null,
+      };
+    });
+}
+
 export async function getAuditFindingById(id: number) {
   const db = await getDb();
   if (!db) return undefined;

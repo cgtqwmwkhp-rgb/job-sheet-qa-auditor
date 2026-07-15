@@ -43,6 +43,8 @@ describe("Pipeline honesty contract (R1)", () => {
       expect(documentProcessor).toContain(
         "measurementReady: calibrationMeasurement.measurementReady"
       );
+      expect(documentProcessor).toContain("loadReviewLabelSamples");
+      expect(documentProcessor).toContain("listReviewedFindingsForCalibration");
     });
   });
 

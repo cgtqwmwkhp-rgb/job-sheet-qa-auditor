@@ -2,6 +2,7 @@
  * Expected Calibration Error (ECE) computation (Phase 3.3)
  */
 
+import { ECE_MIN_SAMPLES } from "./reviewLabels";
 import type { EceResult, PredictionSample } from "./types";
 
 export function computeEce(
@@ -13,6 +14,8 @@ export function computeEce(
       ece: null,
       bins: [],
       measurementReady: false,
+      sampleCount: 0,
+      minSamplesRequired: ECE_MIN_SAMPLES,
       note: "No labelled samples; ECE cannot be measured.",
     };
   }
@@ -45,5 +48,28 @@ export function computeEce(
     }
   }
 
-  return { ece, bins, measurementReady: true };
+  const measurementReady = samples.length >= ECE_MIN_SAMPLES;
+
+  // Honest gate: do not publish ECE as a ready metric until N≥threshold.
+  // Provisional error is still useful for accumulation progress, but callers
+  // must check measurementReady before treating ece as authoritative.
+  if (!measurementReady) {
+    return {
+      ece: null,
+      bins,
+      measurementReady: false,
+      sampleCount: samples.length,
+      minSamplesRequired: ECE_MIN_SAMPLES,
+      provisionalEce: ece,
+      note: `Accumulating review labels toward ECE readiness (${samples.length}/${ECE_MIN_SAMPLES}).`,
+    };
+  }
+
+  return {
+    ece,
+    bins,
+    measurementReady: true,
+    sampleCount: samples.length,
+    minSamplesRequired: ECE_MIN_SAMPLES,
+  };
 }

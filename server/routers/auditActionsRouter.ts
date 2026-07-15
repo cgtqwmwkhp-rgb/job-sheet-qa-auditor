@@ -106,37 +106,44 @@ function toAuditActionTrpcError(
   });
 }
 
+function mapFindingRow(row: NonNullable<
+  Awaited<ReturnType<typeof db.getAuditFindingById>>
+>) {
+  return {
+    id: row.id,
+    auditResultId: row.auditResultId,
+    resolutionStatus: (row.resolutionStatus ?? "open") as
+      | "open"
+      | "waived"
+      | "overridden"
+      | "flagged"
+      | "approved",
+    resolutionReason: row.resolutionReason,
+    resolvedBy: row.resolvedBy,
+    resolvedAt: row.resolvedAt,
+    previousResolutionStatus: row.previousResolutionStatus as
+      | "open"
+      | "waived"
+      | "overridden"
+      | "flagged"
+      | "approved"
+      | null
+      | undefined,
+    severity: row.severity,
+    fieldName: row.fieldName,
+    rawSnippet: row.rawSnippet,
+    normalisedSnippet: row.normalisedSnippet,
+    ruleId: row.ruleId,
+    reasonCode: row.reasonCode,
+  };
+}
+
 function createDbDeps(tx?: DbExecutor): AuditActionDeps {
   return {
     getFinding: async id => {
       const row = await db.getAuditFindingById(id);
       if (!row) return undefined;
-      return {
-        id: row.id,
-        auditResultId: row.auditResultId,
-        resolutionStatus: (row.resolutionStatus ?? "open") as
-          | "open"
-          | "waived"
-          | "overridden"
-          | "flagged"
-          | "approved",
-        resolutionReason: row.resolutionReason,
-        resolvedBy: row.resolvedBy,
-        resolvedAt: row.resolvedAt,
-        previousResolutionStatus: row.previousResolutionStatus as
-          | "open"
-          | "waived"
-          | "overridden"
-          | "flagged"
-          | "approved"
-          | null
-          | undefined,
-        fieldName: row.fieldName,
-        rawSnippet: row.rawSnippet,
-        normalisedSnippet: row.normalisedSnippet,
-        ruleId: row.ruleId,
-        reasonCode: row.reasonCode,
-      };
+      return mapFindingRow(row);
     },
     updateFindingResolution: (id, data) =>
       db.updateFindingResolution(id, data, tx),
@@ -159,6 +166,10 @@ function createDbDeps(tx?: DbExecutor): AuditActionDeps {
     revokeWaiver: (id, revokedBy) => db.revokeWaiver(id, revokedBy, tx),
     logAction: async data => {
       await db.logAction(data, { tx, required: true });
+    },
+    listFindingsByAuditResultId: async auditResultId => {
+      const rows = await db.getAuditFindingsByResultId(auditResultId);
+      return rows.map(mapFindingRow);
     },
   };
 }

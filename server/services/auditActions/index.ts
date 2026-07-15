@@ -14,9 +14,23 @@ import {
   type ResolutionStatus,
 } from "./types";
 import {
+  deriveSheetResultFromFindings,
+  sheetResultToJobSheetStatus,
+  type FindingSeverity,
+  type SheetResult,
+} from "./sheetTruth";
+import {
   buildTrainingSignal,
   withTrainingSignalDetails,
 } from "../trainingSignals";
+
+export {
+  deriveSheetResultFromFindings,
+  sheetResultToJobSheetStatus,
+  type FindingSeverity,
+  type SheetResult,
+  type SheetTruthFinding,
+} from "./sheetTruth";
 
 export type AuditActionErrorCode = "NOT_FOUND" | "CONFLICT";
 
@@ -42,6 +56,8 @@ export interface FindingRecord {
   resolvedBy?: number | null;
   resolvedAt?: Date | null;
   previousResolutionStatus?: ResolutionStatus | null;
+  /** Required for post-override sheet truth recalculation. */
+  severity?: FindingSeverity | null;
   /** Optional — used by captureFieldCorrection (PR-13) */
   fieldName?: string | null;
   rawSnippet?: string | null;
@@ -105,6 +121,13 @@ export interface AuditActionDeps {
     id: number,
     data: { normalisedSnippet: string }
   ) => Promise<void>;
+  /**
+   * List all findings for an audit so sheet truth can be recalculated
+   * after override/waive/approve (Wave-4 A2).
+   */
+  listFindingsByAuditResultId?: (
+    auditResultId: number
+  ) => Promise<FindingRecord[]>;
 }
 
 export function mapActionToStatus(action: FindingAction): ResolutionStatus {
@@ -199,7 +222,6 @@ export async function applyFindingAction(
   const sideEffects = await applySideEffects(deps, {
     finding,
     action: input.action,
-    userId: input.userId,
   });
 
   const audit = await deps.getAuditResult(finding.auditResultId);
@@ -293,9 +315,8 @@ export async function undoFindingAction(
     previousResolutionStatus: current,
   });
 
-  // Soft-undo job sheet flag: if undoing flag and restoring to open, leave
-  // job sheet as-is unless it was only flagged (review_queue stays — PR-13
-  // workstation owns full queue lifecycle). Log the intent.
+  const sideEffects = await recalculateSheetTruth(deps, finding.auditResultId);
+
   await deps.logAction({
     userId: input.userId,
     action: "FINDING_UNDO",
@@ -306,6 +327,7 @@ export async function undoFindingAction(
       fromStatus: current,
       toStatus: restoreTo,
       revokedWaiverId,
+      ...sideEffects,
     },
   });
 
@@ -316,6 +338,8 @@ export async function undoFindingAction(
     resolutionStatus: restoreTo,
     previousResolutionStatus: current,
     revokedWaiverId,
+    jobSheetStatus: sideEffects.jobSheetStatus,
+    auditResultStatus: sideEffects.auditResultStatus,
     undoToken: buildUndoToken(input.findingId, current, restoreTo),
   };
 }
@@ -369,7 +393,6 @@ async function applySideEffects(
   input: {
     finding: FindingRecord;
     action: FindingAction;
-    userId: number;
   }
 ): Promise<{ jobSheetStatus?: string; auditResultStatus?: string }> {
   const audit = await deps.getAuditResult(input.finding.auditResultId);
@@ -386,18 +409,56 @@ async function applySideEffects(
     };
   }
 
-  if (input.action === "waive") {
-    await deps.updateAuditResultStatus(audit.id, "waived");
-    return { auditResultStatus: "waived" };
+  // override / waive / approve → recalculate sheet truth from all findings
+  return recalculateSheetTruth(deps, input.finding.auditResultId);
+}
+
+/**
+ * Recalculate audit + job-sheet status from current finding resolutions.
+ * Prevents stale auto FAIL after the last critical finding is overridden.
+ */
+export async function recalculateSheetTruth(
+  deps: Pick<
+    AuditActionDeps,
+    | "getAuditResult"
+    | "updateAuditResultStatus"
+    | "updateJobSheetStatus"
+    | "listFindingsByAuditResultId"
+    | "getFinding"
+  >,
+  auditResultId: number
+): Promise<{ jobSheetStatus?: string; auditResultStatus?: string }> {
+  const audit = await deps.getAuditResult(auditResultId);
+  if (!audit) return {};
+
+  let findings: FindingRecord[] = [];
+  if (deps.listFindingsByAuditResultId) {
+    findings = await deps.listFindingsByAuditResultId(auditResultId);
   }
 
-  if (input.action === "approve") {
-    // Approving a finding does not auto-pass the whole audit — only logs.
-    // Hold-queue approve (job sheet level) is separate.
+  // Fallback: if listing is unavailable, keep prior result (no silent pass).
+  if (findings.length === 0) {
     return {};
   }
 
-  return {};
+  const nextResult: SheetResult = deriveSheetResultFromFindings(
+    findings.map(f => ({
+      severity: (f.severity ?? "S2") as FindingSeverity,
+      resolutionStatus: f.resolutionStatus,
+    }))
+  );
+
+  if (audit.result !== nextResult) {
+    await deps.updateAuditResultStatus(audit.id, nextResult);
+  }
+
+  const jobSheetStatus = sheetResultToJobSheetStatus(nextResult);
+  await deps.updateJobSheetStatus(audit.jobSheetId, jobSheetStatus);
+
+  return {
+    auditResultStatus: nextResult,
+    jobSheetStatus,
+  };
 }
 
 export interface FieldCorrectionResult {

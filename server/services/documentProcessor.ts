@@ -126,7 +126,9 @@ import {
 import {
   computeEce,
   isCalibrationEnabled,
+  loadReviewLabelSamples,
   suggestThreshold,
+  type PredictionSample,
 } from "./calibration";
 import {
   buildDriftAlert,
@@ -308,6 +310,8 @@ function buildFlaggedProcessorArtifacts(input: {
   processingSettings: Awaited<ReturnType<typeof db.getProcessingSettings>>;
   selectionResult?: SelectionResult;
   usedTemplateVersionId?: number;
+  /** Human review labels loaded for ECE (Wave-4 A2). */
+  labelledSamples?: PredictionSample[];
 }): FlaggedProcessorArtifactBuild {
   const artifacts: FlaggedProcessorArtifacts = {};
   let opsAlert: DriftAlert | null = null;
@@ -334,12 +338,11 @@ function buildFlaggedProcessorArtifacts(input: {
     const currentThreshold = confidenceToUnit(
       input.processingSettings.llmConfidenceThreshold ?? 70
     );
-    const labelledSamples: [] = [];
+    const labelledSamples = input.labelledSamples ?? [];
     const eceResult = computeEce(labelledSamples);
-    // Upload processing has no reviewed outcome labels. Preserve the
-    // unmeasurable state explicitly so this artifact cannot imply ECE = 0.
+    // Empty or below N≥200 → unmeasurable (ece null). Never theater ECE=0.
     const calibrationMeasurement =
-      labelledSamples.length === 0
+      labelledSamples.length === 0 || !eceResult.measurementReady
         ? { ece: null, measurementReady: false }
         : {
             ece: eceResult.ece,
@@ -350,13 +353,17 @@ function buildFlaggedProcessorArtifacts(input: {
       sampleCount: labelledSamples.length,
       ece: calibrationMeasurement.ece,
       measurementReady: calibrationMeasurement.measurementReady,
+      minSamplesRequired: eceResult.minSamplesRequired,
+      provisionalEce: eceResult.provisionalEce,
       bins: eceResult.bins,
       thresholdSuggestion: suggestThreshold(labelledSamples, {
         currentThreshold,
       }),
       note:
         eceResult.note ??
-        "No reviewed outcome labels are available during upload processing.",
+        (labelledSamples.length === 0
+          ? "No reviewed outcome labels are available yet."
+          : undefined),
     };
   });
 
@@ -2780,6 +2787,20 @@ async function processJobSheetWithOptions(
     );
   }
 
+  let labelledSamples: PredictionSample[] = [];
+  if (isCalibrationEnabled()) {
+    try {
+      labelledSamples = await loadReviewLabelSamples({
+        listReviewedFindings: () => db.listReviewedFindingsForCalibration(),
+      });
+    } catch (error) {
+      console.warn(
+        "[DocumentProcessor] Failed to load review labels for ECE (non-fatal):",
+        error
+      );
+    }
+  }
+
   const { artifacts: flaggedProcessorArtifacts, opsAlert } =
     buildFlaggedProcessorArtifacts({
       jobSheetId,
@@ -2789,6 +2810,7 @@ async function processJobSheetWithOptions(
       processingSettings,
       selectionResult,
       usedTemplateVersionId,
+      labelledSamples,
     });
 
   if (opsAlert) {

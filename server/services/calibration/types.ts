@@ -16,11 +16,20 @@ export interface EceBin {
 }
 
 export interface EceResult {
-  /** Null when no labelled samples — never report 0 as perfect calibration. */
+  /** Null when unmeasurable or N below readiness threshold — never theater 0. */
   ece: number | null;
   bins: EceBin[];
-  /** True only when sample count supports a meaningful ECE measurement. */
+  /** True only when labelled sample count ≥ ECE_MIN_SAMPLES (N≥200). */
   measurementReady: boolean;
+  /** Number of labelled prediction samples contributing to this result. */
+  sampleCount: number;
+  /** Readiness threshold (default 200). */
+  minSamplesRequired: number;
+  /**
+   * Computed ECE while still accumulating labels (measurementReady=false).
+   * Must not be treated as an authoritative calibration score.
+   */
+  provisionalEce?: number;
   note?: string;
 }
 
