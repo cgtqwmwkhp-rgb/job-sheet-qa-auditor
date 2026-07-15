@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -425,19 +424,19 @@ export default function TechnicianDashboard() {
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">Dark Mode</span>
                     <span className="text-xs text-muted-foreground">
-                      Adjust app appearance
+                      Theme selection is coming soon
                     </span>
                   </div>
-                  <Switch disabled />
+                  <Badge variant="secondary">Coming soon</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">Offline Mode</span>
                     <span className="text-xs text-muted-foreground">
-                      Cache data for field use
+                      Offline access is coming soon
                     </span>
                   </div>
-                  <Switch defaultChecked />
+                  <Badge variant="secondary">Coming soon</Badge>
                 </div>
                 <div className="pt-4 border-t">
                   <Button
@@ -507,17 +506,23 @@ export default function TechnicianDashboard() {
         </Button>
         <Button
           variant="ghost"
+          disabled
+          aria-label="My Jobs is coming soon"
           className="flex flex-col items-center gap-1 h-auto py-2 px-4 text-muted-foreground hover:text-foreground"
         >
           <FileText className="h-5 w-5" />
           <span className="text-[10px] font-medium">My Jobs</span>
+          <span className="text-[9px] leading-none">Coming soon</span>
         </Button>
         <Button
           variant="ghost"
+          disabled
+          aria-label="History is coming soon"
           className="flex flex-col items-center gap-1 h-auto py-2 px-4 text-muted-foreground hover:text-foreground"
         >
           <Calendar className="h-5 w-5" />
           <span className="text-[10px] font-medium">History</span>
+          <span className="text-[9px] leading-none">Coming soon</span>
         </Button>
       </div>
     </div>
