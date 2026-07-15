@@ -102,9 +102,11 @@ describe("Review Workstation Contract (PR-13)", () => {
       expect(pane).toContain("captureFieldCorrection");
     });
 
-    it("exposes Correct value UI", () => {
-      expect(pane).toContain("Correct value");
+    it("exposes Fix displayed value UI (Wave-7 honest copy)", () => {
+      expect(pane).toContain("Fix displayed value");
       expect(pane).toContain("correctionDialog");
+      expect(pane).not.toMatch(/taught the template/i);
+      expect(pane).not.toMatch(/saved to template memory/i);
     });
 
     it("wires BeforeAfterComparePane confirm/override to auditActions", () => {

@@ -1234,6 +1234,87 @@ export const templateRouter = router({
       .query(async ({ input }) => resolvePromoteRequest(input.promoteId)),
   }),
 
+  // Wave-7: template memory (closed-loop learning)
+  memory: router({
+    listForTemplate: qaLeadProcedure
+      .input(z.object({ templateId: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        const { listMemoryForTemplate } = await import(
+          "../services/templateMemory"
+        );
+        return listMemoryForTemplate(input.templateId);
+      }),
+    listForJobSheet: qaLeadProcedure
+      .input(z.object({ jobSheetId: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        const audit = await db.getAuditResultByJobSheetId(input.jobSheetId);
+        if (!audit?.templateId) return [];
+        const { listMemoryForTemplate } = await import(
+          "../services/templateMemory"
+        );
+        return listMemoryForTemplate(audit.templateId);
+      }),
+    proposeFromCorrection: qaLeadProcedure
+      .input(
+        z.object({
+          findingId: z.number().int().positive(),
+          correctedValue: z.string().min(1).max(4000),
+          trainingReasonCode: z.enum([
+            "ocr_misread",
+            "roi_misaligned",
+            "rule_wrong",
+            "template_mismatch",
+            "true_defect",
+          ]),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const finding = await db.getAuditFindingById(input.findingId);
+        if (!finding) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Finding not found" });
+        }
+        const audit = await db.getAuditResultById(finding.auditResultId);
+        if (!audit) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Audit not found" });
+        }
+        const jobSheet = await db.getJobSheetById(audit.jobSheetId);
+        if (jobSheet) {
+          const { enforceJobSheetAccess } = await import(
+            "../utils/authorization"
+          );
+          enforceJobSheetAccess(jobSheet, ctx.user);
+        }
+        const { recordCorrectionEvent } = await import(
+          "../services/templateMemory"
+        );
+        const result = await recordCorrectionEvent({
+          correctionType: "field_correction",
+          trainingReasonCode: input.trainingReasonCode,
+          findingId: input.findingId,
+          auditResultId: finding.auditResultId,
+          jobSheetId: audit.jobSheetId,
+          templateId: audit.templateId ?? null,
+          templateVersionId: audit.templateVersionId ?? null,
+          fieldKey: finding.fieldName || "unknown",
+          ruleId: finding.ruleId,
+          originalValue: finding.normalisedSnippet ?? finding.rawSnippet,
+          correctedValue: input.correctedValue,
+          reviewerId: ctx.user.id,
+          idempotencyKey: `propose:${input.findingId}:${input.trainingReasonCode}:${input.correctedValue.slice(0, 64)}`,
+        });
+        return {
+          kind: result.studioConfirmRequired
+            ? ("studio_draft" as const)
+            : ("memory_candidate" as const),
+          proposalId: result.candidateId,
+          correctionId: result.correctionId,
+          status: result.promotionStatus,
+          agreeCount: result.agreeCount,
+          studioConfirmRequired: result.studioConfirmRequired,
+        };
+      }),
+  }),
+
   // Template override (review workstation)
   overrides: router({
     list: qaLeadProcedure.query(() => listOverrides()),
