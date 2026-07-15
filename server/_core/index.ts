@@ -34,6 +34,7 @@ import {
   dropIngestRouter,
   startDropIngestPoller,
 } from "../services/dropIngest/boot";
+import { initJobSheetProcessingQueue } from "../services/jobQueue";
 import { sdk } from "./sdk";
 import { generateCsrfToken } from "../utils/csrf";
 import {
@@ -189,6 +190,14 @@ async function startServer() {
     }
   } catch (error) {
     console.warn("[Webhooks] Boot hydrate skipped:", error);
+  }
+
+  // Reclaim stale durable jobs before accepting traffic. Recovery is best-effort:
+  // queue availability must not prevent the HTTP service from starting.
+  try {
+    await initJobSheetProcessingQueue();
+  } catch (error) {
+    console.warn("[JobQueue] Boot recovery skipped:", error);
   }
 
   // Health check endpoints (before auth, before static files)
