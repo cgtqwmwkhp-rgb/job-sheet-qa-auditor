@@ -45,8 +45,8 @@ export interface AuditActionResult {
   previousResolutionStatus: ResolutionStatus;
   /** Present when waive created a waiver row */
   waiverId?: number;
-  /** Present when undo deleted a waiver */
-  deletedWaiverId?: number;
+  /** Present when undo revoked a waiver without deleting its evidence */
+  revokedWaiverId?: number;
   /** Job sheet status after the action (if changed) */
   jobSheetStatus?: string;
   /** Audit result status after the action (if changed) */

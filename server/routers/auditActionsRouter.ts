@@ -107,8 +107,8 @@ function createDbDeps(tx?: DbExecutor): AuditActionDeps {
     updateJobSheetStatus: (id, status) =>
       db.updateJobSheetStatus(id, status, tx),
     createWaiver: data => db.createWaiver(data, tx),
-    getWaiverByFindingId: id => db.getWaiverByFindingId(id),
-    deleteWaiver: id => db.deleteWaiver(id, tx),
+    getWaiverByFindingId: id => db.getWaiverByFindingId(id, tx),
+    revokeWaiver: (id, revokedBy) => db.revokeWaiver(id, revokedBy, tx),
     logAction: async data => {
       await db.logAction(data, { tx, required: true });
     },
@@ -226,7 +226,7 @@ export const auditActionsRouter = router({
       }
     }),
 
-  /** Soft-undo the last finding action (status revert + waiver delete if needed). */
+  /** Soft-undo the last finding action (status revert + waiver revocation if needed). */
   undo: qaLeadProcedure
     .input(z.object({ findingId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {

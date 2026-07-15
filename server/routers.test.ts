@@ -75,7 +75,7 @@ vi.mock("./db", () => ({
   updateDisputeStatus: vi.fn().mockResolvedValue(undefined),
   createWaiver: vi.fn().mockResolvedValue({ id: 1 }),
   getWaiverByFindingId: vi.fn().mockResolvedValue(null),
-  deleteWaiver: vi.fn().mockResolvedValue(undefined),
+  revokeWaiver: vi.fn().mockResolvedValue(undefined),
   getAuditFindingById: vi.fn().mockResolvedValue({
     id: 1,
     auditResultId: 1,

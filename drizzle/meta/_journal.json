@@ -64,6 +64,13 @@
       "when": 1767984000000,
       "tag": "0008_webhook_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1784077140000,
+      "tag": "0009_waiver_revocation",
+      "breakpoints": true
     }
   ]
 }

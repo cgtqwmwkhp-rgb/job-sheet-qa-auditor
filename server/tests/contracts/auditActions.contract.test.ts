@@ -90,18 +90,30 @@ function createMemoryDeps() {
     },
     createWaiver: async data => {
       const id = nextWaiverId++;
-      waivers.set(id, { id, auditFindingId: data.auditFindingId });
+      waivers.set(id, {
+        id,
+        auditFindingId: data.auditFindingId,
+        auditTrail: data.auditTrail,
+      });
       return { id };
     },
     getWaiverByFindingId: async auditFindingId => {
       return (
         Array.from(waivers.values()).find(
-          w => w.auditFindingId === auditFindingId
+          w =>
+            w.auditFindingId === auditFindingId &&
+            !(w as WaiverRecord & { revokedAt?: Date }).revokedAt
         ) ?? undefined
       );
     },
-    deleteWaiver: async id => {
-      waivers.delete(id);
+    revokeWaiver: async (id, revokedBy) => {
+      const waiver = waivers.get(id);
+      if (!waiver) throw new Error("waiver not found");
+      waivers.set(id, {
+        ...waiver,
+        revokedAt: new Date(),
+        revokedBy,
+      });
     },
     logAction: async data => {
       logs.push(data as unknown as Record<string, unknown>);
@@ -138,6 +150,16 @@ describe("Audit Actions Contract (PR-10)", () => {
       const content = fs.readFileSync(schemaPath, "utf-8");
       expect(content).toContain("resolutionStatus");
       expect(content).toContain("previousResolutionStatus");
+      expect(content).toContain('revokedAt: timestamp("revokedAt")');
+      expect(content).toContain('revokedBy: int("revokedBy")');
+    });
+
+    it("revokes waivers without hard-deleting their audit evidence", () => {
+      const dbPath = path.resolve(__dirname, "../../db.ts");
+      const dbSource = fs.readFileSync(dbPath, "utf-8");
+      expect(dbSource).toContain("export async function revokeWaiver");
+      expect(dbSource).toContain("isNull(waivers.revokedAt)");
+      expect(dbSource).not.toContain("db.delete(waivers)");
     });
 
     it("auditActionsRouter wraps compliance mutations in DB transactions", () => {
@@ -326,7 +348,7 @@ describe("Audit Actions Contract (PR-10)", () => {
       expect(mem.logs.some(l => l.action === "FINDING_UNDO")).toBe(true);
     });
 
-    it("undoing waive deletes the waiver", async () => {
+    it("undoing waive revokes the waiver while preserving its audit trail", async () => {
       const mem = createMemoryDeps();
       await applyFindingAction(mem.deps, {
         findingId: 1,
@@ -341,8 +363,19 @@ describe("Audit Actions Contract (PR-10)", () => {
         userId: 1,
       });
 
-      expect(undone.deletedWaiverId).toBeDefined();
-      expect(mem.waivers.size).toBe(0);
+      expect(undone.revokedWaiverId).toBeDefined();
+      expect(mem.waivers.size).toBe(1);
+      const waiver = mem.waivers.get(undone.revokedWaiverId!) as WaiverRecord & {
+        auditTrail: unknown;
+        revokedAt?: Date;
+        revokedBy?: number;
+      };
+      expect(waiver.auditTrail).toEqual([
+        expect.objectContaining({ action: "CREATED", reason: "exception" }),
+      ]);
+      expect(waiver.revokedAt).toBeInstanceOf(Date);
+      expect(waiver.revokedBy).toBe(1);
+      expect(await mem.deps.getWaiverByFindingId(1)).toBeUndefined();
     });
 
     it("throws when nothing to undo", async () => {

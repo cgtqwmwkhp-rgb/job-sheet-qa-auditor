@@ -43,6 +43,9 @@ export interface AuditResultRecord {
 export interface WaiverRecord {
   id: number;
   auditFindingId: number;
+  auditTrail?: unknown;
+  revokedAt?: Date | null;
+  revokedBy?: number | null;
 }
 
 export interface AuditActionDeps {
@@ -72,7 +75,7 @@ export interface AuditActionDeps {
   getWaiverByFindingId: (
     auditFindingId: number
   ) => Promise<WaiverRecord | undefined>;
-  deleteWaiver: (id: number) => Promise<void>;
+  revokeWaiver: (id: number, revokedBy: number) => Promise<void>;
   logAction: (data: {
     userId: number;
     action: string;
@@ -225,7 +228,7 @@ export async function applyFindingAction(
 
 /**
  * Soft-undo: revert finding to previousResolutionStatus (or open).
- * Deletes waiver if undoing a waive.
+ * Revokes the active waiver if undoing a waive, retaining its audit evidence.
  */
 export async function undoFindingAction(
   deps: AuditActionDeps,
@@ -245,12 +248,12 @@ export async function undoFindingAction(
     finding.previousResolutionStatus ?? "open";
   const undoneAction = STATUS_TO_ACTION[current];
 
-  let deletedWaiverId: number | undefined;
+  let revokedWaiverId: number | undefined;
   if (current === "waived") {
     const waiver = await deps.getWaiverByFindingId(input.findingId);
     if (waiver) {
-      await deps.deleteWaiver(waiver.id);
-      deletedWaiverId = waiver.id;
+      await deps.revokeWaiver(waiver.id, input.userId);
+      revokedWaiverId = waiver.id;
     }
   }
 
@@ -274,7 +277,7 @@ export async function undoFindingAction(
       undoneAction,
       fromStatus: current,
       toStatus: restoreTo,
-      deletedWaiverId,
+      revokedWaiverId,
     },
   });
 
@@ -284,7 +287,7 @@ export async function undoFindingAction(
     findingId: input.findingId,
     resolutionStatus: restoreTo,
     previousResolutionStatus: current,
-    deletedWaiverId,
+    revokedWaiverId,
     undoToken: buildUndoToken(input.findingId, current, restoreTo),
   };
 }

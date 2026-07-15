@@ -276,6 +276,9 @@ export const waivers = mysqlTable("waivers", {
   /** Audit trail - full history as JSON */
   auditTrail: json("auditTrail").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  /** Undo revokes a waiver instead of deleting its audit evidence. */
+  revokedAt: timestamp("revokedAt"),
+  revokedBy: int("revokedBy").references(() => users.id),
 });
 
 export type Waiver = typeof waivers.$inferSelect;
