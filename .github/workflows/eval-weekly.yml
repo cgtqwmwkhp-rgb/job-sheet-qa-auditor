@@ -84,6 +84,23 @@ jobs:
           EVAL_ENVIRONMENT: ${{ github.event.inputs.environment || 'local' }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      - name: Field exact-match F1 gate
+        id: field_f1
+        run: |
+          set +e
+          pnpm eval:field-f1
+          CODE=$?
+          set -e
+          echo "exit_code=$CODE" >> "$GITHUB_OUTPUT"
+          if [ "$CODE" -eq 0 ]; then
+            echo "Field-F1 gate PASS"
+          elif [ "$CODE" -eq 2 ]; then
+            echo "::warning::Field-F1 gate UNAVAILABLE (insufficient labelled N) — not treated as greenwash pass"
+          else
+            echo "::error::Field-F1 gate FAIL"
+            exit 1
+          fi
+
       - name: Upload evaluation report
         uses: actions/upload-artifact@v4
         with:
@@ -95,8 +112,15 @@ jobs:
         run: |
           if [ -f scripts/eval/reports/latest.json ]; then
             SCORE=$(cat scripts/eval/reports/latest.json | jq '.overallScore // 0')
-            echo "Overall score: $SCORE"
-            
+            SIMULATED=$(cat scripts/eval/reports/latest.json | jq -r '.simulated // false')
+            echo "Overall score: $SCORE simulated=$SIMULATED"
+
+            # Simulated fixture runs must not greenwash accuracy gates (Wave-4 A1).
+            if [ "$SIMULATED" = "true" ]; then
+              echo "::warning::Eval report is simulated; skipping accuracy score threshold"
+              exit 0
+            fi
+
             # Alert if score below 80%
             THRESHOLD=0.80
             if (( $(echo "$SCORE < $THRESHOLD" | bc -l) )); then

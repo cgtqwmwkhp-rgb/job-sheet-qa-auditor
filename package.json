@@ -35,6 +35,7 @@
     "baseline:list": "npx tsx scripts/parity/list-baselines.ts",
     "eval:run": "npx tsx scripts/eval/run-eval.ts",
     "eval:quick": "npx tsx scripts/eval/run-eval.ts --mode fixtures",
+    "eval:field-f1": "npx tsx scripts/eval/run-field-f1-gate.ts",
     "drift:check": "npx tsx scripts/drift/run-drift-check.ts",
     "drift:baseline": "npx tsx scripts/drift/run-drift-check.ts --create-baseline",
     "governance:check": "npx tsx scripts/governance/check-environment-contract.ts",

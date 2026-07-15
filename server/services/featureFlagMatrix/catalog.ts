@@ -252,6 +252,22 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     deploy: unsetBoth,
   },
   {
+    key: "FEATURE_FIELD_F1_GATE",
+    description: "Field exact-match F1 measurement artifact",
+    defaultWhenUnset: "off",
+    critical: false,
+    parity: "unspecified",
+    deploy: unsetBoth,
+  },
+  {
+    key: "FEATURE_ATTRIBUTION_SLO",
+    description: "Technician attribution unattributed-rate SLO",
+    defaultWhenUnset: "off",
+    critical: false,
+    parity: "unspecified",
+    deploy: unsetBoth,
+  },
+  {
     key: "FEATURE_HOLD_SLA",
     description: "Hold-queue SLA helpers",
     defaultWhenUnset: "off",

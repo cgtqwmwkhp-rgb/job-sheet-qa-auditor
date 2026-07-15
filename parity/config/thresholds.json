@@ -1,7 +1,7 @@
 {
   "$schema": "./thresholds.schema.json",
-  "version": "2.0.0",
-  "description": "Parity threshold governance configuration - applies to POSITIVE suite only",
+  "version": "2.1.0",
+  "description": "Parity threshold governance - Wave-4 A3 PR subset \u226515 + field-F1 SLO hooks",
   "thresholds": {
     "overall": {
       "minPassRate": 1.0,
@@ -44,7 +44,23 @@
     "failOnMissingBaseline": false
   },
   "ci": {
-    "prSubsetDocIds": ["doc-001", "doc-002", "doc-004"],
+    "prSubsetDocIds": [
+      "doc-001",
+      "doc-003",
+      "doc-009",
+      "doc-010",
+      "doc-011",
+      "doc-013",
+      "doc-014",
+      "doc-016",
+      "doc-017",
+      "doc-019",
+      "doc-020",
+      "doc-021",
+      "doc-023",
+      "doc-024",
+      "doc-026"
+    ],
     "nightlyFullSuite": true,
     "artifactRetentionDays": 30,
     "summaryFormat": "markdown"
@@ -64,13 +80,22 @@
     "OCR_FAILURE",
     "PIPELINE_ERROR"
   ],
-  "canonicalStatuses": [
-    "PASS",
-    "FAIL",
-    "REVIEW_QUEUE"
-  ],
+  "canonicalStatuses": ["PASS", "FAIL", "REVIEW_QUEUE"],
   "semanticRules": {
     "PASS_REQUIRES_NULL_REASON_CODE": true,
     "description": "When status is PASS, reasonCode must be null/absent. VALID is NOT a reason code."
+  },
+  "fieldF1": {
+    "minSamplesRequired": 50,
+    "minExactMatchF1": 0.9,
+    "fixturePath": "parity/fixtures/field-f1-labelled.json"
+  },
+  "sampling": {
+    "maxPassSampleMissRate": 0.05,
+    "minPassSamplesRequired": 30
+  },
+  "attribution": {
+    "maxUnattributedRate": 0.05,
+    "minSheetsRequired": 50
   }
 }
