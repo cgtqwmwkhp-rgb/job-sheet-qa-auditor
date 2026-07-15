@@ -128,6 +128,7 @@ export default function TechnicianDashboard() {
   const passedAudits = data?.stats.passedAudits ?? 0;
   const defectsFound = data?.stats.defectsFound ?? 0;
   const hasScoreData = (data?.scorecard.documentsProcessed ?? 0) > 0;
+  const dashboardUnavailable = isError || (!isLoading && !data);
 
   return (
     <div className="min-h-screen bg-muted/40 pb-20">
@@ -190,6 +191,14 @@ export default function TechnicianDashboard() {
                 <Loader2 className="h-5 w-5 animate-spin" />
                 <span className="text-sm">Loading scorecard…</span>
               </div>
+            ) : dashboardUnavailable ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Scorecard unavailable</p>
+                <p className="text-xs text-primary-foreground/70">
+                  Your current quality score could not be loaded. Try again
+                  later.
+                </p>
+              </div>
             ) : (
               <>
                 <div className="flex justify-between items-start mb-6">
@@ -243,7 +252,7 @@ export default function TechnicianDashboard() {
                 <CheckCircle2 className="h-6 w-6 text-green-600" />
               </div>
               <span className="text-3xl font-bold text-foreground">
-                {isLoading ? "—" : passedAudits}
+                {isLoading || dashboardUnavailable ? "—" : passedAudits}
               </span>
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-1">
                 Passed Audits
@@ -256,7 +265,7 @@ export default function TechnicianDashboard() {
                 <AlertTriangle className="h-6 w-6 text-amber-600" />
               </div>
               <span className="text-3xl font-bold text-foreground">
-                {isLoading ? "—" : defectsFound}
+                {isLoading || dashboardUnavailable ? "—" : defectsFound}
               </span>
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-1">
                 Defects Found
@@ -281,6 +290,12 @@ export default function TechnicianDashboard() {
           <TabsContent value="audits" className="space-y-3">
             {isLoading ? (
               <ListSkeleton items={4} />
+            ) : dashboardUnavailable ? (
+              <Card>
+                <CardContent className="p-6 text-center text-sm text-muted-foreground">
+                  Recent audits are unavailable right now. Try again later.
+                </CardContent>
+              </Card>
             ) : !data?.recentAudits.length ? (
               <Card>
                 <CardContent className="p-6 text-center text-sm text-muted-foreground">
@@ -331,6 +346,12 @@ export default function TechnicianDashboard() {
           <TabsContent value="defects" className="space-y-3">
             {isLoading ? (
               <ListSkeleton items={3} />
+            ) : dashboardUnavailable ? (
+              <Card>
+                <CardContent className="p-6 text-center text-sm text-muted-foreground">
+                  Defects are unavailable right now. Try again later.
+                </CardContent>
+              </Card>
             ) : !data?.defects.length ? (
               <Card>
                 <CardContent className="p-6 text-center text-sm text-muted-foreground">
