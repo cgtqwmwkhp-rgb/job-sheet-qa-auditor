@@ -786,10 +786,7 @@ export async function listReviewedFindingsForCalibration(options?: {
       confidenceScore: auditResults.confidenceScore,
     })
     .from(auditFindings)
-    .innerJoin(
-      auditResults,
-      eq(auditFindings.auditResultId, auditResults.id)
-    )
+    .innerJoin(auditResults, eq(auditFindings.auditResultId, auditResults.id))
     .where(
       inArray(auditFindings.resolutionStatus, [
         "waived",

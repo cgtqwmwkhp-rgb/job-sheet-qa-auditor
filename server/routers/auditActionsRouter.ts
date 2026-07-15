@@ -106,9 +106,9 @@ function toAuditActionTrpcError(
   });
 }
 
-function mapFindingRow(row: NonNullable<
-  Awaited<ReturnType<typeof db.getAuditFindingById>>
->) {
+function mapFindingRow(
+  row: NonNullable<Awaited<ReturnType<typeof db.getAuditFindingById>>>
+) {
   return {
     id: row.id,
     auditResultId: row.auditResultId,

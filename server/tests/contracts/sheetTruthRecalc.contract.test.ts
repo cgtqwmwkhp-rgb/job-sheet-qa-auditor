@@ -199,9 +199,9 @@ describe("Sheet truth recalculation (Wave-4 A2)", () => {
   describe("review labels feed ECE", () => {
     it("human labels accumulate and unlock measurement at N≥200", () => {
       const rows = Array.from({ length: ECE_MIN_SAMPLES }, (_, i) => ({
-        resolutionStatus: (i % 4 === 0
-          ? "approved"
-          : "overridden") as "approved" | "overridden",
+        resolutionStatus: (i % 4 === 0 ? "approved" : "overridden") as
+          | "approved"
+          | "overridden",
         confidenceScore: 50 + (i % 50),
       }));
 
