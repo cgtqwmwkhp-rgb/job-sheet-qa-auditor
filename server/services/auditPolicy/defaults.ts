@@ -242,8 +242,8 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
         {
           ruleId: "PHOTO-C014",
           label: "Before/After Inconclusive",
-          description: "Pair compare inconclusive or unpaired",
-          failClass: "informational",
+          description: "Pair compare inconclusive or unverified without VLM",
+          failClass: "minor",
           enabled: true,
           fieldAliases: ["Before/After Pair Compare", "Photo Evidence"],
         },

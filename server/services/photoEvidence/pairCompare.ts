@@ -2,22 +2,25 @@
  * Multimodal before/after pair compare.
  *
  * Gated by FEATURE_PHOTO_PAIR_COMPARE. Fail-soft: never throws; returns
- * inconclusive artifact when VLM unavailable.
+ * inconclusive artifact when VLM unavailable (no medium-confidence heuristic pass).
  *
  * Axes: work_done | repaired_properly | clean | residual_risk
  * Confidence bands: high (≥0.8) → Issue, medium → queue nudge, low → info
  *
  * VLM path (optional): when documentPdfBase64 is present and
  * FEATURE_VLM_VERIFICATION or PHOTO_PAIR_USE_VLM is true, tryVlmPairAxes
- * runs first; on failure falls back to heuristic.
+ * runs first. Gemini path when FEATURE_PHOTO_PAIR_GEMINI is true.
+ * On failure falls back to honest inconclusive heuristic (PHOTO-C014).
  */
 
+import { invokeLLM, isLLMConfigured } from "../../_core/llm";
 import { getVlmConfig } from "../vlmAdapter/types";
 import { createSafeLogger } from "../../utils/safeLogger";
 
 const logger = createSafeLogger("PhotoPairCompare");
 
 export const FEATURE_PHOTO_PAIR_COMPARE = "FEATURE_PHOTO_PAIR_COMPARE";
+export const FEATURE_PHOTO_PAIR_GEMINI = "FEATURE_PHOTO_PAIR_GEMINI";
 export const PHOTO_PAIR_USE_VLM = "PHOTO_PAIR_USE_VLM";
 
 export function isPhotoPairCompareEnabled(): boolean {
@@ -30,6 +33,11 @@ export function isPhotoPairVlmEnabled(): boolean {
     process.env.FEATURE_VLM_VERIFICATION === "true" ||
     process.env[PHOTO_PAIR_USE_VLM] === "true"
   );
+}
+
+/** Gemini pair-axes path when FEATURE_PHOTO_PAIR_GEMINI is true. */
+export function isPhotoPairGeminiEnabled(): boolean {
+  return process.env[FEATURE_PHOTO_PAIR_GEMINI] === "true";
 }
 
 export type AxisVerdict = "pass" | "fail" | "inconclusive";
@@ -53,7 +61,7 @@ export interface PhotoPairResult {
 
 export interface PhotoPairCompareArtifact {
   enabled: boolean;
-  provider: "heuristic" | "vlm" | "mock";
+  provider: "heuristic" | "vlm" | "mock" | "gemini";
   model: string;
   pairs: PhotoPairResult[];
   pageRoles: Array<{
@@ -80,7 +88,7 @@ export interface VlmPairAxesResult {
   axes?: PhotoPairAxes;
   confidence?: number;
   reasoning?: string;
-  provider: "vlm" | "mock";
+  provider: "vlm" | "mock" | "gemini";
   model: string;
   error?: string;
 }
@@ -382,6 +390,144 @@ export async function tryVlmPairAxes(input: {
   }
 }
 
+function buildMockGeminiPairAxesJson(
+  beforePage: number,
+  afterPage: number
+): string {
+  return JSON.stringify({
+    axes: {
+      work_done: "pass",
+      repaired_properly: "pass",
+      clean: "pass",
+      residual_risk: "pass",
+    },
+    confidence: 0.84,
+    reasoning: `mock Gemini pair axes pages ${beforePage}->${afterPage}`,
+  });
+}
+
+/**
+ * Gemini multimodal pair-axes via invokeLLM (PDF document).
+ * Fail-soft: returns success:false on errors (caller falls back to inconclusive heuristic).
+ */
+export async function tryGeminiPairAxes(input: {
+  documentPdfBase64: string;
+  beforePage: number;
+  afterPage: number;
+  partsUsedSnippet?: string;
+  repairsSnippet?: string;
+}): Promise<VlmPairAxesResult> {
+  const model =
+    process.env.GEMINI_MODEL?.trim() ||
+    process.env.JUDGMENT_MODEL?.trim() ||
+    "gemini-2.5-pro";
+
+  if (process.env.LLM_PROVIDER === "mock" || !isLLMConfigured()) {
+    if (process.env.LLM_PROVIDER !== "mock") {
+      return {
+        success: false,
+        provider: "gemini",
+        model,
+        error: "MISSING_API_KEY",
+        reasoning: "GEMINI_API_KEY not configured",
+      };
+    }
+    const parsed = parsePairAxesFromText(
+      buildMockGeminiPairAxesJson(input.beforePage, input.afterPage)
+    );
+    if (!parsed) {
+      return {
+        success: false,
+        provider: "mock",
+        model: "mock-gemini-pair-v1",
+        error: "MOCK_PARSE_FAILED",
+      };
+    }
+    return {
+      success: true,
+      axes: parsed.axes,
+      confidence: parsed.confidence,
+      reasoning: parsed.reasoning,
+      provider: "mock",
+      model: "mock-gemini-pair-v1",
+    };
+  }
+
+  const context = [
+    `Before page: ${input.beforePage}`,
+    `After page: ${input.afterPage}`,
+    input.partsUsedSnippet ? `Parts used: ${input.partsUsedSnippet}` : "",
+    input.repairsSnippet ? `Repairs: ${input.repairsSnippet}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    const response = await invokeLLM({
+      messages: [
+        {
+          role: "system",
+          content:
+            "You compare before/after job-sheet photos. Reply with JSON only for the requested axes.",
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: `${PAIR_AXES_PROMPT}\n${context}` },
+            {
+              type: "file_url",
+              file_url: {
+                url: `data:application/pdf;base64,${input.documentPdfBase64}`,
+                mime_type: "application/pdf",
+              },
+            },
+          ],
+        },
+      ],
+      maxTokens: 384,
+      costMeta: {
+        stage: "photo_pair_compare",
+        provider: "gemini",
+        tool: "gemini_photo_pair_axes",
+      },
+    });
+
+    const text =
+      typeof response.choices[0]?.message?.content === "string"
+        ? response.choices[0].message.content
+        : "";
+    const parsed = parsePairAxesFromText(text);
+    if (!parsed) {
+      return {
+        success: false,
+        provider: "gemini",
+        model: response.model || model,
+        error: "UNPARSEABLE",
+        reasoning: text.slice(0, 200) || "unparseable model response",
+      };
+    }
+
+    return {
+      success: true,
+      axes: parsed.axes,
+      confidence: parsed.confidence,
+      reasoning: parsed.reasoning,
+      provider: "gemini",
+      model: response.model || model,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown";
+    logger.warn("Gemini pair axes failed soft", { message });
+    return {
+      success: false,
+      provider: "gemini",
+      model,
+      error: "NETWORK_OR_PARSE",
+      reasoning: message,
+    };
+  }
+}
+
 /**
  * Run VLM pair compare for all detected before/after pairs.
  * Returns null when VLM cannot produce results (caller falls back to heuristic).
@@ -398,7 +544,7 @@ export async function runVlmPairCompare(
 
   const pairs: PhotoPairResult[] = [];
   let model = "vlm-pair-v1";
-  let provider: "vlm" | "mock" = "vlm";
+  let provider: "vlm" | "mock" | "gemini" = "vlm";
 
   for (const pp of pagePairs) {
     const r = await tryVlmPairAxes({
@@ -412,7 +558,7 @@ export async function runVlmPairCompare(
       return null;
     }
     model = r.model;
-    provider = r.provider;
+    provider = r.provider === "gemini" ? "gemini" : r.provider;
     const confidence = r.confidence ?? 0.7;
     pairs.push({
       beforePage: pp.beforePage,
@@ -436,7 +582,61 @@ export async function runVlmPairCompare(
 }
 
 /**
+ * Run Gemini pair compare for all detected before/after pairs.
+ * Returns null when Gemini cannot produce results (caller falls back to inconclusive heuristic).
+ */
+export async function runGeminiPairCompare(
+  input: PairCompareInput
+): Promise<PhotoPairCompareArtifact | null> {
+  if (!input.documentPdfBase64) return null;
+
+  const started = Date.now();
+  const roles = classifyPageRoles(input.text, input.totalPages);
+  const pagePairs = pairFromRoles(roles);
+  if (pagePairs.length === 0) return null;
+
+  const pairs: PhotoPairResult[] = [];
+  let model = "gemini-pair-v1";
+  let provider: "gemini" | "mock" = "gemini";
+
+  for (const pp of pagePairs) {
+    const r = await tryGeminiPairAxes({
+      documentPdfBase64: input.documentPdfBase64,
+      beforePage: pp.beforePage,
+      afterPage: pp.afterPage,
+      partsUsedSnippet: input.partsUsedSnippet,
+      repairsSnippet: input.repairsSnippet,
+    });
+    if (!r.success || !r.axes) {
+      return null;
+    }
+    model = r.model;
+    provider = r.provider === "mock" ? "mock" : "gemini";
+    const confidence = r.confidence ?? 0.7;
+    pairs.push({
+      beforePage: pp.beforePage,
+      afterPage: pp.afterPage,
+      axes: r.axes,
+      confidence,
+      confidenceBand: bandFor(confidence),
+      reasoning: r.reasoning || "Gemini pair compare",
+    });
+  }
+
+  return {
+    enabled: isPhotoPairCompareEnabled(),
+    provider,
+    model,
+    pairs,
+    pageRoles: roles,
+    summary: `Gemini paired ${pairs.length} before/after page set(s).`,
+    processingTimeMs: Date.now() - started,
+  };
+}
+
+/**
  * Heuristic / mock pair compare — no real vision. Used when flag off or VLM absent.
+ * Default (no mockMode): inconclusive — visual axes are not verified without VLM/Gemini.
  */
 export function runHeuristicPairCompare(
   input: PairCompareInput
@@ -504,8 +704,7 @@ export function runHeuristicPairCompare(
         confidenceBand: "low",
         reasoning: "Mock: inconclusive lighting / framing.",
       });
-    } else {
-      // Default pass when labels present (deterministic scaffold until real VLM)
+    } else if (mock === "pass") {
       pairs.push({
         beforePage: pp.beforePage,
         afterPage: pp.afterPage,
@@ -515,10 +714,25 @@ export function runHeuristicPairCompare(
           clean: "pass",
           residual_risk: "pass",
         },
-        confidence: 0.62,
-        confidenceBand: bandFor(0.62),
+        confidence: 0.84,
+        confidenceBand: "high",
+        reasoning: "Mock: VLM-verified pass axes.",
+      });
+    } else {
+      // Honest inconclusive when labels present but no VLM/Gemini verification ran.
+      pairs.push({
+        beforePage: pp.beforePage,
+        afterPage: pp.afterPage,
+        axes: {
+          work_done: "inconclusive",
+          repaired_properly: "inconclusive",
+          clean: "inconclusive",
+          residual_risk: "inconclusive",
+        },
+        confidence: 0.4,
+        confidenceBand: "low",
         reasoning:
-          "Heuristic: before/after labels present; visual axes not verified by VLM — medium confidence pass.",
+          "Heuristic: before/after labels present; visual axes not verified by VLM — inconclusive.",
       });
     }
   }
@@ -536,7 +750,7 @@ export function runHeuristicPairCompare(
 
 /**
  * Run pair compare when feature flag is on. Fail-soft.
- * Prefer VLM when configured + PDF present; fall back to heuristic.
+ * Prefer VLM/Gemini when configured + PDF present; fall back to inconclusive heuristic.
  */
 export async function runPhotoPairCompare(
   input: PairCompareInput
@@ -545,15 +759,35 @@ export async function runPhotoPairCompare(
     return null;
   }
   try {
-    // Explicit mockMode keeps deterministic test path (skip VLM).
+    // Explicit mockMode keeps deterministic test path (skip VLM/Gemini).
     if (!input.mockMode && isPhotoPairVlmEnabled() && input.documentPdfBase64) {
       try {
         const vlmArt = await runVlmPairCompare(input);
         if (vlmArt) return vlmArt;
       } catch (err) {
-        logger.warn("VLM pair compare failed soft; using heuristic", {
-          message: err instanceof Error ? err.message : String(err),
-        });
+        logger.warn(
+          "VLM pair compare failed soft; using inconclusive heuristic",
+          {
+            message: err instanceof Error ? err.message : String(err),
+          }
+        );
+      }
+    }
+    if (
+      !input.mockMode &&
+      isPhotoPairGeminiEnabled() &&
+      input.documentPdfBase64
+    ) {
+      try {
+        const geminiArt = await runGeminiPairCompare(input);
+        if (geminiArt) return geminiArt;
+      } catch (err) {
+        logger.warn(
+          "Gemini pair compare failed soft; using inconclusive heuristic",
+          {
+            message: err instanceof Error ? err.message : String(err),
+          }
+        );
       }
     }
     return runHeuristicPairCompare(input);
