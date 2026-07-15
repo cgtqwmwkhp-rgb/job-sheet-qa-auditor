@@ -188,6 +188,14 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     deploy: unsetBoth,
   },
   {
+    key: "FEATURE_FIELD_VOTE",
+    description: "Multi-engine field voting + handwriting/VLM path",
+    defaultWhenUnset: "off",
+    critical: false,
+    parity: "unspecified",
+    deploy: unsetBoth,
+  },
+  {
     key: "FEATURE_EVIDENCE_PACK",
     description: "Evidence pack export",
     defaultWhenUnset: "off",

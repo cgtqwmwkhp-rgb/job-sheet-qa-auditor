@@ -59,6 +59,12 @@ import {
   type EnsembleAdapterResult,
 } from "./ensembleExtraction";
 import {
+  applyFieldVote,
+  isFieldVoteEnabled,
+  scrapeCriticalFieldsFromText,
+  type ApplyFieldVoteResult,
+} from "./fieldVoting";
+import {
   applyFindingHygiene,
   hasSignatureLabelEvidence,
   hasTechnicianSignatureLabelEvidence,
@@ -1682,6 +1688,68 @@ async function processJobSheetWithOptions(
     });
   }
 
+  // Stage 1.965: Multi-engine field vote + handwriting/VLM path (Wave-4 B2)
+  // Honest abstain when engines disagree; kill label-only signature Present theater.
+  const fieldVoteStart = Date.now();
+  let fieldVoteResult: ApplyFieldVoteResult | null = null;
+  if (isFieldVoteEnabled()) {
+    try {
+      const scrapedPrimary = scrapeCriticalFieldsFromText(extractedText);
+      const primaryMap: PreExtractedFieldMap = {};
+      for (const f of scrapedPrimary) {
+        primaryMap[f.fieldId] = {
+          value: f.value,
+          confidence: Math.round(f.confidence * 100),
+          pageNumber: 1,
+        };
+      }
+      fieldVoteResult = applyFieldVote({
+        primary: primaryMap,
+        crop: Object.keys(roiSpatialFields).length
+          ? roiSpatialFields
+          : undefined,
+        ensemble: ensembleResult?.ensembleExtractedFields,
+        selectionMarks: selectionMarksResult?.preExtractedFields,
+        multimodalRoi: multimodalRoiResult?.preExtractedFields,
+        vlmHint: vlmInkResult?.preExtractedHint ?? null,
+      });
+      if (
+        fieldVoteResult.votedFields &&
+        Object.keys(fieldVoteResult.votedFields).length > 0
+      ) {
+        roiSpatialFields = mergeRoiSpatialFields(
+          roiSpatialFields,
+          fieldVoteResult.votedFields,
+          {
+            preferRoiFor: new Set(Object.keys(fieldVoteResult.votedFields)),
+          }
+        );
+      }
+      recordStage({
+        stage: "Field Vote",
+        status: "success",
+        durationMs: Date.now() - fieldVoteStart,
+      });
+    } catch (voteErr) {
+      console.warn(
+        "[DocumentProcessor] Field vote failed (non-fatal):",
+        voteErr
+      );
+      recordStage({
+        stage: "Field Vote",
+        status: "failed",
+        durationMs: Date.now() - fieldVoteStart,
+        error: voteErr instanceof Error ? voteErr.message : "field vote failed",
+      });
+    }
+  } else {
+    recordStage({
+      stage: "Field Vote",
+      status: "skipped",
+      durationMs: Date.now() - fieldVoteStart,
+    });
+  }
+
   // =========================================================================
   // Stage 1.97: Pipeline Integration (Phase 1.4) — after ROI spatial + VLM ink
   // Master-flagged and fail-soft. Image QA fusion receives real stage maps or
@@ -1809,32 +1877,35 @@ async function processJobSheetWithOptions(
               )
             ),
           });
-          // Role-separated signature hints (never copy tech → customer).
-          if (
-            hasTechnicianSignatureLabelEvidence(extractedText) &&
-            !withRoi.engineerSignOff
-          ) {
-            withRoi.engineerSignOff = {
-              value: "Present",
-              confidence: 75,
-              pageNumber: 1,
-            };
-          }
-          if (
-            hasCustomerSignatureLabelEvidence(extractedText) &&
-            !withRoi.customerSignature
-          ) {
-            withRoi.customerSignature = {
-              value: "Present",
-              confidence: 75,
-              pageNumber: 1,
-            };
+          // Role-separated signature hints. Wave-4 B2: label-only is not ink proof.
+          // When field vote is on, VLM/handwriting vote owns signatures (no theater).
+          if (!isFieldVoteEnabled()) {
+            if (
+              hasTechnicianSignatureLabelEvidence(extractedText) &&
+              !withRoi.engineerSignOff
+            ) {
+              withRoi.engineerSignOff = {
+                value: "Present",
+                confidence: 40,
+                pageNumber: 1,
+              };
+            }
+            if (
+              hasCustomerSignatureLabelEvidence(extractedText) &&
+              !withRoi.customerSignature
+            ) {
+              withRoi.customerSignature = {
+                value: "Present",
+                confidence: 40,
+                pageNumber: 1,
+              };
+            }
+          } else if (fieldVoteResult?.votedFields) {
+            Object.assign(withRoi, fieldVoteResult.votedFields);
           }
           // VLM ink is technician/sign-off oriented unless customer label is present.
           if (vlmInkResult?.preExtractedHint) {
-            if (!withRoi.engineerSignOff) {
-              withRoi.engineerSignOff = vlmInkResult.preExtractedHint;
-            }
+            withRoi.engineerSignOff = vlmInkResult.preExtractedHint;
             if (
               hasCustomerSignatureLabelEvidence(extractedText) &&
               !withRoi.customerSignature
@@ -1872,30 +1943,32 @@ async function processJobSheetWithOptions(
               ),
             }
           );
-          if (
-            hasTechnicianSignatureLabelEvidence(extractedText) &&
-            !fields.engineerSignOff
-          ) {
-            fields.engineerSignOff = {
-              value: "Present",
-              confidence: 75,
-              pageNumber: 1,
-            };
-          }
-          if (
-            hasCustomerSignatureLabelEvidence(extractedText) &&
-            !fields.customerSignature
-          ) {
-            fields.customerSignature = {
-              value: "Present",
-              confidence: 75,
-              pageNumber: 1,
-            };
+          if (!isFieldVoteEnabled()) {
+            if (
+              hasTechnicianSignatureLabelEvidence(extractedText) &&
+              !fields.engineerSignOff
+            ) {
+              fields.engineerSignOff = {
+                value: "Present",
+                confidence: 40,
+                pageNumber: 1,
+              };
+            }
+            if (
+              hasCustomerSignatureLabelEvidence(extractedText) &&
+              !fields.customerSignature
+            ) {
+              fields.customerSignature = {
+                value: "Present",
+                confidence: 40,
+                pageNumber: 1,
+              };
+            }
+          } else if (fieldVoteResult?.votedFields) {
+            Object.assign(fields, fieldVoteResult.votedFields);
           }
           if (vlmInkResult?.preExtractedHint) {
-            if (!fields.engineerSignOff) {
-              fields.engineerSignOff = vlmInkResult.preExtractedHint;
-            }
+            fields.engineerSignOff = vlmInkResult.preExtractedHint;
             if (
               hasCustomerSignatureLabelEvidence(extractedText) &&
               !fields.customerSignature
@@ -2948,6 +3021,27 @@ async function processJobSheetWithOptions(
         modelRegistry: modelRegistryStamp(),
         ...(ensembleResult
           ? { ensembleExtraction: ensembleResult.artifact }
+          : {}),
+        ...(fieldVoteResult?.enabled && fieldVoteResult.batch
+          ? {
+              fieldVote: {
+                summary: fieldVoteResult.batch.summary,
+                handwriting: Object.fromEntries(
+                  Object.entries(fieldVoteResult.handwritingVotes).map(
+                    ([k, v]) => [
+                      k,
+                      {
+                        decision: v.decision,
+                        reasonCode: v.reasonCode,
+                        abstained: v.abstained,
+                        confidence: v.confidence,
+                        value: v.abstained ? null : v.value,
+                      },
+                    ]
+                  )
+                ),
+              },
+            }
           : {}),
         ...(selectionMarksResult
           ? { selectionMarks: selectionMarksResult.artifact }
