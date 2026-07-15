@@ -1,6 +1,7 @@
 import type { TrainingReasonCode } from "../trainingSignals";
 
-export const FEATURE_TEMPLATE_MEMORY_CAPTURE = "FEATURE_TEMPLATE_MEMORY_CAPTURE";
+export const FEATURE_TEMPLATE_MEMORY_CAPTURE =
+  "FEATURE_TEMPLATE_MEMORY_CAPTURE";
 export const FEATURE_TEMPLATE_MEMORY_APPLY = "FEATURE_TEMPLATE_MEMORY_APPLY";
 
 /** Evidence threshold before soft-apply (shadow). */
@@ -84,5 +85,7 @@ export function memoryKindForReason(
 
 /** Auto-shadow eligible kinds (hybrid-by-type product rule). */
 export function canAutoShadow(kind: MemoryKind): boolean {
-  return kind === "suppress_rule" || kind === "value_alias" || kind === "ocr_hint";
+  return (
+    kind === "suppress_rule" || kind === "value_alias" || kind === "ocr_hint"
+  );
 }

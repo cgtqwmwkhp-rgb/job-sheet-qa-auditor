@@ -17,7 +17,10 @@ import {
   type RecordCorrectionInput,
 } from "./types";
 
-function payloadHash(kind: MemoryKind, payload: Record<string, unknown>): string {
+function payloadHash(
+  kind: MemoryKind,
+  payload: Record<string, unknown>
+): string {
   return createHash("sha256")
     .update(JSON.stringify({ kind, ...payload }))
     .digest("hex");
@@ -77,8 +80,9 @@ export async function insertReviewCorrection(
     const result = await db.insert(reviewCorrections).values(row);
     return { correctionId: Number(result[0].insertId), created: true };
   } catch (err) {
-    const code = (err as { code?: string; cause?: { code?: string } })?.code
-      ?? (err as { cause?: { code?: string } })?.cause?.code;
+    const code =
+      (err as { code?: string; cause?: { code?: string } })?.code ??
+      (err as { cause?: { code?: string } })?.cause?.code;
     if (code === "ER_DUP_ENTRY") {
       const existing = await db
         .select({ id: reviewCorrections.id })

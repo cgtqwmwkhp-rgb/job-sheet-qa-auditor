@@ -42,7 +42,9 @@ import { ingestCorrectionIntoMemory, insertReviewCorrection } from "./store";
  * Always append review_corrections (P0 immutable events).
  * Memory candidate ingest is gated by FEATURE_TEMPLATE_MEMORY_CAPTURE.
  */
-export async function recordCorrectionEvent(input: RecordCorrectionInput): Promise<{
+export async function recordCorrectionEvent(
+  input: RecordCorrectionInput
+): Promise<{
   correctionId: number | null;
   candidateId: number | null;
   promotionStatus: string | null;
@@ -86,7 +88,8 @@ export async function recordCorrectionEvent(input: RecordCorrectionInput): Promi
       candidateId: mem?.candidateId ?? null,
       promotionStatus: mem?.promotionStatus ?? null,
       agreeCount: mem?.agreeCount ?? null,
-      studioConfirmRequired: mem?.studioConfirmRequired ?? studioConfirmRequired,
+      studioConfirmRequired:
+        mem?.studioConfirmRequired ?? studioConfirmRequired,
       captured: inserted.created,
     };
   } catch (err) {

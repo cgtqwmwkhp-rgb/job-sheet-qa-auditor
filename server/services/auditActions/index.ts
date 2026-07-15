@@ -296,9 +296,7 @@ export async function applyFindingAction(
   ) {
     memory = await recordCorrectionEvent({
       correctionType: input.action,
-      trainingReasonCode: normalizeTrainingReasonCode(
-        input.trainingReasonCode
-      ),
+      trainingReasonCode: normalizeTrainingReasonCode(input.trainingReasonCode),
       findingId: input.findingId,
       auditResultId: finding.auditResultId,
       jobSheetId: audit.jobSheetId,
@@ -306,8 +304,7 @@ export async function applyFindingAction(
       templateVersionId: audit.templateVersionId ?? null,
       fieldKey: finding.fieldName || "unknown",
       ruleId: finding.ruleId,
-      originalValue:
-        finding.normalisedSnippet ?? finding.rawSnippet ?? null,
+      originalValue: finding.normalisedSnippet ?? finding.rawSnippet ?? null,
       correctedValue: null,
       reviewerId: input.userId,
       reviewerReason: input.reason,
@@ -725,9 +722,7 @@ export async function captureFieldCorrection(
   if (audit?.jobSheetId != null) {
     memory = await recordCorrectionEvent({
       correctionType: "field_correction",
-      trainingReasonCode: normalizeTrainingReasonCode(
-        input.trainingReasonCode
-      ),
+      trainingReasonCode: normalizeTrainingReasonCode(input.trainingReasonCode),
       findingId: input.findingId,
       auditResultId: finding.auditResultId,
       jobSheetId: audit.jobSheetId,

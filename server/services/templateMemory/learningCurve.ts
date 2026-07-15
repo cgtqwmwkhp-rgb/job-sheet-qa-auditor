@@ -109,8 +109,7 @@ export async function computeTemplateLearningCurve(
 
   for (const bucket of Object.keys(cohorts) as CohortBucket[]) {
     const c = cohorts[bucket];
-    c.fieldCorrectionRate =
-      c.audits > 0 ? c.correctionEvents / c.audits : 0;
+    c.fieldCorrectionRate = c.audits > 0 ? c.correctionEvents / c.audits : 0;
   }
 
   const memoryRows = await db
