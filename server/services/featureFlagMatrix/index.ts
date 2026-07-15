@@ -131,9 +131,9 @@ export function getFeatureFlagMatrix(
   const mustMatchRows = deployMatrix.filter(
     r => r.critical && r.parity === "must_match"
   );
-  const allCriticalMatchedOrDocumented =
-    mustMatchRows.every(r => r.stagingProdMatch) &&
-    intentionallyDivergent.length > 0;
+  const allCriticalMatchedOrDocumented = mustMatchRows.every(
+    r => r.stagingProdMatch
+  );
 
   const uncatalogued: Array<{ key: string; raw: string }> = [];
   for (const [key, value] of Object.entries(process.env)) {

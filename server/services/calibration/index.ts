@@ -12,6 +12,7 @@ export * from "./types";
 export * from "./ece";
 export * from "./thresholds";
 export * from "./reviewLabels";
+export * from "./eceMeasurementStatus";
 
 /**
  * Default: disabled when FEATURE_CALIBRATION unset.

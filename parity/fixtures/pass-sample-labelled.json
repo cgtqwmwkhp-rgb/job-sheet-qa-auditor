@@ -1,0 +1,168 @@
+{
+  "version": "1",
+  "maxMissRate": 0.05,
+  "minSamplesRequired": 30,
+  "rows": [
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    {
+      "modelResult": "PASS",
+      "humanSampleRequested": true,
+      "humanFoundDefect": false
+    },
+    { "modelResult": "PASS", "humanSampleRequested": false },
+    {
+      "modelResult": "FAIL",
+      "humanSampleRequested": true,
+      "humanFoundDefect": true
+    }
+  ]
+}

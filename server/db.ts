@@ -39,6 +39,11 @@ import {
   parseStoredAuditPolicy,
   type AuditPolicy,
 } from "./services/auditPolicy";
+import {
+  extractPassSampleRowFromReport,
+  humanFoundDefectFromFindingStatuses,
+  type PassSampleReviewRow,
+} from "./services/samplingPolicy/missRateReport";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _connectionVerified = false;
@@ -817,6 +822,66 @@ export async function listReviewedFindingsForCalibration(options?: {
         confidenceScore: conf != null && Number.isFinite(conf) ? conf : null,
       };
     });
+}
+
+/**
+ * PASS human-sample rows for miss-rate measurement (Wave-6 P5).
+ * Parses samplingPolicy artifacts from recent PASS audits and joins finding resolutions.
+ */
+export async function listPassSampleReviewRows(options?: {
+  limit?: number;
+}): Promise<PassSampleReviewRow[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const limit = options?.limit ?? 2000;
+  const audits = await db
+    .select({
+      id: auditResults.id,
+      reportJson: auditResults.reportJson,
+    })
+    .from(auditResults)
+    .where(eq(auditResults.result, "pass"))
+    .orderBy(desc(auditResults.createdAt))
+    .limit(limit);
+
+  const sampled: Array<{ auditResultId: number; row: PassSampleReviewRow }> =
+    [];
+  for (const audit of audits) {
+    const row = extractPassSampleRowFromReport(audit.reportJson);
+    if (!row?.humanSampleRequested) continue;
+    sampled.push({ auditResultId: audit.id, row });
+  }
+
+  if (sampled.length === 0) return [];
+
+  const findingRows = await db
+    .select({
+      auditResultId: auditFindings.auditResultId,
+      resolutionStatus: auditFindings.resolutionStatus,
+    })
+    .from(auditFindings)
+    .where(
+      inArray(
+        auditFindings.auditResultId,
+        sampled.map(entry => entry.auditResultId)
+      )
+    );
+
+  const statusesByAudit = new Map<number, string[]>();
+  for (const finding of findingRows) {
+    const bucket = statusesByAudit.get(finding.auditResultId) ?? [];
+    if (finding.resolutionStatus) bucket.push(finding.resolutionStatus);
+    statusesByAudit.set(finding.auditResultId, bucket);
+  }
+
+  return sampled.map(({ auditResultId, row }) => ({
+    modelResult: row.modelResult,
+    humanSampleRequested: true,
+    humanFoundDefect: humanFoundDefectFromFindingStatuses(
+      statusesByAudit.get(auditResultId) ?? []
+    ),
+  }));
 }
 
 export async function getAuditFindingById(id: number) {

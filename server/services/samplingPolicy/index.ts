@@ -23,3 +23,13 @@ export {
   DEFAULT_MAX_PASS_SAMPLE_MISS_RATE,
   DEFAULT_PASS_SAMPLE_MIN_SAMPLES,
 } from "./policy";
+export {
+  buildPassSampleMissRateArtifact,
+  derivePassSampleOutcomes,
+  extractPassSampleRowFromReport,
+  humanFoundDefectFromFindingStatuses,
+  loadPassSampleOutcomes,
+  reviewRowToPassSampleOutcome,
+  type PassSampleMissRateArtifact,
+  type PassSampleReviewRow,
+} from "./missRateReport";
