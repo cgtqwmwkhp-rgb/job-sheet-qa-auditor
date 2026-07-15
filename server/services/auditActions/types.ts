@@ -52,6 +52,10 @@ export interface AuditActionResult {
   /** Audit result status after the action (if changed) */
   auditResultStatus?: string;
   undoToken: string;
+  /** Wave-7 template memory (present when capture flag on) */
+  memoryCandidateId?: number;
+  memoryPromotionStatus?: string;
+  studioConfirmRequired?: boolean;
 }
 
 export interface BulkApproveResult {

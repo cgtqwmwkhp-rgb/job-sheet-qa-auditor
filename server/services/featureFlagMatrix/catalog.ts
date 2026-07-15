@@ -271,6 +271,24 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     deploy: unsetBoth,
   },
   {
+    key: "FEATURE_TEMPLATE_MEMORY_CAPTURE",
+    description:
+      "Wave-7: ingest template_memory_* candidates from review_corrections (corrections always dual-write)",
+    defaultWhenUnset: "off",
+    critical: false,
+    parity: "must_match",
+    deploy: unsetBoth,
+  },
+  {
+    key: "FEATURE_TEMPLATE_MEMORY_APPLY",
+    description:
+      "Wave-7: apply shadow/approved template memory at extract/rule time",
+    defaultWhenUnset: "off",
+    critical: false,
+    parity: "must_match",
+    deploy: unsetBoth,
+  },
+  {
     key: "FEATURE_ENSEMBLE_EXTRACTION",
     description: "Ensemble extraction (enabled only when true)",
     defaultWhenUnset: "off",
