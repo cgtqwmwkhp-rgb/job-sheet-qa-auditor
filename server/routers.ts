@@ -994,32 +994,30 @@ export const appRouter = router({
       )
       .query(async ({ ctx, input }) => {
         const limit = input?.limit ?? 50;
-        const allAudits = await db.getAuditResultList({
-          ...input,
-          limit: limit + 1,
-        });
+        const isPrivileged =
+          ctx.user.role === "admin" || ctx.user.role === "qa_lead";
 
-        // Object-level filtering: regular users only see audits for their own uploads
-        // First, get all job sheets they have access to
-        const allJobSheets = await db.getJobSheets();
-        const { filterJobSheetsByAccess } = await import(
-          "./utils/authorization"
-        );
-        const accessibleJobSheets = filterJobSheetsByAccess(
-          allJobSheets,
-          ctx.user
-        );
-        const accessibleJobSheetIds = new Set(
-          accessibleJobSheets.map(js => js.id)
+        // Authorize the ownership scope before applying pagination. The scoped
+        // IDs become part of the audit query rather than a post-page filter.
+        const jobSheetIds = isPrivileged
+          ? undefined
+          : (await db.getJobSheetIdsByUploader(ctx.user.id)).map(
+              jobSheet => jobSheet.id
+            );
+
+        if (jobSheetIds?.length === 0) {
+          return { items: [], hasMore: false };
+        }
+
+        const allAudits = await db.getAuditResultList(
+          isPrivileged
+            ? { ...input, limit: limit + 1 }
+            : { ...input, limit: limit + 1, jobSheetIds }
         );
 
-        // Filter audits to only those for accessible job sheets
-        const accessibleAudits = allAudits.filter(audit =>
-          accessibleJobSheetIds.has(audit.jobSheetId)
-        );
         return {
-          items: accessibleAudits.slice(0, limit),
-          hasMore: accessibleAudits.length > limit,
+          items: allAudits.slice(0, limit),
+          hasMore: allAudits.length > limit,
         };
       }),
 

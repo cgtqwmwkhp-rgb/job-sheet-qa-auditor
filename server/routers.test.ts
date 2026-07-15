@@ -46,6 +46,7 @@ vi.mock("./db", () => ({
     .mockResolvedValue([
       { id: 1, jobSheetId: 1, result: "pass", runId: "run-123" },
     ]),
+  getJobSheetIdsByUploader: vi.fn().mockResolvedValue([{ id: 1 }]),
   getAuditResultByJobSheetId: vi.fn().mockResolvedValue({
     id: 1,
     jobSheetId: 1,
@@ -328,6 +329,10 @@ vi.mock("./storage", () => ({
     key: "job-sheets/1/test.pdf",
   }),
 }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 type CookieCall = {
   name: string;
@@ -623,6 +628,32 @@ describe("audits", () => {
     expect(db.getAuditResultList).toHaveBeenCalledWith({ limit: 51 });
     expect(db.getAuditResults).not.toHaveBeenCalled();
     expect(result.items[0]).not.toHaveProperty("reportJson");
+  });
+
+  it("applies ownership scope before the paginated audit query", async () => {
+    const { ctx } = createAuthContext("technician");
+    const caller = appRouter.createCaller(ctx);
+    vi.mocked(db.getJobSheetIdsByUploader).mockResolvedValueOnce([{ id: 7 }]);
+
+    await caller.audits.list({ limit: 1, offset: 4 });
+
+    expect(db.getJobSheetIdsByUploader).toHaveBeenCalledWith(ctx.user!.id);
+    expect(db.getAuditResultList).toHaveBeenCalledWith({
+      limit: 2,
+      offset: 4,
+      jobSheetIds: [7],
+    });
+  });
+
+  it("returns an empty page without querying audits for an unauthorized scope", async () => {
+    const { ctx } = createAuthContext("user");
+    const caller = appRouter.createCaller(ctx);
+    vi.mocked(db.getJobSheetIdsByUploader).mockResolvedValueOnce([]);
+
+    const result = await caller.audits.list({ limit: 1, offset: 99 });
+
+    expect(result).toEqual({ items: [], hasMore: false });
+    expect(db.getAuditResultList).not.toHaveBeenCalled();
   });
 
   it("gets audit result by job sheet id", async () => {
