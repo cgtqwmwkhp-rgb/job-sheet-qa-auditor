@@ -31,14 +31,18 @@ describe("Pipeline honesty contract (R1)", () => {
       expect(result.ece).not.toBe(0);
     });
 
-    it("documentProcessor calibration artifact uses measurementReady", () => {
+    it("documentProcessor marks an empty calibration artifact unmeasurable", () => {
       const documentProcessor = readRepoFile(
         "server/services/documentProcessor.ts"
       );
+      expect(documentProcessor).toContain("labelledSamples.length === 0");
       expect(documentProcessor).toContain(
-        "measurementReady: eceResult.measurementReady"
+        "{ ece: null, measurementReady: false }"
       );
-      expect(documentProcessor).toContain("ece: eceResult.ece");
+      expect(documentProcessor).toContain("ece: calibrationMeasurement.ece");
+      expect(documentProcessor).toContain(
+        "measurementReady: calibrationMeasurement.measurementReady"
+      );
     });
   });
 

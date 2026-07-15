@@ -330,11 +330,20 @@ function buildFlaggedProcessorArtifacts(input: {
     );
     const labelledSamples: [] = [];
     const eceResult = computeEce(labelledSamples);
+    // Upload processing has no reviewed outcome labels. Preserve the
+    // unmeasurable state explicitly so this artifact cannot imply ECE = 0.
+    const calibrationMeasurement =
+      labelledSamples.length === 0
+        ? { ece: null, measurementReady: false }
+        : {
+            ece: eceResult.ece,
+            measurementReady: eceResult.measurementReady,
+          };
 
     return {
       sampleCount: labelledSamples.length,
-      ece: eceResult.ece,
-      measurementReady: eceResult.measurementReady,
+      ece: calibrationMeasurement.ece,
+      measurementReady: calibrationMeasurement.measurementReady,
       bins: eceResult.bins,
       thresholdSuggestion: suggestThreshold(labelledSamples, {
         currentThreshold,
