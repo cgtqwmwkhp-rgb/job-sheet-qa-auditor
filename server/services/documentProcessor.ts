@@ -313,6 +313,21 @@ function buildSelectionCohortMeta(
   };
 }
 
+/** Wave-7: columns for audit_results template lineage. */
+function resolveAuditTemplateLineage(
+  selectionResult: SelectionResult | undefined,
+  forcedTemplateVersionId?: number
+): { templateId: number | null; templateVersionId: number | null } {
+  const cohort = buildSelectionCohortMeta(
+    selectionResult,
+    forcedTemplateVersionId
+  );
+  return {
+    templateId: cohort?.templateId ?? null,
+    templateVersionId: cohort?.versionId ?? forcedTemplateVersionId ?? null,
+  };
+}
+
 const PIPELINE_VERSION = "2.1.0"; // PR-8: ensemble extraction stage
 
 function sha256(input: string | Buffer): string {
@@ -901,9 +916,12 @@ async function processJobSheetWithOptions(
     }
 
     try {
+      const lineageEarly = resolveAuditTemplateLineage(undefined);
       const auditResult = await db.createAuditResult({
         jobSheetId,
         goldSpecId: options.goldSpecId || 1,
+        templateId: lineageEarly.templateId,
+        templateVersionId: lineageEarly.templateVersionId,
         runId,
         result: "review_queue",
         confidenceScore: "0",
@@ -1162,9 +1180,12 @@ async function processJobSheetWithOptions(
 
       // Store partial audit result with hybrid data
       try {
+        const lineageHybrid = resolveAuditTemplateLineage(selectionResult);
         const auditResult = await db.createAuditResult({
           jobSheetId,
           goldSpecId: options.goldSpecId || 1,
+          templateId: lineageHybrid.templateId,
+          templateVersionId: lineageHybrid.templateVersionId,
           runId,
           result: "review_queue",
           confidenceScore: String(selectionResult.topScore),
@@ -3185,12 +3206,68 @@ async function processJobSheetWithOptions(
     });
 
     // Attribute technician from OCR name when upload left technicianId unset
-    const finalExtractedFields = ensembleResult
+    let finalExtractedFields = ensembleResult
       ? mergeExtractedFields(
           analysisResult.extractedFields,
           ensembleResult.ensembleExtractedFields
         )
       : analysisResult.extractedFields;
+
+    // Wave-7 H2/H4: apply template memory (value aliases + soft rule suppress)
+    let memoryApplied: import("./templateMemory").MemoryAppliedEntry[] = [];
+    try {
+      const {
+        loadMemoryForPipeline,
+        applyValueMemoryToFields,
+        filterFindingsWithRuleMemory,
+      } = await import("./templateMemory");
+      const lineageMem = resolveAuditTemplateLineage(
+        selectionResult,
+        options.templateVersionId
+      );
+      const memRows = await loadMemoryForPipeline(lineageMem.templateId);
+      if (memRows.length > 0) {
+        // extractedFields is Record<fieldKey, {value,confidence,pageNumber}>
+        const fieldEntries = Object.entries(finalExtractedFields ?? {}).map(
+          ([field, meta]) => ({
+            field,
+            value: String(meta?.value ?? ""),
+            confidence: meta?.confidence,
+            pageNumber: meta?.pageNumber,
+          })
+        );
+        const valuePass = applyValueMemoryToFields(fieldEntries, memRows);
+        finalExtractedFields = Object.fromEntries(
+          valuePass.fields.map(f => {
+            const prev = finalExtractedFields?.[f.field];
+            return [
+              f.field,
+              {
+                value: f.value,
+                confidence: prev?.confidence ?? f.confidence ?? 0,
+                pageNumber: prev?.pageNumber ?? f.pageNumber ?? 1,
+              },
+            ];
+          })
+        );
+        const findingPass = filterFindingsWithRuleMemory(
+          analysisResult.findings,
+          memRows
+        );
+        if (findingPass.applied.length > 0) {
+          analysisResult = {
+            ...analysisResult,
+            findings: findingPass.findings,
+          };
+        }
+        memoryApplied = [...valuePass.applied, ...findingPass.applied];
+      }
+    } catch (memErr) {
+      console.warn(
+        "[DocumentProcessor] template memory apply skipped",
+        memErr instanceof Error ? memErr.message : memErr
+      );
+    }
 
     if (!persistResults) {
       recordStage({
@@ -3256,9 +3333,15 @@ async function processJobSheetWithOptions(
     await persistStatus(finalStatus);
 
     // Create audit result with correct schema fields
+    const lineageFinal = resolveAuditTemplateLineage(
+      selectionResult,
+      options.templateVersionId
+    );
     const auditResult = await db.createAuditResult({
       jobSheetId,
       goldSpecId: options.goldSpecId || 1, // Default to spec ID 1 if not provided
+      templateId: lineageFinal.templateId,
+      templateVersionId: lineageFinal.templateVersionId,
       runId,
       result: analysisResult.overallResult.toLowerCase() as
         | "pass"
@@ -3353,6 +3436,9 @@ async function processJobSheetWithOptions(
               partsCatalogSignals,
               partsCatalogSummary,
             }
+          : {}),
+        ...(memoryApplied.length > 0
+          ? { memoryApplied, memoryAppliedCount: memoryApplied.length }
           : {}),
         ...(photoEvidenceArtifact
           ? {
