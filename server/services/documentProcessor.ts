@@ -822,7 +822,14 @@ async function processJobSheetWithOptions(
         pipelineVersion: PIPELINE_VERSION,
         reportJson: {
           summary: hybridResult.llmSummary || hybridResult.reviewExplanation,
-          extractedText,
+          // Keep reportJson compact. Reviewers open the original evidence on demand
+          // through the authorized jobSheets.getFileUrl route rather than reading
+          // a duplicated OCR payload from every audit row.
+          ocrText: {
+            persisted: false,
+            characterCount: extractedText.length,
+            source: "original_job_sheet",
+          },
           extractedFields: Object.fromEntries(
             hybridResult.extractedFields.map(f => [
               f.field,
@@ -1076,7 +1083,13 @@ async function processJobSheetWithOptions(
           pipelineVersion: PIPELINE_VERSION,
           reportJson: {
             summary: hybridResult.llmSummary || hybridResult.reviewExplanation,
-            extractedText,
+            // Raw OCR text is deliberately not duplicated in reportJson; reviewers
+            // can retrieve the original job sheet through jobSheets.getFileUrl.
+            ocrText: {
+              persisted: false,
+              characterCount: extractedText.length,
+              source: "original_job_sheet",
+            },
             extractedFields: Object.fromEntries(
               hybridResult.extractedFields.map(f => [
                 f.field,
@@ -2762,7 +2775,13 @@ async function processJobSheetWithOptions(
       pipelineVersion: PIPELINE_VERSION,
       reportJson: {
         summary: analysisResult.summary,
-        extractedText,
+        // Do not persist a full OCR copy in every audit row. The original document
+        // remains available to authorized reviewers on demand via getFileUrl.
+        ocrText: {
+          persisted: false,
+          characterCount: extractedText.length,
+          source: "original_job_sheet",
+        },
         documentationQualityScore: analysisResult.score,
         documentationQualityPenalties,
         llmConfidenceScore: llmConfidenceForReport,

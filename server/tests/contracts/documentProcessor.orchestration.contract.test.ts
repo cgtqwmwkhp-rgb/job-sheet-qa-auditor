@@ -60,4 +60,21 @@ describe("documentProcessor orchestration contract", () => {
     expect(documentProcessor).toContain("featureFlagArtifacts");
     expect(router).not.toContain("buildFlaggedProcessorArtifacts");
   });
+
+  it("keeps raw OCR text out of persisted audit reports", () => {
+    const documentProcessor = readRepoFile(
+      "server/services/documentProcessor.ts"
+    );
+    const schema = readRepoFile("drizzle/schema.ts");
+    const router = readRepoFile("server/routers.ts");
+
+    // Each reportJson starts with compact OCR metadata, never the raw payload.
+    expect(documentProcessor).not.toMatch(
+      /reportJson:\s*\{[\s\S]{0,350}\n\s*extractedText\s*(?:,|:)/
+    );
+    expect(documentProcessor).toContain('persisted: false');
+    expect(documentProcessor).toContain('source: "original_job_sheet"');
+    expect(schema).toContain("excludes the full raw OCR text");
+    expect(router).toContain("getFileUrl");
+  });
 });
