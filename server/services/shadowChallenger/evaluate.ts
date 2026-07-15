@@ -5,17 +5,12 @@
  * unless canary mode samples the request. Fail-soft: never throws into the
  * main pipeline.
  *
- * Default path uses deterministic rule-based analysis. FEATURE_SHADOW_REAL_MODEL
- * enables a shadow-only alternate model adapter. In advisory shadow mode,
- * real-model failures fall back to rule_based so pp-delta measurement continues.
- * In canary mode, real-model failures stay fail-soft (no serve).
+ * Only a real-model challenger is eligible. The rule-based analyzer
+ * unconditionally PASSes sufficiently long content and must never create
+ * shadow/canary theater or be served to users.
  */
 
-import {
-  performRuleBasedAnalysis,
-  type AnalysisResult,
-  type GoldSpec,
-} from "../analyzer";
+import type { AnalysisResult, GoldSpec } from "../analyzer";
 import {
   getShadowChallengerConfig,
   shouldApplyCanary,
@@ -47,20 +42,6 @@ export interface ShadowEvalResult {
   canaryApplied: boolean;
 }
 
-function runRuleBasedChallenger(
-  extractedText: string,
-  goldSpec: GoldSpec,
-  pageCount: number
-): AnalysisResult {
-  const start = Date.now();
-  const base = performRuleBasedAnalysis(extractedText, goldSpec, pageCount);
-  return {
-    ...base,
-    processingTimeMs: Date.now() - start,
-    model: "shadow-challenger-rule-based",
-  };
-}
-
 async function runChallenger(
   config: ShadowChallengerConfig,
   extractedText: string,
@@ -68,35 +49,16 @@ async function runChallenger(
   pageCount: number
 ): Promise<{ analysis: AnalysisResult; strategyUsed: ChallengerStrategy }> {
   if (config.strategy === "real_model") {
-    try {
-      const analysis = await runShadowRealModelAnalysis({
-        extractedText,
-        goldSpec,
-        pageCount,
-        modelId: config.realModelId,
-      });
-      return { analysis, strategyUsed: "real_model" };
-    } catch (error) {
-      // Advisory shadow: keep measuring with coded challenger.
-      // Canary: rethrow so evaluate fail-softs and never serves a fallback.
-      if (config.mode === "canary") {
-        throw error;
-      }
-      console.warn(
-        "[ShadowChallenger] real_model unavailable; falling back to rule_based for advisory measurement:",
-        error instanceof Error ? error.message : error
-      );
-      return {
-        analysis: runRuleBasedChallenger(extractedText, goldSpec, pageCount),
-        strategyUsed: "rule_based",
-      };
-    }
+    const analysis = await runShadowRealModelAnalysis({
+      extractedText,
+      goldSpec,
+      pageCount,
+      modelId: config.realModelId,
+    });
+    return { analysis, strategyUsed: "real_model" };
   }
 
-  return {
-    analysis: runRuleBasedChallenger(extractedText, goldSpec, pageCount),
-    strategyUsed: "rule_based",
-  };
+  throw new Error("Rule-based analysis is not eligible as a shadow challenger");
 }
 
 /**
@@ -114,7 +76,11 @@ export async function evaluateShadowChallenger(
 
   try {
     const config = input.config ?? getShadowChallengerConfig();
-    if (!config.enabled || config.mode === "off") {
+    if (
+      !config.enabled ||
+      config.mode === "off" ||
+      config.strategy === "rule_based"
+    ) {
       return empty;
     }
 

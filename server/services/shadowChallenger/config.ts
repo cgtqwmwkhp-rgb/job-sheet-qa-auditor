@@ -17,7 +17,7 @@
  * Optional Gemini Flash challenger:
  *   FEATURE_SHADOW_REAL_MODEL=true
  *   SHADOW_REAL_MODEL_ID=gemini-2.0-flash
- *   (requires GEMINI_API_KEY; falls back to rule_based in shadow mode)
+ *   (requires GEMINI_API_KEY; unavailable model means no challenger run)
  */
 
 import type { ChallengerStrategy, ShadowMode } from "./types";
@@ -101,7 +101,11 @@ export function getShadowChallengerConfig(): ShadowChallengerConfig {
     : parseStrategy(process.env.SHADOW_CHALLENGER_STRATEGY);
   const realModelId = parseRealModelId(process.env.SHADOW_REAL_MODEL_ID);
 
-  if (mode === "off") {
+  // Rule-based analysis unconditionally PASSes any sufficiently long document.
+  // It may be useful as a local fallback, but it is not a valid challenger:
+  // enabling it would create an always-PASS theater measurement and could
+  // accidentally serve PASS if a caller bypassed the canary guard.
+  if (mode === "off" || strategy === "rule_based") {
     return {
       enabled: false,
       mode: "off",
