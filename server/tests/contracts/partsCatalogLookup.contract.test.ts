@@ -199,7 +199,7 @@ describe("verifyPartsCatalogWeb", () => {
 
     expect(result.findings.some(f => f.ruleId === "PARTS-C022")).toBe(true);
     expect(result.findings.every(f => f.ruleId !== "PARTS-C021")).toBe(true);
-    expect(result.findings[0].severity).toBe("S3");
+    expect(result.findings[0].severity).toBe("S2");
   });
 
   it("emits PARTS-C022 on API failure or timeout", async () => {
@@ -264,9 +264,7 @@ describe("policy seeds for parts catalog verify", () => {
     expect(rules.find(r => r.ruleId === "PARTS-C021")!.failClass).toBe(
       "informational"
     );
-    expect(rules.find(r => r.ruleId === "PARTS-C022")!.failClass).toBe(
-      "informational"
-    );
+    expect(rules.find(r => r.ruleId === "PARTS-C022")!.failClass).toBe("minor");
   });
 });
 

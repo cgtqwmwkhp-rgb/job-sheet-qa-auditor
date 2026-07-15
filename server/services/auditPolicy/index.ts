@@ -155,22 +155,23 @@ export function mergeAuditPolicy(
 
 /**
  * Classify a single finding. Unmapped Issues default to Minor (score only).
- * Informational / Passed findings stay informational.
+ * Seeded policy rules win over LOW_CONFIDENCE soft-demote so honesty findings
+ * (PHOTO-C014, PARTS-C022, …) stay Issues when failClass is minor/major.
  */
 export function classifyFinding(
   finding: Finding,
   formFamily: string,
   policy: AuditPolicy
 ): FailClass {
-  if (isInformationalFinding(finding)) return "informational";
-  if (!isIssueSeverity(finding.severity) && finding.severity === "S3") {
-    return "informational";
-  }
-
   const rule = findRule(policy, formFamily, finding);
   if (rule) {
     if (!rule.enabled) return "informational";
     return rule.failClass;
+  }
+
+  if (isInformationalFinding(finding)) return "informational";
+  if (!isIssueSeverity(finding.severity) && finding.severity === "S3") {
+    return "informational";
   }
 
   // Unmapped Issue → Minor (never silent hard-fail)
@@ -199,13 +200,13 @@ export function classifyFindings(
 ): PolicyFinding[] {
   return findings.map(f => {
     const failClass = classifyFinding(f, formFamily, policy);
-    // Preserve Passed/informational S3 as-is; remap Issues to Major/Minor severities
-    if (isInformationalFinding(f) || failClass === "informational") {
+    // Honor seeded failClass — do not let LOW_CONFIDENCE soft-demote override minor/major
+    if (failClass === "informational") {
       return {
         ...f,
         failClass: "informational",
         blocksOverallPass: false,
-        severity: f.severity === "S3" ? "S3" : severityForFailClass(failClass),
+        severity: "S3",
       };
     }
     return {

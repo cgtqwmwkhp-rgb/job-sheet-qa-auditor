@@ -273,7 +273,8 @@ export function evaluatePhotoEvidenceConsistency(
           ruleId: `${PHOTO_EVIDENCE_RULE_PREFIX}014`,
           fieldName: "Before/After Pair Compare",
           severity: "S2",
-          reasonCode: "LOW_CONFIDENCE",
+          // INCOMPLETE_EVIDENCE — must stay Issues (not LOW_CONFIDENCE→S3 theater)
+          reasonCode: "INCOMPLETE_EVIDENCE",
           rawSnippet: p.reasoning.slice(0, 300),
           normalisedSnippet:
             pair.provider === "heuristic"
@@ -293,7 +294,7 @@ export function evaluatePhotoEvidenceConsistency(
       ruleId: `${PHOTO_EVIDENCE_RULE_PREFIX}014`,
       fieldName: "Before/After Pair Compare",
       severity: "S2",
-      reasonCode: "LOW_CONFIDENCE",
+      reasonCode: "INCOMPLETE_EVIDENCE",
       rawSnippet: pair.summary.slice(0, 300),
       normalisedSnippet: "No before/after pairs could be formed from the pack.",
       confidence: 60,
