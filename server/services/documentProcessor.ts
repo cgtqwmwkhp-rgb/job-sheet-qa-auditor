@@ -3216,8 +3216,11 @@ async function processJobSheetWithOptions(
     // Wave-7 H2/H4: apply template memory (value aliases + soft rule suppress)
     let memoryApplied: import("./templateMemory").MemoryAppliedEntry[] = [];
     try {
-      const { loadMemoryForPipeline, applyValueMemoryToFields, filterFindingsWithRuleMemory } =
-        await import("./templateMemory");
+      const {
+        loadMemoryForPipeline,
+        applyValueMemoryToFields,
+        filterFindingsWithRuleMemory,
+      } = await import("./templateMemory");
       const lineageMem = resolveAuditTemplateLineage(
         selectionResult,
         options.templateVersionId
