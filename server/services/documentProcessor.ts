@@ -2423,6 +2423,14 @@ async function processJobSheetWithOptions(
   let engineerAttributionStamp:
     | ReturnType<typeof evaluateEngineerAttribution>["attribution"]
     | null = null;
+  let partsAssessmentSignals:
+    | ReturnType<typeof evaluatePartsUsed>["signals"]
+    | null = null;
+  let partsAssessmentSummary: string | null = null;
+  let partsCatalogSignals:
+    | Awaited<ReturnType<typeof verifyPartsCatalogWeb>>["signals"]
+    | null = null;
+  let partsCatalogSummary: string | null = null;
   {
     const selectedSlug =
       buildSelectionCohortMeta(selectionResult, usedTemplateVersionId)
@@ -2519,6 +2527,8 @@ async function processJobSheetWithOptions(
       }
 
       const partsResult = evaluatePartsUsed(jsrText);
+      partsAssessmentSignals = partsResult.signals;
+      partsAssessmentSummary = partsResult.summary;
       if (partsResult.findings.length > 0) {
         analysisResult = {
           ...analysisResult,
@@ -2535,6 +2545,8 @@ async function processJobSheetWithOptions(
       if (isPartsWebVerifyEnabled()) {
         try {
           const catalogResult = await verifyPartsCatalogWeb(jsrText);
+          partsCatalogSignals = catalogResult.signals;
+          partsCatalogSummary = catalogResult.summary;
           if (catalogResult.findings.length > 0) {
             analysisResult = {
               ...analysisResult,
@@ -3284,6 +3296,18 @@ async function processJobSheetWithOptions(
         ...(commentDeepNote ? { commentDeepNote } : {}),
         ...(engineerAttributionStamp
           ? { attribution: engineerAttributionStamp }
+          : {}),
+        ...(partsAssessmentSignals
+          ? {
+              partsAssessmentSignals,
+              partsAssessmentSummary,
+            }
+          : {}),
+        ...(partsCatalogSignals
+          ? {
+              partsCatalogSignals,
+              partsCatalogSummary,
+            }
           : {}),
         ...(photoEvidenceArtifact
           ? {
