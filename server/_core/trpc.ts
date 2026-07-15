@@ -31,6 +31,35 @@ const requireUser = t.middleware(async opts => {
 
 export const protectedProcedure = t.procedure.use(requireUser);
 
+/**
+ * Authenticated non-technician staff member.
+ *
+ * The role model includes a legacy `user` role for staff/viewer accounts, so
+ * staff access is defined as any authenticated role except `technician`.
+ */
+export const staffProcedure = t.procedure.use(
+  t.middleware(async opts => {
+    const { ctx, next } = opts;
+
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    }
+    if (ctx.user.role === "technician") {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Technician accounts cannot access staff APIs",
+      });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        user: ctx.user,
+      },
+    });
+  })
+);
+
 export const adminProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;

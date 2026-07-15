@@ -7,6 +7,7 @@ import {
   adminProcedure,
   qaLeadProcedure,
   router,
+  staffProcedure,
 } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
@@ -166,7 +167,7 @@ export const appRouter = router({
       }),
 
     /** Users eligible for technician attribution on upload / assign. */
-    listTechnicians: protectedProcedure.query(async () => {
+    listTechnicians: staffProcedure.query(async () => {
       const all = await db.getAllUsers();
       return all
         .filter(u => Boolean(u.name?.trim() || u.email))
@@ -538,7 +539,7 @@ export const appRouter = router({
      * Assign / clear technician attribution for engineer analytics.
      * Available to all staff (analytics page is already RequireStaff).
      */
-    assignTechnician: protectedProcedure
+    assignTechnician: staffProcedure
       .input(
         z.object({
           id: z.number(),
@@ -570,7 +571,7 @@ export const appRouter = router({
     /**
      * Preview OCR names on unattributed sheets + auto-match status.
      */
-    getAttributionGap: protectedProcedure
+    getAttributionGap: staffProcedure
       .input(
         z
           .object({
@@ -1063,7 +1064,7 @@ export const appRouter = router({
 
   // ============ DISPUTES ============
   disputes: router({
-    list: protectedProcedure
+    list: staffProcedure
       .input(
         z
           .object({

@@ -6,7 +6,12 @@
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { protectedProcedure, qaLeadProcedure, router } from "../_core/trpc";
+import {
+  protectedProcedure,
+  qaLeadProcedure,
+  router,
+  staffProcedure,
+} from "../_core/trpc";
 import {
   exportFixPackToJson,
   generateFixPack,
@@ -123,7 +128,7 @@ export const fixPacksRouter = router({
     persistedIn: "memory",
   })),
 
-  export: protectedProcedure
+  export: staffProcedure
     .input(
       z.object({
         engineer: engineerProfileSchema,
