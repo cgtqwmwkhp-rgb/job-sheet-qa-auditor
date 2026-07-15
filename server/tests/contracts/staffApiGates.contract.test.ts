@@ -43,6 +43,10 @@ describe("staff API gates", () => {
     const caller = technicianCaller();
 
     await expectTechnicianRejected(caller.disputes.list());
+    await expectTechnicianRejected(caller.webhooks.deliveryReceipts());
+    await expectTechnicianRejected(
+      caller.webhooks.auditCompletedReceipt({ auditId: 1 })
+    );
     await expectTechnicianRejected(
       caller.fixPacks.export({
         engineer: {

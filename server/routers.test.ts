@@ -6,6 +6,7 @@ import type { TrpcContext } from "./_core/context";
 
 // Mock the database module
 vi.mock("./db", () => ({
+  getDb: vi.fn().mockResolvedValue(null),
   getDashboardStats: vi.fn().mockResolvedValue({
     totalAudits: 150,
     passRate: "87.5",
@@ -733,12 +734,52 @@ describe("portal", () => {
     expect(result).toHaveProperty("stats");
     expect(result).toHaveProperty("recentAudits");
     expect(result).toHaveProperty("defects");
+    expect(result.source).toBe("live");
+    expect(typeof result.scoreMeasured).toBe("boolean");
     expect(Array.isArray(result.recentAudits)).toBe(true);
     expect(Array.isArray(result.defects)).toBe(true);
     for (const d of result.defects) {
       expect(d.title).not.toMatch(/Blurry Serial Number/i);
       expect(d.findingId).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("webhooks ops receipts", () => {
+  it("lists delivery receipts honestly when empty", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.webhooks.deliveryReceipts({
+      limit: 10,
+      event: "audit.completed",
+    });
+
+    expect(result.available).toBe(true);
+    expect(result.receiptCount).toBe(0);
+    expect(result.receipts).toEqual([]);
+  });
+
+  it("returns none status for audit without deliveries", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+
+    const result = await caller.webhooks.auditCompletedReceipt({
+      auditId: 4242,
+    });
+
+    expect(result.available).toBe(true);
+    expect(result.status).toBe("none");
+    expect(result.receiptCount).toBe(0);
+  });
+
+  it("rejects technicians from delivery receipts", async () => {
+    const { ctx } = createAuthContext("technician");
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(
+      caller.webhooks.deliveryReceipts({ limit: 5 })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });
 

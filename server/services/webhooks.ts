@@ -60,6 +60,8 @@ export interface WebhookDeliveryResult {
   webhookId: string;
   event: WebhookEvent;
   payloadId?: string;
+  /** Audit result id when the payload carried `auditId` (ops receipt lookup). */
+  auditId?: number;
   statusCode?: number;
   responseTime?: number;
   error?: string;
@@ -69,6 +71,29 @@ export interface WebhookDeliveryResult {
   /** SHA-256 hex of the exact JSON body that was signed. */
   payloadHash: string;
   deliveredAt: Date;
+}
+
+/** Honest ops view of delivery history — never invents success theater. */
+export type DeliveryReceiptsSnapshot = {
+  available: boolean;
+  unavailableReason?: string;
+  eventFilter: WebhookEvent | "all";
+  subscriptionCount: number;
+  auditCompletedSubscriberCount: number;
+  receiptCount: number;
+  receipts: WebhookDeliveryResult[];
+};
+
+function extractAuditId(data: Record<string, unknown>): number | undefined {
+  const raw = data.auditId;
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
+    return Math.trunc(raw);
+  }
+  if (typeof raw === "string" && /^\d+$/.test(raw)) {
+    const n = Number(raw);
+    return n > 0 ? n : undefined;
+  }
+  return undefined;
 }
 
 // In-memory webhook registry (write-through to webhook_subscriptions when DB available)
@@ -425,6 +450,7 @@ async function deliverWebhook(
   const payloadHash = hashPayload(payloadString);
   const deliveredAt = new Date();
   const deliveryId = uuidv4();
+  const auditId = extractAuditId(payload.data);
 
   let signature = "";
   try {
@@ -477,6 +503,7 @@ async function deliverWebhook(
       webhookId: webhook.id,
       event: payload.event,
       payloadId: payload.id,
+      auditId,
       statusCode: response.status,
       responseTime,
       retryCount: 0,
@@ -498,6 +525,7 @@ async function deliverWebhook(
       webhookId: webhook.id,
       event: payload.event,
       payloadId: payload.id,
+      auditId,
       responseTime: Date.now() - startTime,
       error: error instanceof Error ? error.message : "Unknown error",
       retryCount: webhook.retryCount,
@@ -638,6 +666,73 @@ export function deleteWebhook(id: string): boolean {
 export function getDeliveryLog(limit: number = 100): WebhookDeliveryResult[] {
   void ensureHydrated();
   return deliveryLog.slice(-limit);
+}
+
+/**
+ * Ops-facing delivery receipts with explicit availability.
+ * Empty log ≠ unavailable; unavailable is reserved for load failures.
+ */
+export async function getDeliveryReceiptsSnapshot(options?: {
+  limit?: number;
+  event?: WebhookEvent;
+  auditId?: number;
+}): Promise<DeliveryReceiptsSnapshot> {
+  try {
+    await ensureHydrated();
+    const limit = Math.min(Math.max(options?.limit ?? 50, 1), 200);
+    const eventFilter = options?.event ?? "all";
+    const subscriptions = Array.from(webhookRegistry.values()).filter(
+      w => w.active
+    );
+    const auditCompletedSubscriberCount = subscriptions.filter(w =>
+      w.events.includes("audit.completed")
+    ).length;
+
+    let receipts = [...deliveryLog];
+    if (options?.event) {
+      receipts = receipts.filter(r => r.event === options.event);
+    }
+    if (options?.auditId != null) {
+      receipts = receipts.filter(r => r.auditId === options.auditId);
+    }
+    receipts = receipts.slice(-limit).reverse();
+
+    return {
+      available: true,
+      eventFilter,
+      subscriptionCount: subscriptions.length,
+      auditCompletedSubscriberCount,
+      receiptCount: receipts.length,
+      receipts,
+    };
+  } catch (error) {
+    return {
+      available: false,
+      unavailableReason:
+        error instanceof Error
+          ? error.message
+          : "Webhook delivery log unavailable",
+      eventFilter: options?.event ?? "all",
+      subscriptionCount: 0,
+      auditCompletedSubscriberCount: 0,
+      receiptCount: 0,
+      receipts: [],
+    };
+  }
+}
+
+/**
+ * Per-audit audit.completed delivery receipts (honest empty when none).
+ */
+export async function getAuditCompletedReceipts(
+  auditId: number,
+  limit: number = 20
+): Promise<DeliveryReceiptsSnapshot> {
+  return getDeliveryReceiptsSnapshot({
+    auditId,
+    event: "audit.completed",
+    limit,
+  });
 }
 
 /**

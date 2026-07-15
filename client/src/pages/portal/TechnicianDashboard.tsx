@@ -127,7 +127,9 @@ export default function TechnicianDashboard() {
   const deltaToTarget = data?.scorecard.deltaToTarget ?? 0;
   const passedAudits = data?.stats.passedAudits ?? 0;
   const defectsFound = data?.stats.defectsFound ?? 0;
-  const hasScoreData = (data?.scorecard.documentsProcessed ?? 0) > 0;
+  const hasScoreData =
+    data?.scoreMeasured === true ||
+    (data?.scorecard.documentsProcessed ?? 0) > 0;
   const dashboardUnavailable = isError || (!isLoading && !data);
 
   return (

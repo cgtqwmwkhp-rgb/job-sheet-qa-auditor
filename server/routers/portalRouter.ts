@@ -151,7 +151,14 @@ export const portalRouter = router({
         }),
       }));
 
+    const documentsProcessed = scoreCard?.documentsProcessed ?? 0;
+    const scoreMeasured = documentsProcessed > 0;
+
     return {
+      /** Live API payload — never a hardcoded demo scorecard. */
+      source: "live" as const,
+      /** True only when attributed audits exist; UI must show "—" otherwise. */
+      scoreMeasured,
       scorecard: scoreCard
         ? {
             overallScore: scoreCard.overallScore,
