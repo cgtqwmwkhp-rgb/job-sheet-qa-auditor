@@ -2483,10 +2483,13 @@ async function processJobSheetWithOptions(
         });
       }
 
-      // Clinical comment quality (COMMENT-C*) — owns engineer narrative axis
+      // Clinical comment quality (COMMENT-C* / FAULT-C010) — owns narrative + Fault Reason honesty
       const commentResult = evaluateCommentQuality(jsrText, {
         failMarkCount,
         signals: consistency.signals,
+        faultReasonExtracted:
+          analysisResult.extractedFields?.fault_reason ??
+          analysisResult.extractedFields?.faultReason,
       });
       commentQualitySignals = commentResult.signals;
       if (commentResult.findings.length > 0) {

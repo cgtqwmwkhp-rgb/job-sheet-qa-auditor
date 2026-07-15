@@ -287,7 +287,8 @@ export const GOLD_STANDARD_SPEC_V1: GoldStandardSpec = {
       description: 'Category of the fault or reason for repair',
       whyItMatters: 'Enables trend analysis and preventive maintenance planning.',
       validationRules: [
-        createEnumRule('Fault Reason', ['Wear & Tear', 'Routine', 'Damage', 'Electrical', 'Mechanical', 'User Error', 'Unknown', 'Reason']),
+        // 'Reason' is the form label / placeholder — never a valid category (FAULT-C010).
+        createEnumRule('Fault Reason', ['Wear & Tear', 'Routine', 'Damage', 'Electrical', 'Mechanical', 'User Error', 'Unknown']),
       ],
     },
     {

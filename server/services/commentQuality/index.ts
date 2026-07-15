@@ -7,6 +7,8 @@
  * COMMENT-C040 Actionable (Major) — required when return visit or parts still required
  * COMMENT-C050 Cross-field (Minor) — comments omit Parts Still Required items
  * COMMENT-C041 Informational — coherent clinical narrative passed
+ * COMMENT-C042 Clarity (Minor) — repair list without root-cause / fault clarity
+ * FAULT-C010 (Minor) — placeholder Fault Reason (always-on; see faultReason.ts)
  */
 
 import type { Finding } from "../analyzer";
@@ -17,6 +19,20 @@ import {
   sectionHasContent,
   type FailurePathSignals,
 } from "../jobSummaryConsistency";
+import {
+  evaluateFaultReasonPlaceholder,
+  resolveFaultReasonValue,
+} from "./faultReason";
+
+export {
+  evaluateFaultReasonPlaceholder,
+  extractFaultReasonFromText,
+  isFaultReasonPlaceholderEnabled,
+  isPlaceholderFaultReason,
+  resolveFaultReasonValue,
+  FEATURE_FAULT_REASON_PLACEHOLDER,
+  FAULT_REASON_RULE_ID,
+} from "./faultReason";
 
 export const COMMENT_QUALITY_RULE_PREFIX = "COMMENT-C";
 
@@ -28,6 +44,8 @@ export interface CommentNarrativeAnalysis {
   hasImpact: boolean;
   hasPartsStance: boolean;
   hasNextAction: boolean;
+  /** True when narrative states defect/cause, not only work-done/parts fitted. */
+  hasFaultClarity: boolean;
   isVagueOnly: boolean;
   isTooThin: boolean;
   missingAxes: string[];
@@ -41,6 +59,7 @@ export interface CommentQualitySignals {
   hasImpact: boolean;
   hasPartsStance: boolean;
   hasNextAction: boolean;
+  hasFaultClarity: boolean;
   isVagueOnly: boolean;
   isTooThin: boolean;
   missingAxes: string[];
@@ -49,6 +68,7 @@ export interface CommentQualitySignals {
   returnVisit: boolean;
   partsStillRequired: boolean;
   partsStillSnippet: string;
+  placeholderFaultReason: boolean;
 }
 
 export interface CommentQualityResult {
@@ -77,6 +97,13 @@ const NEXT_ACTION_RE =
 
 const VAGUE_ONLY_RE =
   /^(?:see\s+above|as\s+discussed|as\s+above|tbc|tba|vor|failed?|unsafe|return\s+visit|n\/a|none|ok|done|sorted|fixed|complete)\.?$/i;
+
+/** Root-cause / defect clarity beyond a pure "work done" parts list. */
+const FAULT_CLARITY_RE =
+  /\b(because|due\s+to|caused\s+by|root\s+cause|fault(?:\s+reason)?|wear\s*(?:and|&)\s*tear|electrical|mechanical|user\s+error|defect|fail(?:ed|ure)|broken|crack(?:ed)?|worn|leak(?:ing)?|damage(?:d)?|unsafe|vor|inoperable|seized|corrod(?:ed|ion)|short(?:ed)?|puncture|flat\s+tyre|bent|loose)\b/i;
+
+const WORK_DONE_ONLY_RE =
+  /\b(fitted|replaced|installed|refitted|tightened|adjusted|cleaned|lubricat(?:ed|e)|completed|carried\s+out|parts?\s+used)\b/i;
 
 function extractCommentBody(text: string): string {
   // Bound by signature headers — NOT by "Parts Still Required", because Job-87
@@ -121,11 +148,17 @@ export function analyzeCommentNarrative(
   const hasImpact = present && IMPACT_RE.test(cleaned);
   const hasPartsStance = present && PARTS_STANCE_RE.test(cleaned);
   const hasNextAction = present && NEXT_ACTION_RE.test(cleaned);
+  // Work-done lists with parts keywords but no defect/cause language fail clarity.
+  const hasFaultClarity =
+    present &&
+    FAULT_CLARITY_RE.test(cleaned) &&
+    !(WORK_DONE_ONLY_RE.test(cleaned) && !WHAT_RE.test(cleaned));
 
   const missingAxes: string[] = [];
   if (!present) missingAxes.push("presence");
   else {
     if (!hasWhat) missingAxes.push("what");
+    if (!hasFaultClarity) missingAxes.push("faultClarity");
     if (!hasNextAction && !hasPartsStance)
       missingAxes.push("nextActionOrParts");
     if (isVagueOnly || isTooThin) missingAxes.push("clarity");
@@ -139,6 +172,7 @@ export function analyzeCommentNarrative(
     hasImpact,
     hasPartsStance,
     hasNextAction,
+    hasFaultClarity,
     isVagueOnly,
     isTooThin,
     missingAxes,
@@ -244,7 +278,9 @@ function scoreAxes(analysis: CommentNarrativeAnalysis): {
 }
 
 /**
- * Evaluate clinical comment quality. Only emits findings on the failure path.
+ * Evaluate clinical comment quality.
+ * COMMENT-C* (except FAULT-C010) run on the failure path; FAULT-C010 is always-on.
+ * COMMENT-C042 also runs when FAULT-C010 fires off the failure path.
  */
 export function evaluateCommentQuality(
   text: string,
@@ -252,6 +288,10 @@ export function evaluateCommentQuality(
     failMarkCount?: number;
     /** Precomputed failure-path signals (avoids double extraction). */
     signals?: FailurePathSignals;
+    /** Structured Fault Reason extract (optional; falls back to OCR text). */
+    faultReason?: string | null;
+    /** Raw extractedFields.fault_reason object or string. */
+    faultReasonExtracted?: unknown;
   } = {}
 ): CommentQualityResult {
   const fp =
@@ -259,6 +299,12 @@ export function evaluateCommentQuality(
     extractFailurePathSignals(text, { failMarkCount: options.failMarkCount });
   const analysis = analyzeCommentNarrative(text);
   const scores = scoreAxes(analysis);
+
+  const resolvedFaultReason =
+    options.faultReason ??
+    resolveFaultReasonValue(options.faultReasonExtracted, text);
+  const faultFindings = evaluateFaultReasonPlaceholder(resolvedFaultReason);
+  const placeholderFaultReason = faultFindings.length > 0;
 
   const signals: CommentQualitySignals = {
     onFailurePath: fp.onFailurePath,
@@ -268,6 +314,7 @@ export function evaluateCommentQuality(
     hasImpact: analysis.hasImpact,
     hasPartsStance: analysis.hasPartsStance,
     hasNextAction: analysis.hasNextAction,
+    hasFaultClarity: analysis.hasFaultClarity,
     isVagueOnly: analysis.isVagueOnly,
     isTooThin: analysis.isTooThin,
     missingAxes: analysis.missingAxes,
@@ -276,19 +323,38 @@ export function evaluateCommentQuality(
     returnVisit: fp.returnVisit,
     partsStillRequired: fp.partsStillRequired,
     partsStillSnippet: fp.partsStillSnippet,
+    placeholderFaultReason,
   };
 
-  if (!fp.onFailurePath) {
-    return {
-      signals,
-      findings: [],
-      summary: "No failure-path signals; comment quality check skipped.",
-      scores,
-    };
-  }
-
-  const findings: Finding[] = [];
+  const findings: Finding[] = [...faultFindings];
   const raw = analysis.rawSnippet || "(no engineer comments)";
+
+  if (!fp.onFailurePath) {
+    // Off failure path: still emit FAULT-C010; optionally COMMENT-C042 with it.
+    if (
+      placeholderFaultReason &&
+      analysis.present &&
+      !analysis.hasFaultClarity
+    ) {
+      findings.push(
+        issue(
+          `${COMMENT_QUALITY_RULE_PREFIX}042`,
+          "Engineer Comments (Fault Clarity)",
+          "S2",
+          "INCOMPLETE_EVIDENCE",
+          "Fault Reason is incomplete and comments do not state a clear defect/root cause.",
+          "Placeholder Fault Reason plus a work-done list leaves QA unable to verify why the repair was needed.",
+          'State the defect/cause explicitly (e.g. "Nearside wheel bearing worn — unsafe") and pick a real Fault Reason category.',
+          raw,
+          82
+        )
+      );
+    }
+    const summary = findings.length
+      ? `Fault/comment honesty: ${findings.length} finding(s) off failure path.`
+      : "No failure-path signals; comment quality check skipped.";
+    return { signals, findings, summary, scores };
+  }
 
   // COMMENT-C010 — Presence
   if (!analysis.present) {
@@ -356,6 +422,29 @@ export function evaluateCommentQuality(
     );
   }
 
+  // COMMENT-C042 — Fault / root-cause clarity (S2 Issues)
+  if (
+    (fp.onFailurePath || placeholderFaultReason) &&
+    analysis.present &&
+    !analysis.hasFaultClarity
+  ) {
+    findings.push(
+      issue(
+        `${COMMENT_QUALITY_RULE_PREFIX}042`,
+        "Engineer Comments (Fault Clarity)",
+        "S2",
+        "INCOMPLETE_EVIDENCE",
+        placeholderFaultReason
+          ? "Fault Reason is a placeholder and comments lack a clear defect/root cause."
+          : "Engineer comments describe work done but do not state a clear defect/root cause.",
+        "Without fault clarity, QA cannot verify why the asset failed or whether the repair addresses the root cause.",
+        'Name the defect/cause (e.g. "Nearside wheel bearing worn / cracked — unsafe") — not only parts fitted.',
+        raw,
+        82
+      )
+    );
+  }
+
   // COMMENT-C040 — Actionable when return visit or parts still required
   if ((fp.returnVisit || fp.partsStillRequired) && !analysis.hasNextAction) {
     findings.push(
@@ -405,7 +494,13 @@ export function evaluateCommentQuality(
 
   const hasMajor = findings.some(f => f.severity === "S1");
   const hasMinor = findings.some(f => f.severity === "S2");
-  signals.coherent = !hasMajor && !hasMinor && sufficient;
+  // C041 only when Fault Reason clean, fault clarity present, and no hard fails.
+  signals.coherent =
+    !hasMajor &&
+    !hasMinor &&
+    sufficient &&
+    analysis.hasFaultClarity &&
+    !placeholderFaultReason;
 
   if (signals.coherent) {
     findings.push(
@@ -413,7 +508,7 @@ export function evaluateCommentQuality(
         `${COMMENT_QUALITY_RULE_PREFIX}041`,
         "Engineer Comments (Clinical)",
         `Coherent clinical narrative: ${analysis.rawSnippet.slice(0, 160)}`,
-        "Failure-path diagnosis covers what failed and the parts/next-action stance.",
+        "Failure-path diagnosis covers what failed, fault clarity, and the parts/next-action stance.",
         raw
       )
     );

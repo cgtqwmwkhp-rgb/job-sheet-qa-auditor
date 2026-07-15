@@ -98,7 +98,7 @@ describe("evaluateCommentQuality", () => {
     );
   });
 
-  it("skips when not on failure path", () => {
+  it("skips COMMENT rules when not on failure path (no Fault Reason)", () => {
     const result = evaluateCommentQuality(`
 Job Summary Report
 Is the asset safe to use?: Yes
@@ -107,6 +107,53 @@ Engineer Comments: Routine service completed, no defects found on inspection.
 `);
     expect(result.findings).toHaveLength(0);
     expect(result.summary).toMatch(/skipped/i);
+  });
+
+  it("emits FAULT-C010 for placeholder Fault Reason even off failure path", () => {
+    const result = evaluateCommentQuality(
+      `
+Job Summary Report
+Is the asset safe to use?: Yes
+Were all works fully completed?: Yes
+Fault Reason: Reason
+Engineer Comments: Fitted WT158 wheel and reflector, completed works on site.
+Technician Signature
+`,
+      { faultReason: "Reason" }
+    );
+    expect(result.findings.some(f => f.ruleId === "FAULT-C010")).toBe(true);
+    expect(result.findings.find(f => f.ruleId === "FAULT-C010")!.severity).toBe(
+      "S2"
+    );
+    expect(result.signals.placeholderFaultReason).toBe(true);
+  });
+
+  it("emits FAULT-C010 + blocks COMMENT-C041 when Fault Reason is Reason", () => {
+    const sheet = `
+${FAILURE_PATH_HEADER}
+Fault Reason: Reason
+Repairs Required: Coupling jaw cracked; wheel bearing noise on nearside.
+
+Parts Still Required: coupling assembly, wheel bearing
+
+Engineer Comments: Nearside coupling jaw cracked — asset unsafe / VOR.
+Parts still required: coupling assembly and wheel bearing.
+Return visit required to fit parts and retest.
+
+Technician Signature
+`;
+    const result = evaluateCommentQuality(sheet, { faultReason: "Reason" });
+    expect(result.findings.some(f => f.ruleId === "FAULT-C010")).toBe(true);
+    expect(result.findings.some(f => f.ruleId === "COMMENT-C041")).toBe(false);
+    expect(result.signals.coherent).toBe(false);
+  });
+
+  it("does not treat Wear & Tear as placeholder", () => {
+    const result = evaluateCommentQuality(COHERENT_JOB_87, {
+      faultReason: "Wear & Tear",
+    });
+    expect(result.findings.some(f => f.ruleId === "FAULT-C010")).toBe(false);
+    expect(result.findings.some(f => f.ruleId === "COMMENT-C041")).toBe(true);
   });
 
   it("coach suggestedFix is concrete, not 'add more detail'", () => {
@@ -142,6 +189,8 @@ describe("COMMENT-C audit policy seeds", () => {
       "COMMENT-C040",
       "COMMENT-C050",
       "COMMENT-C041",
+      "COMMENT-C042",
+      "FAULT-C010",
     ]) {
       expect(rules.find(r => r.ruleId === id)).toBeDefined();
     }
@@ -151,11 +200,15 @@ describe("COMMENT-C audit policy seeds", () => {
     expect(rules.find(r => r.ruleId === "COMMENT-C030")!.failClass).toBe(
       "minor"
     );
+    expect(rules.find(r => r.ruleId === "FAULT-C010")!.failClass).toBe("minor");
+    expect(rules.find(r => r.ruleId === "COMMENT-C042")!.failClass).toBe(
+      "minor"
+    );
   });
 });
 
 describe("documentProcessor wiring", () => {
-  it("wires comment quality + skipEngineerCommentRules", () => {
+  it("wires comment quality + skipEngineerCommentRules + fault reason", () => {
     const src = readFileSync(
       resolve(__dirname, "../../services/documentProcessor.ts"),
       "utf8"
@@ -164,5 +217,6 @@ describe("documentProcessor wiring", () => {
     expect(src).toContain("skipEngineerCommentRules: true");
     expect(src).toContain("[COMMENT_QUALITY]");
     expect(src).toContain("commentQualitySignals");
+    expect(src).toContain("faultReasonExtracted");
   });
 });
