@@ -12,6 +12,7 @@ const TOOL_LABELS: Record<string, string> = {
   openai_coaching: "OpenAI Coaching",
   mistral_ocr: "Mistral OCR",
   azure_ocr: "Azure Document Intelligence",
+  exa_parts: "Exa Parts Search",
   unknown: "Unknown AI tool",
 };
 

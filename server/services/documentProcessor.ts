@@ -112,6 +112,10 @@ import {
   isPartsWebVerifyEnabled,
   verifyPartsCatalogWeb,
 } from "./partsCatalogLookup";
+import {
+  evaluatePartsAssetFitment,
+  isPartsAssetFitmentEnabled,
+} from "./partsAssetFitment";
 import { evaluateEvidenceCoherence } from "./evidenceCoherence";
 import { evaluateTyreCompliance } from "./tyreCompliance";
 import { evaluateChecklistCompleteness } from "./checklistCompleteness";
@@ -2556,6 +2560,44 @@ async function processJobSheetWithOptions(
               err instanceof Error
                 ? err.message
                 : "parts catalog verify failed",
+          });
+        }
+      }
+
+      if (isPartsAssetFitmentEnabled()) {
+        try {
+          const extractedMakeModel =
+            ensembleResult?.ensembleExtractedFields?.makeModel?.value ??
+            selectionMarksResult?.preExtractedFields?.makeModel?.value;
+          const fitmentResult = await evaluatePartsAssetFitment(jsrText, {
+            makeModel:
+              typeof extractedMakeModel === "string"
+                ? extractedMakeModel
+                : undefined,
+          });
+          if (fitmentResult.findings.length > 0) {
+            analysisResult = {
+              ...analysisResult,
+              findings: [...analysisResult.findings, ...fitmentResult.findings],
+              summary: `${analysisResult.summary} [PARTS_ASSET_FITMENT] ${fitmentResult.summary}`,
+            };
+          }
+          recordStage({
+            stage: "Parts Asset Fitment",
+            status: "success",
+            durationMs: 0,
+          });
+        } catch (err) {
+          console.warn(
+            "[DocumentProcessor] Parts asset fitment failed (non-fatal):",
+            err
+          );
+          recordStage({
+            stage: "Parts Asset Fitment",
+            status: "failed",
+            durationMs: 0,
+            error:
+              err instanceof Error ? err.message : "parts asset fitment failed",
           });
         }
       }
