@@ -438,6 +438,42 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           fieldAliases: ["Parts Used", "Parts Catalog Verify"],
         },
         {
+          ruleId: "PARTS-C030",
+          label: "Parts Used (Missing Asset Context)",
+          description:
+            "Make/model missing — cannot verify part fitment for this asset",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: ["Parts Used", "Parts Asset Fitment"],
+        },
+        {
+          ruleId: "PARTS-C031",
+          label: "Parts Used (Fitment Conflict)",
+          description:
+            "Exa catalog search did not corroborate part fitment for make/model",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: ["Parts Used", "Parts Asset Fitment"],
+        },
+        {
+          ruleId: "PARTS-C032",
+          label: "Parts Used (Fitment Corroborated)",
+          description:
+            "Exa catalog search corroborates part fitment for make/model",
+          failClass: "informational",
+          enabled: true,
+          fieldAliases: ["Parts Used", "Parts Asset Fitment"],
+        },
+        {
+          ruleId: "PARTS-C033",
+          label: "Parts Used (Fitment Unavailable)",
+          description:
+            "Exa asset fitment verification unavailable — not a pass",
+          failClass: "minor",
+          enabled: true,
+          fieldAliases: ["Parts Used", "Parts Asset Fitment"],
+        },
+        {
           ruleId: "EVIDENCE-C010",
           label: "Evidence Coherence",
           description:

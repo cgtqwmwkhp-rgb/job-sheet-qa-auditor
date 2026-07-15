@@ -181,6 +181,22 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     deploy: unsetBoth,
   },
   {
+    key: "FEATURE_PARTS_ASSET_FITMENT",
+    description: "Exa parts asset fitment verify for PN vs make/model",
+    defaultWhenUnset: "off",
+    critical: false,
+    parity: "unspecified",
+    deploy: unsetBoth,
+  },
+  {
+    key: "FEATURE_PARTS_WEB_OEM_ALLOWLIST",
+    description: "Restrict Exa parts search to OEM domain allowlist",
+    defaultWhenUnset: "off",
+    critical: false,
+    parity: "unspecified",
+    deploy: unsetBoth,
+  },
+  {
     key: "FEATURE_CONFIDENCE_BANDS",
     description: "Confidence band mapping",
     defaultWhenUnset: "off",

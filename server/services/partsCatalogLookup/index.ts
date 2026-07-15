@@ -11,6 +11,7 @@ export {
   EXA_API_KEY_ENV,
   EXA_SEARCH_URL,
   EXA_SEARCH_TIMEOUT_MS,
+  PARTS_OEM_ALLOWLIST_DOMAINS,
   ExaClientError,
   type ExaFetch,
 } from "./exaClient";

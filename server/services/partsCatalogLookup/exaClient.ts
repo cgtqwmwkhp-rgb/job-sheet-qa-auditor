@@ -21,12 +21,34 @@ export class ExaClientError extends Error {
   }
 }
 
+export const PARTS_OEM_ALLOWLIST_DOMAINS = [
+  "parts.ford.com",
+  "mbparts.mbusa.com",
+  "parts.volvotrucks.com",
+  "parts.volvocars.com",
+  "parts.toyota.com",
+  "parts.nissanusa.com",
+  "parts.honda.com",
+  "parts.gm.com",
+  "moparparts.com",
+  "parts.bmw.com",
+  "parts.mercedes-benz.com",
+  "parts.jcb.com",
+  "shop.deere.com",
+  "parts.caterpillar.com",
+];
+
 export function buildPartsCatalogQuery(
   partNumber: string,
-  description: string
+  description: string,
+  makeModel?: string
 ): string {
   const pn = partNumber.trim();
   const desc = description.trim();
+  const mm = makeModel?.trim();
+  if (mm) {
+    return `"${pn}" "${desc}" "${mm}" automotive parts`;
+  }
   return `"${pn}" "${desc}" automotive parts`;
 }
 
@@ -36,6 +58,7 @@ export async function searchExaPartsCatalog(
     fetchFn?: ExaFetch;
     apiKey?: string;
     timeoutMs?: number;
+    includeDomains?: string[];
   }
 ): Promise<ExaSearchResponse> {
   const apiKey = deps?.apiKey ?? process.env[EXA_API_KEY_ENV]?.trim();
@@ -57,6 +80,9 @@ export async function searchExaPartsCatalog(
         query,
         type: "auto",
         numResults: 5,
+        ...(deps?.includeDomains?.length
+          ? { includeDomains: deps.includeDomains }
+          : {}),
         contents: {
           highlights: true,
         },
