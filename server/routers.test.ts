@@ -932,6 +932,7 @@ describe("auditActions (PR-10)", () => {
     const result = await caller.auditActions.override({
       findingId: 1,
       reason: "False positive",
+      trainingReasonCode: "rule_wrong",
     });
 
     expect(result.success).toBe(true);
@@ -981,6 +982,7 @@ describe("auditActions (PR-10)", () => {
     const result = await caller.auditActions.override({
       findingId: 1,
       reason: "QA lead override",
+      trainingReasonCode: "ocr_misread",
     });
 
     expect(result.success).toBe(true);
@@ -992,7 +994,11 @@ describe("auditActions (PR-10)", () => {
     const caller = appRouter.createCaller(ctx);
 
     await expect(
-      caller.auditActions.override({ findingId: 1, reason: "nope" })
+      caller.auditActions.override({
+        findingId: 1,
+        reason: "nope",
+        trainingReasonCode: "true_defect",
+      })
     ).rejects.toThrow();
   });
 
@@ -1027,6 +1033,7 @@ describe("auditActions (PR-10)", () => {
     await caller.auditActions.override({
       findingId: 1,
       reason: "temp",
+      trainingReasonCode: "rule_wrong",
     });
 
     // Claim guard + undo both read the finding — keep overridden for the whole undo path.
