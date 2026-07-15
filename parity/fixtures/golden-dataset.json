@@ -1,9 +1,9 @@
 {
-  "version": "2.1.0",
+  "version": "2.2.0",
   "schemaVersion": "1.0.0",
-  "description": "Golden dataset for parity testing - Expanded with 9 documents covering all edge cases",
+  "description": "Golden dataset for parity testing - Wave-4 A3 labelled expansion (≥50 documents)",
   "createdAt": "2026-01-04T00:00:00.000Z",
-  "contentHash": "sha256:9da88a5a4c6573c4ccba6bcdea82b5efceb9d01fef34b92c1fb23bbe9a56ed8f",
+  "contentHash": "sha256:befdc4f0612f3c261e2f9e4f815136d64cab0925f09b0d02ad56a18ebdc182e2",
   "documents": [
     {
       "id": "doc-001",
@@ -16,10 +16,7 @@
         "serviceDate": "2026-01-15",
         "technicianId": "TECH-042",
         "workDescription": "Quarterly maintenance inspection",
-        "partsUsed": [
-          "PART-A100",
-          "PART-B200"
-        ],
+        "partsUsed": ["PART-A100", "PART-B200"],
         "laborHours": 2.5,
         "totalCost": 450,
         "customerSignature": true,
@@ -138,9 +135,7 @@
         "serviceDate": "2026-01-16",
         "technicianId": "TECH-015",
         "workDescription": "Emergency repair",
-        "partsUsed": [
-          "PART-C300"
-        ],
+        "partsUsed": ["PART-C300"],
         "laborHours": 4,
         "totalCost": 750,
         "customerSignature": false,
@@ -270,9 +265,7 @@
       "name": "Job Sheet - Low Confidence OCR",
       "description": "Job sheet with low confidence extraction requiring review",
       "expectedResult": "pass",
-      "reviewQueueReasons": [
-        "LOW_CONFIDENCE"
-      ],
+      "reviewQueueReasons": ["LOW_CONFIDENCE"],
       "extractedFields": {
         "jobNumber": "JS-2026-003",
         "customerName": "CUSTOMER_C",
@@ -401,9 +394,7 @@
         "serviceDate": "2026-01-18",
         "technicianId": "TECH-022",
         "workDescription": "Preventive maintenance",
-        "partsUsed": [
-          "PART-D400"
-        ],
+        "partsUsed": ["PART-D400"],
         "laborHours": 3,
         "totalCost": 550,
         "customerSignature": true,
@@ -539,11 +530,7 @@
         "serviceDate": "2026-01-19",
         "technicianId": "TECH-033",
         "workDescription": "Major overhaul",
-        "partsUsed": [
-          "PART-E500",
-          "PART-E501",
-          "PART-E502"
-        ],
+        "partsUsed": ["PART-E500", "PART-E501", "PART-E502"],
         "laborHours": 25,
         "totalCost": 3500,
         "customerSignature": true,
@@ -829,9 +816,7 @@
         "serviceDate": "2026-01-20",
         "technicianId": "TECH-055",
         "workDescription": "Repair and calibration",
-        "partsUsed": [
-          "PART-G700"
-        ],
+        "partsUsed": ["PART-G700"],
         "laborHours": 4.5,
         "totalCost": 650,
         "customerSignature": true,
@@ -967,9 +952,7 @@
         "serviceDate": "2026-01-21",
         "technicianId": "TECH-077",
         "workDescription": "Complex repair",
-        "partsUsed": [
-          "PART-H800"
-        ],
+        "partsUsed": ["PART-H800"],
         "laborHours": 5,
         "totalCost": 800,
         "customerSignature": false,
@@ -1241,6 +1224,5077 @@
           "value": true,
           "confidence": 0.99,
           "pageNumber": 3,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-010",
+      "name": "Labelled Job Sheet 010 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-010",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-010",
+        "customerName": "CUSTOMER_C",
+        "serviceDate": "2026-11-11",
+        "technicianId": "TECH-100",
+        "workDescription": "Scheduled service cycle 10",
+        "partsUsed": ["PART-X010"],
+        "laborHours": 2,
+        "totalCost": 170,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-010",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-010",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_C",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_C",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-11-11",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-11-11",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-100",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-100",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 10",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 10",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-011",
+      "name": "Labelled Job Sheet 011 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-011",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-011",
+        "customerName": "CUSTOMER_D",
+        "serviceDate": "2026-12-12",
+        "technicianId": "TECH-101",
+        "workDescription": "Scheduled service cycle 11",
+        "partsUsed": ["PART-X011"],
+        "laborHours": 2.5,
+        "totalCost": 177,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-011",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-011",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_D",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_D",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-12-12",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-12-12",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-101",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-101",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 11",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 11",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-012",
+      "name": "Labelled Job Sheet 012 - Fail",
+      "description": "Wave-4 A3 labelled expansion fail fixture doc-012 (missing signature)",
+      "expectedResult": "fail",
+      "extractedFields": {
+        "jobNumber": "JS-2026-012",
+        "customerName": "CUSTOMER_E",
+        "serviceDate": "2026-01-13",
+        "technicianId": "TECH-102",
+        "workDescription": "Repair cycle 12",
+        "partsUsed": ["PART-Y012"],
+        "laborHours": 3,
+        "totalCost": 210,
+        "customerSignature": false,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-012",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-012",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_E",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_E",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-01-13",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-01-13",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-102",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-102",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Repair cycle 12",
+          "confidence": 0.91,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Repair cycle 12",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "failed",
+          "value": false,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required"
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "F001",
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "severity": "S0",
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required",
+          "extractedValue": "false",
+          "pageNumber": 2,
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "doc-013",
+      "name": "Labelled Job Sheet 013 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-013",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-013",
+        "customerName": "CUSTOMER_F",
+        "serviceDate": "2026-02-14",
+        "technicianId": "TECH-103",
+        "workDescription": "Scheduled service cycle 13",
+        "partsUsed": ["PART-X013"],
+        "laborHours": 3.5,
+        "totalCost": 191,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-013",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-013",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_F",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_F",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-02-14",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-02-14",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-103",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-103",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 13",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 13",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-014",
+      "name": "Labelled Job Sheet 014 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-014",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-014",
+        "customerName": "CUSTOMER_G",
+        "serviceDate": "2026-03-15",
+        "technicianId": "TECH-104",
+        "workDescription": "Scheduled service cycle 14",
+        "partsUsed": ["PART-X014"],
+        "laborHours": 4,
+        "totalCost": 198,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-014",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-014",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_G",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_G",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-03-15",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-03-15",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-104",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-104",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 14",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 14",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-015",
+      "name": "Labelled Job Sheet 015 - Fail",
+      "description": "Wave-4 A3 labelled expansion fail fixture doc-015 (missing signature)",
+      "expectedResult": "fail",
+      "extractedFields": {
+        "jobNumber": "JS-2026-015",
+        "customerName": "CUSTOMER_H",
+        "serviceDate": "2026-04-16",
+        "technicianId": "TECH-105",
+        "workDescription": "Repair cycle 15",
+        "partsUsed": ["PART-Y015"],
+        "laborHours": 2,
+        "totalCost": 225,
+        "customerSignature": false,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-015",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-015",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_H",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_H",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-04-16",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-04-16",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-105",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-105",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Repair cycle 15",
+          "confidence": 0.91,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Repair cycle 15",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "failed",
+          "value": false,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required"
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "F001",
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "severity": "S0",
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required",
+          "extractedValue": "false",
+          "pageNumber": 2,
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "doc-016",
+      "name": "Labelled Job Sheet 016 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-016",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-016",
+        "customerName": "CUSTOMER_I",
+        "serviceDate": "2026-05-17",
+        "technicianId": "TECH-106",
+        "workDescription": "Scheduled service cycle 16",
+        "partsUsed": ["PART-X016"],
+        "laborHours": 1,
+        "totalCost": 212,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-016",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-016",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_I",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_I",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-05-17",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-05-17",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-106",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-106",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 16",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 16",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-017",
+      "name": "Labelled Job Sheet 017 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-017",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-017",
+        "customerName": "CUSTOMER_J",
+        "serviceDate": "2026-06-18",
+        "technicianId": "TECH-107",
+        "workDescription": "Scheduled service cycle 17",
+        "partsUsed": ["PART-X017"],
+        "laborHours": 1.5,
+        "totalCost": 219,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-017",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-017",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_J",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_J",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-06-18",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-06-18",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-107",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-107",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 17",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 17",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-018",
+      "name": "Labelled Job Sheet 018 - Fail",
+      "description": "Wave-4 A3 labelled expansion fail fixture doc-018 (missing signature)",
+      "expectedResult": "fail",
+      "extractedFields": {
+        "jobNumber": "JS-2026-018",
+        "customerName": "CUSTOMER_K",
+        "serviceDate": "2026-07-19",
+        "technicianId": "TECH-108",
+        "workDescription": "Repair cycle 18",
+        "partsUsed": ["PART-Y018"],
+        "laborHours": 3.5,
+        "totalCost": 240,
+        "customerSignature": false,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-018",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-018",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_K",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_K",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-07-19",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-07-19",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-108",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-108",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Repair cycle 18",
+          "confidence": 0.91,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Repair cycle 18",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "failed",
+          "value": false,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required"
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "F001",
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "severity": "S0",
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required",
+          "extractedValue": "false",
+          "pageNumber": 2,
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "doc-019",
+      "name": "Labelled Job Sheet 019 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-019",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-019",
+        "customerName": "CUSTOMER_L",
+        "serviceDate": "2026-08-20",
+        "technicianId": "TECH-109",
+        "workDescription": "Scheduled service cycle 19",
+        "partsUsed": ["PART-X019"],
+        "laborHours": 2.5,
+        "totalCost": 233,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-019",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-019",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_L",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_L",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-08-20",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-08-20",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-109",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-109",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 19",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 19",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-020",
+      "name": "Labelled Job Sheet 020 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-020",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-020",
+        "customerName": "CUSTOMER_M",
+        "serviceDate": "2026-09-21",
+        "technicianId": "TECH-110",
+        "workDescription": "Scheduled service cycle 20",
+        "partsUsed": ["PART-X020"],
+        "laborHours": 3,
+        "totalCost": 240,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-020",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-020",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_M",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_M",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-09-21",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-09-21",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-110",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-110",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 20",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 20",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-021",
+      "name": "Labelled Job Sheet 021 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-021",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-021",
+        "customerName": "CUSTOMER_N",
+        "serviceDate": "2026-10-22",
+        "technicianId": "TECH-111",
+        "workDescription": "Scheduled service cycle 21",
+        "partsUsed": ["PART-X021"],
+        "laborHours": 3.5,
+        "totalCost": 247,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-021",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-021",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_N",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_N",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-10-22",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-10-22",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-111",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-111",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 21",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 21",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-022",
+      "name": "Labelled Job Sheet 022 - Fail",
+      "description": "Wave-4 A3 labelled expansion fail fixture doc-022 (missing signature)",
+      "expectedResult": "fail",
+      "extractedFields": {
+        "jobNumber": "JS-2026-022",
+        "customerName": "CUSTOMER_O",
+        "serviceDate": "2026-11-23",
+        "technicianId": "TECH-112",
+        "workDescription": "Repair cycle 22",
+        "partsUsed": ["PART-Y022"],
+        "laborHours": 3,
+        "totalCost": 260,
+        "customerSignature": false,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-022",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-022",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_O",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_O",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-11-23",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-11-23",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-112",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-112",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Repair cycle 22",
+          "confidence": 0.91,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Repair cycle 22",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "failed",
+          "value": false,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required"
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "F001",
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "severity": "S0",
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required",
+          "extractedValue": "false",
+          "pageNumber": 2,
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "doc-023",
+      "name": "Labelled Job Sheet 023 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-023",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-023",
+        "customerName": "CUSTOMER_P",
+        "serviceDate": "2026-12-24",
+        "technicianId": "TECH-113",
+        "workDescription": "Scheduled service cycle 23",
+        "partsUsed": ["PART-X023"],
+        "laborHours": 4.5,
+        "totalCost": 261,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-023",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-023",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_P",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_P",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-12-24",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-12-24",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-113",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-113",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 23",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 23",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-024",
+      "name": "Labelled Job Sheet 024 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-024",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-024",
+        "customerName": "CUSTOMER_Q",
+        "serviceDate": "2026-01-25",
+        "technicianId": "TECH-114",
+        "workDescription": "Scheduled service cycle 24",
+        "partsUsed": ["PART-X024"],
+        "laborHours": 1,
+        "totalCost": 268,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-024",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-024",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_Q",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_Q",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-01-25",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-01-25",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-114",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-114",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 24",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 24",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-025",
+      "name": "Labelled Job Sheet 025 - Fail",
+      "description": "Wave-4 A3 labelled expansion fail fixture doc-025 (missing signature)",
+      "expectedResult": "fail",
+      "extractedFields": {
+        "jobNumber": "JS-2026-025",
+        "customerName": "CUSTOMER_R",
+        "serviceDate": "2026-02-26",
+        "technicianId": "TECH-115",
+        "workDescription": "Repair cycle 25",
+        "partsUsed": ["PART-Y025"],
+        "laborHours": 2,
+        "totalCost": 275,
+        "customerSignature": false,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-025",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-025",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_R",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_R",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-02-26",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-02-26",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-115",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-115",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Repair cycle 25",
+          "confidence": 0.91,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Repair cycle 25",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "failed",
+          "value": false,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required"
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "F001",
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "severity": "S0",
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required",
+          "extractedValue": "false",
+          "pageNumber": 2,
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "doc-026",
+      "name": "Labelled Job Sheet 026 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-026",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-026",
+        "customerName": "CUSTOMER_S",
+        "serviceDate": "2026-03-27",
+        "technicianId": "TECH-116",
+        "workDescription": "Scheduled service cycle 26",
+        "partsUsed": ["PART-X026"],
+        "laborHours": 2,
+        "totalCost": 282,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-026",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-026",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_S",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_S",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-03-27",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-03-27",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-116",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-116",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 26",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 26",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-027",
+      "name": "Labelled Job Sheet 027 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-027",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-027",
+        "customerName": "CUSTOMER_T",
+        "serviceDate": "2026-04-01",
+        "technicianId": "TECH-117",
+        "workDescription": "Scheduled service cycle 27",
+        "partsUsed": ["PART-X027"],
+        "laborHours": 2.5,
+        "totalCost": 289,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-027",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-027",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_T",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_T",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-04-01",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-04-01",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-117",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-117",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 27",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 27",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-028",
+      "name": "Labelled Job Sheet 028 - Fail",
+      "description": "Wave-4 A3 labelled expansion fail fixture doc-028 (missing signature)",
+      "expectedResult": "fail",
+      "extractedFields": {
+        "jobNumber": "JS-2026-028",
+        "customerName": "CUSTOMER_U",
+        "serviceDate": "2026-05-02",
+        "technicianId": "TECH-118",
+        "workDescription": "Repair cycle 28",
+        "partsUsed": ["PART-Y028"],
+        "laborHours": 3.5,
+        "totalCost": 290,
+        "customerSignature": false,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-028",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-028",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_U",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_U",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-05-02",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-05-02",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-118",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-118",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Repair cycle 28",
+          "confidence": 0.91,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Repair cycle 28",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "failed",
+          "value": false,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required"
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "F001",
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "severity": "S0",
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required",
+          "extractedValue": "false",
+          "pageNumber": 2,
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "doc-029",
+      "name": "Labelled Job Sheet 029 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-029",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-029",
+        "customerName": "CUSTOMER_V",
+        "serviceDate": "2026-06-03",
+        "technicianId": "TECH-119",
+        "workDescription": "Scheduled service cycle 29",
+        "partsUsed": ["PART-X029"],
+        "laborHours": 3.5,
+        "totalCost": 303,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-029",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-029",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_V",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_V",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-06-03",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-06-03",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-119",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-119",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 29",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 29",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-030",
+      "name": "Labelled Job Sheet 030 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-030",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-030",
+        "customerName": "CUSTOMER_W",
+        "serviceDate": "2026-07-04",
+        "technicianId": "TECH-120",
+        "workDescription": "Scheduled service cycle 30",
+        "partsUsed": ["PART-X030"],
+        "laborHours": 4,
+        "totalCost": 310,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-030",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-030",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_W",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_W",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-07-04",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-07-04",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-120",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-120",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 30",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 30",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-031",
+      "name": "Labelled Job Sheet 031 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-031",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-031",
+        "customerName": "CUSTOMER_X",
+        "serviceDate": "2026-08-05",
+        "technicianId": "TECH-121",
+        "workDescription": "Scheduled service cycle 31",
+        "partsUsed": ["PART-X031"],
+        "laborHours": 4.5,
+        "totalCost": 317,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-031",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-031",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_X",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_X",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-08-05",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-08-05",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-121",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-121",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 31",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 31",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-032",
+      "name": "Labelled Job Sheet 032 - Fail",
+      "description": "Wave-4 A3 labelled expansion fail fixture doc-032 (missing signature)",
+      "expectedResult": "fail",
+      "extractedFields": {
+        "jobNumber": "JS-2026-032",
+        "customerName": "CUSTOMER_Y",
+        "serviceDate": "2026-09-06",
+        "technicianId": "TECH-122",
+        "workDescription": "Repair cycle 32",
+        "partsUsed": ["PART-Y032"],
+        "laborHours": 3,
+        "totalCost": 310,
+        "customerSignature": false,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-032",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-032",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_Y",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_Y",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-09-06",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-09-06",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-122",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-122",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Repair cycle 32",
+          "confidence": 0.91,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Repair cycle 32",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "failed",
+          "value": false,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required"
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "F001",
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "severity": "S0",
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required",
+          "extractedValue": "false",
+          "pageNumber": 2,
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "doc-033",
+      "name": "Labelled Job Sheet 033 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-033",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-033",
+        "customerName": "CUSTOMER_Z",
+        "serviceDate": "2026-10-07",
+        "technicianId": "TECH-123",
+        "workDescription": "Scheduled service cycle 33",
+        "partsUsed": ["PART-X033"],
+        "laborHours": 1.5,
+        "totalCost": 331,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-033",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-033",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_Z",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_Z",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-10-07",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-10-07",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-123",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-123",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 33",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 33",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-034",
+      "name": "Labelled Job Sheet 034 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-034",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-034",
+        "customerName": "CUSTOMER_C",
+        "serviceDate": "2026-11-08",
+        "technicianId": "TECH-124",
+        "workDescription": "Scheduled service cycle 34",
+        "partsUsed": ["PART-X034"],
+        "laborHours": 2,
+        "totalCost": 338,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-034",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-034",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_C",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_C",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-11-08",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-11-08",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-124",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-124",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 34",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 34",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-035",
+      "name": "Labelled Job Sheet 035 - Fail",
+      "description": "Wave-4 A3 labelled expansion fail fixture doc-035 (missing signature)",
+      "expectedResult": "fail",
+      "extractedFields": {
+        "jobNumber": "JS-2026-035",
+        "customerName": "CUSTOMER_D",
+        "serviceDate": "2026-12-09",
+        "technicianId": "TECH-125",
+        "workDescription": "Repair cycle 35",
+        "partsUsed": ["PART-Y035"],
+        "laborHours": 2,
+        "totalCost": 325,
+        "customerSignature": false,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-035",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-035",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_D",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_D",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-12-09",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-12-09",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-125",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-125",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Repair cycle 35",
+          "confidence": 0.91,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Repair cycle 35",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "failed",
+          "value": false,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required"
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "F001",
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "severity": "S0",
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required",
+          "extractedValue": "false",
+          "pageNumber": 2,
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "doc-036",
+      "name": "Labelled Job Sheet 036 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-036",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-036",
+        "customerName": "CUSTOMER_E",
+        "serviceDate": "2026-01-10",
+        "technicianId": "TECH-126",
+        "workDescription": "Scheduled service cycle 36",
+        "partsUsed": ["PART-X036"],
+        "laborHours": 3,
+        "totalCost": 352,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-036",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-036",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_E",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_E",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-01-10",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-01-10",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-126",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-126",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 36",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 36",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-037",
+      "name": "Labelled Job Sheet 037 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-037",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-037",
+        "customerName": "CUSTOMER_F",
+        "serviceDate": "2026-02-11",
+        "technicianId": "TECH-127",
+        "workDescription": "Scheduled service cycle 37",
+        "partsUsed": ["PART-X037"],
+        "laborHours": 3.5,
+        "totalCost": 359,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-037",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-037",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_F",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_F",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-02-11",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-02-11",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-127",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-127",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 37",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 37",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-038",
+      "name": "Labelled Job Sheet 038 - Fail",
+      "description": "Wave-4 A3 labelled expansion fail fixture doc-038 (missing signature)",
+      "expectedResult": "fail",
+      "extractedFields": {
+        "jobNumber": "JS-2026-038",
+        "customerName": "CUSTOMER_G",
+        "serviceDate": "2026-03-12",
+        "technicianId": "TECH-128",
+        "workDescription": "Repair cycle 38",
+        "partsUsed": ["PART-Y038"],
+        "laborHours": 3.5,
+        "totalCost": 340,
+        "customerSignature": false,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-038",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-038",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_G",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_G",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-03-12",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-03-12",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-128",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-128",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Repair cycle 38",
+          "confidence": 0.91,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Repair cycle 38",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "failed",
+          "value": false,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required"
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "F001",
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "severity": "S0",
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required",
+          "extractedValue": "false",
+          "pageNumber": 2,
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "doc-039",
+      "name": "Labelled Job Sheet 039 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-039",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-039",
+        "customerName": "CUSTOMER_H",
+        "serviceDate": "2026-04-13",
+        "technicianId": "TECH-129",
+        "workDescription": "Scheduled service cycle 39",
+        "partsUsed": ["PART-X039"],
+        "laborHours": 4.5,
+        "totalCost": 373,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-039",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-039",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_H",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_H",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-04-13",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-04-13",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-129",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-129",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 39",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 39",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-040",
+      "name": "Labelled Job Sheet 040 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-040",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-040",
+        "customerName": "CUSTOMER_I",
+        "serviceDate": "2026-05-14",
+        "technicianId": "TECH-130",
+        "workDescription": "Scheduled service cycle 40",
+        "partsUsed": ["PART-X040"],
+        "laborHours": 1,
+        "totalCost": 380,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-040",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-040",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_I",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_I",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-05-14",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-05-14",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-130",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-130",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 40",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 40",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-041",
+      "name": "Labelled Job Sheet 041 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-041",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-041",
+        "customerName": "CUSTOMER_J",
+        "serviceDate": "2026-06-15",
+        "technicianId": "TECH-131",
+        "workDescription": "Scheduled service cycle 41",
+        "partsUsed": ["PART-X041"],
+        "laborHours": 1.5,
+        "totalCost": 387,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-041",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-041",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_J",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_J",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-06-15",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-06-15",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-131",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-131",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 41",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 41",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-042",
+      "name": "Labelled Job Sheet 042 - Fail",
+      "description": "Wave-4 A3 labelled expansion fail fixture doc-042 (missing signature)",
+      "expectedResult": "fail",
+      "extractedFields": {
+        "jobNumber": "JS-2026-042",
+        "customerName": "CUSTOMER_K",
+        "serviceDate": "2026-07-16",
+        "technicianId": "TECH-132",
+        "workDescription": "Repair cycle 42",
+        "partsUsed": ["PART-Y042"],
+        "laborHours": 3,
+        "totalCost": 360,
+        "customerSignature": false,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-042",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-042",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_K",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_K",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-07-16",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-07-16",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-132",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-132",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Repair cycle 42",
+          "confidence": 0.91,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Repair cycle 42",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "failed",
+          "value": false,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required"
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "F001",
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "severity": "S0",
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required",
+          "extractedValue": "false",
+          "pageNumber": 2,
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "doc-043",
+      "name": "Labelled Job Sheet 043 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-043",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-043",
+        "customerName": "CUSTOMER_L",
+        "serviceDate": "2026-08-17",
+        "technicianId": "TECH-133",
+        "workDescription": "Scheduled service cycle 43",
+        "partsUsed": ["PART-X043"],
+        "laborHours": 2.5,
+        "totalCost": 401,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-043",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-043",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_L",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_L",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-08-17",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-08-17",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-133",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-133",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 43",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 43",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-044",
+      "name": "Labelled Job Sheet 044 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-044",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-044",
+        "customerName": "CUSTOMER_M",
+        "serviceDate": "2026-09-18",
+        "technicianId": "TECH-134",
+        "workDescription": "Scheduled service cycle 44",
+        "partsUsed": ["PART-X044"],
+        "laborHours": 3,
+        "totalCost": 408,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-044",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-044",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_M",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_M",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-09-18",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-09-18",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-134",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-134",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 44",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 44",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-045",
+      "name": "Labelled Job Sheet 045 - Fail",
+      "description": "Wave-4 A3 labelled expansion fail fixture doc-045 (missing signature)",
+      "expectedResult": "fail",
+      "extractedFields": {
+        "jobNumber": "JS-2026-045",
+        "customerName": "CUSTOMER_N",
+        "serviceDate": "2026-10-19",
+        "technicianId": "TECH-135",
+        "workDescription": "Repair cycle 45",
+        "partsUsed": ["PART-Y045"],
+        "laborHours": 2,
+        "totalCost": 375,
+        "customerSignature": false,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-045",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-045",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_N",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_N",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-10-19",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-10-19",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-135",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-135",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Repair cycle 45",
+          "confidence": 0.91,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Repair cycle 45",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "failed",
+          "value": false,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required"
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "F001",
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "severity": "S0",
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required",
+          "extractedValue": "false",
+          "pageNumber": 2,
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "doc-046",
+      "name": "Labelled Job Sheet 046 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-046",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-046",
+        "customerName": "CUSTOMER_O",
+        "serviceDate": "2026-11-20",
+        "technicianId": "TECH-136",
+        "workDescription": "Scheduled service cycle 46",
+        "partsUsed": ["PART-X046"],
+        "laborHours": 4,
+        "totalCost": 422,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-046",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-046",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_O",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_O",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-11-20",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-11-20",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-136",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-136",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 46",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 46",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-047",
+      "name": "Labelled Job Sheet 047 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-047",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-047",
+        "customerName": "CUSTOMER_P",
+        "serviceDate": "2026-12-21",
+        "technicianId": "TECH-137",
+        "workDescription": "Scheduled service cycle 47",
+        "partsUsed": ["PART-X047"],
+        "laborHours": 4.5,
+        "totalCost": 429,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-047",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-047",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_P",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_P",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-12-21",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-12-21",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-137",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-137",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 47",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 47",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-048",
+      "name": "Labelled Job Sheet 048 - Fail",
+      "description": "Wave-4 A3 labelled expansion fail fixture doc-048 (missing signature)",
+      "expectedResult": "fail",
+      "extractedFields": {
+        "jobNumber": "JS-2026-048",
+        "customerName": "CUSTOMER_Q",
+        "serviceDate": "2026-01-22",
+        "technicianId": "TECH-138",
+        "workDescription": "Repair cycle 48",
+        "partsUsed": ["PART-Y048"],
+        "laborHours": 3.5,
+        "totalCost": 390,
+        "customerSignature": false,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-048",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-048",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_Q",
+          "confidence": 0.95,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_Q",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-01-22",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-01-22",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-138",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-138",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Repair cycle 48",
+          "confidence": 0.91,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Repair cycle 48",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "failed",
+          "value": false,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required"
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": [
+        {
+          "id": "F001",
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "severity": "S0",
+          "reasonCode": "MISSING_FIELD",
+          "message": "Customer signature is required",
+          "extractedValue": "false",
+          "pageNumber": 2,
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "doc-049",
+      "name": "Labelled Job Sheet 049 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-049",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-049",
+        "customerName": "CUSTOMER_R",
+        "serviceDate": "2026-02-23",
+        "technicianId": "TECH-139",
+        "workDescription": "Scheduled service cycle 49",
+        "partsUsed": ["PART-X049"],
+        "laborHours": 1.5,
+        "totalCost": 443,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-049",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-049",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_R",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_R",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-02-23",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-02-23",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-139",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-139",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 49",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 49",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "id": "doc-050",
+      "name": "Labelled Job Sheet 050 - Pass",
+      "description": "Wave-4 A3 labelled expansion pass fixture doc-050",
+      "expectedResult": "pass",
+      "extractedFields": {
+        "jobNumber": "JS-2026-050",
+        "customerName": "CUSTOMER_S",
+        "serviceDate": "2026-03-24",
+        "technicianId": "TECH-140",
+        "workDescription": "Scheduled service cycle 50",
+        "partsUsed": ["PART-X000"],
+        "laborHours": 2,
+        "totalCost": 450,
+        "customerSignature": true,
+        "technicianSignature": true
+      },
+      "validatedFields": [
+        {
+          "ruleId": "R001",
+          "field": "jobNumber",
+          "status": "passed",
+          "value": "JS-2026-050",
+          "confidence": 0.98,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "jobNumber: JS-2026-050",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R002",
+          "field": "customerName",
+          "status": "passed",
+          "value": "CUSTOMER_S",
+          "confidence": 0.96,
+          "pageNumber": 1,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "customerName: CUSTOMER_S",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R003",
+          "field": "serviceDate",
+          "status": "passed",
+          "value": "2026-03-24",
+          "confidence": 0.99,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "serviceDate: 2026-03-24",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R004",
+          "field": "technicianId",
+          "status": "passed",
+          "value": "TECH-140",
+          "confidence": 0.97,
+          "pageNumber": 1,
+          "severity": "S1",
+          "evidence": {
+            "snippet": "technicianId: TECH-140",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R005",
+          "field": "workDescription",
+          "status": "passed",
+          "value": "Scheduled service cycle 50",
+          "confidence": 0.93,
+          "pageNumber": 1,
+          "severity": "S2",
+          "evidence": {
+            "snippet": "workDescription: Scheduled service cycle 50",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R006",
+          "field": "customerSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
+          "severity": "S0",
+          "evidence": {
+            "snippet": "",
+            "boundingBox": null
+          },
+          "reasonCode": null
+        },
+        {
+          "ruleId": "R007",
+          "field": "technicianSignature",
+          "status": "passed",
+          "value": true,
+          "confidence": 0.99,
+          "pageNumber": 2,
           "severity": "S0",
           "evidence": {
             "snippet": "",

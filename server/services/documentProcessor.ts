@@ -150,6 +150,7 @@ import {
 } from "./opsAlerts";
 import { isRiskRoutingEnabled, routeByRisk } from "./riskRouting";
 import { evaluateStageSlo, isStageSloEnabled } from "./slo";
+import { decidePassSampling, isSamplingPolicyEnabled } from "./samplingPolicy";
 import {
   checkCollision,
   isTemplateCollisionEnabled,
@@ -449,6 +450,21 @@ function buildFlaggedProcessorArtifacts(input: {
         });
       })
       .filter(Boolean);
+  });
+
+  // Wave-4 A3: wire samplingPolicy → human sample of PASS (artifact only; no demotion).
+  addArtifact("samplingPolicy", isSamplingPolicyEnabled(), () => {
+    const decision = decidePassSampling({
+      confidence,
+      cohortKey: `job-${input.jobSheetId}`,
+      subjectId: input.jobSheetId,
+      overallResult: input.analysisResult.overallResult,
+    });
+    return {
+      ...decision,
+      overallResult: input.analysisResult.overallResult,
+      humanSampleRequested: decision.sample === true,
+    };
   });
 
   addArtifact("templateCollision", isTemplateCollisionEnabled(), () => {

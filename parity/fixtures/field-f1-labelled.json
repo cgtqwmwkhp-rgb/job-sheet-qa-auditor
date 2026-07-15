@@ -1,0 +1,2466 @@
+{
+  "version": "1.0.0",
+  "description": "Wave-4 A3 labelled field exact-match corpus for weekly field-F1 gate",
+  "minSamplesRequired": 50,
+  "minExactMatchF1": 0.9,
+  "documentCount": 50,
+  "observations": [
+    {
+      "documentId": "doc-001",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-001",
+      "predicted": "JS-2026-001",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-001",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_A",
+      "predicted": "CUSTOMER_A",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-001",
+      "fieldId": "serviceDate",
+      "expected": "2026-01-15",
+      "predicted": "2026-01-15",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-001",
+      "fieldId": "technicianId",
+      "expected": "TECH-042",
+      "predicted": "TECH-042",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-001",
+      "fieldId": "workDescription",
+      "expected": "Quarterly maintenance inspection",
+      "predicted": "Quarterly maintenance inspection",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-001",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-001",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-002",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-002",
+      "predicted": "JS-2026-002",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-002",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_B",
+      "predicted": "CUSTOMER_B",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-002",
+      "fieldId": "serviceDate",
+      "expected": "2026-01-16",
+      "predicted": "2026-01-16",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-002",
+      "fieldId": "technicianId",
+      "expected": "TECH-015",
+      "predicted": "TECH-015",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-002",
+      "fieldId": "workDescription",
+      "expected": "Emergency repair",
+      "predicted": "Emergency repair",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-002",
+      "fieldId": "customerSignature",
+      "expected": false,
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-002",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-003",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-003",
+      "predicted": "JS-2026-003",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-003",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_C",
+      "predicted": "CUSTOMER_C",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-003",
+      "fieldId": "serviceDate",
+      "expected": "2026-01-17",
+      "predicted": "2026-01-17",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-003",
+      "fieldId": "technicianId",
+      "expected": "TECH-008",
+      "predicted": "TECH-008",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-003",
+      "fieldId": "workDescription",
+      "expected": "Installation",
+      "predicted": "Installation",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-003",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-003",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-004",
+      "fieldId": "jobNumber",
+      "expected": "JOB-2026-001",
+      "predicted": "JOB-2026-001",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-004",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_D",
+      "predicted": "CUSTOMER_D",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-004",
+      "fieldId": "serviceDate",
+      "expected": "2026-01-18",
+      "predicted": "2026-01-18",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-004",
+      "fieldId": "technicianId",
+      "expected": "TECH-022",
+      "predicted": "TECH-022",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-004",
+      "fieldId": "workDescription",
+      "expected": "Preventive maintenance",
+      "predicted": "Preventive maintenance",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-004",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-004",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-005",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-005",
+      "predicted": "JS-2026-005",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-005",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_E",
+      "predicted": "CUSTOMER_E",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-005",
+      "fieldId": "serviceDate",
+      "expected": "2026-01-19",
+      "predicted": "2026-01-19",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-005",
+      "fieldId": "technicianId",
+      "expected": "TECH-033",
+      "predicted": "TECH-033",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-005",
+      "fieldId": "workDescription",
+      "expected": "Major overhaul",
+      "predicted": "Major overhaul",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-005",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-005",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-005",
+      "fieldId": "laborHours",
+      "expected": 25,
+      "predicted": 25,
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-006",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-006",
+      "predicted": "JS-2026-006",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-006",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_F",
+      "predicted": "CUSTOMER_F",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-006",
+      "fieldId": "serviceDate",
+      "expected": "2027-06-15",
+      "predicted": "2027-06-15",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-006",
+      "fieldId": "technicianId",
+      "expected": "TECH-044",
+      "predicted": "TECH-044",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-006",
+      "fieldId": "workDescription",
+      "expected": "Scheduled inspection",
+      "predicted": "Scheduled inspection",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-006",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-006",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-007",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-007",
+      "predicted": "JS-2026-007",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-007",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_G",
+      "predicted": "CUSTOMER_G",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-007",
+      "fieldId": "serviceDate",
+      "expected": "2026-01-20",
+      "predicted": "2026-01-20",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-007",
+      "fieldId": "technicianId",
+      "expected": "TECH-055",
+      "predicted": "TECH-055",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-007",
+      "fieldId": "workDescription",
+      "expected": "Repair and calibration",
+      "predicted": "Repair and calibration",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-007",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-007",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-008",
+      "fieldId": "jobNumber",
+      "expected": "INVALID",
+      "predicted": "INVALID",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-008",
+      "fieldId": "customerName",
+      "expected": "",
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-008",
+      "fieldId": "serviceDate",
+      "expected": "2026-01-21",
+      "predicted": "2026-01-21",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-008",
+      "fieldId": "technicianId",
+      "expected": "TECH-077",
+      "predicted": "TECH-077",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-008",
+      "fieldId": "workDescription",
+      "expected": "Complex repair",
+      "predicted": "Complex repair",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-008",
+      "fieldId": "customerSignature",
+      "expected": false,
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-008",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-009",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-009",
+      "predicted": "JS-2026-009",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-009",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_I",
+      "predicted": "CUSTOMER_I",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-009",
+      "fieldId": "serviceDate",
+      "expected": "2026-01-22",
+      "predicted": "2026-01-22",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-009",
+      "fieldId": "technicianId",
+      "expected": "TECH-088",
+      "predicted": "TECH-088",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-009",
+      "fieldId": "workDescription",
+      "expected": "Full system replacement",
+      "predicted": "Full system replacement",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-009",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-009",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-010",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-010",
+      "predicted": "JS-2026-010",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-010",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_C",
+      "predicted": "CUSTOMER_C",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-010",
+      "fieldId": "serviceDate",
+      "expected": "2026-11-11",
+      "predicted": "2026-11-11",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-010",
+      "fieldId": "technicianId",
+      "expected": "TECH-100",
+      "predicted": "TECH-100",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-010",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 10",
+      "predicted": "Scheduled service cycle 10",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-010",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-010",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-011",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-011",
+      "predicted": "JS-2026-011",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-011",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_D",
+      "predicted": "CUSTOMER_D",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-011",
+      "fieldId": "serviceDate",
+      "expected": "2026-12-12",
+      "predicted": "2026-12-12",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-011",
+      "fieldId": "technicianId",
+      "expected": "TECH-101",
+      "predicted": "TECH-101",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-011",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 11",
+      "predicted": "Scheduled service cycle 11",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-011",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-011",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-012",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-012",
+      "predicted": "JS-2026-012",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-012",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_E",
+      "predicted": "CUSTOMER_E",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-012",
+      "fieldId": "serviceDate",
+      "expected": "2026-01-13",
+      "predicted": "2026-01-13",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-012",
+      "fieldId": "technicianId",
+      "expected": "TECH-102",
+      "predicted": "TECH-102",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-012",
+      "fieldId": "workDescription",
+      "expected": "Repair cycle 12",
+      "predicted": "Repair cycle 12",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-012",
+      "fieldId": "customerSignature",
+      "expected": false,
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-012",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-013",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-013",
+      "predicted": "JS-2026-013",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-013",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_F",
+      "predicted": "CUSTOMER_F",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-013",
+      "fieldId": "serviceDate",
+      "expected": "2026-02-14",
+      "predicted": "2026-02-14",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-013",
+      "fieldId": "technicianId",
+      "expected": "TECH-103",
+      "predicted": "TECH-103",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-013",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 13",
+      "predicted": "Scheduled service cycle 13",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-013",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-013",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-014",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-014",
+      "predicted": "JS-2026-014",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-014",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_G",
+      "predicted": "CUSTOMER_G",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-014",
+      "fieldId": "serviceDate",
+      "expected": "2026-03-15",
+      "predicted": "2026-03-15",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-014",
+      "fieldId": "technicianId",
+      "expected": "TECH-104",
+      "predicted": "TECH-104",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-014",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 14",
+      "predicted": "Scheduled service cycle 14",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-014",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-014",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-015",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-015",
+      "predicted": "JS-2026-015",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-015",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_H",
+      "predicted": "CUSTOMER_H",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-015",
+      "fieldId": "serviceDate",
+      "expected": "2026-04-16",
+      "predicted": "2026-04-16",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-015",
+      "fieldId": "technicianId",
+      "expected": "TECH-105",
+      "predicted": "TECH-105",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-015",
+      "fieldId": "workDescription",
+      "expected": "Repair cycle 15",
+      "predicted": "Repair cycle 15",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-015",
+      "fieldId": "customerSignature",
+      "expected": false,
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-015",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-016",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-016",
+      "predicted": "JS-2026-016",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-016",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_I",
+      "predicted": "CUSTOMER_I",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-016",
+      "fieldId": "serviceDate",
+      "expected": "2026-05-17",
+      "predicted": "2026-05-17",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-016",
+      "fieldId": "technicianId",
+      "expected": "TECH-106",
+      "predicted": "TECH-106",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-016",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 16",
+      "predicted": "Scheduled service cycle 16",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-016",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-016",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-017",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-017",
+      "predicted": "JS-2026-017",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-017",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_J",
+      "predicted": "CUSTOMER_J",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-017",
+      "fieldId": "serviceDate",
+      "expected": "2026-06-18",
+      "predicted": "2026-06-18",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-017",
+      "fieldId": "technicianId",
+      "expected": "TECH-107",
+      "predicted": "TECH-107",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-017",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 17",
+      "predicted": "Scheduled service cycle 17",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-017",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-017",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-018",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-018",
+      "predicted": "JS-2026-018",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-018",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_K",
+      "predicted": "CUSTOMER_K",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-018",
+      "fieldId": "serviceDate",
+      "expected": "2026-07-19",
+      "predicted": "2026-07-19",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-018",
+      "fieldId": "technicianId",
+      "expected": "TECH-108",
+      "predicted": "TECH-108",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-018",
+      "fieldId": "workDescription",
+      "expected": "Repair cycle 18",
+      "predicted": "Repair cycle 18",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-018",
+      "fieldId": "customerSignature",
+      "expected": false,
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-018",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-019",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-019",
+      "predicted": "JS-2026-019",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-019",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_L",
+      "predicted": "CUSTOMER_L",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-019",
+      "fieldId": "serviceDate",
+      "expected": "2026-08-20",
+      "predicted": "2026-08-20",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-019",
+      "fieldId": "technicianId",
+      "expected": "TECH-109",
+      "predicted": "TECH-109",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-019",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 19",
+      "predicted": "Scheduled service cycle 19",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-019",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-019",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-020",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-020",
+      "predicted": "JS-2026-020",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-020",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_M",
+      "predicted": "CUSTOMER_M",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-020",
+      "fieldId": "serviceDate",
+      "expected": "2026-09-21",
+      "predicted": "2026-09-21",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-020",
+      "fieldId": "technicianId",
+      "expected": "TECH-110",
+      "predicted": "TECH-110",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-020",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 20",
+      "predicted": "Scheduled service cycle 20",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-020",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-020",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-021",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-021",
+      "predicted": "JS-2026-021",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-021",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_N",
+      "predicted": "CUSTOMER_N",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-021",
+      "fieldId": "serviceDate",
+      "expected": "2026-10-22",
+      "predicted": "2026-10-22",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-021",
+      "fieldId": "technicianId",
+      "expected": "TECH-111",
+      "predicted": "TECH-111",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-021",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 21",
+      "predicted": "Scheduled service cycle 21",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-021",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-021",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-022",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-022",
+      "predicted": "JS-2026-022",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-022",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_O",
+      "predicted": "CUSTOMER_O",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-022",
+      "fieldId": "serviceDate",
+      "expected": "2026-11-23",
+      "predicted": "2026-11-23",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-022",
+      "fieldId": "technicianId",
+      "expected": "TECH-112",
+      "predicted": "TECH-112",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-022",
+      "fieldId": "workDescription",
+      "expected": "Repair cycle 22",
+      "predicted": "Repair cycle 22",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-022",
+      "fieldId": "customerSignature",
+      "expected": false,
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-022",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-023",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-023",
+      "predicted": "JS-2026-023",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-023",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_P",
+      "predicted": "CUSTOMER_P",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-023",
+      "fieldId": "serviceDate",
+      "expected": "2026-12-24",
+      "predicted": "2026-12-24",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-023",
+      "fieldId": "technicianId",
+      "expected": "TECH-113",
+      "predicted": "TECH-113",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-023",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 23",
+      "predicted": "Scheduled service cycle 23",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-023",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-023",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-024",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-024",
+      "predicted": "JS-2026-024",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-024",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_Q",
+      "predicted": "CUSTOMER_Q",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-024",
+      "fieldId": "serviceDate",
+      "expected": "2026-01-25",
+      "predicted": "2026-01-25",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-024",
+      "fieldId": "technicianId",
+      "expected": "TECH-114",
+      "predicted": "TECH-114",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-024",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 24",
+      "predicted": "Scheduled service cycle 24",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-024",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-024",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-025",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-025",
+      "predicted": "JS-2026-025",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-025",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_R",
+      "predicted": "CUSTOMER_R",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-025",
+      "fieldId": "serviceDate",
+      "expected": "2026-02-26",
+      "predicted": "2026-02-26",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-025",
+      "fieldId": "technicianId",
+      "expected": "TECH-115",
+      "predicted": "TECH-115",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-025",
+      "fieldId": "workDescription",
+      "expected": "Repair cycle 25",
+      "predicted": "Repair cycle 25",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-025",
+      "fieldId": "customerSignature",
+      "expected": false,
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-025",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-026",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-026",
+      "predicted": "JS-2026-026",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-026",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_S",
+      "predicted": "CUSTOMER_S",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-026",
+      "fieldId": "serviceDate",
+      "expected": "2026-03-27",
+      "predicted": "2026-03-27",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-026",
+      "fieldId": "technicianId",
+      "expected": "TECH-116",
+      "predicted": "TECH-116",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-026",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 26",
+      "predicted": "Scheduled service cycle 26",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-026",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-026",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-027",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-027",
+      "predicted": "JS-2026-027",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-027",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_T",
+      "predicted": "CUSTOMER_T",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-027",
+      "fieldId": "serviceDate",
+      "expected": "2026-04-01",
+      "predicted": "2026-04-01",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-027",
+      "fieldId": "technicianId",
+      "expected": "TECH-117",
+      "predicted": "TECH-117",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-027",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 27",
+      "predicted": "Scheduled service cycle 27",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-027",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-027",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-028",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-028",
+      "predicted": "JS-2026-028",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-028",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_U",
+      "predicted": "CUSTOMER_U",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-028",
+      "fieldId": "serviceDate",
+      "expected": "2026-05-02",
+      "predicted": "2026-05-02",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-028",
+      "fieldId": "technicianId",
+      "expected": "TECH-118",
+      "predicted": "TECH-118",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-028",
+      "fieldId": "workDescription",
+      "expected": "Repair cycle 28",
+      "predicted": "Repair cycle 28",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-028",
+      "fieldId": "customerSignature",
+      "expected": false,
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-028",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-029",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-029",
+      "predicted": "JS-2026-029",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-029",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_V",
+      "predicted": "CUSTOMER_V",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-029",
+      "fieldId": "serviceDate",
+      "expected": "2026-06-03",
+      "predicted": "2026-06-03",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-029",
+      "fieldId": "technicianId",
+      "expected": "TECH-119",
+      "predicted": "TECH-119",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-029",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 29",
+      "predicted": "Scheduled service cycle 29",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-029",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-029",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-030",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-030",
+      "predicted": "JS-2026-030",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-030",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_W",
+      "predicted": "CUSTOMER_W",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-030",
+      "fieldId": "serviceDate",
+      "expected": "2026-07-04",
+      "predicted": "2026-07-04",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-030",
+      "fieldId": "technicianId",
+      "expected": "TECH-120",
+      "predicted": "TECH-120",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-030",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 30",
+      "predicted": "Scheduled service cycle 30",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-030",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-030",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-031",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-031",
+      "predicted": "JS-2026-031",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-031",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_X",
+      "predicted": "CUSTOMER_X",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-031",
+      "fieldId": "serviceDate",
+      "expected": "2026-08-05",
+      "predicted": "2026-08-05",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-031",
+      "fieldId": "technicianId",
+      "expected": "TECH-121",
+      "predicted": "TECH-121",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-031",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 31",
+      "predicted": "Scheduled service cycle 31",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-031",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-031",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-032",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-032",
+      "predicted": "JS-2026-032",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-032",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_Y",
+      "predicted": "CUSTOMER_Y",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-032",
+      "fieldId": "serviceDate",
+      "expected": "2026-09-06",
+      "predicted": "2026-09-06",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-032",
+      "fieldId": "technicianId",
+      "expected": "TECH-122",
+      "predicted": "TECH-122",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-032",
+      "fieldId": "workDescription",
+      "expected": "Repair cycle 32",
+      "predicted": "Repair cycle 32",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-032",
+      "fieldId": "customerSignature",
+      "expected": false,
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-032",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-033",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-033",
+      "predicted": "JS-2026-033",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-033",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_Z",
+      "predicted": "CUSTOMER_Z",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-033",
+      "fieldId": "serviceDate",
+      "expected": "2026-10-07",
+      "predicted": "2026-10-07",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-033",
+      "fieldId": "technicianId",
+      "expected": "TECH-123",
+      "predicted": "TECH-123",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-033",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 33",
+      "predicted": "Scheduled service cycle 33",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-033",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-033",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-034",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-034",
+      "predicted": "JS-2026-034",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-034",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_C",
+      "predicted": "CUSTOMER_C",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-034",
+      "fieldId": "serviceDate",
+      "expected": "2026-11-08",
+      "predicted": "2026-11-08",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-034",
+      "fieldId": "technicianId",
+      "expected": "TECH-124",
+      "predicted": "TECH-124",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-034",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 34",
+      "predicted": "Scheduled service cycle 34",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-034",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-034",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-035",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-035",
+      "predicted": "JS-2026-035",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-035",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_D",
+      "predicted": "CUSTOMER_D",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-035",
+      "fieldId": "serviceDate",
+      "expected": "2026-12-09",
+      "predicted": "2026-12-09",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-035",
+      "fieldId": "technicianId",
+      "expected": "TECH-125",
+      "predicted": "TECH-125",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-035",
+      "fieldId": "workDescription",
+      "expected": "Repair cycle 35",
+      "predicted": "Repair cycle 35",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-035",
+      "fieldId": "customerSignature",
+      "expected": false,
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-035",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-036",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-036",
+      "predicted": "JS-2026-036",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-036",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_E",
+      "predicted": "CUSTOMER_E",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-036",
+      "fieldId": "serviceDate",
+      "expected": "2026-01-10",
+      "predicted": "2026-01-10",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-036",
+      "fieldId": "technicianId",
+      "expected": "TECH-126",
+      "predicted": "TECH-126",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-036",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 36",
+      "predicted": "Scheduled service cycle 36",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-036",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-036",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-037",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-037",
+      "predicted": "JS-2026-037",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-037",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_F",
+      "predicted": "CUSTOMER_F",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-037",
+      "fieldId": "serviceDate",
+      "expected": "2026-02-11",
+      "predicted": "2026-02-11",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-037",
+      "fieldId": "technicianId",
+      "expected": "TECH-127",
+      "predicted": "TECH-127",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-037",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 37",
+      "predicted": "Scheduled service cycle 37",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-037",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-037",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-038",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-038",
+      "predicted": "JS-2026-038",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-038",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_G",
+      "predicted": "CUSTOMER_G",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-038",
+      "fieldId": "serviceDate",
+      "expected": "2026-03-12",
+      "predicted": "2026-03-12",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-038",
+      "fieldId": "technicianId",
+      "expected": "TECH-128",
+      "predicted": "TECH-128",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-038",
+      "fieldId": "workDescription",
+      "expected": "Repair cycle 38",
+      "predicted": "Repair cycle 38",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-038",
+      "fieldId": "customerSignature",
+      "expected": false,
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-038",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-039",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-039",
+      "predicted": "JS-2026-039",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-039",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_H",
+      "predicted": "CUSTOMER_H",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-039",
+      "fieldId": "serviceDate",
+      "expected": "2026-04-13",
+      "predicted": "2026-04-13",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-039",
+      "fieldId": "technicianId",
+      "expected": "TECH-129",
+      "predicted": "TECH-129",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-039",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 39",
+      "predicted": "Scheduled service cycle 39",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-039",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-039",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-040",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-040",
+      "predicted": "JS-2026-040",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-040",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_I",
+      "predicted": "CUSTOMER_I",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-040",
+      "fieldId": "serviceDate",
+      "expected": "2026-05-14",
+      "predicted": "2026-05-14",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-040",
+      "fieldId": "technicianId",
+      "expected": "TECH-130",
+      "predicted": "TECH-130",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-040",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 40",
+      "predicted": "Scheduled service cycle 40",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-040",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-040",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-041",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-041",
+      "predicted": "JS-2026-041",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-041",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_J",
+      "predicted": "CUSTOMER_J",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-041",
+      "fieldId": "serviceDate",
+      "expected": "2026-06-15",
+      "predicted": "2026-06-15",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-041",
+      "fieldId": "technicianId",
+      "expected": "TECH-131",
+      "predicted": "TECH-131",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-041",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 41",
+      "predicted": "Scheduled service cycle 41",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-041",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-041",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-042",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-042",
+      "predicted": "JS-2026-042",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-042",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_K",
+      "predicted": "CUSTOMER_K",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-042",
+      "fieldId": "serviceDate",
+      "expected": "2026-07-16",
+      "predicted": "2026-07-16",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-042",
+      "fieldId": "technicianId",
+      "expected": "TECH-132",
+      "predicted": "TECH-132",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-042",
+      "fieldId": "workDescription",
+      "expected": "Repair cycle 42",
+      "predicted": "Repair cycle 42",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-042",
+      "fieldId": "customerSignature",
+      "expected": false,
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-042",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-043",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-043",
+      "predicted": "JS-2026-043",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-043",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_L",
+      "predicted": "CUSTOMER_L",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-043",
+      "fieldId": "serviceDate",
+      "expected": "2026-08-17",
+      "predicted": "2026-08-17",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-043",
+      "fieldId": "technicianId",
+      "expected": "TECH-133",
+      "predicted": "TECH-133",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-043",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 43",
+      "predicted": "Scheduled service cycle 43",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-043",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-043",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-044",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-044",
+      "predicted": "JS-2026-044",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-044",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_M",
+      "predicted": "CUSTOMER_M",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-044",
+      "fieldId": "serviceDate",
+      "expected": "2026-09-18",
+      "predicted": "2026-09-18",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-044",
+      "fieldId": "technicianId",
+      "expected": "TECH-134",
+      "predicted": "TECH-134",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-044",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 44",
+      "predicted": "Scheduled service cycle 44",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-044",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-044",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-045",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-045",
+      "predicted": "JS-2026-045",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-045",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_N",
+      "predicted": "CUSTOMER_N",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-045",
+      "fieldId": "serviceDate",
+      "expected": "2026-10-19",
+      "predicted": "2026-10-19",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-045",
+      "fieldId": "technicianId",
+      "expected": "TECH-135",
+      "predicted": "TECH-135",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-045",
+      "fieldId": "workDescription",
+      "expected": "Repair cycle 45",
+      "predicted": "Repair cycle 45",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-045",
+      "fieldId": "customerSignature",
+      "expected": false,
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-045",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-046",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-046",
+      "predicted": "JS-2026-046",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-046",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_O",
+      "predicted": "CUSTOMER_O",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-046",
+      "fieldId": "serviceDate",
+      "expected": "2026-11-20",
+      "predicted": "2026-11-20",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-046",
+      "fieldId": "technicianId",
+      "expected": "TECH-136",
+      "predicted": "TECH-136",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-046",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 46",
+      "predicted": "Scheduled service cycle 46",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-046",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-046",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-047",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-047",
+      "predicted": "JS-2026-047",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-047",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_P",
+      "predicted": "CUSTOMER_P",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-047",
+      "fieldId": "serviceDate",
+      "expected": "2026-12-21",
+      "predicted": "2026-12-21",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-047",
+      "fieldId": "technicianId",
+      "expected": "TECH-137",
+      "predicted": "TECH-137",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-047",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 47",
+      "predicted": "Scheduled service cycle 47",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-047",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-047",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-048",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-048",
+      "predicted": "JS-2026-048",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-048",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_Q",
+      "predicted": "CUSTOMER_Q",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-048",
+      "fieldId": "serviceDate",
+      "expected": "2026-01-22",
+      "predicted": "2026-01-22",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-048",
+      "fieldId": "technicianId",
+      "expected": "TECH-138",
+      "predicted": "TECH-138",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-048",
+      "fieldId": "workDescription",
+      "expected": "Repair cycle 48",
+      "predicted": "Repair cycle 48",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-048",
+      "fieldId": "customerSignature",
+      "expected": false,
+      "predicted": null,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-048",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-049",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-049",
+      "predicted": "JS-2026-049",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-049",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_R",
+      "predicted": "CUSTOMER_R",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-049",
+      "fieldId": "serviceDate",
+      "expected": "2026-02-23",
+      "predicted": "2026-02-23",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-049",
+      "fieldId": "technicianId",
+      "expected": "TECH-139",
+      "predicted": "TECH-139",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-049",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 49",
+      "predicted": "Scheduled service cycle 49",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-049",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-049",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-050",
+      "fieldId": "jobNumber",
+      "expected": "JS-2026-050",
+      "predicted": "JS-2026-050",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-050",
+      "fieldId": "customerName",
+      "expected": "CUSTOMER_S",
+      "predicted": "CUSTOMER_S",
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-050",
+      "fieldId": "serviceDate",
+      "expected": "2026-03-24",
+      "predicted": "2026-03-24",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-050",
+      "fieldId": "technicianId",
+      "expected": "TECH-140",
+      "predicted": "TECH-140",
+      "severity": "S1"
+    },
+    {
+      "documentId": "doc-050",
+      "fieldId": "workDescription",
+      "expected": "Scheduled service cycle 50",
+      "predicted": "Scheduled service cycle 50",
+      "severity": "S2"
+    },
+    {
+      "documentId": "doc-050",
+      "fieldId": "customerSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    },
+    {
+      "documentId": "doc-050",
+      "fieldId": "technicianSignature",
+      "expected": true,
+      "predicted": true,
+      "severity": "S0"
+    }
+  ]
+}

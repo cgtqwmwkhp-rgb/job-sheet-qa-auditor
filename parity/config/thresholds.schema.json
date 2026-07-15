@@ -64,7 +64,7 @@
       "properties": {
         "prSubsetDocIds": {
           "type": "array",
-          "items": {"type": "string"},
+          "items": { "type": "string" },
           "description": "Document IDs to run on PR checks (subset)"
         },
         "nightlyFullSuite": {
@@ -90,11 +90,40 @@
         },
         "approvers": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": { "type": "string" }
         },
         "changeLogRequired": {
           "type": "boolean"
         }
+      }
+    },
+    "fieldF1": {
+      "type": "object",
+      "description": "Wave-4 A3 field exact-match F1 gate configuration",
+      "properties": {
+        "minSamplesRequired": { "type": "integer", "minimum": 1 },
+        "minExactMatchF1": { "type": "number", "minimum": 0, "maximum": 1 },
+        "fixturePath": { "type": "string" }
+      }
+    },
+    "sampling": {
+      "type": "object",
+      "description": "Wave-4 A3 PASS sample miss-rate SLO",
+      "properties": {
+        "maxPassSampleMissRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minPassSamplesRequired": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "attribution": {
+      "type": "object",
+      "description": "Wave-4 A3 technician attribution SLO",
+      "properties": {
+        "maxUnattributedRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "minSheetsRequired": { "type": "integer", "minimum": 1 }
       }
     }
   },
