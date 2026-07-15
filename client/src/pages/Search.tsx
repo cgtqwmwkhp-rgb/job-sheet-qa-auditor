@@ -16,7 +16,6 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
 import {
   isActiveJobSheetStatus,
   isTerminalJobSheetStatus,
@@ -31,8 +30,6 @@ type SearchResult = {
   status: string;
   createdAt: Date | string;
   auditResult: string | null;
-  docQualityScore: number | null;
-  hasMajorFails: boolean;
 };
 
 function JobSheetStatusBadge({ status }: { status: string }) {
@@ -105,22 +102,10 @@ export default function SearchPage() {
   const loadError = sheetsError || auditsError;
 
   const auditByJobSheetId = useMemo(() => {
-    const map = new Map<
-      number,
-      { result: string; docQualityScore: number | null; hasMajorFails: boolean }
-    >();
+    const map = new Map<number, { result: string }>();
     for (const ar of auditResults ?? []) {
-      const reportJson = ar.reportJson as Record<string, unknown> | null;
-      const docScore =
-        typeof (reportJson as { documentationQualityScore?: unknown })
-          ?.documentationQualityScore === "number"
-          ? ((reportJson as { documentationQualityScore: number })
-              .documentationQualityScore as number)
-          : null;
       map.set(ar.jobSheetId, {
         result: ar.result,
-        docQualityScore: docScore,
-        hasMajorFails: mapHasMajorFailsFromReport(reportJson),
       });
     }
     return map;
@@ -137,8 +122,6 @@ export default function SearchPage() {
         status: sheet.status,
         createdAt: sheet.createdAt,
         auditResult: audit?.result ?? null,
-        docQualityScore: audit?.docQualityScore ?? null,
-        hasMajorFails: audit?.hasMajorFails ?? false,
       };
     });
   }, [jobSheets, auditByJobSheetId]);
@@ -376,25 +359,6 @@ export default function SearchPage() {
                                 showDocsHint={false}
                               />
                             ) : null}
-                            {item.hasMajorFails && (
-                              <Badge variant="destructive" className="text-xs">
-                                Major
-                              </Badge>
-                            )}
-                            {item.docQualityScore != null && (
-                              <span
-                                className={cn(
-                                  "text-xs font-semibold tabular-nums px-2 py-0.5 rounded",
-                                  item.docQualityScore >= 80
-                                    ? "bg-emerald-50 text-emerald-700"
-                                    : item.docQualityScore >= 50
-                                      ? "bg-amber-50 text-amber-700"
-                                      : "bg-red-50 text-red-700"
-                                )}
-                              >
-                                Doc {item.docQualityScore}%
-                              </span>
-                            )}
                           </div>
                         </CardContent>
                       </Card>
