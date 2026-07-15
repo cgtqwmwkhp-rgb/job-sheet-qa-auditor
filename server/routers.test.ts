@@ -6,6 +6,10 @@ import type { TrpcContext } from "./_core/context";
 
 // Mock the database module
 vi.mock("./db", () => ({
+<<<<<<< HEAD
+=======
+  // Review-claim store falls back to in-memory when getDb() is null.
+>>>>>>> ac3e7be (fix(review): mock getDb for review-claim guards in router tests)
   getDb: vi.fn().mockResolvedValue(null),
   getDashboardStats: vi.fn().mockResolvedValue({
     totalAudits: 150,
@@ -1020,6 +1024,7 @@ describe("auditActions (PR-10)", () => {
   it("undos a finding action", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
+    const db = await import("./db");
 
     // First apply an action so previousResolutionStatus is set via mock chain
     await caller.auditActions.override({
@@ -1027,9 +1032,8 @@ describe("auditActions (PR-10)", () => {
       reason: "temp",
     });
 
-    // Mock returns open by default — update mock for undo path
-    const db = await import("./db");
-    vi.mocked(db.getAuditFindingById).mockResolvedValueOnce({
+    // Claim guard + undo both read the finding — keep overridden for the whole undo path.
+    vi.mocked(db.getAuditFindingById).mockResolvedValue({
       id: 1,
       auditResultId: 1,
       resolutionStatus: "overridden",
@@ -1040,6 +1044,14 @@ describe("auditActions (PR-10)", () => {
     const result = await caller.auditActions.undo({ findingId: 1 });
     expect(result.success).toBe(true);
     expect(result.action).toBe("undo");
+
+    // Restore default open finding for later tests in this file.
+    vi.mocked(db.getAuditFindingById).mockResolvedValue({
+      id: 1,
+      auditResultId: 1,
+      resolutionStatus: "open",
+      fieldName: "signature",
+    } as any);
   });
 });
 
