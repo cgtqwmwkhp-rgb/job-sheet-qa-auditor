@@ -1,5 +1,6 @@
 import { getJobQueueBackend } from "./backend";
 import type { JobSheetProcessingPayload } from "./types";
+import { createRequestContext, runWithContext } from "../../utils/context";
 
 interface OrchestrateRequest {
   source: string;
@@ -51,31 +52,38 @@ async function loadProcessorModule(): Promise<JobSheetProcessorModule> {
 }
 
 async function runJob(payload: JobSheetProcessingPayload): Promise<void> {
-  const processorModule = await loadProcessorModule();
-  const selected = selectJobSheetProcessor(processorModule);
+  const context = createRequestContext(payload.correlationId, {
+    jobSheetId: payload.jobSheetId,
+    queueSource: payload.source ?? "async-queue",
+  });
 
-  if (selected.mode === "orchestrate" && selected.orchestrate) {
-    await selected.orchestrate({
-      source: payload.source ?? "async-queue",
-      jobSheetId: payload.jobSheetId,
-      documentUrl: payload.documentUrl,
-      goldSpecId: payload.goldSpecId,
-      userId: payload.userId,
-      templateVersionId: payload.templateVersionId,
-    });
-    return;
-  }
+  await runWithContext(context, async () => {
+    const processorModule = await loadProcessorModule();
+    const selected = selectJobSheetProcessor(processorModule);
 
-  if (!selected.legacy) {
-    throw new Error("No job sheet processor export is available");
-  }
+    if (selected.mode === "orchestrate" && selected.orchestrate) {
+      await selected.orchestrate({
+        source: payload.source ?? "async-queue",
+        jobSheetId: payload.jobSheetId,
+        documentUrl: payload.documentUrl,
+        goldSpecId: payload.goldSpecId,
+        userId: payload.userId,
+        templateVersionId: payload.templateVersionId,
+      });
+      return;
+    }
 
-  await selected.legacy(
-    payload.jobSheetId,
-    payload.documentUrl,
-    payload.goldSpecId,
-    payload.userId
-  );
+    if (!selected.legacy) {
+      throw new Error("No job sheet processor export is available");
+    }
+
+    await selected.legacy(
+      payload.jobSheetId,
+      payload.documentUrl,
+      payload.goldSpecId,
+      payload.userId
+    );
+  });
 }
 
 async function runDrain(): Promise<void> {

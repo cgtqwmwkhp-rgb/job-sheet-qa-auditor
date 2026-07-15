@@ -4,6 +4,7 @@
  */
 
 import { AsyncLocalStorage } from 'async_hooks';
+import type { NextFunction, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface RequestContext {
@@ -47,6 +48,34 @@ export function createRequestContext(
     startTime: Date.now(),
     metadata,
   };
+}
+
+/**
+ * Read the client correlation ID, generating one only when it is absent.
+ * Empty header values are treated as absent so every request remains traceable.
+ */
+export function correlationIdFromRequest(req: Request): string {
+  const supplied = req.get("X-Correlation-ID")?.trim();
+  return supplied || generateCorrelationId();
+}
+
+/**
+ * Attach a request-scoped context before application routes execute.
+ * The response header lets callers correlate generated IDs with server logs.
+ */
+export function correlationContextMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
+  const correlationId = correlationIdFromRequest(req);
+  const context = createRequestContext(correlationId, {
+    method: req.method,
+    path: req.originalUrl,
+  });
+
+  res.setHeader("X-Correlation-ID", correlationId);
+  runWithContext(context, next);
 }
 
 /**

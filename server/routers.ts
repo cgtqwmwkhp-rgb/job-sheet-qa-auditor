@@ -13,6 +13,7 @@ import * as db from "./db";
 import { getStorageAdapter } from "./storage";
 import { nanoid } from "nanoid";
 import { calculateHash } from "./utils/fileValidation";
+import { getCorrelationId } from "./utils/context";
 import { orchestrateJobSheetProcessing } from "./services/documentProcessor";
 import {
   enqueueJobSheetProcessing,
@@ -518,6 +519,7 @@ export const appRouter = router({
             userId: ctx.user.id,
             contentHash,
             idempotencyKey,
+            correlationId: getCorrelationId(),
           });
         }
 
@@ -934,6 +936,7 @@ export const appRouter = router({
             jobSheetId: input.id,
             documentUrl: jobSheet.fileUrl,
             userId: ctx.user.id,
+            correlationId: getCorrelationId(),
           });
         }
 
