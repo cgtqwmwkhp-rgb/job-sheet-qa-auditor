@@ -5,6 +5,9 @@ import { auditActionsRouter } from "../../routers/auditActionsRouter";
 vi.mock("../../db", () => ({
   getAuditFindingById: vi.fn(),
   getJobSheetById: vi.fn(),
+  getAuditResultById: vi.fn(),
+  updateFindingResolution: vi.fn(),
+  logAction: vi.fn(),
   runTransaction: vi.fn(async fn => fn({})),
 }));
 
@@ -14,9 +17,14 @@ const testRouter = router({
   auditActions: auditActionsRouter,
 });
 
-function createCaller(role: "admin" | "qa_lead" = "qa_lead") {
+function createCaller(
+  role: "admin" | "qa_lead" = "qa_lead",
+  idempotencyKey?: string
+) {
   return testRouter.createCaller({
-    req: {} as any,
+    req: idempotencyKey
+      ? ({ headers: { "idempotency-key": idempotencyKey } } as any)
+      : ({} as any),
     res: {} as any,
     user: {
       id: 1,
@@ -84,5 +92,31 @@ describe("Audit actions router error contracts", () => {
       code: "NOT_FOUND",
       message: "Job sheet not found",
     });
+  });
+
+  it("replays approve with an Idempotency-Key without repeating the mutation", async () => {
+    vi.mocked(db.getAuditFindingById).mockResolvedValue({
+      id: 10,
+      auditResultId: 20,
+      resolutionStatus: "open",
+      resolutionReason: null,
+      resolvedBy: null,
+      resolvedAt: null,
+      previousResolutionStatus: null,
+      fieldName: "assetId",
+      rawSnippet: null,
+      normalisedSnippet: null,
+    });
+    vi.mocked(db.getAuditResultById).mockResolvedValue(undefined);
+
+    const input = { findingId: 10, reason: "Reviewer approved" };
+    const first = await createCaller("qa_lead", "approve-replay-10")
+      .auditActions.approve(input);
+    const replay = await createCaller("qa_lead", "approve-replay-10")
+      .auditActions.approve(input);
+
+    expect(replay).toEqual(first);
+    expect(db.updateFindingResolution).toHaveBeenCalledTimes(1);
+    expect(db.logAction).toHaveBeenCalledTimes(1);
   });
 });
