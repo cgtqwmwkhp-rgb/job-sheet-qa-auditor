@@ -841,23 +841,21 @@ export const analyticsRouter = router({
   /**
    * Evidence ROI — COMMENT/PHOTO/EVIDENCE fail rates (money-saving dashboard).
    */
-  getEvidenceRoi: staffProcedure
-    .input(periodInput)
-    .query(async ({ input }) => {
-      const loaded = await loadExceptionAnalyticsInputs(input);
-      const engineerByFindingId: Record<number, string> = {};
-      for (const f of loaded.findings) {
-        if (f.technicianId != null) {
-          engineerByFindingId[f.findingId] = String(f.technicianId);
-        }
+  getEvidenceRoi: staffProcedure.input(periodInput).query(async ({ input }) => {
+    const loaded = await loadExceptionAnalyticsInputs(input);
+    const engineerByFindingId: Record<number, string> = {};
+    for (const f of loaded.findings) {
+      if (f.technicianId != null) {
+        engineerByFindingId[f.findingId] = String(f.technicianId);
       }
-      return buildEvidenceRoiAnalytics({
-        findings: loaded.findings,
-        startDate: loaded.period.start,
-        endDate: loaded.period.end,
-        engineerByFindingId,
-      });
-    }),
+    }
+    return buildEvidenceRoiAnalytics({
+      findings: loaded.findings,
+      startDate: loaded.period.start,
+      endDate: loaded.period.end,
+      engineerByFindingId,
+    });
+  }),
 
   /**
    * DLQ status + light retry pass (no live OCR/LLM). Rate-limited.
@@ -914,23 +912,21 @@ export const analyticsRouter = router({
   /**
    * Active drift alerts only (sorted by severity).
    */
-  getDriftAlerts: staffProcedure
-    .input(periodInput)
-    .query(async ({ input }) => {
-      const loaded = await loadDriftAnalyticsInputs(input);
-      const summary = buildDriftAnalyticsSummary({
-        documents: loaded.documents,
-        findings: loaded.findings,
-        startDate: loaded.period.start,
-        endDate: loaded.period.end,
-      });
-      return {
-        period: summary.period,
-        asOf: summary.asOf,
-        alerts: summary.alerts,
-        summary: summary.summary,
-      };
-    }),
+  getDriftAlerts: staffProcedure.input(periodInput).query(async ({ input }) => {
+    const loaded = await loadDriftAnalyticsInputs(input);
+    const summary = buildDriftAnalyticsSummary({
+      documents: loaded.documents,
+      findings: loaded.findings,
+      startDate: loaded.period.start,
+      endDate: loaded.period.end,
+    });
+    return {
+      period: summary.period,
+      asOf: summary.asOf,
+      alerts: summary.alerts,
+      summary: summary.summary,
+    };
+  }),
 
   // ============ PR-19: PREDICTIVE RISK ============
 
