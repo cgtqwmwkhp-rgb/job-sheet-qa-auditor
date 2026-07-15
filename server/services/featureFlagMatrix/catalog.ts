@@ -44,8 +44,12 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     description: "Gemini multimodal before/after pair axes compare",
     defaultWhenUnset: "off",
     critical: false,
-    parity: "unspecified",
-    deploy: unsetBoth,
+    parity: "must_match",
+    deploy: {
+      staging: "true",
+      production: "true",
+      note: "Set unconditionally in azure-deploy Set environment variables",
+    },
   },
   {
     key: "FEATURE_SELECTION_MARKS",
@@ -176,8 +180,12 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     description: "Comment LLM advisory",
     defaultWhenUnset: "off",
     critical: false,
-    parity: "unspecified",
-    deploy: unsetBoth,
+    parity: "must_match",
+    deploy: {
+      staging: "true",
+      production: "true",
+      note: "Set unconditionally in azure-deploy Set environment variables",
+    },
   },
   {
     key: "FEATURE_FAULT_REASON_PLACEHOLDER",
@@ -202,10 +210,11 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
       "Exa parts catalog verify for PN vs description (Wave-5 P2 L2)",
     defaultWhenUnset: "off",
     critical: false,
-    parity: "unspecified",
+    parity: "must_match",
     deploy: {
-      ...unsetBoth,
-      note: "Wave-5 opt-in; unset in azure-deploy — default off when unset",
+      staging: "true",
+      production: "true",
+      note: "Requires EXA_API_KEY; set true in azure-deploy Set environment variables",
     },
   },
   {
@@ -214,10 +223,11 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
       "Exa parts asset fitment verify for PN vs make/model (Wave-6 P2 L3)",
     defaultWhenUnset: "off",
     critical: false,
-    parity: "unspecified",
+    parity: "must_match",
     deploy: {
-      ...unsetBoth,
-      note: "Wave-6 opt-in; unset in azure-deploy — default off when unset",
+      staging: "true",
+      production: "true",
+      note: "Requires EXA_API_KEY; set true in azure-deploy Set environment variables",
     },
   },
   {
@@ -265,16 +275,24 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     description: "Ensemble extraction (enabled only when true)",
     defaultWhenUnset: "off",
     critical: false,
-    parity: "unspecified",
-    deploy: unsetBoth,
+    parity: "must_match",
+    deploy: {
+      staging: "true",
+      production: "true",
+      note: "Set unconditionally in azure-deploy Set environment variables",
+    },
   },
   {
     key: "FEATURE_FIELD_VOTE",
     description: "Multi-engine field voting + handwriting/VLM path",
     defaultWhenUnset: "off",
     critical: false,
-    parity: "unspecified",
-    deploy: unsetBoth,
+    parity: "must_match",
+    deploy: {
+      staging: "true",
+      production: "true",
+      note: "Set unconditionally in azure-deploy Set environment variables",
+    },
   },
   {
     key: "FEATURE_EVIDENCE_PACK",
@@ -537,8 +555,12 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     description: "Mistral OCR pass for configured PDF ROI crops",
     defaultWhenUnset: "off",
     critical: false,
-    parity: "unspecified",
-    deploy: unsetBoth,
+    parity: "must_match",
+    deploy: {
+      staging: "true",
+      production: "true",
+      note: "Set unconditionally in azure-deploy Set environment variables",
+    },
   },
   {
     key: "FEATURE_TEMPLATE_COLLISION",
@@ -590,6 +612,20 @@ export const KEY_ENV_CATALOG: readonly {
     secret: true,
   },
   { key: "OPENAI_API_KEY", description: "OpenAI verifier key", secret: true },
+  {
+    key: "EXA_API_KEY",
+    description: "Exa web search for parts catalog / fitment",
+    secret: true,
+  },
+  {
+    key: "SENTRY_DSN",
+    description: "Sentry server DSN",
+    secret: true,
+  },
+  {
+    key: "SENTRY_CLIENT_DSN",
+    description: "Sentry browser DSN (exposed via system.health)",
+  },
   {
     key: "AZURE_DI_ENDPOINT",
     description: "Azure Document Intelligence endpoint",

@@ -279,6 +279,7 @@ jobs:
               ENABLE_SCHEDULER="${{ vars.ENABLE_SCHEDULER || 'false' }}" \
               FEATURE_OVERTURN_METRICS=true \
               FEATURE_PHOTO_PAIR_COMPARE=true \
+              FEATURE_PHOTO_PAIR_GEMINI=true \
               FEATURE_VLM_VERIFICATION=true \
               FEATURE_IMAGE_QA_INTAKE=true \
               FEATURE_GEMINI_MULTIMODAL=true \
@@ -287,6 +288,12 @@ jobs:
               OCR_CROSS_CHECK_PERCENT=15 \
               FEATURE_OCR_FAILOVER=true \
               OCR_FALLBACK_PROVIDER=azure \
+              FEATURE_PARTS_WEB_VERIFY=true \
+              FEATURE_PARTS_ASSET_FITMENT=true \
+              FEATURE_FIELD_VOTE=true \
+              FEATURE_ROI_CROP_REOCR=true \
+              FEATURE_ENSEMBLE_EXTRACTION=true \
+              FEATURE_COMMENT_LLM_ADVISORY=true \
               TEMPLATE_REGISTRY_MYSQL_PERSISTENCE_ENABLED=true
 
       - name: Set secrets as environment variables
@@ -370,6 +377,55 @@ jobs:
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "OPENAI_API_KEY=secretref:openai-api-key" \
                 "FEATURE_COACHING_VERIFIER=true"
+          fi
+
+          # Exa parts catalog / asset fitment web verify
+          if [ -n "${{ secrets.EXA_API_KEY }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "exa-api-key=${{ secrets.EXA_API_KEY }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "EXA_API_KEY=secretref:exa-api-key"
+          fi
+
+          # Sentry (server + client DSN; client DSN is also exposed via system.health)
+          if [ -n "${{ secrets.SENTRY_DSN }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "sentry-dsn=${{ secrets.SENTRY_DSN }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "SENTRY_DSN=secretref:sentry-dsn"
+          fi
+
+          if [ -n "${{ secrets.SENTRY_CLIENT_DSN }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "sentry-client-dsn=${{ secrets.SENTRY_CLIENT_DSN }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "SENTRY_CLIENT_DSN=secretref:sentry-client-dsn"
+          elif [ -n "${{ secrets.SENTRY_DSN }}" ]; then
+            # Fallback: one DSN for both when client-specific secret unset
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "sentry-client-dsn=${{ secrets.SENTRY_DSN }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "SENTRY_CLIENT_DSN=secretref:sentry-client-dsn"
           fi
 
           # Session / cookie signing (required at app boot since #275)
@@ -757,6 +813,7 @@ jobs:
               ENABLE_SCHEDULER="${{ vars.ENABLE_SCHEDULER || 'false' }}" \
               FEATURE_OVERTURN_METRICS=true \
               FEATURE_PHOTO_PAIR_COMPARE=true \
+              FEATURE_PHOTO_PAIR_GEMINI=true \
               FEATURE_VLM_VERIFICATION=true \
               FEATURE_IMAGE_QA_INTAKE=true \
               FEATURE_GEMINI_MULTIMODAL=true \
@@ -765,6 +822,12 @@ jobs:
               OCR_CROSS_CHECK_PERCENT=15 \
               FEATURE_OCR_FAILOVER=true \
               OCR_FALLBACK_PROVIDER=azure \
+              FEATURE_PARTS_WEB_VERIFY=true \
+              FEATURE_PARTS_ASSET_FITMENT=true \
+              FEATURE_FIELD_VOTE=true \
+              FEATURE_ROI_CROP_REOCR=true \
+              FEATURE_ENSEMBLE_EXTRACTION=true \
+              FEATURE_COMMENT_LLM_ADVISORY=true \
               TEMPLATE_REGISTRY_MYSQL_PERSISTENCE_ENABLED=true
 
       - name: Set secrets as environment variables
@@ -848,6 +911,55 @@ jobs:
               --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
               --set-env-vars "OPENAI_API_KEY=secretref:openai-api-key" \
                 "FEATURE_COACHING_VERIFIER=true"
+          fi
+
+          # Exa parts catalog / asset fitment web verify
+          if [ -n "${{ secrets.EXA_API_KEY }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "exa-api-key=${{ secrets.EXA_API_KEY }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "EXA_API_KEY=secretref:exa-api-key"
+          fi
+
+          # Sentry (server + client DSN; client DSN is also exposed via system.health)
+          if [ -n "${{ secrets.SENTRY_DSN }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "sentry-dsn=${{ secrets.SENTRY_DSN }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "SENTRY_DSN=secretref:sentry-dsn"
+          fi
+
+          if [ -n "${{ secrets.SENTRY_CLIENT_DSN }}" ]; then
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "sentry-client-dsn=${{ secrets.SENTRY_CLIENT_DSN }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "SENTRY_CLIENT_DSN=secretref:sentry-client-dsn"
+          elif [ -n "${{ secrets.SENTRY_DSN }}" ]; then
+            # Fallback: one DSN for both when client-specific secret unset
+            az containerapp secret set \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --secrets "sentry-client-dsn=${{ secrets.SENTRY_DSN }}"
+
+            az containerapp update \
+              --name "${{ vars.CONTAINER_APP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --set-env-vars "SENTRY_CLIENT_DSN=secretref:sentry-client-dsn"
           fi
 
           # Session / cookie signing (required at app boot since #275)

@@ -91,7 +91,7 @@ describe("Feature Flag Matrix Contract (PR-OPS-FLAGS)", () => {
       expect(keys).toContain("FEATURE_OCR_FAILOVER");
     });
 
-    it("documents Wave-5/6 parts flags as default-off with deploy unset", async () => {
+    it("documents Wave-5/6 parts + depth flags as default-off with deploy true/true", async () => {
       const { FEATURE_FLAG_CATALOG } = await import(
         "../../services/featureFlagMatrix"
       );
@@ -101,10 +101,15 @@ describe("Feature Flag Matrix Contract (PR-OPS-FLAGS)", () => {
       for (const key of [
         "FEATURE_PARTS_WEB_VERIFY",
         "FEATURE_PARTS_ASSET_FITMENT",
+        "FEATURE_FIELD_VOTE",
+        "FEATURE_ROI_CROP_REOCR",
+        "FEATURE_ENSEMBLE_EXTRACTION",
+        "FEATURE_COMMENT_LLM_ADVISORY",
+        "FEATURE_PHOTO_PAIR_GEMINI",
       ] as const) {
         expect(byKey[key]?.defaultWhenUnset).toBe("off");
-        expect(byKey[key]?.deploy.staging).toBe("unset");
-        expect(byKey[key]?.deploy.production).toBe("unset");
+        expect(byKey[key]?.deploy.staging).toBe("true");
+        expect(byKey[key]?.deploy.production).toBe("true");
       }
     });
 
