@@ -1927,7 +1927,10 @@ function FindingsList({
               key={finding.id}
               id={`finding-${finding.id}`}
               data-finding-pending={pending ? "true" : undefined}
-              className={`p-2.5 rounded-md border cursor-pointer transition-colors ${
+              role="button"
+              tabIndex={0}
+              aria-label={`View finding: ${finding.field}`}
+              className={`p-2.5 rounded-md border cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-primary ${
                 activeBoxId === finding.id
                   ? "ring-2 ring-primary border-primary bg-primary/5"
                   : "hover:bg-muted/50"
@@ -1939,6 +1942,13 @@ function FindingsList({
                     : "bg-green-50/50 border-green-200"
               } ${pending ? "opacity-70" : ""}`}
               onClick={() => onFindingClick(finding.id)}
+              onKeyDown={e => {
+                if (e.currentTarget !== e.target) return;
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onFindingClick(finding.id);
+                }
+              }}
             >
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -2157,7 +2167,10 @@ function IssuesTabContent({
               key={finding.id}
               id={`finding-${finding.id}`}
               data-finding-pending={pending ? "true" : undefined}
-              className={`p-2.5 rounded-md border cursor-pointer transition-colors ${
+              role="button"
+              tabIndex={0}
+              aria-label={`View finding: ${finding.field}`}
+              className={`p-2.5 rounded-md border cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-primary ${
                 activeBoxId === finding.id
                   ? "ring-2 ring-primary border-primary bg-primary/5"
                   : "hover:bg-muted/50"
@@ -2169,6 +2182,13 @@ function IssuesTabContent({
                     : "bg-green-50/50 border-green-200"
               } ${pending ? "opacity-70" : ""}`}
               onClick={() => onFindingClick(finding.id)}
+              onKeyDown={e => {
+                if (e.currentTarget !== e.target) return;
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onFindingClick(finding.id);
+                }
+              }}
             >
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-1.5 min-w-0">
