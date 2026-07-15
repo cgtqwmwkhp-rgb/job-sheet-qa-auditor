@@ -15,10 +15,7 @@
         "serviceDate": "2026-01-15",
         "technicianId": "TECH-042",
         "workDescription": "Quarterly maintenance inspection",
-        "partsUsed": [
-          "PART-A100",
-          "PART-B200"
-        ],
+        "partsUsed": ["PART-A100", "PART-B200"],
         "laborHours": 2.5,
         "totalCost": 450,
         "customerSignature": true,
@@ -124,9 +121,7 @@
       "name": "Job Sheet - Low Confidence OCR",
       "description": "Job sheet with low confidence extraction requiring review",
       "expectedResult": "pass",
-      "reviewQueueReasons": [
-        "LOW_CONFIDENCE"
-      ],
+      "reviewQueueReasons": ["LOW_CONFIDENCE"],
       "extractedFields": {
         "jobNumber": "JS-2026-003",
         "customerName": "CUSTOMER_C",
@@ -369,9 +364,7 @@
         "serviceDate": "2026-11-11",
         "technicianId": "TECH-100",
         "workDescription": "Scheduled service cycle 10",
-        "partsUsed": [
-          "PART-X010"
-        ],
+        "partsUsed": ["PART-X010"],
         "laborHours": 2.0,
         "totalCost": 170,
         "customerSignature": true,
@@ -483,9 +476,7 @@
         "serviceDate": "2026-12-12",
         "technicianId": "TECH-101",
         "workDescription": "Scheduled service cycle 11",
-        "partsUsed": [
-          "PART-X011"
-        ],
+        "partsUsed": ["PART-X011"],
         "laborHours": 2.5,
         "totalCost": 177,
         "customerSignature": true,
@@ -597,9 +588,7 @@
         "serviceDate": "2026-02-14",
         "technicianId": "TECH-103",
         "workDescription": "Scheduled service cycle 13",
-        "partsUsed": [
-          "PART-X013"
-        ],
+        "partsUsed": ["PART-X013"],
         "laborHours": 3.5,
         "totalCost": 191,
         "customerSignature": true,
@@ -711,9 +700,7 @@
         "serviceDate": "2026-03-15",
         "technicianId": "TECH-104",
         "workDescription": "Scheduled service cycle 14",
-        "partsUsed": [
-          "PART-X014"
-        ],
+        "partsUsed": ["PART-X014"],
         "laborHours": 4.0,
         "totalCost": 198,
         "customerSignature": true,
@@ -825,9 +812,7 @@
         "serviceDate": "2026-05-17",
         "technicianId": "TECH-106",
         "workDescription": "Scheduled service cycle 16",
-        "partsUsed": [
-          "PART-X016"
-        ],
+        "partsUsed": ["PART-X016"],
         "laborHours": 1.0,
         "totalCost": 212,
         "customerSignature": true,
@@ -939,9 +924,7 @@
         "serviceDate": "2026-06-18",
         "technicianId": "TECH-107",
         "workDescription": "Scheduled service cycle 17",
-        "partsUsed": [
-          "PART-X017"
-        ],
+        "partsUsed": ["PART-X017"],
         "laborHours": 1.5,
         "totalCost": 219,
         "customerSignature": true,
@@ -1053,9 +1036,7 @@
         "serviceDate": "2026-08-20",
         "technicianId": "TECH-109",
         "workDescription": "Scheduled service cycle 19",
-        "partsUsed": [
-          "PART-X019"
-        ],
+        "partsUsed": ["PART-X019"],
         "laborHours": 2.5,
         "totalCost": 233,
         "customerSignature": true,
@@ -1167,9 +1148,7 @@
         "serviceDate": "2026-09-21",
         "technicianId": "TECH-110",
         "workDescription": "Scheduled service cycle 20",
-        "partsUsed": [
-          "PART-X020"
-        ],
+        "partsUsed": ["PART-X020"],
         "laborHours": 3.0,
         "totalCost": 240,
         "customerSignature": true,
@@ -1281,9 +1260,7 @@
         "serviceDate": "2026-10-22",
         "technicianId": "TECH-111",
         "workDescription": "Scheduled service cycle 21",
-        "partsUsed": [
-          "PART-X021"
-        ],
+        "partsUsed": ["PART-X021"],
         "laborHours": 3.5,
         "totalCost": 247,
         "customerSignature": true,
@@ -1395,9 +1372,7 @@
         "serviceDate": "2026-12-24",
         "technicianId": "TECH-113",
         "workDescription": "Scheduled service cycle 23",
-        "partsUsed": [
-          "PART-X023"
-        ],
+        "partsUsed": ["PART-X023"],
         "laborHours": 4.5,
         "totalCost": 261,
         "customerSignature": true,
@@ -1509,9 +1484,7 @@
         "serviceDate": "2026-01-25",
         "technicianId": "TECH-114",
         "workDescription": "Scheduled service cycle 24",
-        "partsUsed": [
-          "PART-X024"
-        ],
+        "partsUsed": ["PART-X024"],
         "laborHours": 1.0,
         "totalCost": 268,
         "customerSignature": true,
@@ -1623,9 +1596,7 @@
         "serviceDate": "2026-03-27",
         "technicianId": "TECH-116",
         "workDescription": "Scheduled service cycle 26",
-        "partsUsed": [
-          "PART-X026"
-        ],
+        "partsUsed": ["PART-X026"],
         "laborHours": 2.0,
         "totalCost": 282,
         "customerSignature": true,
@@ -1737,9 +1708,7 @@
         "serviceDate": "2026-04-01",
         "technicianId": "TECH-117",
         "workDescription": "Scheduled service cycle 27",
-        "partsUsed": [
-          "PART-X027"
-        ],
+        "partsUsed": ["PART-X027"],
         "laborHours": 2.5,
         "totalCost": 289,
         "customerSignature": true,
@@ -1851,9 +1820,7 @@
         "serviceDate": "2026-06-03",
         "technicianId": "TECH-119",
         "workDescription": "Scheduled service cycle 29",
-        "partsUsed": [
-          "PART-X029"
-        ],
+        "partsUsed": ["PART-X029"],
         "laborHours": 3.5,
         "totalCost": 303,
         "customerSignature": true,
@@ -1965,9 +1932,7 @@
         "serviceDate": "2026-07-04",
         "technicianId": "TECH-120",
         "workDescription": "Scheduled service cycle 30",
-        "partsUsed": [
-          "PART-X030"
-        ],
+        "partsUsed": ["PART-X030"],
         "laborHours": 4.0,
         "totalCost": 310,
         "customerSignature": true,
@@ -2079,9 +2044,7 @@
         "serviceDate": "2026-08-05",
         "technicianId": "TECH-121",
         "workDescription": "Scheduled service cycle 31",
-        "partsUsed": [
-          "PART-X031"
-        ],
+        "partsUsed": ["PART-X031"],
         "laborHours": 4.5,
         "totalCost": 317,
         "customerSignature": true,
@@ -2193,9 +2156,7 @@
         "serviceDate": "2026-10-07",
         "technicianId": "TECH-123",
         "workDescription": "Scheduled service cycle 33",
-        "partsUsed": [
-          "PART-X033"
-        ],
+        "partsUsed": ["PART-X033"],
         "laborHours": 1.5,
         "totalCost": 331,
         "customerSignature": true,
