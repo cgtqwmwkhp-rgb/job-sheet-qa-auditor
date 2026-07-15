@@ -144,7 +144,7 @@ async function guardFindingMutation(input: {
   userId: number;
   claimToken?: string;
   /** When set, enforce job-sheet ownership / role access (Wave-7). */
-  user?: { id: number; role: string };
+  user?: { id: number; role: import("../_core/azureRoles").DbUserRole };
 }): Promise<void> {
   const jobSheetId = await resolveJobSheetIdForFinding(input.findingId);
   if (jobSheetId == null) {
@@ -169,7 +169,7 @@ async function guardFindingsMutation(input: {
   findingIds: number[];
   userId: number;
   claimToken?: string;
-  user?: { id: number; role: string };
+  user?: { id: number; role: import("../_core/azureRoles").DbUserRole };
 }): Promise<void> {
   for (const findingId of input.findingIds) {
     await guardFindingMutation({

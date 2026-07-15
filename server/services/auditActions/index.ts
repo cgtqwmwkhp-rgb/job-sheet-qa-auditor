@@ -638,9 +638,10 @@ export interface FieldCorrectionResult {
   previousSnippet: string | null;
   correctedValue: string;
   undoToken: string;
-  /** Wave-7 — present when FEATURE_TEMPLATE_MEMORY_CAPTURE is on */
+  /** Wave-7 — present when dual-write / capture succeeds */
   memoryCandidateId?: number;
   memoryPromotionStatus?: string;
+  memoryAgreeCount?: number;
   studioConfirmRequired?: boolean;
   correctionId?: number;
 }
