@@ -3,9 +3,9 @@
  * Provides tracing and context propagation for audit trail
  */
 
-import { AsyncLocalStorage } from 'async_hooks';
-import type { NextFunction, Request, Response } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { AsyncLocalStorage } from "async_hooks";
+import type { NextFunction, Request, Response } from "express";
+import { v4 as uuidv4 } from "uuid";
 
 export interface RequestContext {
   correlationId: string;
@@ -81,10 +81,7 @@ export function correlationContextMiddleware(
 /**
  * Run a function within a request context
  */
-export function runWithContext<T>(
-  context: RequestContext,
-  fn: () => T
-): T {
+export function runWithContext<T>(context: RequestContext, fn: () => T): T {
   return contextStorage.run(context, fn);
 }
 
