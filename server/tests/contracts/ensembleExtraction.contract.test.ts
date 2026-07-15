@@ -77,8 +77,13 @@ describe("Ensemble Extraction Contract Tests", () => {
   });
 
   describe("feature flag", () => {
-    it("defaults to enabled when FEATURE_ENSEMBLE_EXTRACTION is unset", () => {
+    it("defaults to disabled when FEATURE_ENSEMBLE_EXTRACTION is unset", () => {
       delete process.env.FEATURE_ENSEMBLE_EXTRACTION;
+      expect(isEnsembleExtractionEnabled()).toBe(false);
+    });
+
+    it("enables only when FEATURE_ENSEMBLE_EXTRACTION=true", () => {
+      process.env.FEATURE_ENSEMBLE_EXTRACTION = "true";
       expect(isEnsembleExtractionEnabled()).toBe(true);
     });
 
