@@ -466,7 +466,12 @@ export function ReviewWorkstationPane({
 
   if (!auditDataProp && jobSheetError) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-destructive p-6">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="flex flex-col items-center justify-center h-full text-destructive p-6"
+      >
         <AlertCircle className="h-12 w-12 mb-3" />
         <p className="font-semibold">Failed to load job sheet</p>
         <p className="text-sm text-muted-foreground">{jobSheetError.message}</p>
@@ -485,7 +490,12 @@ export function ReviewWorkstationPane({
 
   if (!auditData) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="flex flex-col items-center justify-center h-full text-muted-foreground p-6"
+      >
         <AlertCircle className="h-12 w-12 mb-3 opacity-40" />
         <p className="font-medium">No audit data yet</p>
         <p className="text-sm text-center max-w-xs mt-1">
@@ -1911,7 +1921,12 @@ function FindingsList({
 }: FindingsListProps) {
   if (findings.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="flex items-center justify-center h-full text-muted-foreground"
+      >
         No findings in this category.
       </div>
     );
@@ -2114,7 +2129,12 @@ function IssuesTabContent({
 
   if (findings.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="flex items-center justify-center h-full text-muted-foreground"
+      >
         No findings in this category.
       </div>
     );
