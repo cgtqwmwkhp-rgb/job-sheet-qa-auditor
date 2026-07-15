@@ -261,6 +261,22 @@ describe("FinOps Contract (Phase 3.x)", () => {
       expect(content).toContain("recordApiCost");
     });
 
+    it("anthropic VLM adapter records verification spend into the FinOps ledger", () => {
+      const content = fs.readFileSync(
+        path.join(
+          process.cwd(),
+          "server/services/vlmAdapter/anthropicAdapter.ts"
+        ),
+        "utf-8"
+      );
+
+      expect(content).toContain("recordApiCost");
+      expect(content).toContain('stage: "vlm"');
+      expect(content).toContain("json.usage?.input_tokens");
+      expect(content).toContain("json.usage?.output_tokens");
+      expect(content).toContain("latencyMs: Date.now() - start");
+    });
+
     it("rolls up cost by day and month with tool breakdown", () => {
       const now = new Date("2026-07-12T12:00:00.000Z");
       recordApiCost({
