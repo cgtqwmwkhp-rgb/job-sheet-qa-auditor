@@ -207,8 +207,36 @@ export function runDeterministicValidation(params: {
 }
 
 /**
+ * Wave-6 honesty: these rule IDs must never AUTO_PASS even if severity is
+ * remapped or policy failClass is misconfigured.
+ */
+export const AUTO_PASS_BLOCKING_RULE_IDS = new Set([
+  "FAULT-C010",
+  "ATTR-C010",
+  "ATTR-C011",
+  "PARTS-C010",
+  "PARTS-C011",
+  "PARTS-C012",
+  "PARTS-C020",
+  "PARTS-C022",
+  "PARTS-C030",
+  "PARTS-C031",
+  "PHOTO-C012",
+  "PHOTO-C013",
+  "PHOTO-C014",
+  "COMMENT-C010",
+  "COMMENT-C020",
+  "COMMENT-C040",
+  "COMMENT-C042",
+]);
+
+export function findingsBlockAutoPass(findings: Finding[]): boolean {
+  return findings.some(f => AUTO_PASS_BLOCKING_RULE_IDS.has(f.ruleId));
+}
+
+/**
  * AUTO_PASS gate: only S3 (informational) findings, validation passed,
- * score at/above threshold, no blocking selection marks.
+ * score at/above threshold, no blocking selection marks, no honesty blocks.
  */
 export function canPromoteAutoPass(params: {
   overallResult: "PASS" | "FAIL" | "REVIEW_QUEUE";
@@ -224,6 +252,7 @@ export function canPromoteAutoPass(params: {
     params.score >= params.threshold &&
     params.onlyInformational &&
     params.validationPassed &&
-    !params.hasBlockingFailMarks
+    !params.hasBlockingFailMarks &&
+    !findingsBlockAutoPass(params.findings)
   );
 }

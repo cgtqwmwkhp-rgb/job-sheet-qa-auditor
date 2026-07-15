@@ -13,4 +13,6 @@ export {
   validationFindingsToAnalyzer,
   runDeterministicValidation,
   canPromoteAutoPass,
+  findingsBlockAutoPass,
+  AUTO_PASS_BLOCKING_RULE_IDS,
 } from "./goldSpecBridge";

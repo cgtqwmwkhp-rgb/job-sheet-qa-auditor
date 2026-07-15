@@ -432,8 +432,8 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           ruleId: "PARTS-C022",
           label: "Parts Used (Catalog Unavailable)",
           description:
-            "Exa catalog verification unavailable — informational, not a pass",
-          failClass: "informational",
+            "Exa catalog verification unavailable — not a pass; blocks AUTO_PASS",
+          failClass: "minor",
           enabled: true,
           fieldAliases: ["Parts Used", "Parts Catalog Verify"],
         },

@@ -154,10 +154,10 @@ export async function verifyPartsCatalogWeb(
         findings.push(
           issue(
             `${PARTS_CATALOG_RULE_PREFIX}022`,
-            "S3",
-            "LOW_CONFIDENCE",
+            "S2",
+            "INCOMPLETE_EVIDENCE",
             `Catalog verification unavailable for ${partNumber} — ${description}.`,
-            "When catalog evidence cannot be retrieved, auditors cannot corroborate PN vs description — this is informational, not a pass.",
+            "When catalog evidence cannot be retrieved, auditors cannot corroborate PN vs description — this is not a pass and blocks AUTO_PASS.",
             "Re-check the part number and description manually against the supplier catalogue.",
             line.raw,
             70
@@ -184,10 +184,10 @@ export async function verifyPartsCatalogWeb(
       findings.push(
         issue(
           `${PARTS_CATALOG_RULE_PREFIX}022`,
-          "S3",
-          "LOW_CONFIDENCE",
+          "S2",
+          "INCOMPLETE_EVIDENCE",
           `Catalog verification unavailable for ${partNumber} — ${description} (${reason}).`,
-          "When catalog evidence cannot be retrieved, auditors cannot corroborate PN vs description — this is informational, not a pass.",
+          "When catalog evidence cannot be retrieved, auditors cannot corroborate PN vs description — this is not a pass and blocks AUTO_PASS.",
           "Re-check the part number and description manually against the supplier catalogue.",
           line.raw,
           68
