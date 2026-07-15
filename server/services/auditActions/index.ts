@@ -18,6 +18,22 @@ import {
   withTrainingSignalDetails,
 } from "../trainingSignals";
 
+export type AuditActionErrorCode = "NOT_FOUND" | "CONFLICT";
+
+/**
+ * Expected domain failures from audit actions.
+ * Routers translate these into the matching stable tRPC error code.
+ */
+export class AuditActionError extends Error {
+  constructor(
+    public readonly code: AuditActionErrorCode,
+    message: string
+  ) {
+    super(message);
+    this.name = "AuditActionError";
+  }
+}
+
 export interface FindingRecord {
   id: number;
   auditResultId: number;
@@ -138,7 +154,10 @@ export async function applyFindingAction(
 ): Promise<AuditActionResult> {
   const finding = await deps.getFinding(input.findingId);
   if (!finding) {
-    throw new Error(`Finding ${input.findingId} not found`);
+    throw new AuditActionError(
+      "NOT_FOUND",
+      `Finding ${input.findingId} not found`
+    );
   }
 
   const previous = finding.resolutionStatus;
@@ -239,11 +258,17 @@ export async function undoFindingAction(
 ): Promise<AuditActionResult> {
   const finding = await deps.getFinding(input.findingId);
   if (!finding) {
-    throw new Error(`Finding ${input.findingId} not found`);
+    throw new AuditActionError(
+      "NOT_FOUND",
+      `Finding ${input.findingId} not found`
+    );
   }
 
   if (!canUndo(finding.resolutionStatus)) {
-    throw new Error(`Finding ${input.findingId} has no action to undo`);
+    throw new AuditActionError(
+      "CONFLICT",
+      `Finding ${input.findingId} has no action to undo`
+    );
   }
 
   const current = finding.resolutionStatus;
@@ -403,7 +428,10 @@ export async function captureFieldCorrection(
 ): Promise<FieldCorrectionResult> {
   const finding = await deps.getFinding(input.findingId);
   if (!finding) {
-    throw new Error(`Finding ${input.findingId} not found`);
+    throw new AuditActionError(
+      "NOT_FOUND",
+      `Finding ${input.findingId} not found`
+    );
   }
   if (!deps.updateFindingSnippet) {
     throw new Error("updateFindingSnippet is not configured");
@@ -477,7 +505,10 @@ export async function undoFieldCorrection(
 ): Promise<FieldCorrectionResult> {
   const finding = await deps.getFinding(input.findingId);
   if (!finding) {
-    throw new Error(`Finding ${input.findingId} not found`);
+    throw new AuditActionError(
+      "NOT_FOUND",
+      `Finding ${input.findingId} not found`
+    );
   }
   if (!deps.updateFindingSnippet) {
     throw new Error("updateFindingSnippet is not configured");
