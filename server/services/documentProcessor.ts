@@ -3224,20 +3224,29 @@ async function processJobSheetWithOptions(
       );
       const memRows = await loadMemoryForPipeline(lineageMem.templateId);
       if (memRows.length > 0) {
-        const valuePass = applyValueMemoryToFields(
-          finalExtractedFields.map(f => ({
-            field: f.field,
-            value: String(f.value ?? ""),
-            confidence: f.confidence,
-            pageNumber: f.pageNumber,
-          })),
-          memRows
+        // extractedFields is Record<fieldKey, {value,confidence,pageNumber}>
+        const fieldEntries = Object.entries(finalExtractedFields ?? {}).map(
+          ([field, meta]) => ({
+            field,
+            value: String(meta?.value ?? ""),
+            confidence: meta?.confidence,
+            pageNumber: meta?.pageNumber,
+          })
         );
-        finalExtractedFields = valuePass.fields.map((f, i) => ({
-          ...finalExtractedFields[i],
-          field: f.field,
-          value: f.value,
-        }));
+        const valuePass = applyValueMemoryToFields(fieldEntries, memRows);
+        finalExtractedFields = Object.fromEntries(
+          valuePass.fields.map(f => {
+            const prev = finalExtractedFields?.[f.field];
+            return [
+              f.field,
+              {
+                value: f.value,
+                confidence: prev?.confidence ?? f.confidence ?? 0,
+                pageNumber: prev?.pageNumber ?? f.pageNumber ?? 1,
+              },
+            ];
+          })
+        );
         const findingPass = filterFindingsWithRuleMemory(
           analysisResult.findings,
           memRows
