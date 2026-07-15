@@ -96,9 +96,7 @@ export default function TemplateLearningCurveCard() {
               {data.memoryFunnel.approved}a
             </p>
             <div className="grid grid-cols-2 gap-2">
-              {(
-                ["1-50", "51-100", "101-200", "201+"] as const
-              ).map(bucket => {
+              {(["1-50", "51-100", "101-200", "201+"] as const).map(bucket => {
                 const c = data.cohorts[bucket];
                 return (
                   <div

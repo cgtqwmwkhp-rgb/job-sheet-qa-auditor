@@ -52,7 +52,8 @@ export function runTemplateMemorySlice(): TemplateMemorySliceReport {
   );
   cases.push({
     id: "h2-value-alias",
-    status: fields[0]?.value === "0123" && applied.length === 1 ? "pass" : "fail",
+    status:
+      fields[0]?.value === "0123" && applied.length === 1 ? "pass" : "fail",
   });
 
   const suppressMemory = [

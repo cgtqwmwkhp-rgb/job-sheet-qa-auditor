@@ -20,7 +20,9 @@ describe("templateMemory types / product rules", () => {
       "value_alias"
     );
     expect(memoryKindForReason("rule_wrong", "override")).toBe("suppress_rule");
-    expect(memoryKindForReason("roi_misaligned", "override")).toBe("roi_adjust");
+    expect(memoryKindForReason("roi_misaligned", "override")).toBe(
+      "roi_adjust"
+    );
     expect(memoryKindForReason("template_mismatch", "override")).toBe(
       "spec_gap"
     );
