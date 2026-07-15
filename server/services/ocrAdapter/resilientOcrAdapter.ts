@@ -23,7 +23,13 @@ import type {
   OCRCrossCheckMetadata,
   OCRFailoverMetadata,
   OCRPage,
+  OCRFieldCrossCheckSummary,
 } from "./types";
+import {
+  scrapeCriticalFieldsFromPages,
+  voteField,
+  normalizeVoteValue,
+} from "../fieldVoting";
 
 const logger = createSafeLogger("ResilientOCR");
 
@@ -100,6 +106,85 @@ export function computeTextSimilarity(
 
 const AGREEMENT_THRESHOLD = 0.85;
 
+function hashFieldValue(fieldId: string, value: string): string {
+  const norm = normalizeVoteValue(fieldId, value) ?? value;
+  return createHash("sha256").update(norm).digest("hex").slice(0, 16);
+}
+
+/**
+ * Field-level vote between primary and fallback OCR scrapes (Wave-4 B2).
+ * Does not alter canonical pages — advisory metadata only.
+ */
+export function buildFieldCrossCheckVotes(
+  primaryPages: OCRPage[],
+  fallbackPages: OCRPage[]
+): {
+  fieldVotes: OCRFieldCrossCheckSummary[];
+  fieldsAgreed: number;
+  fieldsAbstained: number;
+} {
+  const primaryFields = scrapeCriticalFieldsFromPages(primaryPages);
+  const fallbackFields = scrapeCriticalFieldsFromPages(fallbackPages);
+  const fieldIds = new Set([
+    ...primaryFields.map(f => f.fieldId),
+    ...fallbackFields.map(f => f.fieldId),
+  ]);
+
+  const fieldVotes: OCRFieldCrossCheckSummary[] = [];
+  let fieldsAgreed = 0;
+  let fieldsAbstained = 0;
+
+  for (const fieldId of fieldIds) {
+    const p = primaryFields.find(f => f.fieldId === fieldId);
+    const f = fallbackFields.find(f => f.fieldId === fieldId);
+    const candidates = [
+      ...(p
+        ? [
+            {
+              engine: "primary" as const,
+              fieldId,
+              value: p.value,
+              confidence: p.confidence,
+              evidence: p.evidence,
+              evidenceStrength: /label_only/i.test(p.evidence)
+                ? ("label_only" as const)
+                : ("weak" as const),
+            },
+          ]
+        : []),
+      ...(f
+        ? [
+            {
+              engine: "fallback" as const,
+              fieldId,
+              value: f.value,
+              confidence: f.confidence,
+              evidence: f.evidence,
+              evidenceStrength: /label_only/i.test(f.evidence)
+                ? ("label_only" as const)
+                : ("weak" as const),
+            },
+          ]
+        : []),
+    ];
+    const vote = voteField(fieldId, candidates);
+    const summary: OCRFieldCrossCheckSummary = {
+      fieldId,
+      agreement: !vote.abstained && vote.winningEngines.length >= 2,
+      decision: vote.decision,
+      reasonCode: vote.reasonCode,
+      ...(vote.value
+        ? { valueHash: hashFieldValue(fieldId, vote.value) }
+        : {}),
+    };
+    fieldVotes.push(summary);
+    if (vote.abstained) fieldsAbstained++;
+    else if (summary.agreement) fieldsAgreed++;
+  }
+
+  return { fieldVotes, fieldsAgreed, fieldsAbstained };
+}
+
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
@@ -135,6 +220,11 @@ export function buildCrossCheckMetadata(
 
   const agreement = pageCountMatch && similarityScore >= AGREEMENT_THRESHOLD;
 
+  const fieldVote =
+    primary.pages.length > 0 && fallback.pages.length > 0
+      ? buildFieldCrossCheckVotes(primary.pages, fallback.pages)
+      : null;
+
   return {
     sampled: true,
     agreement,
@@ -149,6 +239,13 @@ export function buildCrossCheckMetadata(
             ? "PAGE_COUNT_MISMATCH"
             : "TEXT_DIVERGENCE",
         }),
+    ...(fieldVote
+      ? {
+          fieldVotes: fieldVote.fieldVotes,
+          fieldsAgreed: fieldVote.fieldsAgreed,
+          fieldsAbstained: fieldVote.fieldsAbstained,
+        }
+      : {}),
   };
 }
 

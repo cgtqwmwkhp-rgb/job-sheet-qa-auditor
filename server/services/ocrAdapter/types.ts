@@ -133,7 +133,20 @@ export interface OCRDeepFeaturesSummary {
 }
 
 /**
- * Advisory dual-engine cross-check metadata (PR-4).
+ * Per-field dual-engine agreement summary (Wave-4 B2).
+ * Field values omitted from metadata when abstaining — decision + hashes only.
+ */
+export interface OCRFieldCrossCheckSummary {
+  fieldId: string;
+  agreement: boolean;
+  decision: "consensus" | "majority" | "confidence_gap" | "single" | "abstain";
+  reasonCode: string;
+  /** Normalized value hash (16 hex) when a value was voted; absent on abstain. */
+  valueHash?: string;
+}
+
+/**
+ * Advisory dual-engine cross-check metadata (PR-4 + B2 field vote).
  * Never contains raw OCR text — hashes/scores only.
  */
 export interface OCRCrossCheckMetadata {
@@ -146,6 +159,14 @@ export interface OCRCrossCheckMetadata {
   pageCountMatch?: boolean;
   /** Short reason when agreement is false. */
   disagreementReason?: string;
+  /**
+   * Field-level vote across primary vs fallback scrapes (Wave-4 B2).
+   * Present when both engines returned pages; does not merge conflicting text
+   * into canonical pages — voting is advisory for critical fields.
+   */
+  fieldVotes?: OCRFieldCrossCheckSummary[];
+  fieldsAgreed?: number;
+  fieldsAbstained?: number;
 }
 
 /**

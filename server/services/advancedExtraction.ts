@@ -472,13 +472,18 @@ function extractWithRegex(
     if (match) {
       let value = match[1]?.trim() || null;
 
-      // Special handling for signature presence
+      // Special handling for signature presence — label alone is weak (B2)
       if (field.name === "technician_signature" && !value) {
         if (
           text.includes("Technician Signature") ||
           text.includes("Engineer Signature")
         ) {
-          value = "Present";
+          return {
+            value: "Present",
+            confidence: 40,
+            strategy: "regex",
+            evidence: "Signature label found (label_only — no ink proof)",
+          };
         }
       }
 
@@ -501,7 +506,8 @@ function extractWithRegex(
     }
   }
 
-  // Special handling for signature presence
+  // Special handling for signature presence — label alone is NOT ink proof.
+  // Wave-4 B2: keep as weak signal (label_only); VLM/crop vote must confirm.
   if (field.name === "technician_signature") {
     if (
       text.includes("Technician Signature") ||
@@ -509,9 +515,9 @@ function extractWithRegex(
     ) {
       return {
         value: "Present",
-        confidence: 70,
+        confidence: 40,
         strategy: "regex",
-        evidence: "Signature label found in document",
+        evidence: "Signature label found (label_only — no ink proof)",
       };
     }
   }
@@ -557,13 +563,13 @@ function extractWithContext(
 
     for (const label of field.fuzzyLabels) {
       if (lineLower.includes(label.toLowerCase())) {
-        // Signature fields: label presence = Present (never grab next-line asset IDs)
+        // Signature fields: label presence = weak Present (no ink proof — B2)
         if (isPresenceSignatureField(field.name)) {
           return {
             value: "Present",
-            confidence: 70,
+            confidence: 40,
             strategy: "context",
-            evidence: `Signature label found on line ${i + 1}`,
+            evidence: `Signature label found on line ${i + 1} (label_only — no ink proof)`,
           };
         }
         if (lines[i].includes(":")) {
