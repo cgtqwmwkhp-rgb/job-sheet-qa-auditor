@@ -129,7 +129,10 @@ export const auditResults = mysqlTable("audit_results", {
   ocrEngineVersion: varchar("ocrEngineVersion", { length: 32 }),
   /** Pipeline version for reproducibility */
   pipelineVersion: varchar("pipelineVersion", { length: 32 }).notNull(),
-  /** Full canonical JSON audit report */
+  /**
+   * Canonical JSON audit report. It intentionally excludes the full raw OCR text;
+   * authorized reviewers retrieve the original job sheet on demand instead.
+   */
   reportJson: json("reportJson").notNull(),
   /** Processing time in milliseconds */
   processingTimeMs: int("processingTimeMs"),
