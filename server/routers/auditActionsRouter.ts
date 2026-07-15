@@ -21,6 +21,7 @@ import {
   undoJobSheetApprove,
   captureFieldCorrection,
   undoFieldCorrection,
+  AuditActionError,
   type AuditActionDeps,
 } from "../services/auditActions";
 import { FINDING_ACTIONS } from "../services/auditActions/types";
@@ -33,7 +34,7 @@ import {
   RateLimitError,
   RATE_LIMITS,
 } from "../utils/rateLimiter";
-import { withTransaction } from "../utils/transactions";
+import { TransactionError, withTransaction } from "../utils/transactions";
 import type { DbExecutor } from "../db";
 
 async function throwIfRateLimited(
@@ -56,6 +57,29 @@ async function enforceReviewLimit(userId: number): Promise<void> {
   await throwIfRateLimited(() =>
     enforceRateLimit(`user:${userId}:review`, RATE_LIMITS.review)
   );
+}
+
+function toAuditActionTrpcError(
+  error: unknown,
+  fallbackMessage: string
+): TRPCError {
+  const cause = error instanceof TransactionError ? error.cause : error;
+
+  if (cause instanceof TRPCError) {
+    return cause;
+  }
+
+  if (cause instanceof AuditActionError) {
+    return new TRPCError({
+      code: cause.code,
+      message: cause.message,
+    });
+  }
+
+  return new TRPCError({
+    code: "BAD_REQUEST",
+    message: error instanceof Error ? error.message : fallbackMessage,
+  });
 }
 
 function createDbDeps(tx?: DbExecutor): AuditActionDeps {
@@ -170,10 +194,7 @@ export const auditActionsRouter = router({
       try {
         return await waiveFinding({ ...input, userId: ctx.user.id });
       } catch (err) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: err instanceof Error ? err.message : "Waive failed",
-        });
+        throw toAuditActionTrpcError(err, "Waive failed");
       }
     }),
 
@@ -193,10 +214,7 @@ export const auditActionsRouter = router({
           })
         );
       } catch (err) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: err instanceof Error ? err.message : "Override failed",
-        });
+        throw toAuditActionTrpcError(err, "Override failed");
       }
     }),
 
@@ -215,10 +233,7 @@ export const auditActionsRouter = router({
           })
         );
       } catch (err) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: err instanceof Error ? err.message : "Flag failed",
-        });
+        throw toAuditActionTrpcError(err, "Flag failed");
       }
     }),
 
@@ -237,10 +252,7 @@ export const auditActionsRouter = router({
           })
         );
       } catch (err) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: err instanceof Error ? err.message : "Approve failed",
-        });
+        throw toAuditActionTrpcError(err, "Approve failed");
       }
     }),
 
@@ -256,10 +268,7 @@ export const auditActionsRouter = router({
           })
         );
       } catch (err) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: err instanceof Error ? err.message : "Undo failed",
-        });
+        throw toAuditActionTrpcError(err, "Undo failed");
       }
     }),
 
@@ -360,11 +369,7 @@ export const auditActionsRouter = router({
           })
         );
       } catch (err) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            err instanceof Error ? err.message : "Field correction failed",
-        });
+        throw toAuditActionTrpcError(err, "Field correction failed");
       }
     }),
 
@@ -386,11 +391,7 @@ export const auditActionsRouter = router({
           })
         );
       } catch (err) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            err instanceof Error ? err.message : "Undo field correction failed",
-        });
+        throw toAuditActionTrpcError(err, "Undo field correction failed");
       }
     }),
 
