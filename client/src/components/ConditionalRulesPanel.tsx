@@ -113,11 +113,13 @@ function isImpliesRule(rule: Record<string, unknown>): boolean {
 interface ConditionalRulesPanelProps {
   specJsonText: string;
   onSpecJsonChange: (next: string) => void;
+  focusRuleId?: string | null;
 }
 
 export function ConditionalRulesPanel({
   specJsonText,
   onSpecJsonChange,
+  focusRuleId,
 }: ConditionalRulesPanelProps) {
   const [whenField, setWhenField] = useState("vorStatus");
   const [whenValue, setWhenValue] = useState("Present");
@@ -136,7 +138,9 @@ export function ConditionalRulesPanel({
   }, [specJsonText]);
 
   const parseError =
-    parsed == null ? "specJson is not valid JSON — fix it before adding rules." : null;
+    parsed == null
+      ? "specJson is not valid JSON — fix it before adding rules."
+      : null;
 
   const impliesRules = useMemo(() => {
     if (!parsed?.rules) return [];
@@ -162,7 +166,9 @@ export function ConditionalRulesPanel({
     onSpecJsonChange(JSON.stringify(next, null, 2));
   };
 
-  const addRule = (draft: Omit<ImpliesRuleDraft, "ruleId"> & { ruleId?: string }) => {
+  const addRule = (
+    draft: Omit<ImpliesRuleDraft, "ruleId"> & { ruleId?: string }
+  ) => {
     if (!parsed) return;
     const rules = [...(parsed.rules ?? [])];
     const ruleId = draft.ruleId ?? nextRuleId(rules);
@@ -195,9 +201,7 @@ export function ConditionalRulesPanel({
         </p>
       </div>
 
-      {parseError && (
-        <p className="text-xs text-destructive">{parseError}</p>
-      )}
+      {parseError && <p className="text-xs text-destructive">{parseError}</p>}
 
       <div className="flex flex-wrap gap-2">
         {PRESETS.map(p => (
@@ -318,12 +322,20 @@ export function ConditionalRulesPanel({
           {impliesRules.map(rule => (
             <li
               key={String(rule.ruleId)}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white px-3 py-2 text-xs"
+              className={`flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white px-3 py-2 text-xs ${
+                String(rule.ruleId) === focusRuleId
+                  ? "border-2 border-[#BEDA41] ring-2 ring-[#BEDA41]/30"
+                  : ""
+              }`}
+              data-testid={
+                String(rule.ruleId) === focusRuleId
+                  ? "studio-focused-rule-item"
+                  : undefined
+              }
             >
               <div className="space-y-1">
                 <div className="font-medium text-[#333030]">
-                  If{" "}
-                  <code>{String(rule.whenField)}</code> is “
+                  If <code>{String(rule.whenField)}</code> is “
                   {String(rule.whenValue)}” →{" "}
                   <code>{String(rule.thenField ?? rule.field)}</code> must be “
                   {String(rule.thenValue)}”
