@@ -972,10 +972,7 @@ export async function getWaiverByFindingId(
     .select()
     .from(waivers)
     .where(
-      and(
-        eq(waivers.auditFindingId, auditFindingId),
-        isNull(waivers.revokedAt)
-      )
+      and(eq(waivers.auditFindingId, auditFindingId), isNull(waivers.revokedAt))
     )
     .limit(1);
 

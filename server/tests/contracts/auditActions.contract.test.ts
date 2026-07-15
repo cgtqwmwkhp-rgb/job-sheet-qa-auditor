@@ -365,7 +365,9 @@ describe("Audit Actions Contract (PR-10)", () => {
 
       expect(undone.revokedWaiverId).toBeDefined();
       expect(mem.waivers.size).toBe(1);
-      const waiver = mem.waivers.get(undone.revokedWaiverId!) as WaiverRecord & {
+      const waiver = mem.waivers.get(
+        undone.revokedWaiverId!
+      ) as WaiverRecord & {
         auditTrail: unknown;
         revokedAt?: Date;
         revokedBy?: number;
