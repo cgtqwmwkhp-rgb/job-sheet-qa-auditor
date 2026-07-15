@@ -6,13 +6,28 @@ import {
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
+import { csrfMiddleware } from "../utils/csrf";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
 });
 
 export const router = t.router;
-export const publicProcedure = t.procedure;
+const csrfMutationGuard = t.middleware(async opts => {
+  // createCaller is used for trusted in-process jobs and unit tests, where
+  // there is no browser request to forge. Express supplies originalUrl for
+  // every HTTP request, so browser/API mutations cannot take this path.
+  const isHttpRequest = typeof opts.ctx.req?.originalUrl === "string";
+  if (opts.type === "mutation" && isHttpRequest) {
+    return csrfMiddleware()(opts);
+  }
+  return opts.next();
+});
+
+// All HTTP procedures inherit this guard. It deliberately applies only to
+// mutations so read-only tRPC traffic and Easy Auth's SPA bootstrap remain
+// unaffected.
+export const publicProcedure = t.procedure.use(csrfMutationGuard);
 
 const requireUser = t.middleware(async opts => {
   const { ctx, next } = opts;
@@ -29,7 +44,7 @@ const requireUser = t.middleware(async opts => {
   });
 });
 
-export const protectedProcedure = t.procedure.use(requireUser);
+export const protectedProcedure = publicProcedure.use(requireUser);
 
 /**
  * Authenticated non-technician staff member.
@@ -37,7 +52,7 @@ export const protectedProcedure = t.procedure.use(requireUser);
  * The role model includes a legacy `user` role for staff/viewer accounts, so
  * staff access is defined as any authenticated role except `technician`.
  */
-export const staffProcedure = t.procedure.use(
+export const staffProcedure = publicProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
@@ -60,7 +75,7 @@ export const staffProcedure = t.procedure.use(
   })
 );
 
-export const adminProcedure = t.procedure.use(
+export const adminProcedure = publicProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
@@ -78,7 +93,7 @@ export const adminProcedure = t.procedure.use(
 );
 
 /** Admin or QA lead — review / hold-queue mutations. */
-export const qaLeadProcedure = t.procedure.use(
+export const qaLeadProcedure = publicProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
     const role = ctx.user?.role;

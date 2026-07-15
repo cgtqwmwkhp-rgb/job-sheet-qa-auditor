@@ -107,16 +107,61 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+let csrfToken: string | null = null;
+let csrfTokenExpiresAt = 0;
+let csrfTokenRequest: Promise<string | null> | null = null;
+
+async function getCsrfToken(): Promise<string | null> {
+  if (csrfToken && Date.now() < csrfTokenExpiresAt) {
+    return csrfToken;
+  }
+  if (csrfTokenRequest) return csrfTokenRequest;
+
+  csrfTokenRequest = globalThis
+    .fetch("/api/csrf-token", {
+      credentials: "include",
+      cache: "no-store",
+    })
+    .then(async response => {
+      if (!response.ok) return null;
+      const body = (await response.json()) as { token?: unknown };
+      if (typeof body.token !== "string") return null;
+
+      csrfToken = body.token;
+      // Tokens are valid for one hour; refresh early to avoid mid-session expiry.
+      csrfTokenExpiresAt = Date.now() + 50 * 60 * 1000;
+      return csrfToken;
+    })
+    .catch(() => null)
+    .finally(() => {
+      csrfTokenRequest = null;
+    });
+
+  return csrfTokenRequest;
+}
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       url: "/api/trpc",
       transformer: superjson,
       fetch(input, init) {
-        return globalThis.fetch(input, {
-          ...(init ?? {}),
-          credentials: "include",
-        });
+        const request = init ?? {};
+        const addCsrfToken = (request.method ?? "GET").toUpperCase() === "POST";
+
+        return (async () => {
+          const headers = new Headers(request.headers);
+          if (addCsrfToken) {
+            const token = await getCsrfToken();
+            if (token) headers.set("x-csrf-token", token);
+          }
+
+          return globalThis.fetch(input, {
+            ...request,
+            headers,
+            credentials: "include",
+          });
+        })();
       },
     }),
   ],
