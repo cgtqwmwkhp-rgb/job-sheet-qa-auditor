@@ -86,8 +86,12 @@ import { isTerminalJobSheetStatus } from "@shared/processingProgress";
 import { type SelectionTrace } from "@/components/audit/SelectionTracePanel";
 import { mapSelectionTraceFromReport } from "@/components/review/mapSelectionTrace";
 import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
+import { Link } from "wouter";
 import {
   TRAINING_REASON_OPTIONS,
+  AUTO_LEARN_REASONS,
+  STUDIO_CONFIRM_REASONS,
+  TEMPLATE_MEMORY_AGREE_THRESHOLD,
   type TrainingReasonCode,
 } from "@/components/review/trainingReasonLabels";
 import {
@@ -184,6 +188,10 @@ export interface Finding {
     color?: string;
     label?: string;
   };
+  /** Wave-7: field value was corrected on this finding. */
+  isCorrected?: boolean;
+  /** Wave-7: e.g. "Memory candidate (2/3)" or "Applied on template v12". */
+  memoryBadge?: string | null;
 }
 
 export interface AuditData {
@@ -207,6 +215,9 @@ export interface AuditData {
   failurePathSignalSummary?: string | null;
   /** Unknown / low-confidence form — teach in Template Studio. */
   needsTemplateAuthoring?: boolean;
+  /** Wave-7 lineage (from audit_results). */
+  templateId?: number | null;
+  templateVersionId?: number | null;
 }
 
 export function mapFindingsFromApi(
@@ -269,6 +280,12 @@ export function mapFindingsFromApi(
       typeof bb.height === "number" &&
       (bb.coordinateSpace == null || bb.coordinateSpace === "percent");
 
+    const isCorrected = Boolean(
+      f.normalisedSnippet &&
+        f.rawSnippet &&
+        f.normalisedSnippet.trim() !== f.rawSnippet.trim()
+    );
+
     return {
       id: f.id,
       field: f.fieldName || "Unknown Field",
@@ -279,6 +296,7 @@ export function mapFindingsFromApi(
       reasonCode: f.reasonCode ?? undefined,
       value: f.rawSnippet || undefined,
       message: f.normalisedSnippet || undefined,
+      isCorrected,
       whyItMatters: f.whyItMatters || undefined,
       suggestedFix: f.suggestedFix || undefined,
       confidence: parseFloat(f.confidence || "0") / 100,
@@ -379,6 +397,8 @@ export function ReviewWorkstationPane({
           docQualityPenalties: mapDocQualityPenaltiesFromReport(
             auditResult?.reportJson
           ),
+          templateId: auditResult?.templateId ?? null,
+          templateVersionId: auditResult?.templateVersionId ?? null,
           needsTemplateAuthoring: Boolean(
             (
               auditResult?.reportJson as
@@ -452,6 +472,11 @@ export function ReviewWorkstationPane({
         docQualityPenalties,
         failurePathSignals: failurePathSignalsDerived.signals,
         failurePathSignalSummary: failurePathSignalsDerived.signalSummary,
+        templateId: auditDataProp.templateId ?? auditResult?.templateId ?? null,
+        templateVersionId:
+          auditDataProp.templateVersionId ??
+          auditResult?.templateVersionId ??
+          null,
         needsTemplateAuthoring:
           auditDataProp.needsTemplateAuthoring ??
           Boolean(
@@ -549,6 +574,7 @@ export function ReviewWorkstationPane({
         makeModel={makeModel}
         photoPairCompare={photoPairCompare}
         deepNoteAnalysis={deepNoteAnalysis}
+        auditReportJson={auditResult?.reportJson}
       />
     </ErrorBoundary>
   );
@@ -572,6 +598,7 @@ function ReviewWorkstationContent({
   makeModel,
   photoPairCompare,
   deepNoteAnalysis,
+  auditReportJson,
 }: {
   auditData: AuditData;
   documentUrl?: string;
@@ -598,6 +625,7 @@ function ReviewWorkstationContent({
   makeModel: string | null;
   photoPairCompare: PhotoPairCompareArtifact | null;
   deepNoteAnalysis: DeepNoteAnalysisData | null;
+  auditReportJson?: unknown;
 }) {
   const [activeBoxId, setActiveBoxId] = useState<string | number | null>(null);
   const [focusPage, setFocusPage] = useState<number | null>(null);
@@ -680,19 +708,85 @@ function ReviewWorkstationContent({
   const canOverrideTemplate = hasRole(["admin", "qa_lead"]);
   const utils = trpc.useUtils();
 
+  const { data: supportedActions } =
+    trpc.auditActions.supportedActions.useQuery();
+  const templateMemoryWrite = Boolean(supportedActions?.templateMemoryWrite);
+
+  const { data: memoryForSheet } =
+    trpc.templates.memory.listForJobSheet.useQuery(
+      { jobSheetId },
+      { enabled: jobSheetId > 0 }
+    );
+
+  const memoryPanelCounts = useMemo(() => {
+    const rows = memoryForSheet ?? [];
+    return {
+      collecting: rows.filter(r => r.promotionStatus === "collecting").length,
+      shadow: rows.filter(
+        r => r.promotionStatus === "shadow" || r.promotionStatus === "candidate"
+      ).length,
+      approved: rows.filter(r => r.promotionStatus === "approved").length,
+    };
+  }, [memoryForSheet]);
+
   const displayFindings = useMemo(() => {
-    if (optimisticPassedIds.size === 0) return auditData.findings;
-    return auditData.findings.map(f =>
+    const report = auditReportJson as
+      | {
+          memoryApplied?: Array<{
+            fieldKey?: string;
+            ruleId?: string | null;
+          }>;
+        }
+      | null
+      | undefined;
+    const applied = report?.memoryApplied ?? [];
+    const versionId = auditData.templateVersionId ?? null;
+
+    const withMemory = auditData.findings.map(f => {
+      const memMatch = (memoryForSheet ?? []).find(
+        m =>
+          m.fieldKey === f.field || (f.ruleId != null && m.ruleId === f.ruleId)
+      );
+      const appliedMatch = applied.find(
+        a =>
+          a.fieldKey === f.field || (f.ruleId != null && a.ruleId === f.ruleId)
+      );
+      let memoryBadge: string | null = null;
+      if (appliedMatch && versionId != null) {
+        memoryBadge = `Applied on template v${versionId}`;
+      } else if (memMatch) {
+        const n = memMatch.agreeCount ?? 0;
+        if (
+          memMatch.promotionStatus === "shadow" ||
+          memMatch.promotionStatus === "approved"
+        ) {
+          memoryBadge = `Memory ${memMatch.promotionStatus}`;
+        } else {
+          memoryBadge = `Memory candidate (${Math.min(n, TEMPLATE_MEMORY_AGREE_THRESHOLD)}/${TEMPLATE_MEMORY_AGREE_THRESHOLD})`;
+        }
+      }
+      return { ...f, memoryBadge };
+    });
+
+    if (optimisticPassedIds.size === 0) return withMemory;
+    return withMemory.map(f =>
       optimisticPassedIds.has(f.id) && f.status !== "passed"
         ? { ...f, status: "passed" as const }
         : f
     );
-  }, [auditData.findings, optimisticPassedIds]);
+  }, [
+    auditData.findings,
+    auditData.templateVersionId,
+    auditReportJson,
+    memoryForSheet,
+    optimisticPassedIds,
+  ]);
 
   const invalidateFindings = () => {
     utils.audits.getFindings.invalidate();
     utils.audits.getByJobSheet.invalidate();
     utils.jobSheets.list.invalidate();
+    utils.templates.memory.listForJobSheet.invalidate({ jobSheetId });
   };
 
   const handleReprocess = () => {
@@ -836,30 +930,85 @@ function ReviewWorkstationContent({
       {
         onSuccess: result => {
           invalidateFindings();
+          const reason = correctionTrainingReason;
           setCorrectionDialog(null);
           setCorrectedValue("");
           setCorrectionTrainingReason("");
           restoreFocus(correctionDialogTriggerRef.current);
-          toast.success("Correction saved", {
-            action: {
-              label: "Undo",
-              onClick: () => {
-                undoCorrection.mutate(
-                  {
-                    findingId: result.findingId,
-                    previousSnippet: result.previousSnippet,
+          const studioRequired =
+            STUDIO_CONFIRM_REASONS.has(reason as TrainingReasonCode) ||
+            ("studioConfirmRequired" in result &&
+              Boolean(
+                (result as { studioConfirmRequired?: boolean })
+                  .studioConfirmRequired
+              ));
+          const memStatus =
+            "memoryPromotionStatus" in result
+              ? (result as { memoryPromotionStatus?: string })
+                  .memoryPromotionStatus
+              : undefined;
+          const agreeCount =
+            "memoryAgreeCount" in result
+              ? (result as { memoryAgreeCount?: number }).memoryAgreeCount
+              : undefined;
+          const candidateId =
+            "memoryCandidateId" in result
+              ? (result as { memoryCandidateId?: number }).memoryCandidateId
+              : undefined;
+          const remaining =
+            agreeCount != null
+              ? Math.max(0, TEMPLATE_MEMORY_AGREE_THRESHOLD - agreeCount)
+              : TEMPLATE_MEMORY_AGREE_THRESHOLD;
+
+          let toastMsg = "Value updated on this finding.";
+          if (studioRequired) {
+            toastMsg =
+              "Value updated on this finding. Open Template Studio to confirm the ROI/template draft.";
+          } else if (
+            templateMemoryWrite &&
+            AUTO_LEARN_REASONS.has(reason as TrainingReasonCode) &&
+            (memStatus === "shadow" || memStatus === "approved") &&
+            candidateId != null
+          ) {
+            toastMsg = `Value updated — template memory ${memStatus} (applies on next audits when apply is on).`;
+          } else if (
+            templateMemoryWrite &&
+            AUTO_LEARN_REASONS.has(reason as TrainingReasonCode) &&
+            candidateId != null
+          ) {
+            toastMsg =
+              remaining > 0
+                ? `Value updated on this finding. Will learn after ${remaining} more agreeing fix${remaining === 1 ? "" : "es"}.`
+                : `Value updated on this finding — memory candidate (${memStatus ?? "collecting"}).`;
+          }
+
+          toast.success(toastMsg, {
+            action: studioRequired
+              ? {
+                  label: "Open Studio",
+                  onClick: () => {
+                    window.location.href = "/template-studio";
                   },
-                  {
-                    onSuccess: () => {
-                      invalidateFindings();
-                      toast.success("Correction undone");
-                    },
-                    onError: err =>
-                      toast.error(err.message || "Undo correction failed"),
-                  }
-                );
-              },
-            },
+                }
+              : {
+                  label: "Undo",
+                  onClick: () => {
+                    undoCorrection.mutate(
+                      {
+                        findingId: result.findingId,
+                        previousSnippet: result.previousSnippet,
+                      },
+                      {
+                        onSuccess: () => {
+                          invalidateFindings();
+                          toast.success("Correction undone");
+                        },
+                        onError: err =>
+                          toast.error(err.message || "Undo correction failed"),
+                      }
+                    );
+                  },
+                },
           });
         },
         onError: err => toast.error(err.message || "Correction failed"),
@@ -1225,10 +1374,13 @@ function ReviewWorkstationContent({
 
   const submitFeedback = () => {
     if (!selectedFinding) return;
+    if (typeof selectedFinding.id !== "number") {
+      toast.error("Cannot report: finding has no durable id yet");
+      return;
+    }
     createDispute.mutate(
       {
-        auditFindingId:
-          typeof selectedFinding.id === "number" ? selectedFinding.id : 1,
+        auditFindingId: selectedFinding.id,
         reason: `[${feedbackType}] ${feedbackComment}`,
       },
       {
@@ -1306,6 +1458,27 @@ function ReviewWorkstationContent({
             {auditData.technician} · {auditData.date} · {failedFindings.length}{" "}
             issue{failedFindings.length === 1 ? "" : "s"}
           </span>
+          {auditData.templateVersionId != null && (
+            <Badge
+              variant="outline"
+              className="font-mono text-[10px] px-1.5"
+              title={`Template ${auditData.templateId ?? "?"} version ${auditData.templateVersionId}`}
+            >
+              tmpl v{auditData.templateVersionId}
+            </Badge>
+          )}
+          {(memoryPanelCounts.collecting > 0 ||
+            memoryPanelCounts.shadow > 0 ||
+            memoryPanelCounts.approved > 0) && (
+            <span
+              className="text-[10px] text-muted-foreground tabular-nums"
+              title="Template memory funnel for this template"
+            >
+              Memory {memoryPanelCounts.collecting} collecting ·{" "}
+              {memoryPanelCounts.shadow} shadow · {memoryPanelCounts.approved}{" "}
+              approved
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {showJobSheetActions && (
@@ -1868,7 +2041,31 @@ function ReviewWorkstationContent({
                   </SelectContent>
                 </Select>
                 <p className="text-[11px] text-muted-foreground">
-                  Feeds TrainLoop signals for ECE and Template Studio inbox.
+                  {overrideTrainingReason &&
+                  STUDIO_CONFIRM_REASONS.has(overrideTrainingReason) ? (
+                    <>
+                      ROI/template changes need a Template Studio draft —{" "}
+                      <Link
+                        href="/template-studio"
+                        className="underline text-foreground"
+                      >
+                        open Studio
+                      </Link>
+                      .
+                    </>
+                  ) : overrideTrainingReason &&
+                    AUTO_LEARN_REASONS.has(overrideTrainingReason) ? (
+                    <>
+                      Will learn after {TEMPLATE_MEMORY_AGREE_THRESHOLD}{" "}
+                      agreeing fixes on this template
+                      {!templateMemoryWrite
+                        ? " (memory capture flag is off)"
+                        : ""}
+                      .
+                    </>
+                  ) : (
+                    <>Case disposition only — does not auto-suppress rules.</>
+                  )}
                 </p>
               </div>
             )}
@@ -1931,12 +2128,15 @@ function ReviewWorkstationContent({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Correct field value</DialogTitle>
+            <DialogTitle>Fix displayed value</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
-              {correctionDialog?.field}
+              Updates this finding only. Teaching the template (memory) depends
+              on the training reason below
+              {templateMemoryWrite ? "" : " — capture flag is currently off"}.
             </p>
+            <p className="text-sm font-medium">{correctionDialog?.field}</p>
             <div className="space-y-2">
               <Label>Original</Label>
               <Input
@@ -1959,7 +2159,7 @@ function ReviewWorkstationContent({
             </div>
             <div className="space-y-2">
               <Label htmlFor="correction-training-reason">
-                Training reason
+                Why are you fixing this?
               </Label>
               <Select
                 value={correctionTrainingReason}
@@ -1968,7 +2168,7 @@ function ReviewWorkstationContent({
                 }
               >
                 <SelectTrigger id="correction-training-reason">
-                  <SelectValue placeholder="What should the model learn?" />
+                  <SelectValue placeholder="Select a reason" />
                 </SelectTrigger>
                 <SelectContent>
                   {TRAINING_REASON_OPTIONS.map(opt => (
@@ -1978,6 +2178,32 @@ function ReviewWorkstationContent({
                   ))}
                 </SelectContent>
               </Select>
+              {correctionTrainingReason &&
+                AUTO_LEARN_REASONS.has(correctionTrainingReason) && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Teach template: will soft-apply after{" "}
+                    {TEMPLATE_MEMORY_AGREE_THRESHOLD} agreeing fixes on this
+                    field/rule.
+                  </p>
+                )}
+              {correctionTrainingReason &&
+                STUDIO_CONFIRM_REASONS.has(correctionTrainingReason) && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Teach template:{" "}
+                    <Link
+                      href="/template-studio"
+                      className="underline text-foreground"
+                    >
+                      open draft in Template Studio
+                    </Link>{" "}
+                    — ROI/template changes never auto-activate.
+                  </p>
+                )}
+              {correctionTrainingReason === "true_defect" && (
+                <p className="text-[11px] text-muted-foreground">
+                  Case only — will not auto-suppress this rule.
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -2003,7 +2229,7 @@ function ReviewWorkstationContent({
               {captureCorrection.isPending && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               )}
-              Save correction
+              Save value
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2110,6 +2336,20 @@ function FindingsList({
                       Minor
                     </Badge>
                   )}
+                  {finding.isCorrected && (
+                    <Badge variant="outline" className="text-[10px] px-1.5">
+                      Corrected
+                    </Badge>
+                  )}
+                  {finding.memoryBadge && (
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] px-1.5 max-w-[140px] truncate"
+                      title={finding.memoryBadge}
+                    >
+                      {finding.memoryBadge}
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {finding.ruleId && (
@@ -2191,11 +2431,11 @@ function FindingsList({
                   variant="ghost"
                   size="sm"
                   className="h-6 text-[11px] px-1.5"
-                  title="Correct value (c)"
+                  title="Fix displayed value (c)"
                   aria-keyshortcuts="c"
                   onClick={e => onCorrect(finding, e)}
                 >
-                  <Pencil className="w-3 h-3 mr-1" /> Correct
+                  <Pencil className="w-3 h-3 mr-1" /> Fix value
                 </Button>
                 <Button
                   variant="ghost"
@@ -2401,6 +2641,20 @@ function IssuesTabContent({
                       Minor
                     </Badge>
                   )}
+                  {finding.isCorrected && (
+                    <Badge variant="outline" className="text-[10px] px-1.5">
+                      Corrected
+                    </Badge>
+                  )}
+                  {finding.memoryBadge && (
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] px-1.5 max-w-[140px] truncate"
+                      title={finding.memoryBadge}
+                    >
+                      {finding.memoryBadge}
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {finding.ruleId && (
@@ -2482,11 +2736,11 @@ function IssuesTabContent({
                   variant="ghost"
                   size="sm"
                   className="h-6 text-[11px] px-1.5"
-                  title="Correct value (c)"
+                  title="Fix displayed value (c)"
                   aria-keyshortcuts="c"
                   onClick={e => onCorrect(finding, e)}
                 >
-                  <Pencil className="w-3 h-3 mr-1" /> Correct
+                  <Pencil className="w-3 h-3 mr-1" /> Fix value
                 </Button>
                 <Button
                   variant="ghost"
