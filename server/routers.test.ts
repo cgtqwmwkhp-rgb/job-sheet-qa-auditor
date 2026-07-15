@@ -6,10 +6,7 @@ import type { TrpcContext } from "./_core/context";
 
 // Mock the database module
 vi.mock("./db", () => ({
-<<<<<<< HEAD
-=======
   // Review-claim store falls back to in-memory when getDb() is null.
->>>>>>> ac3e7be (fix(review): mock getDb for review-claim guards in router tests)
   getDb: vi.fn().mockResolvedValue(null),
   getDashboardStats: vi.fn().mockResolvedValue({
     totalAudits: 150,
