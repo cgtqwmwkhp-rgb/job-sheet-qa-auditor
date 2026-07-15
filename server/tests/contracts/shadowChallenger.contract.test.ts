@@ -454,9 +454,7 @@ describe("Shadow Challenger Contract Tests (PR-21)", () => {
         sampleKey: "always",
       });
       expect(result.canaryApplied).toBe(true);
-      expect(result.servedAnalysis?.model).toBe(
-        "gemini-2.0-flash"
-      );
+      expect(result.servedAnalysis?.model).toBe("gemini-2.0-flash");
       expect(result.comparison?.strategy).toBe("real_model");
       expect(result.comparison?.canaryApplied).toBe(true);
     });
