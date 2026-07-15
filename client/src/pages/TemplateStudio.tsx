@@ -492,14 +492,17 @@ export default function TemplateStudio() {
         setRoiLayoutError(null);
       }
       showSuccessToast(
-        applyAccepted ? "Accepted fields saved to draft" : "Field preview ready",
+        applyAccepted
+          ? "Accepted fields saved to draft"
+          : "Field preview ready",
         (() => {
           const base = result.proposal.geminiUsed
             ? "Gemini + OCR"
             : result.proposal.layoutAvailable
               ? "OCR heuristics"
               : "Starter scaffold (no sample OCR)";
-          if (ocrPlacedCount > 0) return `${base} · ${ocrPlacedCount} OCR-placed ROI boxes`;
+          if (ocrPlacedCount > 0)
+            return `${base} · ${ocrPlacedCount} OCR-placed ROI boxes`;
           if (result.proposal.layoutError) {
             return `ROI not placed — ${result.proposal.layoutError.slice(0, 120)}`;
           }
@@ -538,8 +541,9 @@ export default function TemplateStudio() {
           rejectedFieldIds: Array.from(rejectedFields),
         });
         const rois = result.proposal.roiRegions ?? [];
-        const ocrPlacedCount = rois.filter(r => r.source === "ocr-layout")
-          .length;
+        const ocrPlacedCount = rois.filter(
+          r => r.source === "ocr-layout"
+        ).length;
         const fallbackCount = rois.filter(
           r => r.source === "starter-roi-fallback"
         ).length;
@@ -556,7 +560,8 @@ export default function TemplateStudio() {
             result.proposal.fields.length > 0
               ? result.proposal.fields.reduce((a, f) => a + f.confidence, 0) /
                 result.proposal.fields.length
-              : (prev?.confidence ?? result.proposal.selectionTokens.confidence),
+              : (prev?.confidence ??
+                result.proposal.selectionTokens.confidence),
           source: result.proposal.geminiUsed
             ? "Gemini + OCR"
             : result.proposal.layoutAvailable
@@ -619,8 +624,7 @@ export default function TemplateStudio() {
   // When Draw regions opens with a sample and no boxes, auto-run OCR mapping
   useEffect(() => {
     if (step !== "roi" || !versionId || !sampleUrl) return;
-    const regions =
-      roiDraft?.regions ?? version?.roiJson?.regions ?? [];
+    const regions = roiDraft?.regions ?? version?.roiJson?.regions ?? [];
     const empty = regions.length === 0;
     const already =
       ocrAutoMappedForRef.current?.startsWith(`${versionId}:`) ?? false;
@@ -1364,8 +1368,8 @@ export default function TemplateStudio() {
                 >
                   <strong>OCR could not place boxes automatically.</strong>{" "}
                   {roiLayoutError} Use Draw labels to box fields manually, or
-                  re-attach a clearer sample and click{" "}
-                  <em>OCR map this PDF</em>.
+                  re-attach a clearer sample and click <em>OCR map this PDF</em>
+                  .
                 </div>
               )}
 
@@ -1377,8 +1381,8 @@ export default function TemplateStudio() {
                   >
                     <strong>OCR-placed regions loaded.</strong>{" "}
                     {proposalPreview.roiProvenance.ocrPlacedCount} boxes from
-                  layout evidence — still drag/resize any that miss the printed
-                  field.
+                    layout evidence — still drag/resize any that miss the
+                    printed field.
                   </div>
                 )}
 
