@@ -72,7 +72,7 @@ describe("documentProcessor orchestration contract", () => {
     expect(documentProcessor).not.toMatch(
       /reportJson:\s*\{[\s\S]{0,350}\n\s*extractedText\s*(?:,|:)/
     );
-    expect(documentProcessor).toContain('persisted: false');
+    expect(documentProcessor).toContain("persisted: false");
     expect(documentProcessor).toContain('source: "original_job_sheet"');
     expect(schema).toContain("excludes the full raw OCR text");
     expect(router).toContain("getFileUrl");
