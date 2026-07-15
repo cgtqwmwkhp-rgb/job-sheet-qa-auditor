@@ -115,6 +115,12 @@ function formatAppMetrics(): string {
   lines.push(`pdf_proxy_range_requests_count ${pdfMetrics.rangeRequestsCount}`);
 
   lines.push(
+    "# HELP pdf_proxy_cache_hits_total Number of PDF range responses served from the process-local cache"
+  );
+  lines.push("# TYPE pdf_proxy_cache_hits_total counter");
+  lines.push(`pdf_proxy_cache_hits_total ${pdfMetrics.cacheHitCount}`);
+
+  lines.push(
     "# HELP pdf_proxy_access_denied_count Number of RBAC access denied responses"
   );
   lines.push("# TYPE pdf_proxy_access_denied_count counter");
