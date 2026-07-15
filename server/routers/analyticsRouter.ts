@@ -13,10 +13,10 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import {
-  protectedProcedure,
   adminProcedure,
   qaLeadProcedure,
   router,
+  staffProcedure,
 } from "../_core/trpc";
 import {
   getSelectionAnalytics,
@@ -436,7 +436,7 @@ export const analyticsRouter = router({
    * reviewQueue is a live hold-queue snapshot and is intentionally not
    * filtered by startDate/endDate — document that in UI copy if needed.
    */
-  getExecutiveSummary: protectedProcedure
+  getExecutiveSummary: staffProcedure
     .input(periodInput)
     .query(async ({ input }) => {
       const period = resolvePeriod(input?.startDate, input?.endDate);
@@ -462,7 +462,7 @@ export const analyticsRouter = router({
   /**
    * Leaderboard + team trends from technician-attributed job sheets / findings.
    */
-  getEngineerSummary: protectedProcedure
+  getEngineerSummary: staffProcedure
     .input(periodInput)
     .query(async ({ input }) => {
       const loaded = await loadEngineerAnalyticsInputs(input);
@@ -487,7 +487,7 @@ export const analyticsRouter = router({
   /**
    * Single engineer scorecard + fix pack + finding drill-through rows.
    */
-  getEngineerScoreCard: protectedProcedure
+  getEngineerScoreCard: staffProcedure
     .input(
       z.object({
         engineerId: z.string().min(1),
@@ -519,7 +519,7 @@ export const analyticsRouter = router({
    * Round 1: evidence dossier from findings + reportJson.
    * Round 2: optional LLM critic grounded only in that dossier.
    */
-  getEngineerCoachingPack: protectedProcedure
+  getEngineerCoachingPack: staffProcedure
     .input(
       z.object({
         engineerId: z.string().min(1),
@@ -629,7 +629,7 @@ export const analyticsRouter = router({
   /**
    * Cohort summary by site / assetType / workType from DB-backed audits.
    */
-  getCohortSummary: protectedProcedure
+  getCohortSummary: staffProcedure
     .input(periodInput)
     .query(async ({ input }) => {
       const loaded = await loadCohortAnalyticsInputs(input);
@@ -644,7 +644,7 @@ export const analyticsRouter = router({
   /**
    * Finding-level drill-through for a single cohort bucket.
    */
-  getCohortDrilldown: protectedProcedure
+  getCohortDrilldown: staffProcedure
     .input(
       z.object({
         dimension: z.enum(["site", "assetType", "workType"]),
@@ -739,7 +739,7 @@ export const analyticsRouter = router({
   /**
    * Hold-queue SLA timers + ageing buckets.
    */
-  getHoldQueueSla: protectedProcedure.query(async () => {
+  getHoldQueueSla: staffProcedure.query(async () => {
     const holdItems = await db.getExceptionHoldQueueItems();
     return buildHoldQueueSlaSummary({
       items: holdItems as HoldQueueItemRow[],
@@ -749,7 +749,7 @@ export const analyticsRouter = router({
   /**
    * Per-rule overturn / waiver rates from resolved findings.
    */
-  getOverturnAnalytics: protectedProcedure
+  getOverturnAnalytics: staffProcedure
     .input(periodInput)
     .query(async ({ input }) => {
       const period = resolveExceptionPeriod(input?.startDate, input?.endDate);
@@ -769,7 +769,7 @@ export const analyticsRouter = router({
    * Overturn metrics summary from audit action logs (scaffold #248).
    * Gated by FEATURE_OVERTURN_METRICS env var.
    */
-  getOverturnMetricsSummary: protectedProcedure
+  getOverturnMetricsSummary: staffProcedure
     .input(periodInput)
     .query(async ({ input }) => {
       if (!isOverturnMetricsEnabled()) {
@@ -797,7 +797,7 @@ export const analyticsRouter = router({
   /**
    * Recurring rule+site clusters in the period.
    */
-  getRecurrence: protectedProcedure
+  getRecurrence: staffProcedure
     .input(
       z
         .object({
@@ -826,7 +826,7 @@ export const analyticsRouter = router({
   /**
    * Combined exception management dashboard payload.
    */
-  getExceptionSummary: protectedProcedure
+  getExceptionSummary: staffProcedure
     .input(periodInput)
     .query(async ({ input }) => {
       const loaded = await loadExceptionAnalyticsInputs(input);
@@ -841,7 +841,7 @@ export const analyticsRouter = router({
   /**
    * Evidence ROI — COMMENT/PHOTO/EVIDENCE fail rates (money-saving dashboard).
    */
-  getEvidenceRoi: protectedProcedure
+  getEvidenceRoi: staffProcedure
     .input(periodInput)
     .query(async ({ input }) => {
       const loaded = await loadExceptionAnalyticsInputs(input);
@@ -899,7 +899,7 @@ export const analyticsRouter = router({
   /**
    * EWMA/CUSUM defect-rate drift + calibration histograms + alerts.
    */
-  getDriftSummary: protectedProcedure
+  getDriftSummary: staffProcedure
     .input(periodInput)
     .query(async ({ input }) => {
       const loaded = await loadDriftAnalyticsInputs(input);
@@ -914,7 +914,7 @@ export const analyticsRouter = router({
   /**
    * Active drift alerts only (sorted by severity).
    */
-  getDriftAlerts: protectedProcedure
+  getDriftAlerts: staffProcedure
     .input(periodInput)
     .query(async ({ input }) => {
       const loaded = await loadDriftAnalyticsInputs(input);
@@ -937,7 +937,7 @@ export const analyticsRouter = router({
   /**
    * Leading-indicator risk scores, attention queue, and fix packs.
    */
-  getPredictiveRiskSummary: protectedProcedure
+  getPredictiveRiskSummary: staffProcedure
     .input(periodInput)
     .query(async ({ input }) => {
       const loaded = await loadPredictiveRiskInputs(input);
@@ -954,7 +954,7 @@ export const analyticsRouter = router({
   /**
    * Attention queue only (entities above risk threshold), sorted by score.
    */
-  getAttentionQueue: protectedProcedure
+  getAttentionQueue: staffProcedure
     .input(periodInput)
     .query(async ({ input }) => {
       const loaded = await loadPredictiveRiskInputs(input);
@@ -977,7 +977,7 @@ export const analyticsRouter = router({
   /**
    * Fix packs for engineers in the attention queue.
    */
-  getPredictiveFixPacks: protectedProcedure
+  getPredictiveFixPacks: staffProcedure
     .input(periodInput)
     .query(async ({ input }) => {
       const loaded = await loadPredictiveRiskInputs(input);
@@ -1002,7 +1002,7 @@ export const analyticsRouter = router({
   /**
    * Shadow comparison disagreement report + feature-flag status.
    */
-  getShadowChallengerSummary: protectedProcedure
+  getShadowChallengerSummary: staffProcedure
     .input(periodInput)
     .query(async ({ input }) => {
       const loaded = await loadShadowChallengerInputs(input);
@@ -1018,7 +1018,7 @@ export const analyticsRouter = router({
   /**
    * Disagreement-only slice for weekly review.
    */
-  getShadowDisagreements: protectedProcedure
+  getShadowDisagreements: staffProcedure
     .input(periodInput)
     .query(async ({ input }) => {
       const loaded = await loadShadowChallengerInputs(input);
@@ -1041,7 +1041,7 @@ export const analyticsRouter = router({
   /**
    * Current shadow/canary feature-flag config (no secrets).
    */
-  getShadowChallengerConfig: protectedProcedure.query(() => {
+  getShadowChallengerConfig: staffProcedure.query(() => {
     return getShadowChallengerConfig();
   }),
 });
