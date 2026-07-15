@@ -103,7 +103,7 @@ export default function SearchPage() {
 
   const auditByJobSheetId = useMemo(() => {
     const map = new Map<number, { result: string }>();
-    for (const ar of auditResults ?? []) {
+    for (const ar of auditResults?.items ?? []) {
       map.set(ar.jobSheetId, {
         result: ar.result,
       });
@@ -112,7 +112,7 @@ export default function SearchPage() {
   }, [auditResults]);
 
   const allResults = useMemo<SearchResult[]>(() => {
-    return (jobSheets ?? []).map(sheet => {
+    return (jobSheets?.items ?? []).map(sheet => {
       const audit = auditByJobSheetId.get(sheet.id);
       return {
         id: sheet.id,

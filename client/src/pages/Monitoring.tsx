@@ -130,7 +130,7 @@ export default function Monitoring() {
       review_queue: 0,
       pending: 0,
     };
-    for (const sheet of allSheets ?? []) {
+    for (const sheet of allSheets?.items ?? []) {
       if (sheet.status === "completed") counts.completed += 1;
       else if (sheet.status === "processing") counts.processing += 1;
       else if (sheet.status === "failed") counts.failed += 1;

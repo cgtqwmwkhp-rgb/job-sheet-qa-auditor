@@ -157,13 +157,24 @@ export const appRouter = router({
           .optional()
       )
       .query(async ({ ctx, input }) => {
-        const allJobSheets = await db.getJobSheets(input);
+        const limit = input?.limit ?? 50;
+        const allJobSheets = await db.getJobSheets({
+          ...input,
+          limit: limit + 1,
+        });
 
         // Object-level filtering: regular users only see their own uploads
         const { filterJobSheetsByAccess } = await import(
           "./utils/authorization"
         );
-        return filterJobSheetsByAccess(allJobSheets, ctx.user);
+        const accessibleJobSheets = filterJobSheetsByAccess(
+          allJobSheets,
+          ctx.user
+        );
+        return {
+          items: accessibleJobSheets.slice(0, limit),
+          hasMore: accessibleJobSheets.length > limit,
+        };
       }),
 
     /** Users eligible for technician attribution on upload / assign. */
@@ -982,7 +993,11 @@ export const appRouter = router({
           .optional()
       )
       .query(async ({ ctx, input }) => {
-        const allAudits = await db.getAuditResultList(input);
+        const limit = input?.limit ?? 50;
+        const allAudits = await db.getAuditResultList({
+          ...input,
+          limit: limit + 1,
+        });
 
         // Object-level filtering: regular users only see audits for their own uploads
         // First, get all job sheets they have access to
@@ -999,9 +1014,13 @@ export const appRouter = router({
         );
 
         // Filter audits to only those for accessible job sheets
-        return allAudits.filter(audit =>
+        const accessibleAudits = allAudits.filter(audit =>
           accessibleJobSheetIds.has(audit.jobSheetId)
         );
+        return {
+          items: accessibleAudits.slice(0, limit),
+          hasMore: accessibleAudits.length > limit,
+        };
       }),
 
     getByJobSheet: protectedProcedure

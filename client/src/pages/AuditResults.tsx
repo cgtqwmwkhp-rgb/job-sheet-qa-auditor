@@ -51,8 +51,9 @@ const JOB_SHEET_PAGE_SIZE = 50;
 const AUDIT_PAGE_SIZE = 100;
 
 type JobSheetListItem =
-  inferRouterOutputs<AppRouter>["jobSheets"]["list"][number];
-type AuditListItem = inferRouterOutputs<AppRouter>["audits"]["list"][number];
+  inferRouterOutputs<AppRouter>["jobSheets"]["list"]["items"][number];
+type AuditListItem =
+  inferRouterOutputs<AppRouter>["audits"]["list"]["items"][number];
 
 function mergePage<T extends { id: number }>(existing: T[], page: T[]): T[] {
   const rows = new Map(existing.map(row => [row.id, row]));
@@ -243,7 +244,7 @@ export default function AuditResults() {
     { limit: JOB_SHEET_PAGE_SIZE, offset: jobSheetOffset },
     {
       refetchInterval: query => {
-        const rows = query.state.data;
+        const rows = query.state.data?.items;
         if (!rows?.length) return false;
         return rows.some(r => isActiveJobSheetStatus(r.status)) ? 2000 : false;
       },
@@ -260,7 +261,9 @@ export default function AuditResults() {
     if (!jobSheetPage) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- offset pages are accumulated from the query cache.
     setAllJobSheets(existing =>
-      jobSheetOffset === 0 ? jobSheetPage : mergePage(existing, jobSheetPage)
+      jobSheetOffset === 0
+        ? jobSheetPage.items
+        : mergePage(existing, jobSheetPage.items)
     );
   }, [jobSheetOffset, jobSheetPage]);
 
@@ -269,12 +272,12 @@ export default function AuditResults() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- offset pages are accumulated from the query cache.
     setAllAuditResults(existing =>
       auditOffset === 0
-        ? auditResultsPage
-        : mergePage(existing, auditResultsPage)
+        ? auditResultsPage.items
+        : mergePage(existing, auditResultsPage.items)
     );
   }, [auditOffset, auditResultsPage]);
 
-  const hasMoreJobSheets = jobSheetPage?.length === JOB_SHEET_PAGE_SIZE;
+  const hasMoreJobSheets = jobSheetPage?.hasMore ?? false;
   const loadMoreAudits = () => {
     if (!hasMoreJobSheets || jobSheetsFetching || auditsFetching) return;
     setJobSheetOffset(offset => offset + JOB_SHEET_PAGE_SIZE);
