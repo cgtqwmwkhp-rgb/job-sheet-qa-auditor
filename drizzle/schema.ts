@@ -138,6 +138,13 @@ export const auditResults = mysqlTable("audit_results", {
   reportJson: json("reportJson").notNull(),
   /** Processing time in milliseconds */
   processingTimeMs: int("processingTimeMs"),
+  /**
+   * Wave-7: template lineage for closed-loop memory.
+   * Nullable for legacy rows; new audits should populate from selection.
+   * FKs declared in drizzle/0012_template_memory.sql (tables defined later in this file).
+   */
+  templateId: int("templateId"),
+  templateVersionId: int("templateVersionId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -666,3 +673,180 @@ export type ProcessIdempotencyOutboxRow =
   typeof processIdempotencyOutbox.$inferSelect;
 export type InsertProcessIdempotencyOutbox =
   typeof processIdempotencyOutbox.$inferInsert;
+
+/**
+ * Wave-7: immutable reviewer correction events (TrainLoop source of truth).
+ */
+export const reviewCorrections = mysqlTable(
+  "review_corrections",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    correctionType: mysqlEnum("correctionType", [
+      "field_correction",
+      "override",
+      "waive",
+      "flag",
+      "approve",
+    ]).notNull(),
+    trainingReasonCode: mysqlEnum("trainingReasonCode", [
+      "ocr_misread",
+      "roi_misaligned",
+      "rule_wrong",
+      "template_mismatch",
+      "true_defect",
+    ]).notNull(),
+    findingId: int("findingId")
+      .notNull()
+      .references(() => auditFindings.id),
+    auditResultId: int("auditResultId")
+      .notNull()
+      .references(() => auditResults.id),
+    jobSheetId: int("jobSheetId")
+      .notNull()
+      .references(() => jobSheets.id),
+    templateId: int("templateId").references(() => templates.id),
+    templateVersionId: int("templateVersionId").references(
+      () => templateVersions.id
+    ),
+    fieldKey: varchar("fieldKey", { length: 128 }).notNull(),
+    ruleId: varchar("ruleId", { length: 64 }),
+    originalValue: text("originalValue"),
+    correctedValue: text("correctedValue"),
+    reviewerId: int("reviewerId")
+      .notNull()
+      .references(() => users.id),
+    reviewerReason: text("reviewerReason"),
+    idempotencyKey: varchar("idempotencyKey", { length: 191 }).notNull(),
+    supersedesCorrectionId: int("supersedesCorrectionId"),
+    undoneAt: timestamp("undoneAt"),
+    undoneBy: int("undoneBy"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    idempotencyUnique: uniqueIndex(
+      "review_corrections_idempotencyKey_unique"
+    ).on(table.idempotencyKey),
+    templateFieldRuleIdx: index("review_corrections_template_field_rule_idx").on(
+      table.templateId,
+      table.fieldKey,
+      table.ruleId,
+      table.createdAt
+    ),
+  })
+);
+
+export type ReviewCorrection = typeof reviewCorrections.$inferSelect;
+export type InsertReviewCorrection = typeof reviewCorrections.$inferInsert;
+
+/**
+ * Wave-7: aggregated template memory candidates (promotable).
+ */
+export const templateMemoryCandidates = mysqlTable(
+  "template_memory_candidates",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    templateId: int("templateId")
+      .notNull()
+      .references(() => templates.id),
+    templateVersionId: int("templateVersionId").references(
+      () => templateVersions.id
+    ),
+    memoryKind: mysqlEnum("memoryKind", [
+      "suppress_rule",
+      "value_alias",
+      "ocr_hint",
+      "roi_adjust",
+      "spec_gap",
+    ]).notNull(),
+    fieldKey: varchar("fieldKey", { length: 128 }).notNull(),
+    ruleId: varchar("ruleId", { length: 64 }),
+    payloadJson: json("payloadJson").notNull(),
+    payloadHash: varchar("payloadHash", { length: 64 }).notNull(),
+    evidenceCount: int("evidenceCount").notNull().default(0),
+    agreeCount: int("agreeCount").notNull().default(0),
+    disagreeCount: int("disagreeCount").notNull().default(0),
+    promotionStatus: mysqlEnum("promotionStatus", [
+      "collecting",
+      "candidate",
+      "shadow",
+      "approved",
+      "rejected",
+      "retired",
+    ])
+      .notNull()
+      .default("collecting"),
+    promotedToVersionId: int("promotedToVersionId"),
+    createdFromCorrectionId: int("createdFromCorrectionId"),
+    lastEvidenceAt: timestamp("lastEvidenceAt"),
+    createdBy: int("createdBy"),
+    approvedBy: int("approvedBy"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => ({
+    uniqueCandidate: uniqueIndex("template_memory_candidates_unique").on(
+      table.templateId,
+      table.memoryKind,
+      table.fieldKey,
+      table.ruleId,
+      table.payloadHash
+    ),
+    statusTemplateIdx: index(
+      "template_memory_candidates_status_template_idx"
+    ).on(table.promotionStatus, table.templateId),
+  })
+);
+
+export type TemplateMemoryCandidate =
+  typeof templateMemoryCandidates.$inferSelect;
+export type InsertTemplateMemoryCandidate =
+  typeof templateMemoryCandidates.$inferInsert;
+
+export const templateMemoryEvidence = mysqlTable(
+  "template_memory_evidence",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    candidateId: int("candidateId")
+      .notNull()
+      .references(() => templateMemoryCandidates.id),
+    correctionId: int("correctionId")
+      .notNull()
+      .references(() => reviewCorrections.id),
+    weight: decimal("weight", { precision: 5, scale: 2 })
+      .notNull()
+      .default("1.00"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    uniqueEvidence: uniqueIndex("template_memory_evidence_unique").on(
+      table.candidateId,
+      table.correctionId
+    ),
+  })
+);
+
+export type TemplateMemoryEvidence = typeof templateMemoryEvidence.$inferSelect;
+export type InsertTemplateMemoryEvidence =
+  typeof templateMemoryEvidence.$inferInsert;
+
+export const templateMemoryPromotions = mysqlTable(
+  "template_memory_promotions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    candidateId: int("candidateId")
+      .notNull()
+      .references(() => templateMemoryCandidates.id),
+    fromStatus: varchar("fromStatus", { length: 32 }).notNull(),
+    toStatus: varchar("toStatus", { length: 32 }).notNull(),
+    fromVersionId: int("fromVersionId"),
+    toVersionId: int("toVersionId"),
+    diffJson: json("diffJson"),
+    promotedBy: int("promotedBy"),
+    promotedAt: timestamp("promotedAt").defaultNow().notNull(),
+  }
+);
+
+export type TemplateMemoryPromotion =
+  typeof templateMemoryPromotions.$inferSelect;
+export type InsertTemplateMemoryPromotion =
+  typeof templateMemoryPromotions.$inferInsert;
