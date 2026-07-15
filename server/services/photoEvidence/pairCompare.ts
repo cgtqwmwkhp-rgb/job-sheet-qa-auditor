@@ -544,7 +544,7 @@ export async function runVlmPairCompare(
 
   const pairs: PhotoPairResult[] = [];
   let model = "vlm-pair-v1";
-  let provider: "vlm" | "mock" = "vlm";
+  let provider: "vlm" | "mock" | "gemini" = "vlm";
 
   for (const pp of pagePairs) {
     const r = await tryVlmPairAxes({
@@ -558,7 +558,7 @@ export async function runVlmPairCompare(
       return null;
     }
     model = r.model;
-    provider = r.provider;
+    provider = r.provider === "gemini" ? "gemini" : r.provider;
     const confidence = r.confidence ?? 0.7;
     pairs.push({
       beforePage: pp.beforePage,
