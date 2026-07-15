@@ -148,7 +148,23 @@ export class AnthropicVlmAdapter implements VlmAdapter {
 
       const json = (await response.json()) as {
         content?: Array<{ type: string; text?: string }>;
+        usage?: { input_tokens?: number; output_tokens?: number };
       };
+      // Attribute successful VLM responses to FinOps without delaying verification.
+      void import("../finOps")
+        .then(({ recordApiCost }) => {
+          recordApiCost({
+            provider: "anthropic",
+            model: this.modelId,
+            stage: "vlm",
+            inputTokens: json.usage?.input_tokens ?? 0,
+            outputTokens: json.usage?.output_tokens ?? 0,
+            latencyMs: Date.now() - start,
+          });
+        })
+        .catch(() => {
+          /* FinOps must never block VLM verification */
+        });
       const text =
         json.content?.find(c => c.type === "text")?.text?.trim() || "";
       const parsed = parseVlmJson(text);
