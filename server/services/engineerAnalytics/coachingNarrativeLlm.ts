@@ -10,6 +10,8 @@
  * Fail-soft at every step. QA Lead still owns the text.
  */
 
+import type { AiPersona } from "../aiPersona";
+import { buildPersonaPromptBlock } from "../aiPersona";
 import type { CoachingNarrativeDraft } from "./coachingNarrative";
 import {
   dossierAllowedJobSheetIds,
@@ -502,10 +504,14 @@ export async function enrichCoachingNarrativeWithLlm(input: {
   draft: CoachingNarrativeDraft;
   dossier: EvidenceDossier;
   forceMock?: boolean;
+  persona?: AiPersona | null;
 }): Promise<CoachingNarrativeDraft> {
   const { draft, dossier } = input;
   const allowed = dossierAllowedJobSheetIds(dossier);
   const dossierCorpus = buildDossierCorpus(dossier);
+  const writerSystem = input.persona
+    ? `${WRITER_SYSTEM}\n\n## Org AI Persona (advisory voice)\n${buildPersonaPromptBlock(input.persona)}`
+    : WRITER_SYSTEM;
 
   if (!isCoachingLlmNarrativeEnabled() && !input.forceMock) {
     return draft;
@@ -551,7 +557,7 @@ export async function enrichCoachingNarrativeWithLlm(input: {
   try {
     const writerResult = await invokeCoachingLlm({
       provider: writer,
-      system: WRITER_SYSTEM,
+      system: writerSystem,
       user: buildWriterUserPrompt(draft, dossier),
       maxTokens: 2800,
     });

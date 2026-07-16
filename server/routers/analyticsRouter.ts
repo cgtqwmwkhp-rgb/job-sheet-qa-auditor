@@ -570,9 +570,11 @@ export const analyticsRouter = router({
       }
 
       try {
+        const orgPersona = await db.getAiPersona();
         const enrichedNarrative = await enrichCoachingNarrativeWithLlm({
           draft: pack.draftNarrative,
           dossier: pack.evidenceDossier,
+          persona: orgPersona,
         });
         pack = {
           ...pack,

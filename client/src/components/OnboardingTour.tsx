@@ -47,7 +47,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     title: "AI Auditor Persona",
     description:
-      "Configure the AI's 'lens'—adjust strictness, tone, and focus areas to match your specific compliance requirements.",
+      "Set the AI advisory lens (voice, strictness, focus). Fail Majors/Minors stay under Audit Policy — a separate Settings control.",
     icon: <BrainCircuit className="h-12 w-12 text-primary" />,
     targetPath: "/settings",
   },

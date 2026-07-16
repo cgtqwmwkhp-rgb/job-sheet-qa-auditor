@@ -772,10 +772,38 @@ export async function testWebhook(id: string): Promise<WebhookDeliveryResult> {
 
 // Convenience functions for common events
 export const webhookEvents = {
-  auditCompleted: (auditId: number, result: string, score: number) =>
+  auditCompleted: (
+    auditId: number,
+    result: string,
+    score: number,
+    meta?: {
+      pipelineVersion?: string | null;
+      templateVersionId?: number | null;
+      policyVersion?: string | null;
+      personaVersion?: string | null;
+      personaSnapshotHash?: string | null;
+    }
+  ) =>
     emitWebhookEvent(
       "audit.completed",
-      { auditId, result, score },
+      {
+        auditId,
+        result,
+        score,
+        ...(meta?.pipelineVersion
+          ? { pipelineVersion: meta.pipelineVersion }
+          : {}),
+        ...(meta?.templateVersionId != null
+          ? { templateVersionId: meta.templateVersionId }
+          : {}),
+        ...(meta?.policyVersion ? { policyVersion: meta.policyVersion } : {}),
+        ...(meta?.personaVersion
+          ? { personaVersion: meta.personaVersion }
+          : {}),
+        ...(meta?.personaSnapshotHash
+          ? { personaSnapshotHash: meta.personaSnapshotHash }
+          : {}),
+      },
       { redactPII: true }
     ),
 

@@ -382,6 +382,30 @@ function mapDbAuditToExportShape(
       processingTimeMs: audit.processingTimeMs ?? 0,
       specVersion: audit.pipelineVersion || "unknown",
       extractionVersion: audit.ocrEngineVersion || "unknown",
+      ...(() => {
+        const report =
+          audit.reportJson && typeof audit.reportJson === "object"
+            ? (audit.reportJson as Record<string, unknown>)
+            : {};
+        const policy = report.auditPolicyDecision as
+          | { policyVersion?: string }
+          | undefined;
+        const persona = report.personaDecision as
+          | {
+              version?: string;
+              snapshotHash?: string;
+            }
+          | undefined;
+        return {
+          ...(policy?.policyVersion
+            ? { policyVersion: policy.policyVersion }
+            : {}),
+          ...(persona?.version ? { personaVersion: persona.version } : {}),
+          ...(persona?.snapshotHash
+            ? { personaSnapshotHash: persona.snapshotHash }
+            : {}),
+        };
+      })(),
     },
     createdAt:
       audit.createdAt instanceof Date

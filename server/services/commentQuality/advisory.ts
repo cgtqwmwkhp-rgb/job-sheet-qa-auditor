@@ -6,6 +6,8 @@
  * network call succeeded.
  */
 
+import type { AiPersona } from "../aiPersona";
+import { strictnessBand } from "../aiPersona";
 import type { CommentQualityResult, CommentQualitySignals } from "./index";
 
 export const FEATURE_COMMENT_LLM_ADVISORY = "FEATURE_COMMENT_LLM_ADVISORY";
@@ -28,6 +30,11 @@ export interface CommentDeepNoteAdvisory {
   coachRewrite: string;
   gaps: string[];
   recommendEscalate: boolean;
+  persona?: {
+    version: string;
+    strictness: number;
+    band: string;
+  };
 }
 
 /**
@@ -35,11 +42,19 @@ export interface CommentDeepNoteAdvisory {
  * Used always; Gemini path can enrich when flag + key present.
  */
 export function buildDeterministicDeepNote(
-  result: CommentQualityResult
+  result: CommentQualityResult,
+  persona?: AiPersona | null
 ): CommentDeepNoteAdvisory {
   const s = result.signals;
   const flags: CommentDeepNoteAdvisory["flags"] = [];
   const gaps: string[] = [];
+  const personaMeta = persona
+    ? {
+        version: persona.version,
+        strictness: persona.strictness,
+        band: strictnessBand(persona.strictness),
+      }
+    : undefined;
 
   if (!s.onFailurePath) {
     return {
@@ -60,6 +75,7 @@ export function buildDeterministicDeepNote(
       coachRewrite: "",
       gaps: [],
       recommendEscalate: false,
+      persona: personaMeta,
     };
   }
 
@@ -131,6 +147,7 @@ export function buildDeterministicDeepNote(
     coachRewrite,
     gaps,
     recommendEscalate,
+    persona: personaMeta,
   };
 }
 
@@ -140,9 +157,9 @@ export function buildDeterministicDeepNote(
  */
 export async function buildCommentDeepNoteAdvisory(
   result: CommentQualityResult,
-  options: { forceMockGemini?: boolean } = {}
+  options: { forceMockGemini?: boolean; persona?: AiPersona | null } = {}
 ): Promise<CommentDeepNoteAdvisory> {
-  const base = buildDeterministicDeepNote(result);
+  const base = buildDeterministicDeepNote(result, options.persona);
 
   if (!isCommentLlmAdvisoryEnabled() && !options.forceMockGemini) {
     return base;

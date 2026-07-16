@@ -106,7 +106,7 @@ const GUIDES = [
   },
   {
     title: "Configuring AI Personas",
-    desc: "Adjusting the strictness and tone of the AI auditor.",
+    desc: "Set org advisory voice (strictness, tone, focus). Separate from Audit Policy fail law.",
     time: "3 min read",
     action: "/settings",
     actionLabel: "Configure AI",
@@ -525,8 +525,8 @@ export default function HelpCenter() {
                       <li className="flex gap-2">
                         <span className="font-bold text-primary">•</span>
                         <span>
-                          Adjust AI Persona strictness gradually—start lenient,
-                          then tighten.
+                          Adjust AI Persona for advisory voice gradually; use
+                          Audit Policy for Major/Minor fail law.
                         </span>
                       </li>
                       <li className="flex gap-2">

@@ -54,6 +54,14 @@ import {
   type FailClass,
 } from "./services/auditPolicy";
 import {
+  AI_PERSONA_FOCUS_AREAS,
+  DEFAULT_AI_PERSONA,
+  MAX_CUSTOM_INSTRUCTIONS_CHARS,
+  mergeAiPersona,
+  previewAiPersona,
+  sanitizeCustomInstructions,
+} from "./services/aiPersona";
+import {
   isImageQaIntakeEnabled,
   runIntakeGate,
   type IntakeGateResult,
@@ -1740,6 +1748,113 @@ export const appRouter = router({
       });
       return { success: true, policy };
     }),
+  }),
+
+  // ============ AI PERSONA (advisory voice — not fail law) ============
+  aiPersona: router({
+    get: protectedProcedure.query(async () => {
+      return db.getAiPersona();
+    }),
+
+    getDefaults: protectedProcedure.query(() => {
+      return DEFAULT_AI_PERSONA;
+    }),
+
+    save: qaLeadProcedure
+      .input(
+        z.object({
+          version: z.string().min(1),
+          strictness: z.number().min(0).max(100),
+          toneCheck: z.boolean(),
+          completenessCheck: z.boolean(),
+          customInstructions: z
+            .string()
+            .max(MAX_CUSTOM_INSTRUCTIONS_CHARS)
+            .optional()
+            .default(""),
+          focusAreas: z.array(z.enum(AI_PERSONA_FOCUS_AREAS)).max(3),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const current = await db.getAiPersona();
+        if (current.version !== input.version) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message:
+              "AI persona was modified by another user. Please refresh and retry.",
+          });
+        }
+        const nextVersion = bumpPatchVersion(input.version);
+        const persona = mergeAiPersona({
+          ...input,
+          version: nextVersion,
+          customInstructions: sanitizeCustomInstructions(
+            input.customInstructions ?? ""
+          ),
+        });
+        await db.saveAiPersona(persona, ctx.user.id);
+        await db.logAction({
+          userId: ctx.user.id,
+          action: "UPDATE_AI_PERSONA",
+          entityType: "ai_persona",
+          entityId: null,
+          details: {
+            version: persona.version,
+            strictness: persona.strictness,
+            focusAreas: persona.focusAreas,
+          },
+        });
+        return { success: true, persona };
+      }),
+
+    reset: qaLeadProcedure.mutation(async ({ ctx }) => {
+      const persona = mergeAiPersona(null);
+      await db.saveAiPersona(persona, ctx.user.id);
+      await db.logAction({
+        userId: ctx.user.id,
+        action: "RESET_AI_PERSONA",
+        entityType: "ai_persona",
+        entityId: null,
+        details: { version: persona.version },
+      });
+      return { success: true, persona };
+    }),
+
+    preview: protectedProcedure
+      .input(
+        z.object({
+          commentSnippet: z.string().max(4000),
+          onFailurePath: z.boolean().optional().default(true),
+          failMarkCount: z.number().int().min(0).optional(),
+          partsSummary: z.string().max(500).nullable().optional(),
+          photoSummary: z.string().max(500).nullable().optional(),
+          /** Optional draft persona (unsaved); else uses persisted org persona. */
+          draft: z
+            .object({
+              strictness: z.number().min(0).max(100),
+              toneCheck: z.boolean(),
+              completenessCheck: z.boolean(),
+              customInstructions: z.string().max(MAX_CUSTOM_INSTRUCTIONS_CHARS),
+              focusAreas: z.array(z.enum(AI_PERSONA_FOCUS_AREAS)).max(3),
+            })
+            .optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const base = input.draft
+          ? mergeAiPersona({
+              ...input.draft,
+              version: "preview",
+            })
+          : await db.getAiPersona();
+        return previewAiPersona(base, {
+          commentSnippet: input.commentSnippet,
+          onFailurePath: input.onFailurePath,
+          failMarkCount: input.failMarkCount,
+          partsSummary: input.partsSummary,
+          photoSummary: input.photoSummary,
+        });
+      }),
   }),
 });
 

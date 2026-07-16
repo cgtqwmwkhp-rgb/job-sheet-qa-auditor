@@ -250,11 +250,11 @@ export default function Settings() {
                     <h2 className="text-lg font-medium">
                       AI Auditor Configuration
                     </h2>
-                    <Badge variant="secondary">Preview</Badge>
+                    <Badge variant="outline">Live</Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    UI mock only — persona controls do not change the live
-                    analysis engine and are not saved.
+                    Org advisory voice for sufficiency, Deep Note, and coaching.
+                    Fail Majors/Minors remain under Audit Policy — separate tab.
                   </p>
                 </div>
                 <AIPersonaSettings />
