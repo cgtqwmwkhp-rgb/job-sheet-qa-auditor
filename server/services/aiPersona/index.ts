@@ -7,7 +7,6 @@ import {
   DEFAULT_AI_PERSONA,
   MAX_CUSTOM_INSTRUCTIONS_CHARS,
   PERSONA_INSTRUCTION_BLOCKLIST,
-  AI_PERSONA_SETTING_KEY,
 } from "./defaults";
 import type {
   AiPersona,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -54,8 +54,7 @@ function bandLabel(strictness: number): string {
 }
 
 export function AIPersonaSettings() {
-  const [persona, setPersona] = useState<AiPersona | null>(null);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [draft, setDraft] = useState<Partial<AiPersona> | null>(null);
   const [sampleNote, setSampleNote] = useState(
     "Compressor failed on start. Ordered seal kit. Return visit tomorrow to fit and retest."
   );
@@ -65,21 +64,17 @@ export function AIPersonaSettings() {
   const resetMutation = trpc.aiPersona.reset.useMutation();
   const previewMutation = trpc.aiPersona.preview.useMutation();
 
-  useEffect(() => {
-    if (data) {
-      setPersona(data as AiPersona);
-      setHasChanges(false);
-    }
-  }, [data]);
+  const server = (data as AiPersona | undefined) ?? null;
+  const persona: AiPersona | null = useMemo(() => {
+    if (!server) return null;
+    return { ...server, ...(draft ?? {}) };
+  }, [server, draft]);
 
-  const band = useMemo(
-    () => (persona ? bandLabel(persona.strictness) : "—"),
-    [persona]
-  );
+  const hasChanges = draft != null && Object.keys(draft).length > 0;
+  const band = persona ? bandLabel(persona.strictness) : "—";
 
   const update = (patch: Partial<AiPersona>) => {
-    setPersona(prev => (prev ? { ...prev, ...patch } : prev));
-    setHasChanges(true);
+    setDraft(prev => ({ ...prev, ...patch }));
   };
 
   const toggleFocus = (id: FocusArea) => {
@@ -92,18 +87,17 @@ export function AIPersonaSettings() {
   };
 
   const handleSave = async () => {
-    if (!persona) return;
+    if (!persona || !server) return;
     try {
       const result = await saveMutation.mutateAsync({
-        version: persona.version,
+        version: server.version,
         strictness: persona.strictness,
         toneCheck: persona.toneCheck,
         completenessCheck: persona.completenessCheck,
         customInstructions: persona.customInstructions,
         focusAreas: persona.focusAreas,
       });
-      setPersona(result.persona as AiPersona);
-      setHasChanges(false);
+      setDraft(null);
       toast.success(`AI persona saved (v${result.persona.version})`);
       await refetch();
     } catch (err) {
@@ -115,9 +109,8 @@ export function AIPersonaSettings() {
   const handleReset = async () => {
     try {
       const result = await resetMutation.mutateAsync();
-      setPersona(result.persona as AiPersona);
-      setHasChanges(false);
-      toast.success("AI persona reset to defaults");
+      setDraft(null);
+      toast.success(`AI persona reset (v${result.persona.version})`);
       await refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Reset failed");
