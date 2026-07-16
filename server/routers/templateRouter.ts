@@ -1362,15 +1362,70 @@ export const templateRouter = router({
 
         let reprocessResult = null as unknown;
         if (input.reprocess) {
-          const { orchestrateJobSheetProcessing } = await import(
-            "../services/documentProcessor"
-          );
-          reprocessResult = await orchestrateJobSheetProcessing({
-            source: "template-reprocess",
-            jobSheetId: input.jobSheetId,
-            templateVersionId: input.versionId,
-            userId: ctx.user.id,
-          });
+          const jobSheet = await db.getJobSheetById(input.jobSheetId);
+          if (!jobSheet) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: `Job sheet ${input.jobSheetId} not found`,
+            });
+          }
+          if (jobSheet.status === "processing") {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message:
+                "Cannot reprocess: document is currently being processed. Wait for it to finish, then retry override.",
+            });
+          }
+
+          const { isAsyncProcessingEnabled, enqueueJobSheetProcessing } =
+            await import("../services/jobQueue");
+          const { getCorrelationId } = await import("../utils/context");
+
+          if (isAsyncProcessingEnabled()) {
+            // Same path as jobSheets.reprocess — tall PTO PDFs exceed sync HTTP budgets.
+            reprocessResult = await enqueueJobSheetProcessing({
+              source: "template-reprocess",
+              jobSheetId: input.jobSheetId,
+              documentUrl: jobSheet.fileUrl,
+              userId: ctx.user.id,
+              templateVersionId: input.versionId,
+              correlationId: getCorrelationId(),
+            });
+          } else {
+            const { orchestrateJobSheetProcessing } = await import(
+              "../services/documentProcessor"
+            );
+            try {
+              reprocessResult = await orchestrateJobSheetProcessing({
+                source: "template-reprocess",
+                jobSheetId: input.jobSheetId,
+                documentUrl: jobSheet.fileUrl,
+                templateVersionId: input.versionId,
+                userId: ctx.user.id,
+              });
+            } catch (err) {
+              const message =
+                err instanceof Error ? err.message : "Reprocess failed";
+              console.error(
+                "[templates.overrides.set] sync reprocess threw",
+                message
+              );
+              reprocessResult = {
+                success: false,
+                jobSheetId: input.jobSheetId,
+                error: message,
+                processingStages: [],
+                totalDurationMs: 0,
+                ocrResult: {
+                  success: false,
+                  pages: [],
+                  totalPages: 0,
+                  model: "unknown",
+                  error: message,
+                },
+              };
+            }
+          }
         }
 
         return { override: result.override, reprocessResult };
