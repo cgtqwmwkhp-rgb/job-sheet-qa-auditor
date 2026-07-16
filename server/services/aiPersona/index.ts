@@ -214,7 +214,7 @@ export function personaSoftGaps(input: {
     const snip = input.commentSnippet.toLowerCase();
     if (
       /\b(idiot|stupid|crap|wtf|fuck|shit)\b/i.test(snip) ||
-      /\bfixed it\b/i.test(snip) && snip.length < 40
+      (/\bfixed it\b/i.test(snip) && snip.length < 40)
     ) {
       gaps.push(
         "Persona (tone): unprofessional or non-technical close-out language."
@@ -266,8 +266,9 @@ export function previewAiPersona(
       /\b(fault|fail|defect|broken|leak|error|issue|not working)\b/i.test(
         snippet
       );
-    const hasNext =
-      /\b(return|reorder|replace|next|follow.?up|will)\b/i.test(snippet);
+    const hasNext = /\b(return|reorder|replace|next|follow.?up|will)\b/i.test(
+      snippet
+    );
     const hasParts = /\b(part|pn|ordered|awaiting)\b/i.test(snippet);
     const vague = /^(fixed it|done|ok|sorted)\.?$/i.test(snippet);
     if (!hasWhat) gaps.push("No clear defect / fault statement.");

@@ -238,7 +238,8 @@ export function AIPersonaSettings() {
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Emphasize missing next action, parts stance, or vague descriptions.
+              Emphasize missing next action, parts stance, or vague
+              descriptions.
             </p>
           </div>
         </CardContent>

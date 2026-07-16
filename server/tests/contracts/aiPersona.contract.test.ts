@@ -78,10 +78,7 @@ describe("aiPersona core", () => {
 
   it("setting key and router are wired", () => {
     expect(AI_PERSONA_SETTING_KEY).toBe("aiPersona");
-    const routers = readFileSync(
-      join(__dirname, "../../routers.ts"),
-      "utf8"
-    );
+    const routers = readFileSync(join(__dirname, "../../routers.ts"), "utf8");
     expect(routers).toContain("aiPersona:");
     expect(routers).toContain("UPDATE_AI_PERSONA");
     expect(routers).toContain("preview:");
@@ -100,10 +97,7 @@ describe("aiPersona core", () => {
 
   it("UI is live (not preview mock)", () => {
     const ui = readFileSync(
-      join(
-        __dirname,
-        "../../../client/src/components/AIPersonaSettings.tsx"
-      ),
+      join(__dirname, "../../../client/src/components/AIPersonaSettings.tsx"),
       "utf8"
     );
     expect(ui).not.toContain("Preview — not saved");

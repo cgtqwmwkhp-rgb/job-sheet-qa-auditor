@@ -3,11 +3,7 @@
  * Never changes COMMENT-C / FAULT-C / Audit Policy Major-Minor law.
  */
 
-export const AI_PERSONA_FOCUS_AREAS = [
-  "safety",
-  "customer",
-  "parts",
-] as const;
+export const AI_PERSONA_FOCUS_AREAS = ["safety", "customer", "parts"] as const;
 
 export type AiPersonaFocusArea = (typeof AI_PERSONA_FOCUS_AREAS)[number];
 
