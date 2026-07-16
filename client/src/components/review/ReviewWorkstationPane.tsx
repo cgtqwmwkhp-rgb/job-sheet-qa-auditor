@@ -2268,7 +2268,7 @@ function ReviewWorkstationContent({
                   ? "Override Before / After Pair"
                   : "Override Finding"}
             </DialogTitle>
-          <DialogDescription>
+            <DialogDescription>
               Provide a reason and training taxonomy for this finding action.
             </DialogDescription>
           </DialogHeader>
