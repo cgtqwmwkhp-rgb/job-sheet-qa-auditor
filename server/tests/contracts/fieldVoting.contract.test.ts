@@ -379,6 +379,35 @@ describe("Field voting (Wave-4 B2)", () => {
       expect(result.votedFields.engineerSignOff).toBeUndefined();
       expect(result.handwritingVotes.engineerSignOff?.abstained).toBe(true);
     });
+
+    it("fuses ensemble jobNumber with crop jobReference before vote", () => {
+      const result = applyFieldVote({
+        force: true,
+        ensemble: {
+          jobNumber: { value: "JS-FUSE-1", confidence: 80 },
+        },
+        crop: {
+          jobReference: { value: "JS-FUSE-1", confidence: 92 },
+        },
+        multimodalRoi: {
+          jobReference: { value: "JS-FUSE-1", confidence: 88 },
+        },
+      });
+      expect(result.votedFields.jobReference?.value).toBe("JS-FUSE-1");
+      // Dual-emit keeps legacy key populated for downstream consumers
+      expect(result.votedFields.jobNumber?.value).toBe("JS-FUSE-1");
+    });
+
+    it("does not cross-map customerSignature into engineerSignOff via alias", async () => {
+      const { aliasCanonicalExtractedFields } = await import(
+        "../../services/ensembleExtraction"
+      );
+      const aliased = aliasCanonicalExtractedFields({
+        customerSignature: { value: "Present", confidence: 90, pageNumber: 1 },
+      });
+      expect(aliased.customerSignature?.value).toBe("Present");
+      expect(aliased.engineerSignOff).toBeUndefined();
+    });
   });
 
   describe("resilient OCR field cross-check", () => {

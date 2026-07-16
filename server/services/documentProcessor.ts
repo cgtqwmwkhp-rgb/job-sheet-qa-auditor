@@ -84,7 +84,11 @@ import {
   mergeRoiSpatialFields,
   type PreExtractedFieldMap,
 } from "./roiSpatialExtraction";
-import { CRITICAL_ROI_FIELDS, processWithRoi } from "./roiProcessor";
+import {
+  CRITICAL_ROI_FIELDS,
+  cropImagesFromRoiTrace,
+  processWithRoi,
+} from "./roiProcessor";
 import { isRoiCropReocrEnabled } from "./ocrAdapter/cropOcrAdapter";
 import {
   reconcileFields,
@@ -106,10 +110,12 @@ import {
 } from "./photoEvidence";
 import { evaluateCommentQuality } from "./commentQuality";
 import { buildCommentDeepNoteAdvisory } from "./commentQuality/advisory";
+import { buildSheetSufficiencyAdvisory } from "./commentQuality/llmSufficiencyJudge";
 import { evaluatePartsUsed } from "./partsAssessment";
 import { evaluateEngineerAttribution } from "./engineerAttributionFindings";
 import {
   isPartsWebVerifyEnabled,
+  toPersistedPartsCatalogLineResults,
   verifyPartsCatalogWeb,
 } from "./partsCatalogLookup";
 import {
@@ -1525,7 +1531,12 @@ async function processJobSheetWithOptions(
   // Stage 1.92: ROI crop → re-OCR for critical fields (PR-AI-05 / CropVision)
   // Fail-soft. Beats whole-PDF plateau on cramped / handwriting-adjacent ROIs.
   // HTR model swap is follow-on (AI-15) via CropOcrRunner.
+  // Retained PNG crops are passed to multimodal ROI (stage 1.96) as cropImages.
   const cropReocrStart = Date.now();
+  let multimodalCropImages: Record<
+    string,
+    { data: string; mediaType: "image/png" | "image/jpeg" | "image/webp" }
+  > = {};
   if (isRoiCropReocrEnabled() && sharedPdfBuffer?.length) {
     try {
       const pinnedForCrop = usedTemplateVersionId
@@ -1551,6 +1562,7 @@ async function processJobSheetWithOptions(
                 : undefined,
           }
         );
+        multimodalCropImages = cropImagesFromRoiTrace(cropTrace);
         // Snapshot pre-crop spatial evidence as primary for reconciliation
         const primarySpatial = { ...roiSpatialFields };
         const cropFields: PreExtractedFieldMap = {};
@@ -1736,6 +1748,10 @@ async function processJobSheetWithOptions(
         documentPdf: sharedPdfBuffer
           ? pdfBufferToVlmDocument(sharedPdfBuffer)
           : null,
+        // Prefer pixel crops from stage 1.92 when available (fail-soft → PDF+bounds)
+        ...(Object.keys(multimodalCropImages).length > 0
+          ? { cropImages: multimodalCropImages }
+          : {}),
       });
       recordStage({
         stage: "Multimodal ROI Extract",
@@ -2457,6 +2473,9 @@ async function processJobSheetWithOptions(
   let commentDeepNote: Awaited<
     ReturnType<typeof buildCommentDeepNoteAdvisory>
   > | null = null;
+  let sheetSufficiencyAdvisory: Awaited<
+    ReturnType<typeof buildSheetSufficiencyAdvisory>
+  > | null = null;
   let photoEvidenceArtifact: ReturnType<
     typeof evaluatePhotoEvidenceConsistency
   > | null = null;
@@ -2476,6 +2495,9 @@ async function processJobSheetWithOptions(
     | Awaited<ReturnType<typeof verifyPartsCatalogWeb>>["signals"]
     | null = null;
   let partsCatalogSummary: string | null = null;
+  let partsCatalogLineResults: ReturnType<
+    typeof toPersistedPartsCatalogLineResults
+  > | null = null;
   {
     const selectedSlug =
       buildSelectionCohortMeta(selectionResult, usedTemplateVersionId)
@@ -2592,6 +2614,9 @@ async function processJobSheetWithOptions(
           const catalogResult = await verifyPartsCatalogWeb(jsrText);
           partsCatalogSignals = catalogResult.signals;
           partsCatalogSummary = catalogResult.summary;
+          partsCatalogLineResults = toPersistedPartsCatalogLineResults(
+            catalogResult.lineResults
+          );
           if (catalogResult.findings.length > 0) {
             analysisResult = {
               ...analysisResult,
@@ -2748,6 +2773,24 @@ async function processJobSheetWithOptions(
       } catch (err) {
         console.warn(
           "[DocumentProcessor] Comment Deep Note advisory failed (non-fatal):",
+          err
+        );
+      }
+      try {
+        sheetSufficiencyAdvisory = await buildSheetSufficiencyAdvisory(
+          commentResult,
+          {
+            commentSnippet: commentResult.signals.snippet ?? "",
+            onFailurePath: commentResult.signals.onFailurePath,
+            failMarkCount,
+            partsSummary: partsCatalogSummary ?? partsAssessmentSummary,
+            photoSummary: null,
+            jobSummarySignals: failurePathSignalSummary,
+          }
+        );
+      } catch (err) {
+        console.warn(
+          "[DocumentProcessor] Sheet sufficiency advisory failed (non-fatal):",
           err
         );
       }
@@ -3422,6 +3465,7 @@ async function processJobSheetWithOptions(
             }
           : {}),
         ...(commentDeepNote ? { commentDeepNote } : {}),
+        ...(sheetSufficiencyAdvisory ? { sheetSufficiencyAdvisory } : {}),
         ...(engineerAttributionStamp
           ? { attribution: engineerAttributionStamp }
           : {}),
@@ -3435,6 +3479,9 @@ async function processJobSheetWithOptions(
           ? {
               partsCatalogSignals,
               partsCatalogSummary,
+              ...(partsCatalogLineResults
+                ? { partsCatalogLineResults }
+                : {}),
             }
           : {}),
         ...(memoryApplied.length > 0

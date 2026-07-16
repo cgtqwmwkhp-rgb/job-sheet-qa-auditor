@@ -41,6 +41,8 @@ export interface DeepNoteAnalysisData {
   gaps?: string[];
   recommendEscalate?: boolean;
   provider?: string;
+  /** True only when a live LLM call produced the advisory. */
+  usedLlm?: boolean;
 }
 
 export interface DeepNoteAnalysisProps {
@@ -86,7 +88,9 @@ export function DeepNoteAnalysis({
               >
                 {analysis.recommendEscalate
                   ? "Escalate suggested"
-                  : "AI advisory"}
+                  : analysis.usedLlm
+                    ? "AI advisory"
+                    : "Rubric advisory"}
               </Badge>
             </Button>
           </CollapsibleTrigger>
@@ -204,6 +208,7 @@ export function mapDeepNoteFromReport(
         gaps?: string[];
         recommendEscalate?: boolean;
         provider?: string;
+        usedLlm?: boolean;
         enabled?: boolean;
       }
     | undefined;
@@ -218,5 +223,101 @@ export function mapDeepNoteFromReport(
     gaps: Array.isArray(note.gaps) ? note.gaps : undefined,
     recommendEscalate: note.recommendEscalate,
     provider: note.provider,
+    usedLlm: note.usedLlm === true,
   };
+}
+
+export interface SheetSufficiencyAnalysisData {
+  adequate: boolean | null;
+  summary: string;
+  gaps: string[];
+  usedLlm: boolean;
+  provider?: string;
+  confidence?: number;
+}
+
+export function mapSheetSufficiencyFromReport(
+  reportJson: unknown
+): SheetSufficiencyAnalysisData | null {
+  if (!reportJson || typeof reportJson !== "object") return null;
+  const report = reportJson as Record<string, unknown>;
+  const note = report.sheetSufficiencyAdvisory as
+    | {
+        enabled?: boolean;
+        adequate?: boolean | null;
+        summary?: string;
+        gaps?: string[];
+        usedLlm?: boolean;
+        provider?: string;
+        confidence?: number;
+      }
+    | undefined;
+  if (!note || note.enabled === false) return null;
+  return {
+    adequate: typeof note.adequate === "boolean" ? note.adequate : null,
+    summary: note.summary ?? "",
+    gaps: Array.isArray(note.gaps) ? note.gaps : [],
+    usedLlm: note.usedLlm === true,
+    provider: note.provider,
+    confidence: note.confidence,
+  };
+}
+
+/** Context-tab advisory panel — never hard-fail. */
+export function SheetSufficiencyAdvisoryPanel({
+  analysis,
+  className,
+  defaultOpen = false,
+}: {
+  analysis?: SheetSufficiencyAnalysisData | null;
+  className?: string;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  if (!analysis) return null;
+  return (
+    <Card className={cn("shadow-none", className)}>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CardHeader className="py-2 px-3">
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start gap-2 px-1 h-7 hover:bg-transparent"
+            >
+              {open ? (
+                <ChevronDown className="h-4 w-4 shrink-0" />
+              ) : (
+                <ChevronRight className="h-4 w-4 shrink-0" />
+              )}
+              <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">
+                Sufficiency advisory
+              </CardTitle>
+              <Badge variant="outline" className="text-[10px] px-1.5 ml-auto">
+                {analysis.usedLlm ? "AI advisory" : "Rubric advisory"}
+              </Badge>
+            </Button>
+          </CollapsibleTrigger>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent className="px-3 pb-3 pt-0 space-y-2">
+            <CardDescription className="text-[11px]">
+              Senior-engineer documentation sufficiency — advisory only; never
+              sole hard-fail.
+              {analysis.provider ? ` (${analysis.provider})` : ""}
+            </CardDescription>
+            <p className="text-xs text-muted-foreground">{analysis.summary}</p>
+            {analysis.gaps.length > 0 ? (
+              <ul className="text-xs list-disc pl-4 space-y-1">
+                {analysis.gaps.map((g, i) => (
+                  <li key={`${i}-${g.slice(0, 24)}`}>{g}</li>
+                ))}
+              </ul>
+            ) : null}
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
 }

@@ -847,3 +847,38 @@ export type TemplateMemoryPromotion =
   typeof templateMemoryPromotions.$inferSelect;
 export type InsertTemplateMemoryPromotion =
   typeof templateMemoryPromotions.$inferInsert;
+
+/**
+ * Wave C / PR6: durable signed-ingest receipts (externalJobId + contentHash idempotency).
+ */
+export const ingestReceipts = mysqlTable(
+  "ingest_receipts",
+  {
+    ingestId: varchar("ingestId", { length: 64 }).primaryKey(),
+    externalJobId: varchar("externalJobId", { length: 128 }).notNull(),
+    contentHash: varchar("contentHash", { length: 64 }).notNull(),
+    deviceId: varchar("deviceId", { length: 128 }).notNull(),
+    fileName: varchar("fileName", { length: 255 }).notNull(),
+    fileType: varchar("fileType", { length: 64 }).notNull(),
+    fileSizeBytes: int("fileSizeBytes").notNull(),
+    fileKey: varchar("fileKey", { length: 512 }).notNull(),
+    fileUrl: text("fileUrl").notNull(),
+    jobSheetId: int("jobSheetId"),
+    createdAt: timestamp("createdAt").notNull(),
+  },
+  table => ({
+    externalHashUnique: uniqueIndex("ingest_receipts_external_hash_unique").on(
+      table.externalJobId,
+      table.contentHash
+    ),
+    externalJobIdIdx: index("ingest_receipts_externalJobId_idx").on(
+      table.externalJobId
+    ),
+    contentHashIdx: index("ingest_receipts_contentHash_idx").on(
+      table.contentHash
+    ),
+  })
+);
+
+export type IngestReceiptRow = typeof ingestReceipts.$inferSelect;
+export type InsertIngestReceipt = typeof ingestReceipts.$inferInsert;

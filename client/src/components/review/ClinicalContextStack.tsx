@@ -37,7 +37,9 @@ import {
 } from "@/components/review/BeforeAfterComparePane";
 import {
   DeepNoteAnalysis,
+  SheetSufficiencyAdvisoryPanel,
   type DeepNoteAnalysisData,
+  type SheetSufficiencyAnalysisData,
 } from "@/components/DeepNoteAnalysis";
 
 export interface ClinicalContextStackProps {
@@ -57,9 +59,11 @@ export interface ClinicalContextStackProps {
   hasAttrFindings?: boolean;
   photoPairCompare: PhotoPairCompareArtifact | null;
   deepNoteAnalysis: DeepNoteAnalysisData | null;
+  sheetSufficiencyAnalysis?: SheetSufficiencyAnalysisData | null;
   documentUrl?: string;
-  onConfirmPair?: (pairIndex: number) => void;
-  onOverridePair?: (pairIndex: number) => void;
+  onConfirmPair?: (pairIndex: number) => void | Promise<boolean>;
+  onOverridePair?: (pairIndex: number) => void | Promise<boolean>;
+  onFocusPairPage?: (page: number) => void;
   onMarksRowClick?: (rowIndex: number, pageNumber: number) => void;
   className?: string;
 }
@@ -243,10 +247,18 @@ export function ClinicalContextStack(props: ClinicalContextStackProps) {
         className="shadow-none border-muted"
         onConfirmPair={props.onConfirmPair}
         onOverridePair={props.onOverridePair}
+        onFocusPage={props.onFocusPairPage}
       />
       {props.deepNoteAnalysis ? (
         <DeepNoteAnalysis
           analysis={props.deepNoteAnalysis}
+          defaultOpen={false}
+          className="shadow-none border-muted"
+        />
+      ) : null}
+      {props.sheetSufficiencyAnalysis ? (
+        <SheetSufficiencyAdvisoryPanel
+          analysis={props.sheetSufficiencyAnalysis}
           defaultOpen={false}
           className="shadow-none border-muted"
         />

@@ -16,12 +16,21 @@ export {
   sha256Hex,
   formatSignatureHeader,
 } from "./hmac";
-export { acceptIngestUpload, type IngestServiceDeps } from "./ingestService";
+export {
+  acceptIngestUpload,
+  isIngestAutoProcessEnabled,
+  type IngestServiceDeps,
+  type IngestEnqueueProcessing,
+} from "./ingestService";
 export {
   MemoryIngestReceiptStore,
+  MysqlIngestReceiptStore,
+  MapIngestReceiptDurableBackend,
   getDefaultReceiptStore,
   resetDefaultReceiptStore,
+  setDefaultReceiptStoreForTests,
   type IngestReceiptStore,
+  type IngestReceiptDurableBackend,
 } from "./receiptStore";
 export { createDefaultPersister } from "./persist";
 export {

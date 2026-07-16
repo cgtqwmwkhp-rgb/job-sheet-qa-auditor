@@ -10,9 +10,12 @@ import {
   buildPartsCatalogQuery,
   FEATURE_PARTS_WEB_VERIFY,
   isPartsWebVerifyEnabled,
+  linesFromPersistedCatalogResults,
   MAX_PARTS_CATALOG_LINES,
+  patchReportJsonPartsCatalog,
   scorePartsCatalogMatch,
   searchExaPartsCatalog,
+  toPersistedPartsCatalogLineResults,
   verifyPartsCatalogWeb,
 } from "../../services/partsCatalogLookup";
 import type { ExaSearchResponse } from "../../services/partsCatalogLookup";
@@ -158,6 +161,7 @@ describe("verifyPartsCatalogWeb", () => {
         results: [
           {
             title: "WT158 wheel catalogue entry",
+            url: "https://parts.example.com/wt158",
             highlights: ["WT158 wheel replacement automotive parts"],
           },
         ],
@@ -170,6 +174,64 @@ describe("verifyPartsCatalogWeb", () => {
     expect(result.lineResults[0].query).toBe(
       '"WT158" "wheel" automotive parts'
     );
+    expect(result.lineResults[0].evidenceUrls).toEqual([
+      "https://parts.example.com/wt158",
+    ]);
+    const slim = toPersistedPartsCatalogLineResults(result.lineResults);
+    expect(slim).toEqual([
+      {
+        partNumber: "WT158",
+        description: "wheel",
+        outcome: "match",
+        evidenceUrls: ["https://parts.example.com/wt158"],
+      },
+    ]);
+  });
+
+  it("does not invent match when catalog verify is disabled", async () => {
+    const result = await verifyPartsCatalogWeb(COMPLETE_PARTS, {
+      fetchFn: mockFetchResponse({
+        results: [
+          {
+            title: "WT158 wheel",
+            url: "https://parts.example.com/wt158",
+            highlights: ["WT158 wheel"],
+          },
+        ],
+      }),
+      apiKey: "test-key",
+    });
+    expect(result.signals.enabled).toBe(false);
+    expect(result.signals.matchCount).toBe(0);
+    expect(result.lineResults).toEqual([]);
+    expect(result.findings.every(f => f.ruleId !== "PARTS-C021")).toBe(true);
+  });
+
+  it("re-check with lines while disabled keeps PN/desc as unavailable (no fake match)", async () => {
+    const result = await verifyPartsCatalogWeb("", {
+      lines: [
+        {
+          partNumber: "WT158",
+          description: "wheel",
+          raw: "WT158 — wheel",
+        },
+      ],
+      fetchFn: mockFetchResponse({
+        results: [
+          {
+            title: "WT158 wheel",
+            url: "https://parts.example.com/wt158",
+            highlights: ["WT158 wheel"],
+          },
+        ],
+      }),
+      apiKey: "test-key",
+    });
+    expect(result.signals.enabled).toBe(false);
+    expect(result.signals.matchCount).toBe(0);
+    expect(result.lineResults).toHaveLength(1);
+    expect(result.lineResults[0].outcome).toBe("unavailable");
+    expect(result.findings).toHaveLength(0);
   });
 
   it("emits PARTS-C020 on catalog mismatch", async () => {
@@ -268,6 +330,73 @@ describe("policy seeds for parts catalog verify", () => {
   });
 });
 
+describe("persisted line results + reportJson patch", () => {
+  it("reconstructs verify lines from slim persisted results", () => {
+    const lines = linesFromPersistedCatalogResults([
+      {
+        partNumber: "WT158",
+        description: "wheel",
+        outcome: "unavailable",
+        evidenceUrls: [],
+      },
+      { partNumber: "", description: "skip", outcome: "mismatch" },
+    ]);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      partNumber: "WT158",
+      description: "wheel",
+    });
+  });
+
+  it("patches only parts catalog fields on reportJson", () => {
+    const patched = patchReportJsonPartsCatalog(
+      { summary: "keep", partsAssessmentSignals: { lineCount: 1 } },
+      {
+        signals: {
+          enabled: true,
+          lineCount: 1,
+          verifiedCount: 1,
+          matchCount: 0,
+          mismatchCount: 0,
+          unavailableCount: 1,
+          capped: false,
+        },
+        findings: [],
+        lineResults: [
+          {
+            line: {
+              partNumber: "WT158",
+              description: "wheel",
+              raw: "WT158 — wheel",
+            },
+            outcome: "unavailable",
+            query: '"WT158" "wheel" automotive parts',
+            score: 0,
+            matchedResultCount: 0,
+            reason: "No Exa search results returned",
+            evidenceUrls: [],
+          },
+        ],
+        summary: "Verified=1 | Match=0 | Mismatch=0 | Unavailable=1",
+      }
+    );
+    expect(patched.summary).toBe("keep");
+    expect(patched.partsAssessmentSignals).toEqual({ lineCount: 1 });
+    expect(patched.partsCatalogSignals).toMatchObject({
+      unavailableCount: 1,
+      enabled: true,
+    });
+    expect(patched.partsCatalogLineResults).toEqual([
+      {
+        partNumber: "WT158",
+        description: "wheel",
+        outcome: "unavailable",
+        evidenceUrls: [],
+      },
+    ]);
+  });
+});
+
 describe("documentProcessor wiring", () => {
   it("wires parts catalog verify after parts assessment", () => {
     const src = readFileSync(
@@ -276,8 +405,19 @@ describe("documentProcessor wiring", () => {
     );
     expect(src).toContain("verifyPartsCatalogWeb");
     expect(src).toContain("[PARTS_CATALOG_VERIFY]");
+    expect(src).toContain("partsCatalogLineResults");
     expect(src.indexOf("evaluatePartsUsed")).toBeLessThan(
       src.indexOf("verifyPartsCatalogWeb")
     );
+  });
+
+  it("exposes audits.recheckPartsCatalog mutation", () => {
+    const src = readFileSync(
+      resolve(__dirname, "../../routers.ts"),
+      "utf8"
+    );
+    expect(src).toContain("recheckPartsCatalog");
+    expect(src).toContain("verifyPartsCatalogWeb");
+    expect(src).toContain("patchReportJsonPartsCatalog");
   });
 });

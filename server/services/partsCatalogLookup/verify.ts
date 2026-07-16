@@ -14,6 +14,8 @@ import {
 import { scorePartsCatalogMatch } from "./score";
 import type {
   PartsCatalogLineVerifyResult,
+  PartsCatalogPersistedLineResult,
+  PartsCatalogVerifyOutcome,
   PartsCatalogVerifyResult,
   PartsCatalogVerifySignals,
 } from "./types";
@@ -21,6 +23,101 @@ import type {
 export const FEATURE_PARTS_WEB_VERIFY = "FEATURE_PARTS_WEB_VERIFY";
 export const PARTS_CATALOG_RULE_PREFIX = "PARTS-C";
 export const MAX_PARTS_CATALOG_LINES = 10;
+export const MAX_PARTS_CATALOG_EVIDENCE_URLS = 5;
+
+function extractEvidenceUrls(
+  results: { url?: string }[] | undefined
+): string[] {
+  if (!Array.isArray(results)) return [];
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  for (const result of results) {
+    const url = typeof result?.url === "string" ? result.url.trim() : "";
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    urls.push(url);
+    if (urls.length >= MAX_PARTS_CATALOG_EVIDENCE_URLS) break;
+  }
+  return urls;
+}
+
+export function toPersistedPartsCatalogLineResults(
+  lineResults: PartsCatalogLineVerifyResult[]
+): PartsCatalogPersistedLineResult[] {
+  return lineResults.slice(0, MAX_PARTS_CATALOG_LINES).map(r => ({
+    partNumber: (r.line.partNumber ?? "").trim(),
+    description: (r.line.description ?? "").trim(),
+    outcome: r.outcome,
+    evidenceUrls: Array.isArray(r.evidenceUrls)
+      ? r.evidenceUrls.slice(0, MAX_PARTS_CATALOG_EVIDENCE_URLS)
+      : [],
+  }));
+}
+
+export function linesFromPersistedCatalogResults(
+  persisted: unknown
+): PartsUsedLine[] {
+  if (!Array.isArray(persisted)) return [];
+  const lines: PartsUsedLine[] = [];
+  for (const raw of persisted.slice(0, MAX_PARTS_CATALOG_LINES)) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as Record<string, unknown>;
+    const partNumber =
+      typeof row.partNumber === "string" ? row.partNumber.trim() : "";
+    const description =
+      typeof row.description === "string" ? row.description.trim() : "";
+    if (!partNumber || !description) continue;
+    lines.push({
+      partNumber,
+      description,
+      raw: `${partNumber} — ${description}`,
+    });
+  }
+  return lines;
+}
+
+export function patchReportJsonPartsCatalog(
+  reportJson: unknown,
+  result: PartsCatalogVerifyResult
+): Record<string, unknown> {
+  const report =
+    reportJson && typeof reportJson === "object"
+      ? { ...(reportJson as Record<string, unknown>) }
+      : {};
+  report.partsCatalogSignals = result.signals;
+  report.partsCatalogSummary = result.summary;
+  report.partsCatalogLineResults =
+    toPersistedPartsCatalogLineResults(result.lineResults);
+  return report;
+}
+
+function isCatalogOutcome(value: unknown): value is PartsCatalogVerifyOutcome {
+  return value === "match" || value === "mismatch" || value === "unavailable";
+}
+
+export function coercePersistedPartsCatalogLineResults(
+  raw: unknown
+): PartsCatalogPersistedLineResult[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PartsCatalogPersistedLineResult[] = [];
+  for (const item of raw.slice(0, MAX_PARTS_CATALOG_LINES)) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const partNumber =
+      typeof row.partNumber === "string" ? row.partNumber.trim() : "";
+    const description =
+      typeof row.description === "string" ? row.description.trim() : "";
+    if (!partNumber || !description || !isCatalogOutcome(row.outcome)) continue;
+    const evidenceUrls = Array.isArray(row.evidenceUrls)
+      ? row.evidenceUrls
+          .filter((u): u is string => typeof u === "string" && u.trim() !== "")
+          .map(u => u.trim())
+          .slice(0, MAX_PARTS_CATALOG_EVIDENCE_URLS)
+      : [];
+    out.push({ partNumber, description, outcome: row.outcome, evidenceUrls });
+  }
+  return out;
+}
 
 export function isPartsWebVerifyEnabled(): boolean {
   return process.env[FEATURE_PARTS_WEB_VERIFY] === "true";
@@ -77,10 +174,28 @@ export async function verifyPartsCatalogWeb(
   }
 ): Promise<PartsCatalogVerifyResult> {
   if (!isPartsWebVerifyEnabled()) {
+    // Honesty: never invent match when disabled. If callers pass lines
+    // (re-check), keep PN/desc as unavailable so a later enable can retry.
+    const provided = (deps?.lines ?? []).slice(0, MAX_PARTS_CATALOG_LINES);
+    const unavailableResults: PartsCatalogLineVerifyResult[] = provided.map(
+      line => ({
+        line,
+        outcome: "unavailable" as const,
+        query: "",
+        score: 0,
+        matchedResultCount: 0,
+        reason: "FEATURE_PARTS_WEB_VERIFY off",
+        evidenceUrls: [],
+      })
+    );
     return {
-      signals: emptySignals(false),
+      signals: {
+        ...emptySignals(false),
+        lineCount: provided.length,
+        unavailableCount: unavailableResults.length,
+      },
       findings: [],
-      lineResults: [],
+      lineResults: unavailableResults,
       summary:
         "Parts catalog web verify disabled (FEATURE_PARTS_WEB_VERIFY off).",
     };
@@ -114,6 +229,7 @@ export async function verifyPartsCatalogWeb(
         description,
         response.results
       );
+      const evidenceUrls = extractEvidenceUrls(response.results);
 
       lineResults.push({
         line,
@@ -122,6 +238,7 @@ export async function verifyPartsCatalogWeb(
         score: scored.score,
         matchedResultCount: scored.matchedResultCount,
         reason: scored.reason,
+        evidenceUrls,
       });
 
       if (scored.outcome === "match") {
@@ -179,6 +296,7 @@ export async function verifyPartsCatalogWeb(
         score: 0,
         matchedResultCount: 0,
         reason,
+        evidenceUrls: [],
       });
 
       findings.push(

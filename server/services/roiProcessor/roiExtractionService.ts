@@ -54,6 +54,8 @@ export interface RoiExtractionResult {
   reprocessAttempts: number;
   imageQaResult?: ImageQaResult;
   cropHash?: string;
+  /** Retained PNG crop for multimodal ROI (AI-08); omit from logs/JSON dumps. */
+  cropImage?: RoiCropImage;
 }
 
 /**
@@ -523,6 +525,7 @@ export async function processWithRoi(
       reprocessAttempts,
       imageQaResult,
       cropHash,
+      cropImage: lastCrop,
     });
   }
 
@@ -536,6 +539,22 @@ export async function processWithRoi(
     processingTimeMs: Date.now() - startTime,
     warnings,
   };
+}
+
+/** Map retained ROI crops to multimodal `cropImages` keyed by region name / fieldId. */
+export function cropImagesFromRoiTrace(
+  trace: RoiProcessingTrace
+): Record<string, VlmCropImage> {
+  const out: Record<string, VlmCropImage> = {};
+  for (const r of trace.results) {
+    if (!r.cropImage?.dataBase64) continue;
+    const key = r.roiRegion?.name || r.fieldId;
+    out[key] = toVlmCrop(r.cropImage);
+    if (key !== r.fieldId) {
+      out[r.fieldId] = out[key]!;
+    }
+  }
+  return out;
 }
 
 /**

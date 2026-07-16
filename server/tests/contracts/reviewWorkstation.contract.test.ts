@@ -120,6 +120,29 @@ describe("Review Workstation Contract (PR-13)", () => {
       expect(pane).toContain(
         'applyBeforeAfterPairAction(pairIndex, "override")'
       );
+      // Mutate-then-commit: optimistic ids + Promise<boolean> return
+      expect(pane).toContain("Promise<boolean>");
+      expect(pane).toContain("Failed to persist pair decision");
+    });
+
+    it("Issues rail sticky cost-risk Confirm/Override for photo pairs", () => {
+      expect(pane).toContain("photoPairCompare={photoPairCompare}");
+      expect(pane).toContain("onConfirmPair={handleConfirmPair}");
+      const photoGroup = fs.readFileSync(
+        path.join(
+          root,
+          "client/src/components/review/PhotoEvidenceFindingsGroup.tsx"
+        ),
+        "utf-8"
+      );
+      expect(photoGroup).toContain("Cost risk");
+      expect(photoGroup).toContain("onConfirmPair");
+      expect(photoGroup).toContain("onOverridePair");
+      expect(
+        fs.existsSync(
+          path.join(root, "client/src/components/review/PdfPageThumb.tsx")
+        )
+      ).toBe(true);
     });
 
     it("uses ClinicalContextStack and composite outcome strip", () => {
@@ -197,5 +220,9 @@ describe("BeforeAfterComparePane pair resolution", () => {
   it("accepts onConfirmPair and onOverridePair callbacks", () => {
     expect(src).toContain("onConfirmPair?: (pairIndex: number) => void");
     expect(src).toContain("onOverridePair?: (pairIndex: number) => void");
+    expect(src).toContain("Promise<boolean>");
+    expect(src).toContain("PdfPageThumb");
+    expect(src).toContain("commitDecision");
   });
 });
+
