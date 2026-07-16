@@ -2157,20 +2157,47 @@ function ReviewWorkstationContent({
                   },
                   {
                     onSuccess: result => {
-                      const ok =
-                        result.reprocessResult == null ||
-                        (typeof result.reprocessResult === "object" &&
-                          result.reprocessResult !== null &&
-                          "success" in result.reprocessResult &&
-                          (result.reprocessResult as { success?: boolean })
-                            .success !== false);
-                      if (ok) {
+                      const rr = result.reprocessResult as
+                        | {
+                            success?: boolean;
+                            accepted?: boolean;
+                            async?: boolean;
+                            error?: string;
+                            ocrResult?: { error?: string };
+                            processingStages?: Array<{
+                              stage: string;
+                              status: string;
+                              error?: string;
+                            }>;
+                          }
+                        | null
+                        | undefined;
+                      const queued =
+                        rr != null &&
+                        (rr.accepted === true || rr.async === true);
+                      const syncOk =
+                        rr == null ||
+                        queued ||
+                        (typeof rr === "object" &&
+                          "success" in rr &&
+                          rr.success !== false);
+                      if (syncOk) {
                         toast.success(
-                          "Template override applied — reprocessing"
+                          queued
+                            ? "Template override applied — reprocess queued"
+                            : "Template override applied — reprocessing"
                         );
                       } else {
+                        const failedStage = rr?.processingStages?.find(
+                          s => s.status === "failed" && s.error
+                        );
+                        const detail =
+                          rr?.error ||
+                          failedStage?.error ||
+                          rr?.ocrResult?.error ||
+                          "check job status";
                         toast.error(
-                          "Override saved but reprocess reported failure — check job status"
+                          `Override saved but reprocess failed: ${detail}`
                         );
                       }
                       setOverrideOpen(false);
