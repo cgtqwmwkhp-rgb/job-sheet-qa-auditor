@@ -3,7 +3,15 @@
  * PR6: auto-process enqueue + durable ingest_receipts.
  */
 
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import fs from "fs";
 import path from "path";
 import { loadIngestConfig } from "../../services/ingest/config";
@@ -102,10 +110,7 @@ describe("Signed ingest API contract (PR-IO-INGEST)", () => {
     expect(journal).toContain("0013_ingest_receipts");
 
     const catalog = fs.readFileSync(
-      path.join(
-        repoRoot,
-        "server/services/featureFlagMatrix/catalog.ts"
-      ),
+      path.join(repoRoot, "server/services/featureFlagMatrix/catalog.ts"),
       "utf-8"
     );
     expect(catalog).toContain("FEATURE_INGEST_AUTO_PROCESS");

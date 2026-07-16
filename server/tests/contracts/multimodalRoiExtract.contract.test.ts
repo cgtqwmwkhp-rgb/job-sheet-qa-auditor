@@ -158,10 +158,7 @@ describe("multimodalRoiExtract", () => {
 
   it("documentProcessor wires cropImages from stage 1.92 into multimodal", () => {
     const src = readFileSync(
-      path.join(
-        process.cwd(),
-        "server/services/documentProcessor.ts"
-      ),
+      path.join(process.cwd(), "server/services/documentProcessor.ts"),
       "utf8"
     );
     expect(src).toContain("cropImagesFromRoiTrace");

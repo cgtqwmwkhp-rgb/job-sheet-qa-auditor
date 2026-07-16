@@ -10,7 +10,13 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, ExternalLink, Package, RefreshCw } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  Package,
+  RefreshCw,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -438,7 +444,9 @@ export function PartsContextPanel({
                     recheckMutation.isPending && "animate-spin"
                   )}
                 />
-                {recheckMutation.isPending ? "Re-checking…" : "Re-check catalog"}
+                {recheckMutation.isPending
+                  ? "Re-checking…"
+                  : "Re-check catalog"}
               </Button>
             ) : null}
           </CardContent>

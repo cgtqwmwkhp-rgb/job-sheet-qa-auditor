@@ -412,10 +412,7 @@ describe("documentProcessor wiring", () => {
   });
 
   it("exposes audits.recheckPartsCatalog mutation", () => {
-    const src = readFileSync(
-      resolve(__dirname, "../../routers.ts"),
-      "utf8"
-    );
+    const src = readFileSync(resolve(__dirname, "../../routers.ts"), "utf8");
     expect(src).toContain("recheckPartsCatalog");
     expect(src).toContain("verifyPartsCatalogWeb");
     expect(src).toContain("patchReportJsonPartsCatalog");

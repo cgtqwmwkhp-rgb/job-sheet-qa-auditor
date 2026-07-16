@@ -225,4 +225,3 @@ describe("BeforeAfterComparePane pair resolution", () => {
     expect(src).toContain("commitDecision");
   });
 });
-

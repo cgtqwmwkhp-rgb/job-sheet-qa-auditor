@@ -86,8 +86,9 @@ export function patchReportJsonPartsCatalog(
       : {};
   report.partsCatalogSignals = result.signals;
   report.partsCatalogSummary = result.summary;
-  report.partsCatalogLineResults =
-    toPersistedPartsCatalogLineResults(result.lineResults);
+  report.partsCatalogLineResults = toPersistedPartsCatalogLineResults(
+    result.lineResults
+  );
   return report;
 }
 

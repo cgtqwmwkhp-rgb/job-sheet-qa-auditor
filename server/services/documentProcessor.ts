@@ -3479,9 +3479,7 @@ async function processJobSheetWithOptions(
           ? {
               partsCatalogSignals,
               partsCatalogSummary,
-              ...(partsCatalogLineResults
-                ? { partsCatalogLineResults }
-                : {}),
+              ...(partsCatalogLineResults ? { partsCatalogLineResults } : {}),
             }
           : {}),
         ...(memoryApplied.length > 0
