@@ -25,10 +25,11 @@ import { sanitizeMakeModelValue } from "../findingHygiene";
 
 export const ENGINE_VERSION = advancedExtraction.ENGINE_VERSION;
 
-/** advancedExtraction snake_case → GoldSpec camelCase */
+/** advancedExtraction snake_case → GoldSpec / ROI-canonical camelCase */
 export const ENSEMBLE_TO_GOLDSPEC: Record<string, string> = {
-  job_no: "jobNumber",
-  asset_no: "serialNumber",
+  // Canonical ROI / vote IDs (aliasCanonical still dual-emits legacy jobNumber)
+  job_no: "jobReference",
+  asset_no: "assetId",
   customer_name: "customerName",
   engineer_name: "technicianName",
   date: "dateOfService",
@@ -401,8 +402,7 @@ export function mergeExtractedFields(
 
 /**
  * Bridge legacy GoldSpec field names ↔ activation-canonical IDs.
- * Job Summary / mobilisation templates use jobReference/assetId/date/engineerSignOff;
- * ensemble still emits jobNumber/serialNumber/dateOfService/customerSignature.
+ * Job / asset / date only — never cross-map signature roles or technicianName→sign-off.
  */
 export function aliasCanonicalExtractedFields(
   fields: Record<
@@ -422,9 +422,6 @@ export function aliasCanonicalExtractedFields(
   copyIfMissing("assetId", "serialNumber");
   copyIfMissing("dateOfService", "date");
   copyIfMissing("date", "dateOfService");
-  copyIfMissing("customerSignature", "engineerSignOff");
-  copyIfMissing("engineerSignOff", "customerSignature");
-  copyIfMissing("technicianName", "engineerSignOff");
   return out;
 }
 

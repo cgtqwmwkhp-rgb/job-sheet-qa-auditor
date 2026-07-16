@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { PdfPageThumb } from "@/components/review/PdfPageThumb";
 
 export type AxisVerdict = "pass" | "fail" | "inconclusive";
 
@@ -58,8 +59,10 @@ export interface BeforeAfterComparePaneProps {
   documentUrl?: string;
   defaultOpen?: boolean;
   className?: string;
-  onConfirmPair?: (pairIndex: number) => void;
-  onOverridePair?: (pairIndex: number) => void;
+  /** Resolve true only after server mutate succeeds (mutate-then-commit). */
+  onConfirmPair?: (pairIndex: number) => void | Promise<boolean>;
+  onOverridePair?: (pairIndex: number) => void | Promise<boolean>;
+  onFocusPage?: (page: number) => void;
 }
 
 const axisLabels: Record<keyof PhotoPairAxes, string> = {
@@ -124,16 +127,46 @@ export function BeforeAfterComparePane({
   className,
   onConfirmPair,
   onOverridePair,
+  onFocusPage,
 }: BeforeAfterComparePaneProps) {
   const [open, setOpen] = useState(defaultOpen);
   const [decisions, setDecisions] = useState<
     Record<number, "confirmed" | "overridden">
   >({});
+  const [pendingIdx, setPendingIdx] = useState<number | null>(null);
 
   const pairs = Array.isArray(artifact?.pairs) ? artifact!.pairs : [];
   if (!artifact || pairs.length === 0) return null;
 
   const hasFail = pairs.some(p => pairHasActionableFail(p));
+
+  const commitDecision = async (
+    idx: number,
+    kind: "confirmed" | "overridden",
+    handler?: (pairIndex: number) => void | Promise<boolean>
+  ) => {
+    if (decisions[idx] || pendingIdx != null) return;
+    setPendingIdx(idx);
+    try {
+      if (handler) {
+        const ok = await Promise.resolve(handler(idx));
+        // void handlers (legacy) → treat as success after settle
+        if (ok === false) {
+          toast.error("Failed to persist pair decision");
+          return;
+        }
+      } else if (kind === "confirmed") {
+        toast.success(
+          "Pair confirmed — incomplete repair catch retained (cost avoided)."
+        );
+      } else {
+        toast.message("Pair overridden — finding overturned for this review.");
+      }
+      setDecisions(d => ({ ...d, [idx]: kind }));
+    } finally {
+      setPendingIdx(null);
+    }
+  };
 
   return (
     <Card className={cn("shadow-none", className)}>
@@ -174,32 +207,30 @@ export function BeforeAfterComparePane({
             {pairs.map((pair, idx) => {
               const decision = decisions[idx];
               const axes = pair.axes ?? EMPTY_AXES;
+              const beforePage = pair.beforePage ?? 1;
+              const afterPage = pair.afterPage ?? 1;
               return (
                 <div
                   key={idx}
                   className="rounded-md border border-border p-2 space-y-2"
                 >
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded bg-muted/40 p-2 min-h-[72px]">
-                      <div className="font-medium mb-1">
-                        Before · p{pair.beforePage ?? "?"}
-                      </div>
-                      <p className="text-muted-foreground text-[10px]">
-                        {documentUrl
-                          ? `Open page ${pair.beforePage ?? 1} in the PDF viewer`
-                          : "Before page"}
-                      </p>
-                    </div>
-                    <div className="rounded bg-muted/40 p-2 min-h-[72px]">
-                      <div className="font-medium mb-1">
-                        After · p{pair.afterPage ?? "?"}
-                      </div>
-                      <p className="text-muted-foreground text-[10px]">
-                        {documentUrl
-                          ? `Open page ${pair.afterPage ?? 1} in the PDF viewer`
-                          : "After page"}
-                      </p>
-                    </div>
+                    <PdfPageThumb
+                      documentUrl={documentUrl}
+                      page={beforePage}
+                      label={`Before · p${pair.beforePage ?? "?"}`}
+                      onClick={
+                        onFocusPage ? () => onFocusPage(beforePage) : undefined
+                      }
+                    />
+                    <PdfPageThumb
+                      documentUrl={documentUrl}
+                      page={afterPage}
+                      label={`After · p${pair.afterPage ?? "?"}`}
+                      onClick={
+                        onFocusPage ? () => onFocusPage(afterPage) : undefined
+                      }
+                    />
                   </div>
 
                   <div className="flex flex-wrap gap-1">
@@ -232,17 +263,10 @@ export function BeforeAfterComparePane({
                       size="sm"
                       variant="secondary"
                       className="h-7 text-xs"
-                      disabled={!!decision}
-                      onClick={() => {
-                        setDecisions(d => ({ ...d, [idx]: "confirmed" }));
-                        if (onConfirmPair) {
-                          onConfirmPair(idx);
-                        } else {
-                          toast.success(
-                            "Pair confirmed — incomplete repair catch retained (cost avoided)."
-                          );
-                        }
-                      }}
+                      disabled={!!decision || pendingIdx === idx}
+                      onClick={() =>
+                        void commitDecision(idx, "confirmed", onConfirmPair)
+                      }
                     >
                       <Check className="h-3 w-3 mr-1" />
                       Confirm
@@ -251,17 +275,10 @@ export function BeforeAfterComparePane({
                       size="sm"
                       variant="outline"
                       className="h-7 text-xs"
-                      disabled={!!decision}
-                      onClick={() => {
-                        setDecisions(d => ({ ...d, [idx]: "overridden" }));
-                        if (onOverridePair) {
-                          onOverridePair(idx);
-                        } else {
-                          toast.message(
-                            "Pair overridden — finding overturned for this review."
-                          );
-                        }
-                      }}
+                      disabled={!!decision || pendingIdx === idx}
+                      onClick={() =>
+                        void commitDecision(idx, "overridden", onOverridePair)
+                      }
                     >
                       <X className="h-3 w-3 mr-1" />
                       Override

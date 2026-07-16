@@ -155,7 +155,9 @@ import {
 } from "@/components/review/BeforeAfterComparePane";
 import {
   mapDeepNoteFromReport,
+  mapSheetSufficiencyFromReport,
   type DeepNoteAnalysisData,
+  type SheetSufficiencyAnalysisData,
 } from "@/components/DeepNoteAnalysis";
 import {
   ClinicalContextStack,
@@ -462,6 +464,9 @@ export function ReviewWorkstationPane({
     auditResult?.reportJson
   );
   const deepNoteAnalysis = mapDeepNoteFromReport(auditResult?.reportJson);
+  const sheetSufficiencyAnalysis = mapSheetSufficiencyFromReport(
+    auditResult?.reportJson
+  );
 
   const auditData = auditDataProp
     ? {
@@ -574,6 +579,7 @@ export function ReviewWorkstationPane({
         makeModel={makeModel}
         photoPairCompare={photoPairCompare}
         deepNoteAnalysis={deepNoteAnalysis}
+        sheetSufficiencyAnalysis={sheetSufficiencyAnalysis}
         auditReportJson={auditResult?.reportJson}
       />
     </ErrorBoundary>
@@ -598,6 +604,7 @@ function ReviewWorkstationContent({
   makeModel,
   photoPairCompare,
   deepNoteAnalysis,
+  sheetSufficiencyAnalysis,
   auditReportJson,
 }: {
   auditData: AuditData;
@@ -625,6 +632,7 @@ function ReviewWorkstationContent({
   makeModel: string | null;
   photoPairCompare: PhotoPairCompareArtifact | null;
   deepNoteAnalysis: DeepNoteAnalysisData | null;
+  sheetSufficiencyAnalysis: SheetSufficiencyAnalysisData | null;
   auditReportJson?: unknown;
 }) {
   const [activeBoxId, setActiveBoxId] = useState<string | number | null>(null);
@@ -1145,22 +1153,22 @@ function ReviewWorkstationContent({
     }
   };
 
-  const applyBeforeAfterPairAction = (
+  const applyBeforeAfterPairAction = async (
     pairIndex: number,
     action: "approve" | "override"
-  ) => {
+  ): Promise<boolean> => {
     const pairs = Array.isArray(photoPairCompare?.pairs)
       ? photoPairCompare!.pairs
       : [];
     const pair = pairs[pairIndex];
     if (!pair) {
       toast.error("Pair not found");
-      return;
+      return false;
     }
     const targets = resolvePhotoPairFindings(auditData.findings, pair);
     if (targets.length === 0) {
       toast.error("No PHOTO-C012/C013 finding mapped for this pair");
-      return;
+      return false;
     }
     const reason =
       action === "approve"
@@ -1169,7 +1177,18 @@ function ReviewWorkstationContent({
     const label =
       action === "approve" ? "Pair catch confirmed" : "Pair finding overridden";
 
-    void Promise.allSettled(
+    const targetIds = targets
+      .map(f => resolveFindingId(f))
+      .filter((id): id is number => id != null);
+
+    // Optimistic only after we start mutate — rolled back if all fail
+    setOptimisticPassedIds(prev => {
+      const next = new Set(prev);
+      for (const id of targetIds) next.add(id);
+      return next;
+    });
+
+    const results = await Promise.allSettled(
       targets.map(f => {
         const findingId = resolveFindingId(f);
         if (findingId == null) {
@@ -1184,29 +1203,36 @@ function ReviewWorkstationContent({
             })
           : approveMutation.mutateAsync({ findingId, reason });
       })
-    ).then(results => {
-      const ok = results.filter(r => r.status === "fulfilled");
-      const failed = results.filter(r => r.status === "rejected");
-      if (ok.length > 0) {
-        invalidateFindings();
-        const firstId = resolveFindingId(targets[0]!);
-        if (firstId != null) {
-          showUndoToast(
-            firstId,
-            ok.length > 1 ? `${label} (${ok.length})` : label
-          );
-        } else {
-          toast.success(label);
-        }
-      }
-      if (failed.length > 0) {
-        toast.error(
-          failed.length === results.length
-            ? "Failed to persist pair decision"
-            : `${failed.length} of ${results.length} pair finding actions failed`
+    );
+    const ok = results.filter(r => r.status === "fulfilled");
+    const failed = results.filter(r => r.status === "rejected");
+    if (failed.length === results.length) {
+      setOptimisticPassedIds(prev => {
+        const next = new Set(prev);
+        for (const id of targetIds) next.delete(id);
+        return next;
+      });
+      toast.error("Failed to persist pair decision");
+      return false;
+    }
+    if (ok.length > 0) {
+      invalidateFindings();
+      const firstId = resolveFindingId(targets[0]!);
+      if (firstId != null) {
+        showUndoToast(
+          firstId,
+          ok.length > 1 ? `${label} (${ok.length})` : label
         );
+      } else {
+        toast.success(label);
       }
-    });
+    }
+    if (failed.length > 0) {
+      toast.error(
+        `${failed.length} of ${results.length} pair finding actions failed`
+      );
+    }
+    return ok.length > 0;
   };
 
   const handleConfirmPair = (pairIndex: number) =>
@@ -1725,6 +1751,9 @@ function ReviewWorkstationContent({
                   pendingActionIds={pendingActionIds}
                   makeModel={makeModel}
                   extractedEngineerName={extractedEngineerName}
+                  photoPairCompare={photoPairCompare}
+                  onConfirmPair={handleConfirmPair}
+                  onOverridePair={handleOverridePair}
                   onFindingClick={handleFindingClick}
                   onReportIssue={handleReportIssue}
                   onOverride={handleOverrideClick}
@@ -1790,9 +1819,14 @@ function ReviewWorkstationContent({
                     hasAttrFindings={hasAttrFindings}
                     photoPairCompare={photoPairCompare}
                     deepNoteAnalysis={deepNoteAnalysis}
+                    sheetSufficiencyAnalysis={sheetSufficiencyAnalysis}
                     documentUrl={documentUrl}
                     onConfirmPair={handleConfirmPair}
                     onOverridePair={handleOverridePair}
+                    onFocusPairPage={pageNumber => {
+                      setFocusPage(pageNumber);
+                      if (!showPdfViewer) setShowPdfViewer(true);
+                    }}
                     onMarksRowClick={(_rowIndex, pageNumber) => {
                       setFocusPage(pageNumber);
                       if (!showPdfViewer) setShowPdfViewer(true);
@@ -2460,6 +2494,9 @@ function IssuesTabContent({
   pendingActionIds,
   makeModel,
   extractedEngineerName,
+  photoPairCompare,
+  onConfirmPair,
+  onOverridePair,
   onFindingClick,
   onReportIssue,
   onOverride,
@@ -2467,6 +2504,9 @@ function IssuesTabContent({
 }: FindingsListProps & {
   makeModel?: string | null;
   extractedEngineerName?: string | null;
+  photoPairCompare?: PhotoPairCompareArtifact | null;
+  onConfirmPair?: (pairIndex: number) => void | Promise<boolean>;
+  onOverridePair?: (pairIndex: number) => void | Promise<boolean>;
 }) {
   const relationshipFindings = findings.filter(isRelationshipFinding);
   const tyreFindings = findings.filter(
@@ -2585,6 +2625,9 @@ function IssuesTabContent({
             findings={photoFindings}
             activeBoxId={activeBoxId}
             onFindingClick={onFindingClick}
+            photoPairCompare={photoPairCompare}
+            onConfirmPair={onConfirmPair}
+            onOverridePair={onOverridePair}
           />
         )}
         {otherFindings.map(finding => {

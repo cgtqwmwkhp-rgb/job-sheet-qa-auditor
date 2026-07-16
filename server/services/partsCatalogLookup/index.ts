@@ -4,6 +4,11 @@ export {
   FEATURE_PARTS_WEB_VERIFY,
   PARTS_CATALOG_RULE_PREFIX,
   MAX_PARTS_CATALOG_LINES,
+  MAX_PARTS_CATALOG_EVIDENCE_URLS,
+  toPersistedPartsCatalogLineResults,
+  linesFromPersistedCatalogResults,
+  patchReportJsonPartsCatalog,
+  coercePersistedPartsCatalogLineResults,
 } from "./verify";
 export {
   buildPartsCatalogQuery,
@@ -21,6 +26,7 @@ export type {
   ExaSearchResult,
   ExaSearchResponse,
   PartsCatalogLineVerifyResult,
+  PartsCatalogPersistedLineResult,
   PartsCatalogVerifySignals,
   PartsCatalogVerifyResult,
 } from "./types";

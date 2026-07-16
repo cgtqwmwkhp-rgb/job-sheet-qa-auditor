@@ -81,4 +81,22 @@ describe("dropIngest contract (PR-IO-SHAREPOINT)", () => {
     expect(dropBootSrc).not.toMatch(/from ["']\.\.\/ingest/);
     expect(dropBootSrc).not.toContain("ingestRouter");
   });
+
+  it("benefits from PR6 ingest auto-process without owning enqueue", () => {
+    const ingestService = readFileSync(
+      path.join(repoRoot, "server/services/ingest/ingestService.ts"),
+      "utf8"
+    );
+    expect(ingestService).toContain("FEATURE_INGEST_AUTO_PROCESS");
+    expect(ingestService).toContain("enqueueJobSheetProcessing");
+    expect(ingestService).toContain('source: "ingest"');
+
+    const dropClient = readFileSync(
+      path.join(repoRoot, "server/services/dropIngest/ingestClient.ts"),
+      "utf8"
+    );
+    // Drop path posts to signed ingest; auto-process is owned by ingest accept.
+    expect(dropClient).toContain(INGEST_JOB_SHEETS_PATH);
+    expect(dropClient).not.toContain("enqueueJobSheetProcessing");
+  });
 });

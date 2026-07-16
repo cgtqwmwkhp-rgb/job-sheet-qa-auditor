@@ -1,6 +1,9 @@
 /**
  * LLM Deep Note advisory for engineer comments — non-blocking, structured gaps.
  * Gated by FEATURE_COMMENT_LLM_ADVISORY (default off). Never sole hard-fail.
+ *
+ * Honesty: never label provider "gemini" unless usedLlm === true and a real
+ * network call succeeded.
  */
 
 import type { CommentQualityResult, CommentQualitySignals } from "./index";
@@ -13,8 +16,10 @@ export function isCommentLlmAdvisoryEnabled(): boolean {
 
 export interface CommentDeepNoteAdvisory {
   enabled: boolean;
-  provider: "deterministic" | "gemini" | "mock";
+  provider: "deterministic" | "gemini" | "mock" | "gemini-ready";
   model: string;
+  /** True only when a live LLM call produced this advisory. */
+  usedLlm: boolean;
   completenessScore: number;
   toneScore: number;
   clarityScore: number;
@@ -41,6 +46,7 @@ export function buildDeterministicDeepNote(
       enabled: false,
       provider: "deterministic",
       model: "comment-quality-v1",
+      usedLlm: false,
       completenessScore: 100,
       toneScore: 100,
       clarityScore: 100,
@@ -113,6 +119,7 @@ export function buildDeterministicDeepNote(
     enabled: true,
     provider: "deterministic",
     model: "comment-quality-v1",
+    usedLlm: false,
     completenessScore: result.scores.completeness,
     toneScore: 90,
     clarityScore: result.scores.clarity,
@@ -129,6 +136,7 @@ export function buildDeterministicDeepNote(
 
 /**
  * Optional Gemini enrichment — fail-soft; falls back to deterministic.
+ * Never sets provider "gemini" without a successful network call.
  */
 export async function buildCommentDeepNoteAdvisory(
   result: CommentQualityResult,
@@ -146,19 +154,19 @@ export async function buildCommentDeepNoteAdvisory(
       ...base,
       provider: "mock",
       model: "mock-gemini-deep-note",
+      usedLlm: false,
       summary: `${base.summary} [LLM advisory mock — deterministic scores retained.]`,
     };
   }
 
-  // Network Gemini call intentionally deferred: structured deterministic advisory
-  // is the production default so CI and staging stay deterministic. When a live
-  // key is present we still return deterministic scores + mark provider gemini
-  // readiness without blocking the pipeline on latency.
+  // Key present but Deep Note enrichment is still the deterministic rubric.
+  // Mark readiness honestly — do not claim a live Gemini call occurred.
   return {
     ...base,
-    provider: "gemini",
+    provider: "gemini-ready",
     model: process.env.GEMINI_MODEL || "gemini-2.0-flash",
-    summary: `${base.summary} [LLM advisory ready — deterministic rubric applied.]`,
+    usedLlm: false,
+    summary: `${base.summary} [Gemini key present — rubric scores retained; live Deep Note enrich deferred.]`,
   };
 }
 

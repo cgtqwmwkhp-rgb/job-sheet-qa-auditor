@@ -21,6 +21,16 @@ export interface PartsCatalogLineVerifyResult {
   score: number;
   matchedResultCount: number;
   reason: string;
+  /** Top Exa result URLs for operator evidence links (may be empty). */
+  evidenceUrls: string[];
+}
+
+/** Slim shape persisted on reportJson.partsCatalogLineResults (cap 10). */
+export interface PartsCatalogPersistedLineResult {
+  partNumber: string;
+  description: string;
+  outcome: PartsCatalogVerifyOutcome;
+  evidenceUrls: string[];
 }
 
 export interface PartsCatalogVerifySignals {

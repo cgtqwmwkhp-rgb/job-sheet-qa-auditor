@@ -439,11 +439,12 @@ export default function HelpCenter() {
                         How does the "Deep Note Analysis" work?
                       </AccordionTrigger>
                       <AccordionContent className="text-muted-foreground">
-                        We use a Large Language Model (LLM) to analyze the
-                        semantic content of engineer notes. We score them based
-                        on Clarity (is it understandable?), Completeness (does
-                        it cover the work done?), and Sentiment (is it
-                        professional?).
+                        Deep Note is a clinical documentation rubric (what
+                        failed, parts stance, next action) built from COMMENT-C
+                        rules. Scores are Clarity and Completeness — advisory
+                        only; Majors still come from COMMENT-C. An optional
+                        per-sheet sufficiency LLM may enrich the advisory when
+                        enabled; it never hard-fails a sheet on its own.
                       </AccordionContent>
                     </AccordionItem>
                   </Accordion>

@@ -60,6 +60,14 @@ import {
 } from "./services/imageQa";
 import { getModelRegistry } from "./services/modelRegistry";
 import { enforceJobSheetAccess } from "./utils/authorization";
+import { eq } from "drizzle-orm";
+import { auditResults } from "../drizzle/schema";
+import {
+  linesFromPersistedCatalogResults,
+  patchReportJsonPartsCatalog,
+  toPersistedPartsCatalogLineResults,
+  verifyPartsCatalogWeb,
+} from "./services/partsCatalogLookup";
 
 async function throwIfRateLimited(
   fn: () => unknown | Promise<unknown>
@@ -1064,6 +1072,76 @@ export const appRouter = router({
         enforceAuditAccess(audit, jobSheet, ctx.user);
 
         return db.getAuditFindingsByResultId(input.auditResultId);
+      }),
+
+    /**
+     * Targeted parts-catalog re-check (no full re-OCR).
+     * Re-runs Exa verify from persisted line PNs/descriptions and patches
+     * reportJson partsCatalog* fields only.
+     */
+    recheckPartsCatalog: protectedProcedure
+      .input(z.object({ jobSheetId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const jobSheet = await db.getJobSheetById(input.jobSheetId);
+        enforceJobSheetAccess(jobSheet, ctx.user);
+
+        const audit = await db.getAuditResultByJobSheetId(input.jobSheetId);
+        if (!audit) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Audit result not found",
+          });
+        }
+
+        const report =
+          audit.reportJson && typeof audit.reportJson === "object"
+            ? (audit.reportJson as Record<string, unknown>)
+            : {};
+        const lines = linesFromPersistedCatalogResults(
+          report.partsCatalogLineResults
+        );
+        if (lines.length === 0) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message:
+              "No persisted catalog lines to re-check. Reprocess the sheet first.",
+          });
+        }
+
+        const catalogResult = await verifyPartsCatalogWeb("", { lines });
+        const nextReport = patchReportJsonPartsCatalog(report, catalogResult);
+
+        const database = await db.getDb();
+        if (!database) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Database not available",
+          });
+        }
+        await database
+          .update(auditResults)
+          .set({ reportJson: nextReport })
+          .where(eq(auditResults.id, audit.id));
+
+        await db.logAction({
+          userId: ctx.user.id,
+          action: "RECHECK_PARTS_CATALOG",
+          entityType: "audit_result",
+          entityId: audit.id,
+          details: {
+            jobSheetId: input.jobSheetId,
+            summary: catalogResult.summary,
+            enabled: catalogResult.signals.enabled,
+          },
+        });
+
+        return {
+          signals: catalogResult.signals,
+          summary: catalogResult.summary,
+          lineResults: toPersistedPartsCatalogLineResults(
+            catalogResult.lineResults
+          ),
+        };
       }),
   }),
 

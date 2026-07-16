@@ -3,16 +3,21 @@
  *
  * Wave-4 B3: optional Image QA intake gate (fail-closed in prod/staging) so
  * garbage raster drops are rejected before storage / OCR spend.
+ *
+ * PR6: on accepted (non-duplicate) with jobSheetId, optionally enqueue
+ * processing behind FEATURE_INGEST_AUTO_PROCESS === "true".
  */
 
 import { randomUUID } from "crypto";
 import { calculateHash } from "../../utils/fileValidation";
 import { isImageQaIntakeEnabled, runIntakeGate } from "../imageQa/intakeGate";
+import { enqueueJobSheetProcessing } from "../jobQueue";
 import type { IngestConfig } from "./config";
 import type { IngestReceiptStore } from "./receiptStore";
 import {
   IngestError,
   type IngestPersister,
+  type IngestReceipt,
   type IngestResult,
   type IngestUploadRequest,
 } from "./types";
@@ -21,12 +26,63 @@ const ALLOWED_TYPES = new Set(["application/pdf", "image/jpeg", "image/png"]);
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
+const FEATURE_INGEST_AUTO_PROCESS = "FEATURE_INGEST_AUTO_PROCESS";
+
+export type IngestEnqueueProcessing = (payload: {
+  source: "ingest";
+  jobSheetId: number;
+  documentUrl: string;
+  contentHash: string;
+}) => unknown | Promise<unknown>;
+
 export interface IngestServiceDeps {
   config: IngestConfig;
   store: IngestReceiptStore;
   persist: IngestPersister;
   /** Injected for tests — defaults to runIntakeGate when intake is enabled. */
   runIntake?: typeof runIntakeGate;
+  /** Injected for tests — defaults to enqueueJobSheetProcessing. */
+  enqueueProcessing?: IngestEnqueueProcessing;
+}
+
+export function isIngestAutoProcessEnabled(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  return env[FEATURE_INGEST_AUTO_PROCESS] === "true";
+}
+
+async function maybeEnqueueAutoProcess(
+  deps: IngestServiceDeps,
+  receipt: IngestReceipt
+): Promise<void> {
+  if (!isIngestAutoProcessEnabled()) return;
+  if (receipt.jobSheetId == null) return;
+
+  const enqueue =
+    deps.enqueueProcessing ??
+    ((payload: {
+      source: "ingest";
+      jobSheetId: number;
+      documentUrl: string;
+      contentHash: string;
+    }) => enqueueJobSheetProcessing(payload));
+
+  try {
+    await Promise.resolve(
+      enqueue({
+        source: "ingest",
+        jobSheetId: receipt.jobSheetId,
+        documentUrl: receipt.fileUrl,
+        contentHash: receipt.contentHash,
+      })
+    );
+  } catch (err) {
+    console.error("[ingest] auto-process enqueue failed", {
+      jobSheetId: receipt.jobSheetId,
+      externalJobId: receipt.externalJobId,
+      err,
+    });
+  }
 }
 
 function assertUploadShape(input: IngestUploadRequest): void {
@@ -159,7 +215,7 @@ export async function acceptIngestUpload(
     siteInfo: input.siteInfo,
   });
 
-  const receipt = {
+  const receipt: IngestReceipt = {
     ingestId: randomUUID(),
     externalJobId: input.externalJobId,
     deviceId: input.deviceId,
@@ -174,6 +230,7 @@ export async function acceptIngestUpload(
   };
 
   await deps.store.put(receipt);
+  await maybeEnqueueAutoProcess(deps, receipt);
 
   return {
     status: "accepted",

@@ -177,7 +177,8 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
   },
   {
     key: "FEATURE_COMMENT_LLM_ADVISORY",
-    description: "Comment LLM advisory",
+    description:
+      "Comment Deep Note rubric advisory (never labels gemini without usedLlm)",
     defaultWhenUnset: "off",
     critical: false,
     parity: "must_match",
@@ -186,6 +187,15 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
       production: "true",
       note: "Set unconditionally in azure-deploy Set environment variables",
     },
+  },
+  {
+    key: "FEATURE_SHEET_SUFFICIENCY_LLM",
+    description:
+      "Per-sheet senior-engineer sufficiency LLM advisory (never sole hard-fail)",
+    defaultWhenUnset: "off",
+    critical: false,
+    parity: "must_match",
+    deploy: unsetBoth,
   },
   {
     key: "FEATURE_FAULT_REASON_PLACEHOLDER",
@@ -558,6 +568,15 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     defaultWhenUnset: "off",
     critical: false,
     parity: "unspecified",
+    deploy: unsetBoth,
+  },
+  {
+    key: "FEATURE_INGEST_AUTO_PROCESS",
+    description:
+      "Enqueue job-sheet processing after signed ingest accept (skip duplicates)",
+    defaultWhenUnset: "off",
+    critical: false,
+    parity: "must_match",
     deploy: unsetBoth,
   },
   {

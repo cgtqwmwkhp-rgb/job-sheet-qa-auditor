@@ -6,6 +6,7 @@
  */
 
 import { buildCandidateMap, type PreExtractedLike } from "./buildCandidates";
+import { aliasPreExtractedForVote } from "./aliasFields";
 import {
   isFieldVoteEnabled,
   voteFields,
@@ -59,27 +60,35 @@ export function applyFieldVote(
     };
   }
 
+  // Alias job/asset/date before vote so ensemble jobNumber fuses with crop jobReference
+  const primary = aliasPreExtractedForVote(input.primary);
+  const fallback = aliasPreExtractedForVote(input.fallback);
+  const crop = aliasPreExtractedForVote(input.crop);
+  const ensemble = aliasPreExtractedForVote(input.ensemble);
+  const selectionMarks = aliasPreExtractedForVote(input.selectionMarks);
+  const multimodalRoi = aliasPreExtractedForVote(input.multimodalRoi);
+
   const engines = [
-    ...(input.primary ? [{ engine: "primary", fields: input.primary }] : []),
-    ...(input.fallback ? [{ engine: "fallback", fields: input.fallback }] : []),
-    ...(input.crop
+    ...(primary ? [{ engine: "primary", fields: primary }] : []),
+    ...(fallback ? [{ engine: "fallback", fields: fallback }] : []),
+    ...(crop
       ? [
           {
             engine: "crop",
-            fields: input.crop,
+            fields: crop,
             evidenceStrength: "strong" as const,
           },
         ]
       : []),
-    ...(input.ensemble ? [{ engine: "ensemble", fields: input.ensemble }] : []),
-    ...(input.selectionMarks
-      ? [{ engine: "azure_custom", fields: input.selectionMarks }]
+    ...(ensemble ? [{ engine: "ensemble", fields: ensemble }] : []),
+    ...(selectionMarks
+      ? [{ engine: "azure_custom", fields: selectionMarks }]
       : []),
-    ...(input.multimodalRoi
+    ...(multimodalRoi
       ? [
           {
             engine: "vlm",
-            fields: input.multimodalRoi,
+            fields: multimodalRoi,
             evidenceStrength: "strong" as const,
           },
         ]
@@ -105,13 +114,13 @@ export function applyFieldVote(
                 : input.vlmHint.confidence,
           }
         : null,
-      crop: input.crop?.[sigField]
+      crop: crop?.[sigField]
         ? {
-            value: input.crop[sigField]!.value,
+            value: crop[sigField]!.value,
             confidence:
-              input.crop[sigField]!.confidence > 1
-                ? input.crop[sigField]!.confidence / 100
-                : input.crop[sigField]!.confidence,
+              crop[sigField]!.confidence > 1
+                ? crop[sigField]!.confidence / 100
+                : crop[sigField]!.confidence,
           }
         : null,
     });

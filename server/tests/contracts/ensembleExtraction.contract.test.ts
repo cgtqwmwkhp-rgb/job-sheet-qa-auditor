@@ -247,14 +247,17 @@ Customer Name: Acme Corp
 
       expect(adapter).not.toBeNull();
       expect(adapter!.artifact.engineVersion).toBe(ENGINE_VERSION);
-      expect(adapter!.ensembleExtractedFields.jobNumber?.value).toBe("12345");
+      expect(adapter!.ensembleExtractedFields.jobReference?.value).toBe(
+        "12345"
+      );
       expect(adapter!.ensembleExtractedFields.customerName?.value).toMatch(
         /Acme/i
       );
       expect(adapter!.ensembleExtractedFields.technicianName?.value).toMatch(
         /Jane/i
       );
-      expect(ENSEMBLE_TO_GOLDSPEC.job_no).toBe("jobNumber");
+      expect(ENSEMBLE_TO_GOLDSPEC.job_no).toBe("jobReference");
+      expect(ENSEMBLE_TO_GOLDSPEC.asset_no).toBe("assetId");
     });
 
     it("returns null when feature flag disabled", async () => {

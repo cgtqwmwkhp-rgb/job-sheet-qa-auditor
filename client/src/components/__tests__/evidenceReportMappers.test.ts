@@ -9,7 +9,10 @@ import {
   photoPairHasActionableFail,
 } from "../review/BeforeAfterComparePane";
 import { mapCommentQualityFromReport } from "../review/CommentQualityPanel";
-import { mapPartsContextFromReport } from "../review/PartsContextPanel";
+import {
+  mapPartsContextFromReport,
+  partsCatalogNeedsRecheck,
+} from "../review/PartsContextPanel";
 import { mapAttributionFromReport } from "../review/AttrContextPanel";
 import { mapMakeModelFromReport } from "../review/mapReportContext";
 import { mapDeepNoteFromReport } from "../DeepNoteAnalysis";
@@ -81,6 +84,46 @@ describe("Evidence AI reportJson mapper crash guards", () => {
     expect(catalogSignals!.matchCount).toBe(0);
   });
 
+  it("mapPartsContextFromReport maps capped/unavailable + evidence URLs", () => {
+    const { catalogSignals, catalogSummary, lineResults } =
+      mapPartsContextFromReport({
+        partsCatalogSignals: {
+          enabled: true,
+          lineCount: 12,
+          verifiedCount: 10,
+          matchCount: 2,
+          mismatchCount: 3,
+          unavailableCount: 5,
+          capped: true,
+        },
+        partsCatalogSummary:
+          "Verified=10 | Match=2 | Mismatch=3 | Unavailable=5 | CappedAt=10",
+        partsCatalogLineResults: [
+          {
+            partNumber: "WT158",
+            description: "wheel",
+            outcome: "unavailable",
+            evidenceUrls: ["https://parts.example.com/wt158"],
+          },
+          { partNumber: "BAD", description: "x", outcome: "invented" },
+        ],
+      });
+    expect(catalogSignals).toMatchObject({
+      capped: true,
+      unavailableCount: 5,
+      mismatchCount: 3,
+    });
+    expect(catalogSummary).toContain("CappedAt=10");
+    expect(lineResults).toEqual([
+      {
+        partNumber: "WT158",
+        description: "wheel",
+        outcome: "unavailable",
+        evidenceUrls: ["https://parts.example.com/wt158"],
+      },
+    ]);
+  });
+
   it("mapAttributionFromReport reads attribution stamp", () => {
     const stamp = mapAttributionFromReport({
       attribution: {
@@ -102,6 +145,43 @@ describe("Evidence AI reportJson mapper crash guards", () => {
         },
       })
     ).toBe("JCB 3CX");
+  });
+
+  it("partsCatalogNeedsRecheck is true for unavailable or mismatch only when enabled", () => {
+    expect(partsCatalogNeedsRecheck(null)).toBe(false);
+    expect(
+      partsCatalogNeedsRecheck({
+        enabled: false,
+        lineCount: 1,
+        verifiedCount: 0,
+        matchCount: 0,
+        mismatchCount: 1,
+        unavailableCount: 0,
+        capped: false,
+      })
+    ).toBe(false);
+    expect(
+      partsCatalogNeedsRecheck({
+        enabled: true,
+        lineCount: 1,
+        verifiedCount: 1,
+        matchCount: 0,
+        mismatchCount: 0,
+        unavailableCount: 1,
+        capped: false,
+      })
+    ).toBe(true);
+    expect(
+      partsCatalogNeedsRecheck({
+        enabled: true,
+        lineCount: 1,
+        verifiedCount: 1,
+        matchCount: 0,
+        mismatchCount: 1,
+        unavailableCount: 0,
+        capped: false,
+      })
+    ).toBe(true);
   });
 
   it("photoPairHasActionableFail is safe on null / empty", () => {

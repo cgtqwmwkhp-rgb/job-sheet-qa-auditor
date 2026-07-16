@@ -2,6 +2,8 @@
  * Multimodal ROI field extract — structured JSON per crop (AI-08).
  */
 
+import { readFileSync } from "fs";
+import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { deflateSync } from "zlib";
 import {
@@ -152,6 +154,16 @@ describe("multimodalRoiExtract", () => {
     expect(resolved.media).toBe("crop");
     expect(resolved.cropImage?.data).toBe(tiny);
     expect(resolved.reference?.pixelCropped).toBe(true);
+  });
+
+  it("documentProcessor wires cropImages from stage 1.92 into multimodal", () => {
+    const src = readFileSync(
+      path.join(process.cwd(), "server/services/documentProcessor.ts"),
+      "utf8"
+    );
+    expect(src).toContain("cropImagesFromRoiTrace");
+    expect(src).toContain("multimodalCropImages");
+    expect(src).toMatch(/cropImages:\s*multimodalCropImages/);
   });
 
   it("parseCropFieldsJson returns structured fields per crop", () => {

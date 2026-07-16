@@ -326,6 +326,45 @@ describe("ROI Processor - PR-J Contract Tests", () => {
       expect(trace.results[0].value).toBe("JOB-FROM-CROP");
       expect(trace.results[0].source).toBe("crop_ocr");
       expect(trace.results[0].cropHash).toBe("crop_abc123def4");
+      expect(trace.results[0].cropImage?.dataBase64).toBe("aa");
+      expect(trace.results[0].cropImage?.cropHash).toBe("crop_abc123def4");
+    });
+
+    it("cropImagesFromRoiTrace maps retained PNGs for multimodal", async () => {
+      const { cropImagesFromRoiTrace } = await import(
+        "../../services/roiProcessor/roiExtractionService"
+      );
+      const trace = await processWithRoi(
+        1,
+        EVIDENCE_DOC,
+        100,
+        fullRoiConfig,
+        ["jobReference"],
+        undefined,
+        {
+          forceCropReocr: true,
+          cropOcrRunner: async () => ({
+            fieldId: "jobReference",
+            success: true,
+            value: "JOB-FROM-CROP",
+            confidence: 0.93,
+            method: "crop_ocr",
+            crop: {
+              dataBase64: "pngbytes",
+              mediaType: "image/png",
+              page: 1,
+              bounds: { x: 0.05, y: 0.1, width: 0.4, height: 0.05 },
+              cropHash: "crop_retain01",
+              widthPx: 100,
+              heightPx: 20,
+            },
+            processingTimeMs: 1,
+          }),
+        }
+      );
+      const crops = cropImagesFromRoiTrace(trace);
+      expect(crops.jobReference?.data).toBe("pngbytes");
+      expect(crops.jobReference?.mediaType).toBe("image/png");
     });
   });
 
