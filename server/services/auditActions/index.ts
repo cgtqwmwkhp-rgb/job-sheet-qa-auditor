@@ -36,7 +36,10 @@ export {
   type SheetTruthFinding,
 } from "./sheetTruth";
 
-export type AuditActionErrorCode = "NOT_FOUND" | "CONFLICT";
+export type AuditActionErrorCode =
+  | "NOT_FOUND"
+  | "CONFLICT"
+  | "PRECONDITION_FAILED";
 
 /**
  * Expected domain failures from audit actions.
@@ -100,6 +103,9 @@ export interface AuditActionDeps {
     }
   ) => Promise<void>;
   getAuditResult: (id: number) => Promise<AuditResultRecord | undefined>;
+  getAuditResultByJobSheetId?: (
+    jobSheetId: number
+  ) => Promise<AuditResultRecord | undefined>;
   updateAuditResultStatus: (
     id: number,
     result: "pass" | "fail" | "review_queue" | "waived"
@@ -808,10 +814,46 @@ export async function undoFieldCorrection(
 /**
  * Approve a job sheet out of the hold/review queue (status → completed).
  */
+function isFindingDisposed(finding: FindingRecord): boolean {
+  if (
+    finding.resolutionStatus !== "open" &&
+    finding.resolutionStatus !== "flagged"
+  ) {
+    return true;
+  }
+
+  const raw = finding.rawSnippet?.trim();
+  const normalised = finding.normalisedSnippet?.trim();
+  return Boolean(raw && normalised && raw !== normalised);
+}
+
+function isMajorFinding(finding: FindingRecord): boolean {
+  return finding.severity === "S0" || finding.severity === "S1";
+}
+
+function isPhotoCostRiskFinding(finding: FindingRecord): boolean {
+  const ruleId = finding.ruleId?.trim().toUpperCase() ?? "";
+  return ruleId === "PHOTO-C012" || ruleId === "PHOTO-C013";
+}
+
+export function getApprovalBlockers(
+  findings: readonly FindingRecord[]
+): FindingRecord[] {
+  return findings.filter(
+    finding =>
+      !isFindingDisposed(finding) &&
+      (isMajorFinding(finding) || isPhotoCostRiskFinding(finding))
+  );
+}
+
 export async function approveJobSheet(
   deps: Pick<
     AuditActionDeps,
-    "updateJobSheetStatus" | "logAction" | "getAuditResult"
+    | "updateJobSheetStatus"
+    | "logAction"
+    | "getAuditResult"
+    | "getAuditResultByJobSheetId"
+    | "listFindingsByAuditResultId"
   > & {
     getJobSheetStatus?: (id: number) => Promise<string | undefined>;
   },
@@ -828,6 +870,38 @@ export async function approveJobSheet(
   newStatus: "completed";
   undoToken: string;
 }> {
+  const audit = await deps.getAuditResultByJobSheetId?.(input.jobSheetId);
+  if (!audit) {
+    throw new AuditActionError(
+      "PRECONDITION_FAILED",
+      "Job sheet cannot be approved until audit findings are available"
+    );
+  }
+  const findings = await deps.listFindingsByAuditResultId?.(audit.id);
+  if (!findings) {
+    throw new AuditActionError(
+      "PRECONDITION_FAILED",
+      "Job sheet cannot be approved until audit findings can be verified"
+    );
+  }
+  const blockers = getApprovalBlockers(findings);
+  if (blockers.length > 0) {
+    const majorCount = blockers.filter(isMajorFinding).length;
+    const photoCount = blockers.filter(isPhotoCostRiskFinding).length;
+    const reasons = [
+      majorCount > 0
+        ? `${majorCount} open Major finding${majorCount === 1 ? "" : "s"}`
+        : null,
+      photoCount > 0
+        ? `${photoCount} actionable photo cost-risk finding${photoCount === 1 ? "" : "s"}`
+        : null,
+    ].filter(Boolean);
+    throw new AuditActionError(
+      "PRECONDITION_FAILED",
+      `Dispose ${reasons.join(" and ")} before approving this job sheet`
+    );
+  }
+
   const previous = input.previousStatus ?? "review_queue";
   await deps.updateJobSheetStatus(input.jobSheetId, "completed");
   await deps.logAction({

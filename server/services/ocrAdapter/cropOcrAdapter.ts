@@ -4,9 +4,11 @@
  * Renders a template ROI from a PDF page, then re-OCRs the crop so cramped /
  * handwriting-heavy fields are not limited to whole-PDF OCR plateaus.
  *
- * HTR (AI-15) is a follow-on: this path uses the configured OCR adapter on the
- * cropped image; a dedicated handwriting model can plug in later via the same
- * CropOcrRunner interface.
+ * HTR (AI-15): when FEATURE_CROP_HTR is enabled, handwriting fields are first
+ * sent to Azure DI prebuilt-read, which supports handwritten text. The path
+ * requires AZURE_DI_ENDPOINT + AZURE_DI_KEY and fails soft to the configured
+ * crop OCR adapter when Azure is unavailable or returns no usable text. No
+ * confidence is fabricated when either provider omits confidence scores.
  *
  * Rendering uses @napi-rs/canvas when resolvable (pdfjs optional peer). Fail-soft
  * when canvas/PDF render is unavailable — never fabricates field values.
@@ -16,16 +18,33 @@ import { createHash } from "crypto";
 import { createRequire } from "node:module";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { RoiRegion } from "../templateRegistry/types";
+import { HANDWRITING_FIELD_IDS } from "../fieldVoting/types";
 import type { OCRAdapter, OCRResult } from "./types";
 
 const require = createRequire(import.meta.url);
 
 export const FEATURE_ROI_CROP_REOCR = "FEATURE_ROI_CROP_REOCR";
+export const FEATURE_CROP_HTR = "FEATURE_CROP_HTR";
 
 /** Opt-in to avoid multiplying OCR calls for every configured ROI. */
 export function isRoiCropReocrEnabled(): boolean {
   const raw = (process.env[FEATURE_ROI_CROP_REOCR] ?? "").toLowerCase();
   return raw === "true" || raw === "1" || raw === "on";
+}
+
+export function isCropHtrEnabled(): boolean {
+  const raw = (process.env[FEATURE_CROP_HTR] ?? "").toLowerCase();
+  return raw === "true" || raw === "1" || raw === "on";
+}
+
+/** Handwriting-heavy text ROIs. Signature presence remains a visual/VLM fact. */
+export function isCropHtrField(fieldId: string): boolean {
+  return (
+    HANDWRITING_FIELD_IDS.has(fieldId) ||
+    /^(?:engineer)?comments?$|comment(?:s|ary)|work(?:s)?_?description/i.test(
+      fieldId
+    )
+  );
 }
 
 export interface RoiCropImage {
@@ -58,6 +77,10 @@ export interface CropOcrResult {
   method: "crop_ocr" | "unavailable";
   crop?: RoiCropImage;
   ocrText?: string;
+  ocrProvider?: string;
+  ocrModel?: string;
+  htrAttempted?: boolean;
+  htrUsed?: boolean;
   error?: string;
   processingTimeMs: number;
 }
@@ -270,8 +293,21 @@ function confidenceFromOcrResult(result: OCRResult): number {
     // Mistral may return 0–100 or 0–1
     return mean > 1 ? Math.min(1, mean / 100) : Math.min(1, Math.max(0, mean));
   }
-  // Successful crop OCR without scores — still above whole-page noise floor
-  return result.success ? 0.82 : 0;
+  // Provider supplied no score: retain a conservative confidence. Success is
+  // not evidence for an invented high-confidence value.
+  return result.success ? 0.5 : 0;
+}
+
+async function runCropAdapter(
+  adapter: OCRAdapter,
+  crop: RoiCropImage,
+  request: CropOcrRequest
+): Promise<OCRResult> {
+  return adapter.extractFromBase64(crop.dataBase64, crop.mediaType, {
+    skipRetry: request.skipRetry ?? true,
+    pageLimit: 1,
+    includeDeepFeatures: false,
+  });
 }
 
 /**
@@ -281,6 +317,7 @@ export async function reOcrRoiCrop(
   request: CropOcrRequest,
   deps: {
     adapter?: OCRAdapter;
+    htrAdapter?: OCRAdapter;
     render?: CropRenderer;
   } = {}
 ): Promise<CropOcrResult> {
@@ -307,15 +344,30 @@ export async function reOcrRoiCrop(
 
   try {
     const adapter = deps.adapter ?? (await import("./index")).getOCRAdapter();
-    const ocr = await adapter.extractFromBase64(
-      crop.dataBase64,
-      crop.mediaType,
-      {
-        skipRetry: request.skipRetry ?? true,
-        pageLimit: 1,
-        includeDeepFeatures: false,
+    const htrAttempted = isCropHtrEnabled() && isCropHtrField(fieldId);
+    let htrUsed = false;
+    let ocr: OCRResult | null = null;
+    if (htrAttempted) {
+      const htrAdapter =
+        deps.htrAdapter ??
+        (
+          await import("./azureDocumentIntelligenceAdapter")
+        ).createAzureDocumentIntelligenceAdapter({
+          azureModel: "prebuilt-read",
+        });
+      const htrResult = await runCropAdapter(htrAdapter, crop, request);
+      if (htrResult.success) {
+        const htrText = htrResult.pages
+          .map(p => p.markdown || "")
+          .join("\n")
+          .trim();
+        if (valueFromCropOcrText(htrText, fieldId)) {
+          ocr = htrResult;
+          htrUsed = true;
+        }
       }
-    );
+    }
+    ocr ??= await runCropAdapter(adapter, crop, request);
 
     if (!ocr.success) {
       return {
@@ -326,6 +378,10 @@ export async function reOcrRoiCrop(
         method: "unavailable",
         crop,
         error: ocr.error || ocr.errorCode || "crop OCR failed",
+        ocrProvider: ocr.provider,
+        ocrModel: ocr.model,
+        htrAttempted,
+        htrUsed: false,
         processingTimeMs: Date.now() - start,
       };
     }
@@ -345,6 +401,10 @@ export async function reOcrRoiCrop(
       method: "crop_ocr",
       crop,
       ocrText,
+      ocrProvider: ocr.provider,
+      ocrModel: ocr.model,
+      htrAttempted,
+      htrUsed,
       processingTimeMs: Date.now() - start,
     };
   } catch (err) {
@@ -363,6 +423,7 @@ export async function reOcrRoiCrop(
 
 export function createCropOcrRunner(deps?: {
   adapter?: OCRAdapter;
+  htrAdapter?: OCRAdapter;
   render?: CropRenderer;
 }): CropOcrRunner {
   return request => reOcrRoiCrop(request, deps);

@@ -24,6 +24,9 @@ export function createDefaultPersister(config: IngestConfig): IngestPersister {
     if (config.systemUserId != null) {
       const created = await db.createJobSheet({
         referenceNumber: input.referenceNumber ?? input.externalJobId,
+        externalJobId: input.externalJobId,
+        sourceSystem: "signed_ingest",
+        deviceId: input.deviceId,
         fileUrl: url,
         fileKey,
         fileName: input.fileName,

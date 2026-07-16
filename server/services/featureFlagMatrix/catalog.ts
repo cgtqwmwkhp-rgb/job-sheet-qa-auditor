@@ -556,7 +556,8 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
   },
   {
     key: "FEATURE_AZURE_DI_CUSTOM_JSR",
-    description: "Azure DI custom neural JSR voter",
+    description:
+      "Azure DI custom neural JSR voter; FlagOps enables only with a provisioned AZURE_DI_CUSTOM_JSR_MODEL_ID",
     defaultWhenUnset: "off",
     critical: false,
     parity: "unspecified",
@@ -574,6 +575,24 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
     key: "FEATURE_INGEST_AUTO_PROCESS",
     description:
       "Enqueue job-sheet processing after signed ingest accept (skip duplicates)",
+    defaultWhenUnset: "off",
+    critical: false,
+    parity: "must_match",
+    deploy: unsetBoth,
+  },
+  {
+    key: "FEATURE_ERP_WRITEBACK",
+    description:
+      "Deliver completed audit results to ERP_WEBHOOK_URL through the durable outbox",
+    defaultWhenUnset: "off",
+    critical: false,
+    parity: "must_match",
+    deploy: unsetBoth,
+  },
+  {
+    key: "FEATURE_TEAMS_AUDIT_CARD",
+    description:
+      "Send failed and review-queue audit cards to TEAMS_WEBHOOK_URL",
     defaultWhenUnset: "off",
     critical: false,
     parity: "must_match",
@@ -598,6 +617,15 @@ export const FEATURE_FLAG_CATALOG: readonly FeatureFlagCatalogEntry[] = [
       production: "true",
       note: "Set unconditionally in azure-deploy Set environment variables",
     },
+  },
+  {
+    key: "FEATURE_CROP_HTR",
+    description:
+      "Azure DI Read handwriting pass for configured handwriting ROI crops",
+    defaultWhenUnset: "off",
+    critical: false,
+    parity: "must_match",
+    deploy: unsetBoth,
   },
   {
     key: "FEATURE_TEMPLATE_COLLISION",

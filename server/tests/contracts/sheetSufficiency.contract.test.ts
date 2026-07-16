@@ -2,7 +2,7 @@
  * Deep Note honesty + per-sheet sufficiency advisory contracts.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
 import {
@@ -49,6 +49,7 @@ describe("Deep Note honesty", () => {
   const prevKey = process.env.GEMINI_API_KEY;
 
   afterEach(() => {
+    vi.restoreAllMocks();
     if (prevAdv === undefined) delete process.env[FEATURE_COMMENT_LLM_ADVISORY];
     else process.env[FEATURE_COMMENT_LLM_ADVISORY] = prevAdv;
     if (prevKey === undefined) delete process.env.GEMINI_API_KEY;
@@ -61,13 +62,60 @@ describe("Deep Note honesty", () => {
     expect(note.provider).toBe("deterministic");
   });
 
-  it("with key + flag still does not claim gemini without a live call", async () => {
+  it("restores deterministic advisory when the live Gemini call fails", async () => {
     process.env[FEATURE_COMMENT_LLM_ADVISORY] = "true";
     process.env.GEMINI_API_KEY = "test-key-not-used";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("offline");
+      })
+    );
     const note = await buildCommentDeepNoteAdvisory(sampleResult());
     expect(note.usedLlm).toBe(false);
-    expect(note.provider).not.toBe("gemini");
-    expect(["gemini-ready", "deterministic", "mock"]).toContain(note.provider);
+    expect(note.provider).toBe("deterministic");
+  });
+
+  it("uses Gemini only after a structured live response", async () => {
+    process.env[FEATURE_COMMENT_LLM_ADVISORY] = "true";
+    process.env.GEMINI_API_KEY = "test-key";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              candidates: [
+                {
+                  content: {
+                    parts: [
+                      {
+                        text: JSON.stringify({
+                          completenessScore: 62,
+                          toneScore: 88,
+                          clarityScore: 71,
+                          gaps: ["Name the failed component."],
+                          summary: "The note needs a specific component.",
+                          coachRewrite:
+                            "Coupling cracked; return visit required.",
+                          recommendEscalate: false,
+                        }),
+                      },
+                    ],
+                  },
+                },
+              ],
+            }),
+            { status: 200 }
+          )
+      )
+    );
+
+    const note = await buildCommentDeepNoteAdvisory(sampleResult());
+    expect(note.usedLlm).toBe(true);
+    expect(note.provider).toBe("gemini");
+    expect(note.completenessScore).toBe(62);
+    expect(note.gaps).toContain("Name the failed component.");
   });
 
   it("UI badge uses Rubric advisory when usedLlm false", () => {
@@ -134,5 +182,7 @@ describe("Sheet sufficiency advisory", () => {
     );
     expect(src).toContain("buildSheetSufficiencyAdvisory");
     expect(src).toContain("sheetSufficiencyAdvisory");
+    expect(src).not.toContain("photoSummary: null");
+    expect(src).toContain("photoEvidenceArtifact?.summary");
   });
 });

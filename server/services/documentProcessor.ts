@@ -89,7 +89,11 @@ import {
   cropImagesFromRoiTrace,
   processWithRoi,
 } from "./roiProcessor";
-import { isRoiCropReocrEnabled } from "./ocrAdapter/cropOcrAdapter";
+import {
+  isCropHtrEnabled,
+  isCropHtrField,
+  isRoiCropReocrEnabled,
+} from "./ocrAdapter/cropOcrAdapter";
 import {
   reconcileFields,
   type ExtractedField as ReconcileExtractedField,
@@ -1535,7 +1539,7 @@ async function processJobSheetWithOptions(
 
   // Stage 1.92: ROI crop → re-OCR for critical fields (PR-AI-05 / CropVision)
   // Fail-soft. Beats whole-PDF plateau on cramped / handwriting-adjacent ROIs.
-  // HTR model swap is follow-on (AI-15) via CropOcrRunner.
+  // FEATURE_CROP_HTR routes handwriting ROIs through Azure DI Read first.
   // Retained PNG crops are passed to multimodal ROI (stage 1.96) as cropImages.
   const cropReocrStart = Date.now();
   let multimodalCropImages: ReturnType<typeof cropImagesFromRoiTrace> = {};
@@ -1546,12 +1550,20 @@ async function processJobSheetWithOptions(
         : null;
       const cropRoiConfig = pinnedForCrop?.roiJson ?? null;
       if (cropRoiConfig?.regions?.length) {
+        const cropTargetFields = [
+          ...CRITICAL_ROI_FIELDS,
+          ...(isCropHtrEnabled()
+            ? cropRoiConfig.regions
+                .map(region => region.name)
+                .filter(isCropHtrField)
+            : []),
+        ];
         const cropTrace = await processWithRoi(
           jobSheetId,
           extractedText,
           usedTemplateVersionId ?? 0,
           cropRoiConfig,
-          [...CRITICAL_ROI_FIELDS],
+          Array.from(new Set(cropTargetFields)),
           undefined,
           {
             pdfBuffer: sharedPdfBuffer,
@@ -2472,6 +2484,8 @@ async function processJobSheetWithOptions(
   let commentQualitySignals:
     | ReturnType<typeof evaluateCommentQuality>["signals"]
     | null = null;
+  let commentQualityResult: ReturnType<typeof evaluateCommentQuality> | null =
+    null;
   let commentDeepNote: Awaited<
     ReturnType<typeof buildCommentDeepNoteAdvisory>
   > | null = null;
@@ -2596,6 +2610,7 @@ async function processJobSheetWithOptions(
           analysisResult.extractedFields?.fault_reason ??
           analysisResult.extractedFields?.faultReason,
       });
+      commentQualityResult = commentResult;
       commentQualitySignals = commentResult.signals;
       if (commentResult.findings.length > 0) {
         analysisResult = {
@@ -2795,25 +2810,6 @@ async function processJobSheetWithOptions(
           err
         );
       }
-      try {
-        sheetSufficiencyAdvisory = await buildSheetSufficiencyAdvisory(
-          commentResult,
-          {
-            commentSnippet: commentResult.signals.snippet ?? "",
-            onFailurePath: commentResult.signals.onFailurePath,
-            failMarkCount,
-            partsSummary: partsCatalogSummary ?? partsAssessmentSummary,
-            photoSummary: null,
-            jobSummarySignals: failurePathSignalSummary,
-          },
-          { persona: orgAiPersona }
-        );
-      } catch (err) {
-        console.warn(
-          "[DocumentProcessor] Sheet sufficiency advisory failed (non-fatal):",
-          err
-        );
-      }
     }
   }
 
@@ -2902,6 +2898,38 @@ async function processJobSheetWithOptions(
         status: "success",
         durationMs: 0,
       });
+    }
+  }
+
+  if (commentQualityResult) {
+    const photoSummary =
+      [
+        photoEvidenceArtifact?.summary,
+        photoPairCompareArtifact?.summary
+          ? `Pair compare: ${photoPairCompareArtifact.summary}`
+          : null,
+      ]
+        .filter((value): value is string => Boolean(value?.trim()))
+        .join(" ")
+        .slice(0, 1000) || null;
+    try {
+      sheetSufficiencyAdvisory = await buildSheetSufficiencyAdvisory(
+        commentQualityResult,
+        {
+          commentSnippet: commentQualityResult.signals.snippet ?? "",
+          onFailurePath: commentQualityResult.signals.onFailurePath,
+          failMarkCount: failurePathSignals?.failMarkCount ?? 0,
+          partsSummary: partsCatalogSummary ?? partsAssessmentSummary,
+          photoSummary,
+          jobSummarySignals: failurePathSignalSummary,
+        },
+        { persona: orgAiPersona }
+      );
+    } catch (err) {
+      console.warn(
+        "[DocumentProcessor] Sheet sufficiency advisory failed (non-fatal):",
+        err
+      );
     }
   }
 
