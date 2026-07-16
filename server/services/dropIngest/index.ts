@@ -14,6 +14,7 @@ import { DropIngestPoller } from "./poller";
 import {
   createAzureBlobDropSource,
   createFolderDropSource,
+  createGraphDriveDropSource,
   type DropSource,
 } from "./sources";
 import { createDropStateStore } from "./stateStore";
@@ -41,8 +42,10 @@ export {
 export {
   FolderDropSource,
   BlobDropSource,
+  GraphDriveDropSource,
   createFolderDropSource,
   createAzureBlobDropSource,
+  createGraphDriveDropSource,
 } from "./sources";
 export {
   MemoryDropStateStore,
@@ -59,7 +62,7 @@ export function getDropIngestPoller(): DropIngestPoller | null {
 export function getDropIngestStatus(): {
   enabled: boolean;
   credentialsReady: boolean;
-  sources: Array<"folder" | "blob">;
+  sources: Array<"folder" | "blob" | "graph">;
   running: boolean;
   processedCount: number;
   lastTick: ReturnType<DropIngestPoller["getStatus"]>["lastTick"];
@@ -94,6 +97,8 @@ export async function buildDropSources(
       sources.push(createFolderDropSource(config));
     } else if (kind === "blob") {
       sources.push(await createAzureBlobDropSource(config));
+    } else if (kind === "graph") {
+      sources.push(await createGraphDriveDropSource(config));
     }
   }
   return sources;
@@ -126,7 +131,7 @@ export async function startDropIngestPoller(
   const kinds = resolveActiveSources(config);
   if (kinds.length === 0) {
     console.warn(
-      "[DropIngest] Enabled but no sources configured (set DROP_INGEST_WATCH_DIR and/or blob connection)"
+      "[DropIngest] Enabled but no sources configured (set DROP_INGEST_WATCH_DIR, blob connection, or gated Graph drive config)"
     );
     return null;
   }

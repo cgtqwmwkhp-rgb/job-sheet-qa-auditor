@@ -61,8 +61,9 @@ export interface ClinicalContextStackProps {
   deepNoteAnalysis: DeepNoteAnalysisData | null;
   sheetSufficiencyAnalysis?: SheetSufficiencyAnalysisData | null;
   documentUrl?: string;
-  onConfirmPair?: (pairIndex: number) => void | Promise<boolean>;
-  onOverridePair?: (pairIndex: number) => void | Promise<boolean>;
+  onConfirmPair?: (pairIndex: number) => void | Promise<boolean | "deferred">;
+  onOverridePair?: (pairIndex: number) => void | Promise<boolean | "deferred">;
+  pairResolvedDecisions?: Record<number, "confirmed" | "overridden">;
   onFocusPairPage?: (page: number) => void;
   onMarksRowClick?: (rowIndex: number, pageNumber: number) => void;
   className?: string;
@@ -247,6 +248,7 @@ export function ClinicalContextStack(props: ClinicalContextStackProps) {
         className="shadow-none border-muted"
         onConfirmPair={props.onConfirmPair}
         onOverridePair={props.onOverridePair}
+        resolvedDecisions={props.pairResolvedDecisions}
         onFocusPage={props.onFocusPairPage}
       />
       {props.deepNoteAnalysis ? (

@@ -180,6 +180,14 @@ export default function AuditResults() {
   }>();
   const listRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
+  const { data: technicians } = trpc.jobSheets.listTechnicians.useQuery();
+  const technicianNameById = useMemo(
+    () =>
+      new Map(
+        (technicians ?? []).map(technician => [technician.id, technician.name])
+      ),
+    [technicians]
+  );
 
   const approveJobSheet = trpc.auditActions.approveJobSheet.useMutation();
   const undoApprove = trpc.auditActions.undoJobSheetApprove.useMutation();
@@ -963,7 +971,9 @@ export default function AuditResults() {
       auditResult?.confidenceScore ||
       (jobSheetData.status === "completed" ? "100" : "-"),
     date: new Date(jobSheetData.createdAt).toLocaleDateString(),
-    technician: `User ${jobSheetData.uploadedBy}`,
+    technician:
+      technicianNameById.get(jobSheetData.uploadedBy) ??
+      `User ${jobSheetData.uploadedBy}`,
     documentUrl: jobSheetData.fileUrl,
     findings,
     hasMajorFails,

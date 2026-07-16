@@ -158,6 +158,7 @@ import {
 import {
   mapDeepNoteFromReport,
   mapSheetSufficiencyFromReport,
+  mapPersonaDecisionFromReport,
   type DeepNoteAnalysisData,
   type SheetSufficiencyAnalysisData,
 } from "@/components/DeepNoteAnalysis";
@@ -196,6 +197,8 @@ export interface Finding {
   isCorrected?: boolean;
   /** Wave-7: e.g. "Memory candidate (2/3)" or "Applied on template v12". */
   memoryBadge?: string | null;
+  /** Persisted review action, used to restore photo-pair decision state. */
+  resolutionStatus?: string | null;
 }
 
 export interface AuditData {
@@ -298,6 +301,7 @@ export function mapFindingsFromApi(
       failClass,
       ruleId: f.ruleId ?? undefined,
       reasonCode: f.reasonCode ?? undefined,
+      resolutionStatus: f.resolutionStatus ?? null,
       value: f.rawSnippet || undefined,
       message: f.normalisedSnippet || undefined,
       isCorrected,
@@ -362,6 +366,14 @@ export function ReviewWorkstationPane({
     { id: jobSheetId },
     { enabled: jobSheetId > 0 && !auditDataProp }
   );
+  const { data: technicians } = trpc.jobSheets.listTechnicians.useQuery();
+  const technicianNameById = useMemo(
+    () =>
+      new Map(
+        (technicians ?? []).map(technician => [technician.id, technician.name])
+      ),
+    [technicians]
+  );
 
   const { data: auditResult, isLoading: auditLoading } =
     trpc.audits.getByJobSheet.useQuery(
@@ -397,7 +409,9 @@ export function ReviewWorkstationPane({
             auditResult?.confidenceScore ||
             (jobSheetData.status === "completed" ? "100" : "-"),
           date: new Date(jobSheetData.createdAt).toLocaleDateString(),
-          technician: `User ${jobSheetData.uploadedBy}`,
+          technician:
+            technicianNameById.get(jobSheetData.uploadedBy) ??
+            `User ${jobSheetData.uploadedBy}`,
           documentUrl: jobSheetData.fileUrl,
           findings: mapFindingsFromApi(findingsData || []),
           hasMajorFails: mapHasMajorFailsFromReport(auditResult?.reportJson),
@@ -659,6 +673,7 @@ function ReviewWorkstationContent({
   const [actionDialog, setActionDialog] = useState<{
     finding: Finding;
     action: "override" | "waive";
+    pairIndex?: number;
   } | null>(null);
   const [actionReason, setActionReason] = useState("");
   const [overrideTrainingReason, setOverrideTrainingReason] = useState<
@@ -742,7 +757,20 @@ function ReviewWorkstationContent({
 
   const { data: supportedActions } =
     trpc.auditActions.supportedActions.useQuery();
+  const { data: currentPersona } = trpc.aiPersona.get.useQuery();
   const templateMemoryWrite = Boolean(supportedActions?.templateMemoryWrite);
+  const personaLabel = useMemo(() => {
+    const stamped = mapPersonaDecisionFromReport(auditReportJson);
+    if (stamped) return stamped.label;
+    if (!currentPersona) return null;
+    const band =
+      currentPersona.strictness < 40
+        ? "lenient"
+        : currentPersona.strictness > 70
+          ? "strict"
+          : "standard";
+    return `Persona v${currentPersona.version} · ${band} ${currentPersona.strictness} · advisory`;
+  }, [auditReportJson, currentPersona]);
 
   const { data: memoryForSheet } =
     trpc.templates.memory.listForJobSheet.useQuery(
@@ -813,6 +841,29 @@ function ReviewWorkstationContent({
     memoryForSheet,
     optimisticPassedIds,
   ]);
+
+  const pairResolvedDecisions = useMemo(() => {
+    const decisions: Record<number, "confirmed" | "overridden"> = {};
+    for (
+      let index = 0;
+      index < (photoPairCompare?.pairs.length ?? 0);
+      index++
+    ) {
+      const pair = photoPairCompare!.pairs[index]!;
+      const targets = resolvePhotoPairFindings(auditData.findings, pair, true);
+      const statuses = targets
+        .map(finding => finding.resolutionStatus)
+        .filter((status): status is string =>
+          Boolean(status && status !== "open")
+        );
+      if (targets.length > 0 && statuses.length === targets.length) {
+        decisions[index] = statuses.every(status => status === "approved")
+          ? "confirmed"
+          : "overridden";
+      }
+    }
+    return decisions;
+  }, [auditData.findings, photoPairCompare]);
 
   const invalidateFindings = () => {
     utils.audits.getFindings.invalidate();
@@ -1086,6 +1137,29 @@ function ReviewWorkstationContent({
 
   const submitActionDialog = () => {
     if (!actionDialog) return;
+    if (actionDialog.pairIndex != null) {
+      if (!actionReason.trim()) {
+        toast.error("Please provide a reason");
+        return;
+      }
+      if (!overrideTrainingReason) {
+        toast.error("Select a training reason");
+        return;
+      }
+      const pairIndex = actionDialog.pairIndex;
+      const reason = actionReason.trim();
+      const trainingReasonCode = overrideTrainingReason;
+      setActionDialog(null);
+      setActionReason("");
+      setOverrideTrainingReason("");
+      void applyBeforeAfterPairAction(
+        pairIndex,
+        "override",
+        reason,
+        trainingReasonCode
+      );
+      return;
+    }
     const finding = actionDialog.finding;
     const findingId = resolveFindingId(finding);
     if (!findingId) {
@@ -1187,7 +1261,9 @@ function ReviewWorkstationContent({
 
   const applyBeforeAfterPairAction = async (
     pairIndex: number,
-    action: "approve" | "override"
+    action: "approve" | "override",
+    reasonOverride?: string,
+    trainingReasonCode?: TrainingReasonCode
   ): Promise<boolean> => {
     const pairs = Array.isArray(photoPairCompare?.pairs)
       ? photoPairCompare!.pairs
@@ -1203,9 +1279,10 @@ function ReviewWorkstationContent({
       return false;
     }
     const reason =
-      action === "approve"
+      reasonOverride ??
+      (action === "approve"
         ? "Confirmed before/after pair catch from workstation"
-        : "Overridden before/after pair from workstation";
+        : "Overridden before/after pair from workstation");
     const label =
       action === "approve" ? "Pair catch confirmed" : "Pair finding overridden";
 
@@ -1230,8 +1307,7 @@ function ReviewWorkstationContent({
           ? overrideMutation.mutateAsync({
               findingId,
               reason,
-              // Pair override: rule false-positive on PHOTO-C012/C013
-              trainingReasonCode: "rule_wrong",
+              trainingReasonCode: trainingReasonCode!,
               claimToken,
             })
           : approveMutation.mutateAsync({ findingId, reason, claimToken });
@@ -1271,8 +1347,27 @@ function ReviewWorkstationContent({
   const handleConfirmPair = (pairIndex: number) =>
     applyBeforeAfterPairAction(pairIndex, "approve");
 
-  const handleOverridePair = (pairIndex: number) =>
-    applyBeforeAfterPairAction(pairIndex, "override");
+  const handleOverridePair = (pairIndex: number) => {
+    const pair = photoPairCompare?.pairs?.[pairIndex];
+    const finding = pair
+      ? resolvePhotoPairFindings(auditData.findings, pair)[0]
+      : undefined;
+    if (!finding) {
+      toast.error("No PHOTO-C012/C013 finding mapped for this pair");
+      return Promise.resolve(false);
+    }
+    actionDialogTriggerRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setActionDialog({ finding, action: "override", pairIndex });
+    setActionReason("");
+    setOverrideTrainingReason("");
+    requestAnimationFrame(() => {
+      document.getElementById("override-reason")?.focus();
+    });
+    return Promise.resolve("deferred" as const);
+  };
 
   const boxes: ViewerBoundingBox[] = findingsToViewerBoxes(
     displayFindings.map(f => ({
@@ -1388,6 +1483,75 @@ function ReviewWorkstationContent({
     }
     openOverrideForFinding(finding);
   });
+  const onWaiveFinding = usePersistFn(() => {
+    const finding = getActiveFinding();
+    if (!finding) {
+      toast.error("No finding selected");
+      return;
+    }
+    const pairIndex = photoPairCompare?.pairs.findIndex(pair =>
+      resolvePhotoPairFindings(auditData.findings, pair).some(
+        target => target.id === finding.id
+      )
+    );
+    if (isPhotoPairFinding(finding) && pairIndex != null && pairIndex >= 0) {
+      void handleOverridePair(pairIndex);
+      return;
+    }
+    if (finding.status === "passed") {
+      toast.error("Waive applies to open findings");
+      return;
+    }
+    actionDialogTriggerRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setActionDialog({ finding, action: "waive" });
+    setActionReason("");
+  });
+  const onApproveFinding = usePersistFn(() => {
+    const finding = getActiveFinding();
+    if (!finding) {
+      toast.error("No finding selected");
+      return;
+    }
+    const pairIndex = photoPairCompare?.pairs.findIndex(pair =>
+      resolvePhotoPairFindings(auditData.findings, pair).some(
+        target => target.id === finding.id
+      )
+    );
+    if (isPhotoPairFinding(finding) && pairIndex != null && pairIndex >= 0) {
+      void handleConfirmPair(pairIndex);
+      return;
+    }
+    const findingId = resolveFindingId(finding);
+    if (!findingId || finding.status === "passed") {
+      toast.error("Approve applies to open findings");
+      return;
+    }
+    setOptimisticPassedIds(prev => new Set(prev).add(finding.id));
+    approveMutation.mutate(
+      {
+        findingId,
+        reason: "Approved finding from workstation keyboard",
+        claimToken,
+      },
+      {
+        onSuccess: () => {
+          invalidateFindings();
+          showUndoToast(findingId, "Finding approved");
+        },
+        onError: err => {
+          setOptimisticPassedIds(prev => {
+            const next = new Set(prev);
+            next.delete(finding.id);
+            return next;
+          });
+          toast.error(err.message || "Approve failed");
+        },
+      }
+    );
+  });
   const onCorrectFinding = usePersistFn(() => {
     const finding = getActiveFinding();
     if (!finding) {
@@ -1412,6 +1576,8 @@ function ReviewWorkstationContent({
       onOverrideFinding,
       onCorrectFinding,
       onViewFinding,
+      onWaiveFinding,
+      onApproveFinding,
     }),
     [
       onNextFinding,
@@ -1419,6 +1585,8 @@ function ReviewWorkstationContent({
       onOverrideFinding,
       onCorrectFinding,
       onViewFinding,
+      onWaiveFinding,
+      onApproveFinding,
     ]
   );
 
@@ -1513,6 +1681,15 @@ function ReviewWorkstationContent({
             score={auditData.score}
             penalties={auditData.docQualityPenalties ?? []}
           />
+          {personaLabel && (
+            <Badge
+              variant="secondary"
+              className="text-[10px] font-normal max-w-[220px] truncate"
+              title={personaLabel}
+            >
+              {personaLabel}
+            </Badge>
+          )}
           <span className="text-xs text-muted-foreground truncate">
             {auditData.technician} · {auditData.date} · {failedFindings.length}{" "}
             issue{failedFindings.length === 1 ? "" : "s"}
@@ -1804,6 +1981,7 @@ function ReviewWorkstationContent({
                   makeModel={makeModel}
                   extractedEngineerName={extractedEngineerName}
                   photoPairCompare={photoPairCompare}
+                  pairResolvedDecisions={pairResolvedDecisions}
                   onConfirmPair={handleConfirmPair}
                   onOverridePair={handleOverridePair}
                   onFindingClick={handleFindingClick}
@@ -1870,6 +2048,7 @@ function ReviewWorkstationContent({
                     attribution={attributionStamp}
                     hasAttrFindings={hasAttrFindings}
                     photoPairCompare={photoPairCompare}
+                    pairResolvedDecisions={pairResolvedDecisions}
                     deepNoteAnalysis={deepNoteAnalysis}
                     sheetSufficiencyAnalysis={sheetSufficiencyAnalysis}
                     documentUrl={documentUrl}
@@ -2077,12 +2256,16 @@ function ReviewWorkstationContent({
             <DialogTitle>
               {actionDialog?.action === "waive"
                 ? "Waive Finding"
-                : "Override Finding"}
+                : actionDialog?.pairIndex != null
+                  ? "Override Before / After Pair"
+                  : "Override Finding"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-3">
             <p className="text-sm text-muted-foreground">
-              {actionDialog?.finding.field}
+              {actionDialog?.pairIndex != null
+                ? `PHOTO-C012/C013 pair ${actionDialog.pairIndex + 1}`
+                : actionDialog?.finding.field}
               {actionDialog?.finding.message
                 ? ` — ${actionDialog.finding.message}`
                 : ""}
@@ -2547,6 +2730,7 @@ function IssuesTabContent({
   makeModel,
   extractedEngineerName,
   photoPairCompare,
+  pairResolvedDecisions,
   onConfirmPair,
   onOverridePair,
   onFindingClick,
@@ -2557,8 +2741,9 @@ function IssuesTabContent({
   makeModel?: string | null;
   extractedEngineerName?: string | null;
   photoPairCompare?: PhotoPairCompareArtifact | null;
-  onConfirmPair?: (pairIndex: number) => void | Promise<boolean>;
-  onOverridePair?: (pairIndex: number) => void | Promise<boolean>;
+  pairResolvedDecisions?: Record<number, "confirmed" | "overridden">;
+  onConfirmPair?: (pairIndex: number) => void | Promise<boolean | "deferred">;
+  onOverridePair?: (pairIndex: number) => void | Promise<boolean | "deferred">;
 }) {
   const relationshipFindings = findings.filter(isRelationshipFinding);
   const tyreFindings = findings.filter(
@@ -2680,6 +2865,7 @@ function IssuesTabContent({
             photoPairCompare={photoPairCompare}
             onConfirmPair={onConfirmPair}
             onOverridePair={onOverridePair}
+            pairResolvedDecisions={pairResolvedDecisions}
           />
         )}
         {otherFindings.map(finding => {

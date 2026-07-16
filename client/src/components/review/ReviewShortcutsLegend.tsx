@@ -16,6 +16,8 @@ const FINDING_SHORTCUTS: ShortcutEntry[] = [
   { keys: ["o"], label: "override" },
   { keys: ["c"], label: "correct" },
   { keys: ["v"], label: "view on PDF" },
+  { keys: ["w"], label: "waive" },
+  { keys: ["y"], label: "approve / confirm pair" },
   { keys: ["⌘", "Enter"], label: "confirm override" },
 ];
 

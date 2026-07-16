@@ -31,6 +31,8 @@ import {
   systemAuditLog,
   InsertProcessingSetting,
   processingSettings,
+  photoEvidencePairs,
+  partsLines,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import {
@@ -646,6 +648,86 @@ export async function createAuditResult(
 
   const result = await db.insert(auditResults).values(data);
   return { id: Number(result[0].insertId) };
+}
+
+/**
+ * Store queryable L3 evidence entities after their parent audit row exists.
+ * The caller deliberately treats this as best-effort so optional artifacts
+ * can never turn a successful document audit into a failed pipeline run.
+ */
+export async function persistAuditEvidenceEntities(input: {
+  jobSheetId: number;
+  auditResultId: number;
+  fileHash?: string | null;
+  photoPairCompare?: {
+    provider: string;
+    model: string;
+    pairs: Array<{
+      beforePage: number | null;
+      afterPage: number | null;
+      axes: {
+        work_done: string;
+        repaired_properly: string;
+        clean: string;
+        residual_risk: string;
+      };
+      confidence: number;
+      confidenceBand: string;
+      reasoning: string;
+    }>;
+  } | null;
+  parts: Array<{
+    partNumber: string | null;
+    description: string | null;
+    qty?: string | null;
+    raw: string;
+  }>;
+}): Promise<void> {
+  const db = await resolveDbClient();
+  const writes: Promise<unknown>[] = [];
+
+  if (input.photoPairCompare?.pairs.length) {
+    writes.push(
+      db.insert(photoEvidencePairs).values(
+        input.photoPairCompare.pairs.map((pair, pairIndex) => ({
+          jobSheetId: input.jobSheetId,
+          auditResultId: input.auditResultId,
+          pairIndex,
+          beforePage: pair.beforePage,
+          afterPage: pair.afterPage,
+          axes: pair.axes,
+          confidence: String(pair.confidence),
+          confidenceBand: pair.confidenceBand,
+          provider: input.photoPairCompare!.provider,
+          model: input.photoPairCompare!.model,
+          reasoning: pair.reasoning,
+          fileHash: input.fileHash ?? null,
+        }))
+      )
+    );
+  }
+
+  if (input.parts.length) {
+    writes.push(
+      db.insert(partsLines).values(
+        input.parts.map((part, lineIndex) => ({
+          jobSheetId: input.jobSheetId,
+          auditResultId: input.auditResultId,
+          lineIndex,
+          partNumber: part.partNumber,
+          description: part.description,
+          quantity: part.qty ?? null,
+          rawLine: part.raw,
+          isComplete: Boolean(
+            part.partNumber?.trim() && part.description?.trim()
+          ),
+          source: "parts_used",
+        }))
+      )
+    );
+  }
+
+  await Promise.all(writes);
 }
 
 export async function getAuditResultByJobSheetId(jobSheetId: number) {

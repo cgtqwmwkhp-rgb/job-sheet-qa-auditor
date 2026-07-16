@@ -398,6 +398,50 @@ describe("Field voting (Wave-4 B2)", () => {
       expect(result.votedFields.jobNumber?.value).toBe("JS-FUSE-1");
     });
 
+    it("uses Azure layout as a distinct OCR candidate, preserving conflict abstention", () => {
+      const agreed = applyFieldVote({
+        force: true,
+        primary: {
+          jobReference: { value: "AZ-249200", confidence: 75 },
+        },
+        azure: {
+          jobReference: { value: "AZ-249200", confidence: 75 },
+        },
+      });
+      expect(agreed.votedFields.jobReference?.value).toBe("AZ-249200");
+      expect(agreed.batch?.fields.jobReference?.winningEngines).toContain(
+        "azure"
+      );
+
+      const conflicted = applyFieldVote({
+        force: true,
+        primary: {
+          assetId: { value: "ASSET-A", confidence: 72 },
+        },
+        azure: {
+          assetId: { value: "ASSET-B", confidence: 71 },
+        },
+      });
+      expect(conflicted.votedFields.assetId).toBeUndefined();
+      expect(conflicted.batch?.fields.assetId?.abstained).toBe(true);
+    });
+
+    it("keeps provisioned custom JSR candidates separately attributable", () => {
+      const result = applyFieldVote({
+        force: true,
+        primary: {
+          jobReference: { value: "JSR-249200", confidence: 75 },
+        },
+        azureCustom: {
+          jobNumber: { value: "JSR-249200", confidence: 91 },
+        },
+      });
+      expect(result.votedFields.jobReference?.value).toBe("JSR-249200");
+      expect(result.batch?.fields.jobReference?.winningEngines).toContain(
+        "azure_custom"
+      );
+    });
+
     it("does not cross-map customerSignature into engineerSignOff via alias", async () => {
       const { aliasCanonicalExtractedFields } = await import(
         "../../services/ensembleExtraction"

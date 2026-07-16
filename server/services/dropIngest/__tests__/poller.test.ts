@@ -4,7 +4,11 @@ import path from "path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DropIngestConfig } from "../config";
 import { DropIngestPoller } from "../poller";
-import { BlobDropSource, FolderDropSource } from "../sources";
+import {
+  BlobDropSource,
+  FolderDropSource,
+  GraphDriveDropSource,
+} from "../sources";
 import { MemoryDropStateStore } from "../stateStore";
 
 function baseConfig(
@@ -17,6 +21,10 @@ function baseConfig(
     blobConnectionString: null,
     blobContainer: "jobsheet-drops",
     blobPrefix: "",
+    graphEnabled: false,
+    graphDriveId: null,
+    graphFolderId: null,
+    graphCredentialsReady: false,
     pollIntervalMs: 60_000,
     deviceId: "sharepoint-drop",
     baseUrl: "http://127.0.0.1:3000",
@@ -108,6 +116,40 @@ describe("DropIngestPoller", () => {
     expect(result.duplicates).toBe(1);
     expect(result.errors).toBe(0);
     expect(postUpload).toHaveBeenCalledTimes(1);
+  });
+
+  it("submits supported Microsoft Graph drive files through the same signed ingest path", async () => {
+    const postUpload = vi.fn(async () => ({
+      httpStatus: 201,
+      status: "accepted" as const,
+      body: { status: "accepted" },
+      idempotent: false,
+    }));
+    const source = new GraphDriveDropSource({
+      maxFileBytes: 10_000_000,
+      list: async () => [
+        { id: "pdf-id", name: "library-sheet.pdf", size: 4, file: {} },
+        { id: "folder-id", name: "archive", folder: {} },
+        { id: "text-id", name: "notes.txt", size: 4, file: {} },
+      ],
+      download: async itemId => Buffer.from(itemId === "pdf-id" ? "%PDF" : ""),
+    });
+    const poller = new DropIngestPoller({
+      config: baseConfig({
+        mode: "graph",
+        graphEnabled: true,
+        graphDriveId: "drive-id",
+        graphCredentialsReady: true,
+      }),
+      sources: [source],
+      state: new MemoryDropStateStore(),
+      postUpload: postUpload as never,
+      log: () => undefined,
+    });
+
+    const result = await poller.tick();
+    expect(result).toMatchObject({ scanned: 1, submitted: 1, errors: 0 });
+    expect(postUpload.mock.calls[0][1].externalJobId).toMatch(/^drop-graph-/);
   });
 
   it("archives local file after successful ingest when archiveDir set", async () => {
