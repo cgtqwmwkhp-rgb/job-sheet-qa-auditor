@@ -153,6 +153,11 @@ export default function HoldQueue() {
   }>({ status: "idle" });
   const paneRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
+  const { data: technicians } = trpc.jobSheets.listTechnicians.useQuery();
+  const technicianNameById = useMemo(
+    () => new Map((technicians ?? []).map(technician => [technician.id, technician.name])),
+    [technicians]
+  );
 
   const {
     data: jobSheets,
@@ -202,7 +207,9 @@ export default function HoldQueue() {
         return {
           id: sheet.id,
           referenceNumber: sheet.referenceNumber || `JS-${sheet.id}`,
-          technician: `User ${sheet.uploadedBy}`,
+          technician:
+            technicianNameById.get(sheet.uploadedBy) ??
+            `User ${sheet.uploadedBy}`,
           site: sheet.siteInfo || "Unknown Site",
           date: new Date(sheet.createdAt).toLocaleString(),
           severity: (sla?.highestSeverity === "S0" ||
@@ -216,7 +223,7 @@ export default function HoldQueue() {
           hoursUntilBreach: sla?.hoursUntilBreach,
         };
       }),
-    [jobSheets, slaById]
+    [jobSheets, slaById, technicianNameById]
   );
 
   const holdIdsKey = useMemo(

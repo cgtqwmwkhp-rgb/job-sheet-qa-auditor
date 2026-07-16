@@ -94,6 +94,11 @@ export interface SelectionMarksResult {
     string,
     { value: string; confidence: number; pageNumber: number }
   >;
+  /** Structured fields emitted only by the provisioned Azure DI custom model. */
+  customPreExtractedFields?: Record<
+    string,
+    { value: string; confidence: number; pageNumber: number }
+  >;
   /**
    * Full page text from the Azure DI layout pass (line-concatenated markdown).
    * Richer than Mistral-flattened text for completion-grid fields.
@@ -430,6 +435,9 @@ export function artifactToResult(
     artifact,
     hintsBlock,
     preExtractedFields,
+    ...(options?.extraPreExtractedFields
+      ? { customPreExtractedFields: options.extraPreExtractedFields }
+      : {}),
     ...(options?.layoutText ? { layoutText: options.layoutText } : {}),
     ...(options?.lines?.length ? { lines: options.lines } : {}),
     ...(options?.selectionMarks?.length

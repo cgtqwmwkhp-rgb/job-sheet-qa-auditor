@@ -24,8 +24,13 @@ export interface PhotoEvidenceFindingsGroupProps {
   activeBoxId: string | number | null;
   onFindingClick: (id: string | number) => void;
   photoPairCompare?: PhotoPairCompareArtifact | null;
-  onConfirmPair?: (pairIndex: number) => void | Promise<boolean>;
-  onOverridePair?: (pairIndex: number) => void | Promise<boolean>;
+  onConfirmPair?: (
+    pairIndex: number
+  ) => void | Promise<boolean | "deferred">;
+  onOverridePair?: (
+    pairIndex: number
+  ) => void | Promise<boolean | "deferred">;
+  pairResolvedDecisions?: Record<number, "confirmed" | "overridden">;
 }
 
 export function isPhotoPairFinding(finding: Finding): boolean {
@@ -39,6 +44,7 @@ export function PhotoEvidenceFindingsGroup({
   photoPairCompare,
   onConfirmPair,
   onOverridePair,
+  pairResolvedDecisions,
 }: PhotoEvidenceFindingsGroupProps) {
   const [expanded, setExpanded] = useState(false);
   const [pendingIdx, setPendingIdx] = useState<number | null>(null);
@@ -53,13 +59,15 @@ export function PhotoEvidenceFindingsGroup({
 
   const runPair = async (
     idx: number,
-    handler?: (pairIndex: number) => void | Promise<boolean>
+    handler?: (pairIndex: number) => void | Promise<boolean | "deferred">
   ) => {
     if (!handler || decided[idx] || pendingIdx != null) return;
     setPendingIdx(idx);
     try {
       const ok = await Promise.resolve(handler(idx));
-      if (ok !== false) setDecided(d => ({ ...d, [idx]: true }));
+      if (ok !== false && ok !== "deferred") {
+        setDecided(d => ({ ...d, [idx]: true }));
+      }
     } finally {
       setPendingIdx(null);
     }
@@ -93,7 +101,11 @@ export function PhotoEvidenceFindingsGroup({
                   size="sm"
                   variant="secondary"
                   className="h-6 text-[10px] px-2"
-                  disabled={!!decided[idx] || pendingIdx === idx}
+                  disabled={
+                    !!decided[idx] ||
+                    !!pairResolvedDecisions?.[idx] ||
+                    pendingIdx === idx
+                  }
                   onClick={() => void runPair(idx, onConfirmPair)}
                 >
                   <Check className="h-3 w-3 mr-1" />
@@ -103,7 +115,11 @@ export function PhotoEvidenceFindingsGroup({
                   size="sm"
                   variant="outline"
                   className="h-6 text-[10px] px-2"
-                  disabled={!!decided[idx] || pendingIdx === idx}
+                  disabled={
+                    !!decided[idx] ||
+                    !!pairResolvedDecisions?.[idx] ||
+                    pendingIdx === idx
+                  }
                   onClick={() => void runPair(idx, onOverridePair)}
                 >
                   <X className="h-3 w-3 mr-1" />

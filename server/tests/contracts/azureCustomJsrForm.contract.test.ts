@@ -28,6 +28,7 @@ import {
   customChoicesToSelectionRows,
   voteChecklistRows,
   buildSelectionMarksArtifact,
+  artifactToResult,
   mapSelectionMarksToRows,
   ENGINE_VERSION,
   ENGINE_VERSION_WITH_CUSTOM_VOTER,
@@ -239,5 +240,20 @@ describe("selectionMarks custom voter", () => {
     expect(artifact.customVoter?.preferredSource).toBe("custom");
     expect(artifact.rows[0].choice).toBe("Ok");
     expect(artifact.summary.readableRows).toBe(2);
+  });
+
+  it("retains custom fields separately for the field-vote engine", () => {
+    const parsed = parseAzureDiCustomForm(customFixture);
+    const customFields = customFieldsToPreExtracted(parsed.fields);
+    const result = buildSelectionMarksArtifact(parsed.selectionMarks, {
+      model: parsed.model,
+      processingTimeMs: 12,
+    });
+    const selectionResult = artifactToResult(result, {
+      extraPreExtractedFields: customFields,
+    });
+    expect(selectionResult.customPreExtractedFields?.jobNumber?.value).toBe(
+      "249200123"
+    );
   });
 });

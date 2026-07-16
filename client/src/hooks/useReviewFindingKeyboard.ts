@@ -11,6 +11,10 @@ export interface ReviewFindingKeyboardHandlers {
   onCorrectFinding: () => void;
   /** v — view active finding on PDF */
   onViewFinding: () => void;
+  /** w — waive active finding */
+  onWaiveFinding: () => void;
+  /** y — approve or confirm active finding */
+  onApproveFinding: () => void;
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -44,7 +48,8 @@ function isFindingKeyboardContext(target: EventTarget | null): boolean {
 
 /**
  * Finding-level shortcuts for the review workstation (Phase 1.7):
- * n/p navigate findings, o override, c correct, v view on document.
+ * n/p navigate findings, o override, c correct, v view on document,
+ * w waive, y approve/confirm.
  * Scoped so Hold Queue j/k/a/r still own queue navigation when focus is
  * on queue chrome; body fallback keeps the override path one keystroke.
  */
@@ -85,6 +90,16 @@ export function useReviewFindingKeyboard(
       if (key === "v") {
         e.preventDefault();
         handlers.onViewFinding();
+        return;
+      }
+      if (key === "w") {
+        e.preventDefault();
+        handlers.onWaiveFinding();
+        return;
+      }
+      if (key === "y") {
+        e.preventDefault();
+        handlers.onApproveFinding();
       }
     };
 

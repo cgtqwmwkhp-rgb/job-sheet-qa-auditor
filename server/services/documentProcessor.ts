@@ -75,6 +75,7 @@ import {
 } from "./findingHygiene";
 import {
   evaluateJobSummaryConsistency,
+  extractNamedSection,
   type FailurePathSignals,
 } from "./jobSummaryConsistency";
 import { evaluateImpliesRules } from "./impliesRules";
@@ -121,6 +122,7 @@ import {
   type PersonaDecisionStamp,
 } from "./aiPersona";
 import { evaluatePartsUsed } from "./partsAssessment";
+import { parsePartsUsedLines } from "./partsAssessment/parsePartsUsedLines";
 import { evaluateEngineerAttribution } from "./engineerAttributionFindings";
 import {
   isPartsWebVerifyEnabled,
@@ -1808,13 +1810,29 @@ async function processJobSheetWithOptions(
           pageNumber: 1,
         };
       }
+      // Azure DI prebuilt-layout is a second OCR engine, so scrape its own
+      // response into a distinct candidate map rather than relabelling it as
+      // an ensemble strategy over the primary OCR text.
+      const azureMap: PreExtractedFieldMap = {};
+      for (const f of scrapeCriticalFieldsFromText(
+        selectionMarksResult?.layoutText ?? ""
+      )) {
+        azureMap[f.fieldId] = {
+          value: f.value,
+          confidence: Math.round(f.confidence * 100),
+          pageNumber: 1,
+        };
+      }
       fieldVoteResult = applyFieldVote({
         primary: primaryMap,
+        azure: Object.keys(azureMap).length ? azureMap : undefined,
+        // Only this map originates from the provisioned custom model; layout
+        // candidates above remain independently attributable to Azure OCR.
+        azureCustom: selectionMarksResult?.customPreExtractedFields,
         crop: Object.keys(roiSpatialFields).length
           ? roiSpatialFields
           : undefined,
         ensemble: ensembleResult?.ensembleExtractedFields,
-        selectionMarks: selectionMarksResult?.preExtractedFields,
         multimodalRoi: multimodalRoiResult?.preExtractedFields,
         vlmHint: vlmInkResult?.preExtractedHint ?? null,
       });
@@ -2509,6 +2527,7 @@ async function processJobSheetWithOptions(
     | ReturnType<typeof evaluatePartsUsed>["signals"]
     | null = null;
   let partsAssessmentSummary: string | null = null;
+  let partsLinesToPersist: ReturnType<typeof parsePartsUsedLines> = [];
   let partsCatalogSignals:
     | Awaited<ReturnType<typeof verifyPartsCatalogWeb>>["signals"]
     | null = null;
@@ -2628,6 +2647,9 @@ async function processJobSheetWithOptions(
       const partsResult = evaluatePartsUsed(jsrText);
       partsAssessmentSignals = partsResult.signals;
       partsAssessmentSummary = partsResult.summary;
+      partsLinesToPersist = parsePartsUsedLines(
+        extractNamedSection(jsrText, "Parts Used")
+      );
       if (partsResult.findings.length > 0) {
         analysisResult = {
           ...analysisResult,
@@ -3602,6 +3624,23 @@ async function processJobSheetWithOptions(
     });
 
     auditResultId = auditResult.id;
+
+    // L3 normalized artifacts are supplemental to reportJson. A DB/migration
+    // issue here must not fail the completed audit or change its result.
+    try {
+      await db.persistAuditEvidenceEntities({
+        jobSheetId,
+        auditResultId: auditResult.id,
+        fileHash: evidenceFileHashToPersist,
+        photoPairCompare: photoPairCompareArtifact,
+        parts: partsLinesToPersist,
+      });
+    } catch (err) {
+      console.warn(
+        "[DocumentProcessor] Failed to persist normalized evidence entities (non-fatal):",
+        err
+      );
+    }
 
     // Create audit findings (enrich with OCR-4 bboxes/confidence when available)
     if (analysisResult.findings.length > 0) {

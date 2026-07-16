@@ -60,8 +60,14 @@ export interface BeforeAfterComparePaneProps {
   defaultOpen?: boolean;
   className?: string;
   /** Resolve true only after server mutate succeeds (mutate-then-commit). */
-  onConfirmPair?: (pairIndex: number) => void | Promise<boolean>;
-  onOverridePair?: (pairIndex: number) => void | Promise<boolean>;
+  onConfirmPair?: (
+    pairIndex: number
+  ) => void | Promise<boolean | "deferred">;
+  onOverridePair?: (
+    pairIndex: number
+  ) => void | Promise<boolean | "deferred">;
+  /** Server-resolved findings hydrate pair state after reopening a review. */
+  resolvedDecisions?: Record<number, "confirmed" | "overridden">;
   onFocusPage?: (page: number) => void;
 }
 
@@ -127,6 +133,7 @@ export function BeforeAfterComparePane({
   className,
   onConfirmPair,
   onOverridePair,
+  resolvedDecisions,
   onFocusPage,
 }: BeforeAfterComparePaneProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -143,13 +150,14 @@ export function BeforeAfterComparePane({
   const commitDecision = async (
     idx: number,
     kind: "confirmed" | "overridden",
-    handler?: (pairIndex: number) => void | Promise<boolean>
+    handler?: (pairIndex: number) => void | Promise<boolean | "deferred">
   ) => {
     if (decisions[idx] || pendingIdx != null) return;
     setPendingIdx(idx);
     try {
       if (handler) {
         const ok = await Promise.resolve(handler(idx));
+        if (ok === "deferred") return;
         // void handlers (legacy) → treat as success after settle
         if (ok === false) {
           toast.error("Failed to persist pair decision");
@@ -205,7 +213,7 @@ export function BeforeAfterComparePane({
               {artifact.summary} · {artifact.provider}/{artifact.model}
             </p>
             {pairs.map((pair, idx) => {
-              const decision = decisions[idx];
+              const decision = decisions[idx] ?? resolvedDecisions?.[idx];
               const axes = pair.axes ?? EMPTY_AXES;
               const beforePage = pair.beforePage ?? 1;
               const afterPage = pair.afterPage ?? 1;
@@ -308,12 +316,16 @@ export function resolvePhotoPairFindings<
     box?: { page: number };
     status?: string;
   },
->(findings: T[], pair: PhotoPairResult): T[] {
+>(
+  findings: T[],
+  pair: PhotoPairResult,
+  includeResolved = false
+): T[] {
   const c012Page = pair.afterPage ?? pair.beforePage ?? 1;
   const c013Page = pair.afterPage ?? 1;
   const candidates = findings.filter(
     f =>
-      f.status !== "passed" &&
+      (includeResolved || f.status !== "passed") &&
       (f.ruleId === "PHOTO-C012" || f.ruleId === "PHOTO-C013")
   );
   const byPage = candidates.filter(f => {

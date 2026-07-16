@@ -1,5 +1,6 @@
 /**
- * Drop sources: local watched folder (SharePoint library sync) and Azure Blob prefix.
+ * Drop sources: local watched folder (SharePoint library sync), Graph drive
+ * folders, and Azure Blob prefixes.
  */
 
 import { promises as fs } from "fs";
@@ -9,7 +10,7 @@ import type { DropIngestConfig } from "./config";
 export interface DropCandidate {
   /** Stable key for state / idempotency (source-scoped). */
   key: string;
-  source: "folder" | "blob";
+  source: "folder" | "blob" | "graph";
   /** Relative path / blob name. */
   relativeKey: string;
   fileName: string;
@@ -21,7 +22,7 @@ export interface DropCandidate {
 }
 
 export interface DropSource {
-  readonly kind: "folder" | "blob";
+  readonly kind: "folder" | "blob" | "graph";
   listCandidates(): Promise<DropCandidate[]>;
 }
 
@@ -188,6 +189,142 @@ export class BlobDropSource implements DropSource {
     }
     return out;
   }
+}
+
+export type GraphDriveItem = {
+  id: string;
+  name: string;
+  size?: number;
+  file?: Record<string, unknown>;
+  folder?: Record<string, unknown>;
+};
+
+export type GraphLister = () => Promise<GraphDriveItem[]>;
+export type GraphDownloader = (itemId: string) => Promise<Buffer>;
+
+/**
+ * Microsoft Graph document-library source. The production factory authenticates
+ * with application credentials; injected operations keep it entirely unit-testable.
+ */
+export class GraphDriveDropSource implements DropSource {
+  readonly kind = "graph" as const;
+
+  constructor(
+    private readonly options: {
+      maxFileBytes: number;
+      list: GraphLister;
+      download: GraphDownloader;
+    }
+  ) {}
+
+  async listCandidates(): Promise<DropCandidate[]> {
+    const items = await this.options.list();
+    const out: DropCandidate[] = [];
+
+    for (const item of items) {
+      if (!item.id || !item.name || !item.file) continue;
+      if (!isSupportedFileName(item.name) || item.name.startsWith(".")) continue;
+      const size = item.size ?? 0;
+      if (size > this.options.maxFileBytes) continue;
+
+      out.push({
+        key: `graph:${item.id}`,
+        source: "graph",
+        relativeKey: item.id,
+        fileName: item.name,
+        sizeBytes: size,
+        read: () => this.options.download(item.id),
+      });
+    }
+    return out;
+  }
+}
+
+async function getGraphAccessToken(): Promise<string> {
+  const tenantId = process.env.GRAPH_TENANT_ID?.trim();
+  const clientId = process.env.GRAPH_CLIENT_ID?.trim();
+  const clientSecret = process.env.GRAPH_CLIENT_SECRET?.trim();
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error("Microsoft Graph credentials are not configured");
+  }
+
+  const response = await fetch(
+    `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        scope: "https://graph.microsoft.com/.default",
+        grant_type: "client_credentials",
+      }),
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Graph token request failed (${response.status})`);
+  }
+  const token = (await response.json()) as { access_token?: string };
+  if (!token.access_token) throw new Error("Graph token response missing access_token");
+  return token.access_token;
+}
+
+/** Build a Graph source for direct SharePoint document-library polling. */
+export async function createGraphDriveDropSource(
+  config: DropIngestConfig
+): Promise<GraphDriveDropSource> {
+  if (!config.graphEnabled || !config.graphDriveId || !config.graphCredentialsReady) {
+    throw new Error(
+      "Graph source requires FEATURE_DROP_GRAPH=true, DROP_INGEST_GRAPH_DRIVE_ID, and GRAPH_* credentials"
+    );
+  }
+
+  const driveId = encodeURIComponent(config.graphDriveId);
+  const folderPath = config.graphFolderId
+    ? `/items/${encodeURIComponent(config.graphFolderId)}/children`
+    : "/root/children";
+
+  const withToken = async () => ({
+    authorization: `Bearer ${await getGraphAccessToken()}`,
+  });
+
+  const list: GraphLister = async () => {
+    const items: GraphDriveItem[] = [];
+    let nextUrl: string | null =
+      `https://graph.microsoft.com/v1.0/drives/${driveId}${folderPath}` +
+      "?$select=id,name,size,file,folder&$top=200";
+
+    while (nextUrl) {
+      const response = await fetch(nextUrl, { headers: await withToken() });
+      if (!response.ok) {
+        throw new Error(`Graph drive listing failed (${response.status})`);
+      }
+      const body = (await response.json()) as {
+        value?: GraphDriveItem[];
+        "@odata.nextLink"?: string;
+      };
+      items.push(...(body.value ?? []));
+      nextUrl = body["@odata.nextLink"] ?? null;
+    }
+    return items;
+  };
+
+  const download: GraphDownloader = async itemId => {
+    const response = await fetch(
+      `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${encodeURIComponent(itemId)}/content`,
+      { headers: await withToken() }
+    );
+    if (!response.ok) {
+      throw new Error(`Graph drive download failed (${response.status})`);
+    }
+    return Buffer.from(await response.arrayBuffer());
+  };
+
+  return new GraphDriveDropSource({
+    maxFileBytes: config.maxFileBytes,
+    list,
+    download,
+  });
 }
 
 /**

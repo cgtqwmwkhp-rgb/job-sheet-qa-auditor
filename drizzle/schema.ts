@@ -168,6 +168,85 @@ export type AuditResult = typeof auditResults.$inferSelect;
 export type InsertAuditResult = typeof auditResults.$inferInsert;
 
 /**
+ * Normalized before/after pair-comparison output. reportJson retains the
+ * complete legacy artifact; this table supports indexed evidence queries.
+ */
+export const photoEvidencePairs = mysqlTable(
+  "photo_evidence_pairs",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    jobSheetId: int("jobSheetId")
+      .notNull()
+      .references(() => jobSheets.id),
+    auditResultId: int("auditResultId")
+      .notNull()
+      .references(() => auditResults.id),
+    pairIndex: int("pairIndex").notNull(),
+    beforePage: int("beforePage"),
+    afterPage: int("afterPage"),
+    axes: json("axes").$type<Record<string, string>>().notNull(),
+    confidence: decimal("confidence", { precision: 5, scale: 4 }),
+    confidenceBand: varchar("confidenceBand", { length: 16 }),
+    provider: varchar("provider", { length: 32 }).notNull(),
+    model: varchar("model", { length: 128 }),
+    reasoning: text("reasoning"),
+    fileHash: varchar("fileHash", { length: 64 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    auditPairUnique: uniqueIndex("photo_evidence_pairs_audit_pair_unique").on(
+      table.auditResultId,
+      table.pairIndex
+    ),
+    jobAuditIdx: index("photo_evidence_pairs_job_audit_idx").on(
+      table.jobSheetId,
+      table.auditResultId
+    ),
+  })
+);
+
+export type PhotoEvidencePair = typeof photoEvidencePairs.$inferSelect;
+export type InsertPhotoEvidencePair = typeof photoEvidencePairs.$inferInsert;
+
+/**
+ * Parsed Parts Used lines. reportJson remains the backwards-compatible
+ * processor snapshot; these rows are the queryable reconciliation surface.
+ */
+export const partsLines = mysqlTable(
+  "parts_lines",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    jobSheetId: int("jobSheetId")
+      .notNull()
+      .references(() => jobSheets.id),
+    auditResultId: int("auditResultId")
+      .notNull()
+      .references(() => auditResults.id),
+    lineIndex: int("lineIndex").notNull(),
+    partNumber: varchar("partNumber", { length: 128 }),
+    description: text("description"),
+    quantity: varchar("quantity", { length: 32 }),
+    rawLine: text("rawLine").notNull(),
+    isComplete: boolean("isComplete").notNull(),
+    source: varchar("source", { length: 32 }).notNull().default("parts_used"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    auditLineUnique: uniqueIndex("parts_lines_audit_line_unique").on(
+      table.auditResultId,
+      table.lineIndex
+    ),
+    jobAuditIdx: index("parts_lines_job_audit_idx").on(
+      table.jobSheetId,
+      table.auditResultId
+    ),
+  })
+);
+
+export type PartsLine = typeof partsLines.$inferSelect;
+export type InsertPartsLine = typeof partsLines.$inferInsert;
+
+/**
  * Audit Findings - individual defects/issues found
  */
 export const auditFindings = mysqlTable("audit_findings", {

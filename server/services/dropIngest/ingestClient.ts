@@ -162,7 +162,7 @@ export function guessFileType(fileName: string): string {
  * Idempotent across poller restarts for the same blob/file bytes.
  */
 export function buildExternalJobId(params: {
-  source: "folder" | "blob";
+  source: "folder" | "blob" | "graph";
   relativeKey: string;
   contentHash: string;
 }): string {

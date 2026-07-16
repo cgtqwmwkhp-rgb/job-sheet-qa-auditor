@@ -52,4 +52,21 @@ describe("dropIngest config", () => {
       )
     ).toEqual([]);
   });
+
+  it("activates Graph only behind FEATURE_DROP_GRAPH with drive and credentials", () => {
+    const base = {
+      DROP_INGEST_MODE: "graph",
+      DROP_INGEST_GRAPH_DRIVE_ID: "drive-123",
+      GRAPH_TENANT_ID: "tenant",
+      GRAPH_CLIENT_ID: "client",
+      GRAPH_CLIENT_SECRET: "secret",
+    };
+
+    expect(resolveActiveSources(loadDropIngestConfig(base))).toEqual([]);
+    expect(
+      resolveActiveSources(
+        loadDropIngestConfig({ ...base, FEATURE_DROP_GRAPH: "true" })
+      )
+    ).toEqual(["graph"]);
+  });
 });

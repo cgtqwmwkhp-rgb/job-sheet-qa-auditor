@@ -18,8 +18,13 @@ import type { FieldVoteBatchResult } from "./types";
 export interface ApplyFieldVoteInput {
   primary?: PreExtractedLike;
   fallback?: PreExtractedLike;
+  /** Separate Azure DI prebuilt-layout/read OCR candidates. */
+  azure?: PreExtractedLike;
+  /** Structured candidates from a provisioned Azure DI custom JSR model. */
+  azureCustom?: PreExtractedLike;
   crop?: PreExtractedLike;
   ensemble?: PreExtractedLike;
+  /** @deprecated Use azureCustom for Azure DI custom-model candidates. */
   selectionMarks?: PreExtractedLike;
   multimodalRoi?: PreExtractedLike;
   /** VLM ink hint for technician / customer signatures. */
@@ -63,6 +68,8 @@ export function applyFieldVote(
   // Alias job/asset/date before vote so ensemble jobNumber fuses with crop jobReference
   const primary = aliasPreExtractedForVote(input.primary);
   const fallback = aliasPreExtractedForVote(input.fallback);
+  const azure = aliasPreExtractedForVote(input.azure);
+  const azureCustom = aliasPreExtractedForVote(input.azureCustom);
   const crop = aliasPreExtractedForVote(input.crop);
   const ensemble = aliasPreExtractedForVote(input.ensemble);
   const selectionMarks = aliasPreExtractedForVote(input.selectionMarks);
@@ -71,6 +78,8 @@ export function applyFieldVote(
   const engines = [
     ...(primary ? [{ engine: "primary", fields: primary }] : []),
     ...(fallback ? [{ engine: "fallback", fields: fallback }] : []),
+    ...(azure ? [{ engine: "azure", fields: azure }] : []),
+    ...(azureCustom ? [{ engine: "azure_custom", fields: azureCustom }] : []),
     ...(crop
       ? [
           {
