@@ -197,7 +197,7 @@ export const PLANTEXPAND_JSR_FIELD_MAP: Record<string, string> = {
 };
 
 /** Checklist choice tokens accepted from selectionGroup / string fields. */
-const CHECKLIST_CHOICE_RE = /^(ok|adv\.?|fail|n\/?a|unreadable)$/i;
+const CHECKLIST_CHOICE_RE = /^(ok|pass|adv\.?|fail|n\/?a|unreadable)$/i;
 
 export function normalizeChecklistChoice(
   raw: string | null | undefined
@@ -205,7 +205,7 @@ export function normalizeChecklistChoice(
   if (!raw?.trim()) return null;
   const t = raw.trim();
   if (!CHECKLIST_CHOICE_RE.test(t)) return null;
-  if (/^ok$/i.test(t)) return "Ok";
+  if (/^(ok|pass)$/i.test(t)) return "Ok";
   if (/^adv\.?$/i.test(t)) return "Adv";
   if (/^fail$/i.test(t)) return "Fail";
   if (/^n\/?a$/i.test(t)) return "N/A";

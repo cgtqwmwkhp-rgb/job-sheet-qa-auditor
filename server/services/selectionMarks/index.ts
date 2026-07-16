@@ -124,7 +124,8 @@ const HEADER_PATTERNS: Array<{
   choice: Exclude<ChecklistChoice, "UNREADABLE">;
   re: RegExp;
 }> = [
-  { choice: "Ok", re: /\bok\b/i },
+  // Pass is PlantExpand synonym for Ok on older compliance grids
+  { choice: "Ok", re: /\b(?:ok|pass)\b/i },
   { choice: "Adv", re: /\badv\.?\b|advisor/i },
   { choice: "Fail", re: /\bfail\b/i },
   { choice: "N/A", re: /\bn\/?a\b|not\s*applicable/i },
@@ -133,6 +134,9 @@ const HEADER_PATTERNS: Array<{
 /**
  * Infer column order from header line text near the top of the mark cluster.
  * Falls back to Ok|Adv|Fail|N/A left-to-right.
+ *
+ * Supports 3-column headers (Pass|Fail|N/A or Ok|Fail|N/A) without stuffing
+ * a phantom Adv column — that mis-maps Fail↔Adv and N/A↔Fail.
  */
 export function inferColumnOrder(
   headerText?: string
@@ -152,11 +156,48 @@ export function inferColumnOrder(
   if (found.length < 2) return [...CHECKLIST_COLUMNS];
   found.sort((a, b) => a.index - b.index);
   const ordered = found.map(f => f.choice);
-  // Ensure all four columns present
-  for (const col of CHECKLIST_COLUMNS) {
-    if (!ordered.includes(col)) ordered.push(col);
+  // Deduplicate while preserving left-to-right order (Pass+Ok both → Ok)
+  const deduped: Exclude<ChecklistChoice, "UNREADABLE">[] = [];
+  for (const col of ordered) {
+    if (!deduped.includes(col)) deduped.push(col);
   }
-  return ordered.slice(0, 4);
+  // Only pad to four when the header clearly names an Adv column.
+  // Pass|Fail|N/A and Ok|Fail|N/A stay 3-wide.
+  const headerHasAdv = /\badv\.?\b|advisor/i.test(headerText);
+  if (headerHasAdv) {
+    for (const col of CHECKLIST_COLUMNS) {
+      if (!deduped.includes(col)) deduped.push(col);
+    }
+    return deduped.slice(0, 4);
+  }
+  return deduped.slice(0, 4);
+}
+
+/**
+ * When Azure DI misses an empty Adv circle we often see 3 marks on a 4-column
+ * Ok|Adv|Fail|N/A header. Indexing into the 4-name list then maps N/A → Fail.
+ * Drop Adv when the physical mark count is 3 and the header includes N/A.
+ */
+export function alignColumnsToMarkCount(
+  columns: Exclude<ChecklistChoice, "UNREADABLE">[],
+  markCount: number
+): Exclude<ChecklistChoice, "UNREADABLE">[] {
+  if (markCount <= 0) return columns;
+  if (markCount === columns.length) return columns;
+  if (
+    markCount === 3 &&
+    columns.length === 4 &&
+    columns[0] === "Ok" &&
+    columns.includes("Adv") &&
+    columns.includes("Fail") &&
+    columns.includes("N/A")
+  ) {
+    return ["Ok", "Fail", "N/A"];
+  }
+  if (markCount < columns.length) {
+    return columns.slice(0, markCount);
+  }
+  return columns;
 }
 
 /**
@@ -224,6 +265,7 @@ export function mapSelectionMarksToRows(
     const pageNumber = colMarks[0].pageNumber;
     const avgConf =
       colMarks.reduce((s, m) => s + m.confidence, 0) / colMarks.length;
+    const rowColumns = alignColumnsToMarkCount(columns, colMarks.length);
 
     let choice: ChecklistChoice = "UNREADABLE";
     let bbox = unionBBox(colMarks);
@@ -231,12 +273,12 @@ export function mapSelectionMarksToRows(
     if (selected.length === 1 && colMarks.length >= 2) {
       const selIdx = colMarks.indexOf(selected[0]);
       if (colMarks.length === 4 || colMarks.length === 3) {
-        choice = columns[selIdx] ?? "UNREADABLE";
+        choice = rowColumns[selIdx] ?? "UNREADABLE";
       } else {
         choice =
           selIdx === 0
-            ? columns[0]
-            : (columns[columns.length - 1] ?? "UNREADABLE");
+            ? rowColumns[0]
+            : (rowColumns[rowColumns.length - 1] ?? "UNREADABLE");
       }
       bbox = selected[0].bbox;
     } else if (selected.length > 1) {
@@ -247,7 +289,7 @@ export function mapSelectionMarksToRows(
         byConf[0].confidence >= byConf[1].confidence + 15
       ) {
         const selIdx = colMarks.indexOf(byConf[0]);
-        choice = columns[selIdx] ?? "UNREADABLE";
+        choice = rowColumns[selIdx] ?? "UNREADABLE";
         bbox = byConf[0].bbox;
       } else {
         choice = "UNREADABLE";

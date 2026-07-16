@@ -1,0 +1,390 @@
+{
+  "packVersion": "1.0.0",
+  "exportedAt": "2026-07-16T15:00:00.000Z",
+  "sourceSystem": "mobilisation-compliance-checklist-pto-service",
+  "templates": [
+    {
+      "metadata": {
+        "templateId": "compliance-checklist-pto-service-v1",
+        "name": "Compliance Checklist — PTO Service",
+        "description": "PlantExpand Job Summary + Compliance Checklist (PTO Service / OVP). Tall single-page layout with Ok|Adv.|Fail|N/A radio grid. ROIs tuned for ~595×2264 pt pages (WX65VMH-class).",
+        "category": "compliance",
+        "tags": [
+          "compliance-checklist",
+          "pto-service",
+          "ovp",
+          "plantexpand",
+          "job-summary",
+          "selection-marks"
+        ]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Compliance Checklist PTO Service Spec",
+        "version": "1.0.0",
+        "fields": [
+          {
+            "field": "jobReference",
+            "label": "Job ID",
+            "type": "string",
+            "required": true,
+            "extractionHints": [
+              "job id",
+              "job no",
+              "job number",
+              "job reference",
+              "work order"
+            ],
+            "aliases": ["Job ID", "Job No", "Job Number", "Job Ref"]
+          },
+          {
+            "field": "assetId",
+            "label": "Asset No",
+            "type": "string",
+            "required": true,
+            "extractionHints": [
+              "asset no",
+              "asset number",
+              "asset id",
+              "registration",
+              "reg no"
+            ],
+            "aliases": ["Asset No", "Asset Number", "Asset ID"]
+          },
+          {
+            "field": "date",
+            "label": "Date",
+            "type": "date",
+            "required": true,
+            "extractionHints": [
+              "date",
+              "service date",
+              "job date",
+              "completed on"
+            ],
+            "aliases": ["Service Date", "Job Date"]
+          },
+          {
+            "field": "engineerSignOff",
+            "label": "Technician Signature",
+            "type": "boolean",
+            "required": true,
+            "extractionHints": [
+              "technician signature",
+              "technician name",
+              "engineer signature",
+              "engineer sign off",
+              "signed by",
+              "signature"
+            ],
+            "aliases": [
+              "Technician Signature",
+              "Technician Name",
+              "Engineer Sign Off"
+            ]
+          },
+          {
+            "field": "makeModel",
+            "label": "Make/Model",
+            "type": "string",
+            "required": false,
+            "extractionHints": [
+              "make/model",
+              "make model",
+              "pto on board",
+              "equipment type"
+            ],
+            "aliases": ["Make/Model", "Make Model"]
+          },
+          {
+            "field": "mileageHours",
+            "label": "Mileage/Hours",
+            "type": "number",
+            "required": false,
+            "extractionHints": ["miles/hours", "mileage", "hours", "odometer"],
+            "aliases": ["Miles/Hours", "Mileage/Hours", "Mileage", "Hours"]
+          },
+          {
+            "field": "serialNumber",
+            "label": "Serial No",
+            "type": "string",
+            "required": false,
+            "extractionHints": ["serial no", "serial number", "s/n"],
+            "aliases": ["Serial No", "Serial Number"]
+          },
+          {
+            "field": "customerName",
+            "label": "Customer/Site",
+            "type": "string",
+            "required": false,
+            "extractionHints": ["customer", "site", "site address", "contact"],
+            "aliases": ["Customer", "Site", "Site Address"]
+          },
+          {
+            "field": "complianceTitle",
+            "label": "Compliance Title",
+            "type": "string",
+            "required": false,
+            "extractionHints": [
+              "compliance title",
+              "pto service",
+              "compliance checklist"
+            ],
+            "aliases": ["Compliance Title", "PTO Service"]
+          },
+          {
+            "field": "complianceType",
+            "label": "Compliance Type",
+            "type": "string",
+            "required": false,
+            "extractionHints": ["compliance type", "service - other"],
+            "aliases": ["Compliance Type"]
+          },
+          {
+            "field": "expiryDate",
+            "label": "Next Service Date",
+            "type": "date",
+            "required": false,
+            "extractionHints": ["next service date", "expiry", "next service"],
+            "aliases": ["Next Service Date", "Expiry Date"]
+          },
+          {
+            "field": "safeToUse",
+            "label": "Safe to Use",
+            "type": "boolean",
+            "required": false,
+            "extractionHints": [
+              "asset safe to use",
+              "safe to use",
+              "safe for use"
+            ],
+            "aliases": ["Asset Safe To Use", "Safe to Use"]
+          },
+          {
+            "field": "returnVisitRequired",
+            "label": "Return Visit Needed",
+            "type": "boolean",
+            "required": false,
+            "extractionHints": [
+              "return visit needed",
+              "return visit required",
+              "return visit"
+            ],
+            "aliases": ["Return Visit Needed", "Return Visit Required"]
+          },
+          {
+            "field": "worksCompleted",
+            "label": "All Works Completed",
+            "type": "boolean",
+            "required": false,
+            "extractionHints": [
+              "all works completed",
+              "service completed",
+              "works completed"
+            ],
+            "aliases": ["All Works Completed", "Service Completed"]
+          },
+          {
+            "field": "complianceTickboxes",
+            "label": "Compliance Checklist Marks",
+            "type": "string",
+            "required": false,
+            "extractionHints": [
+              "compliance checklist",
+              "ok",
+              "adv",
+              "fail",
+              "n/a",
+              "lubricate",
+              "check/do",
+              "change"
+            ],
+            "aliases": ["Checklist", "Selection Marks"]
+          },
+          {
+            "field": "workDescription",
+            "label": "Engineer Comments",
+            "type": "string",
+            "required": false,
+            "extractionHints": [
+              "engineer comments",
+              "work notes",
+              "repairs",
+              "comments"
+            ],
+            "aliases": ["Engineer Comments", "Work Notes", "Comments"]
+          }
+        ],
+        "rules": [
+          {
+            "ruleId": "PTO-R001",
+            "field": "jobReference",
+            "description": "Job ID is required on PTO Service compliance reports",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "PTO-R002",
+            "field": "assetId",
+            "description": "Asset No is required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "PTO-R003",
+            "field": "date",
+            "description": "Service date is required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "PTO-R004",
+            "field": "engineerSignOff",
+            "description": "Technician name/signature is required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "PTO-R005",
+            "field": "assetId",
+            "description": "Asset ID should be alphanumeric registration-style",
+            "severity": "major",
+            "type": "pattern",
+            "pattern": "^[A-Z0-9][A-Z0-9_-]*$",
+            "enabled": true
+          }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["pto", "service"],
+        "requiredTokensAny": [
+          "compliance",
+          "checklist",
+          "ovp",
+          "winton",
+          "gardener",
+          "compressor"
+        ],
+        "optionalTokens": [
+          "plantexpand",
+          "job",
+          "summary",
+          "lubricate",
+          "driveline",
+          "propshaft",
+          "airline",
+          "asset",
+          "technician"
+        ],
+        "tokenWeights": {
+          "pto": 20,
+          "service": 10,
+          "compliance": 12,
+          "checklist": 12,
+          "ovp": 8,
+          "winton": 6,
+          "gardener": 6,
+          "compressor": 5,
+          "lubricate": 4,
+          "plantexpand": 3,
+          "job": 2,
+          "summary": 2
+        }
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          {
+            "name": "assetId",
+            "x": 0.05,
+            "y": 0.09,
+            "w": 0.4,
+            "h": 0.04,
+            "page": 1
+          },
+          {
+            "name": "date",
+            "x": 0.1,
+            "y": 0.145,
+            "w": 0.3,
+            "h": 0.03,
+            "page": 1
+          },
+          {
+            "name": "expiryDate",
+            "x": 0.1,
+            "y": 0.155,
+            "w": 0.3,
+            "h": 0.03,
+            "page": 1
+          },
+          {
+            "name": "jobReference",
+            "x": 0.68,
+            "y": 0.195,
+            "w": 0.28,
+            "h": 0.035,
+            "page": 1
+          },
+          {
+            "name": "tickboxBlock",
+            "x": 0.02,
+            "y": 0.24,
+            "w": 0.96,
+            "h": 0.7,
+            "page": 1
+          },
+          {
+            "name": "signatureBlock",
+            "x": 0.02,
+            "y": 0.94,
+            "w": 0.96,
+            "h": 0.055,
+            "page": 1
+          }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "PASS-001",
+          "description": "Complete PTO Service compliance checklist with Ok marks",
+          "inputText": "Job Summary Report\nPlantExpand\nAsset No: WX65VMH\nMake/Model: PTO On Board Air System\nCompliance Checklist\nPTO Service\nType of PTO\nWinton\nLubricate Ok Adv. Fail N/A\nClean and lubricate PTO end selector cable\nCheck/Do Ok Adv. Fail N/A\nBelt tension and condition\nChange Ok Adv. Fail N/A\nCompressor oil filter\nDate: 16/07/2026\nJob ID: 218\nTechnician Name: craig.powell\nSignature: Signed\nAsset Safe To Use? Yes\nReturn Visit Needed? No\nAll Works Completed? Yes",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "PASS-002",
+          "description": "Minimal PTO Service with required fields",
+          "inputText": "Job Summary Report\nCompliance Checklist\nPTO Service\nOVP system\nAsset No: AB12CDE\nJob ID: 100\nDate: 01/06/2026\nTechnician Signature: Signed\nOk Adv. Fail N/A",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "FAIL-001",
+          "description": "Invoice / wrong document family",
+          "inputText": "Invoice\nInvoice Number: INV-999\nAmount Due: 500.00",
+          "expectedOutcome": "fail",
+          "required": true
+        },
+        {
+          "caseId": "FAIL-002",
+          "description": "PTO checklist missing asset and job id",
+          "inputText": "Compliance Checklist\nPTO Service\nDate: 16/07/2026\nOk Adv. Fail N/A",
+          "expectedOutcome": "fail",
+          "required": true
+        },
+        {
+          "caseId": "REVIEW-001",
+          "description": "PTO Service with criticals present; optional comments absent",
+          "inputText": "Job Summary Report\nCompliance Checklist PTO Service\nAsset No: WX65VMH\nJob ID: 218\nDate: 16/07/2026\nTechnician Name: craig.powell\nSignature present\nOk Adv. Fail N/A\nCompressor oil",
+          "expectedOutcome": "pass",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

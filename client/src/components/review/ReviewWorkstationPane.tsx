@@ -51,6 +51,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -2080,6 +2081,10 @@ function ReviewWorkstationContent({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Override template + reprocess</DialogTitle>
+            <DialogDescription>
+              Force a registry template version for this job sheet, then
+              reprocess.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <p className="text-sm text-muted-foreground">
@@ -2199,6 +2204,9 @@ function ReviewWorkstationContent({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Report Issue with Finding</DialogTitle>
+            <DialogDescription>
+              Describe the problem with this finding for engineering follow-up.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -2260,6 +2268,9 @@ function ReviewWorkstationContent({
                   ? "Override Before / After Pair"
                   : "Override Finding"}
             </DialogTitle>
+            <DialogDescription>
+              Provide a reason and training taxonomy for this finding action.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-3">
             <p className="text-sm text-muted-foreground">
@@ -2398,6 +2409,9 @@ function ReviewWorkstationContent({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Fix displayed value</DialogTitle>
+            <DialogDescription>
+              Correct the displayed field value and capture a training reason.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
