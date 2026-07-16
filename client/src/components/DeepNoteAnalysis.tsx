@@ -234,6 +234,35 @@ export interface SheetSufficiencyAnalysisData {
   usedLlm: boolean;
   provider?: string;
   confidence?: number;
+  personaLabel?: string;
+}
+
+export function mapPersonaDecisionFromReport(
+  reportJson: unknown
+): { label: string; version: string; strictness: number } | null {
+  if (!reportJson || typeof reportJson !== "object") return null;
+  const report = reportJson as Record<string, unknown>;
+  const d = report.personaDecision as
+    | {
+        version?: string;
+        strictness?: number;
+        band?: string;
+      }
+    | undefined;
+  if (!d?.version || typeof d.strictness !== "number") return null;
+  const band =
+    typeof d.band === "string"
+      ? d.band
+      : d.strictness < 40
+        ? "lenient"
+        : d.strictness > 70
+          ? "strict"
+          : "standard";
+  return {
+    version: d.version,
+    strictness: d.strictness,
+    label: `Persona v${d.version} · ${band} ${d.strictness} · advisory`,
+  };
 }
 
 export function mapSheetSufficiencyFromReport(
@@ -250,9 +279,16 @@ export function mapSheetSufficiencyFromReport(
         usedLlm?: boolean;
         provider?: string;
         confidence?: number;
+        persona?: { version?: string; strictness?: number; band?: string };
       }
     | undefined;
   if (!note || note.enabled === false) return null;
+  const personaStamp = mapPersonaDecisionFromReport(reportJson);
+  const personaLabel =
+    personaStamp?.label ??
+    (note.persona?.version
+      ? `Persona v${note.persona.version} · ${note.persona.band ?? "standard"} ${note.persona.strictness ?? ""} · advisory`.trim()
+      : undefined);
   return {
     adequate: typeof note.adequate === "boolean" ? note.adequate : null,
     summary: note.summary ?? "",
@@ -260,6 +296,7 @@ export function mapSheetSufficiencyFromReport(
     usedLlm: note.usedLlm === true,
     provider: note.provider,
     confidence: note.confidence,
+    personaLabel,
   };
 }
 
@@ -297,6 +334,15 @@ export function SheetSufficiencyAdvisoryPanel({
               <Badge variant="outline" className="text-[10px] px-1.5 ml-auto">
                 {analysis.usedLlm ? "AI advisory" : "Rubric advisory"}
               </Badge>
+              {analysis.personaLabel ? (
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] px-1.5"
+                  title="Assessed under org persona at process time"
+                >
+                  {analysis.personaLabel}
+                </Badge>
+              ) : null}
             </Button>
           </CollapsibleTrigger>
         </CardHeader>

@@ -40,6 +40,12 @@ import {
   type AuditPolicy,
 } from "./services/auditPolicy";
 import {
+  AI_PERSONA_SETTING_KEY,
+  mergeAiPersona,
+  parseStoredAiPersona,
+  type AiPersona,
+} from "./services/aiPersona";
+import {
   extractPassSampleRowFromReport,
   humanFoundDefectFromFindingStatuses,
   type PassSampleReviewRow,
@@ -1512,6 +1518,60 @@ export async function saveAuditPolicy(
       .where(eq(processingSettings.settingKey, AUDIT_POLICY_SETTING_KEY));
   } catch {
     // Non-fatal — setting value is what matters
+  }
+}
+
+// ============ AI PERSONA (advisory voice) ============
+
+/**
+ * Load org AI Persona. Falls back to code defaults.
+ */
+export async function getAiPersona(): Promise<AiPersona> {
+  const db = await getDb();
+  if (!db) return mergeAiPersona(null);
+
+  try {
+    const rows = await db
+      .select()
+      .from(processingSettings)
+      .where(eq(processingSettings.settingKey, AI_PERSONA_SETTING_KEY))
+      .limit(1);
+    if (rows.length === 0) return mergeAiPersona(null);
+    return mergeAiPersona(parseStoredAiPersona(rows[0].settingValue));
+  } catch (error) {
+    console.error("[Database] Failed to get AI persona:", error);
+    return mergeAiPersona(null);
+  }
+}
+
+/**
+ * Persist AI Persona JSON (Settings → AI Persona).
+ */
+export async function saveAiPersona(
+  persona: AiPersona,
+  updatedBy: number
+): Promise<void> {
+  const stamped: AiPersona = {
+    ...persona,
+    updatedAt: new Date().toISOString(),
+    updatedBy,
+  };
+  await updateProcessingSetting(
+    AI_PERSONA_SETTING_KEY,
+    stamped,
+    updatedBy,
+    "Org AI auditor persona (advisory voice)"
+  );
+
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db
+      .update(processingSettings)
+      .set({ category: "validation" })
+      .where(eq(processingSettings.settingKey, AI_PERSONA_SETTING_KEY));
+  } catch {
+    // Non-fatal
   }
 }
 

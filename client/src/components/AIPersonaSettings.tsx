@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -13,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
 import {
   BrainCircuit,
   Scale,
@@ -20,14 +22,140 @@ import {
   FileSearch,
   Save,
   RefreshCw,
+  Loader2,
+  FlaskConical,
 } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
-/** Illustrative defaults — persona is not persisted and does not drive the engine. */
-const PREVIEW_STRICTNESS = [70];
-const PREVIEW_INSTRUCTIONS =
-  "Ensure the engineer provides a clear root cause for any return visit. Flag vague phrases like 'fixed it' or 'done' without technical detail. Check for professional language.";
+type FocusArea = "safety" | "customer" | "parts";
+
+interface AiPersona {
+  version: string;
+  strictness: number;
+  toneCheck: boolean;
+  completenessCheck: boolean;
+  customInstructions: string;
+  focusAreas: FocusArea[];
+  updatedAt?: string;
+}
+
+const FOCUS_OPTIONS: { id: FocusArea; label: string }[] = [
+  { id: "safety", label: "Safety Compliance" },
+  { id: "customer", label: "Customer Interaction" },
+  { id: "parts", label: "Parts Usage" },
+];
+
+function bandLabel(strictness: number): string {
+  if (strictness < 40) return "Lenient";
+  if (strictness > 70) return "Strict";
+  return "Standard";
+}
 
 export function AIPersonaSettings() {
+  const [draft, setDraft] = useState<Partial<AiPersona> | null>(null);
+  const [sampleNote, setSampleNote] = useState(
+    "Compressor failed on start. Ordered seal kit. Return visit tomorrow to fit and retest."
+  );
+
+  const { data, isLoading, refetch } = trpc.aiPersona.get.useQuery();
+  const saveMutation = trpc.aiPersona.save.useMutation();
+  const resetMutation = trpc.aiPersona.reset.useMutation();
+  const previewMutation = trpc.aiPersona.preview.useMutation();
+
+  const server = (data as AiPersona | undefined) ?? null;
+  const persona: AiPersona | null = useMemo(() => {
+    if (!server) return null;
+    return { ...server, ...(draft ?? {}) };
+  }, [server, draft]);
+
+  const hasChanges = draft != null && Object.keys(draft).length > 0;
+  const band = persona ? bandLabel(persona.strictness) : "—";
+
+  const update = (patch: Partial<AiPersona>) => {
+    setDraft(prev => ({ ...prev, ...patch }));
+  };
+
+  const toggleFocus = (id: FocusArea) => {
+    if (!persona) return;
+    const has = persona.focusAreas.includes(id);
+    const next = has
+      ? persona.focusAreas.filter(f => f !== id)
+      : [...persona.focusAreas, id].slice(0, 3);
+    update({ focusAreas: next });
+  };
+
+  const handleSave = async () => {
+    if (!persona || !server) return;
+    try {
+      const result = await saveMutation.mutateAsync({
+        version: server.version,
+        strictness: persona.strictness,
+        toneCheck: persona.toneCheck,
+        completenessCheck: persona.completenessCheck,
+        customInstructions: persona.customInstructions,
+        focusAreas: persona.focusAreas,
+      });
+      setDraft(null);
+      toast.success(`AI persona saved (v${result.persona.version})`);
+      await refetch();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Save failed";
+      toast.error(msg);
+    }
+  };
+
+  const handleReset = async () => {
+    try {
+      const result = await resetMutation.mutateAsync();
+      setDraft(null);
+      toast.success(`AI persona reset (v${result.persona.version})`);
+      await refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Reset failed");
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!persona) return;
+    try {
+      const result = await previewMutation.mutateAsync({
+        commentSnippet: sampleNote,
+        onFailurePath: true,
+        draft: {
+          strictness: persona.strictness,
+          toneCheck: persona.toneCheck,
+          completenessCheck: persona.completenessCheck,
+          customInstructions: persona.customInstructions,
+          focusAreas: persona.focusAreas,
+        },
+      });
+      if (result.adequate === null) {
+        toast.message(result.summary);
+      } else if (result.adequate) {
+        toast.success(result.summary);
+      } else {
+        toast.warning(
+          result.gaps.length
+            ? result.gaps.slice(0, 3).join(" · ")
+            : result.summary
+        );
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Preview failed");
+    }
+  };
+
+  if (isLoading || !persona) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground text-sm py-8">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading AI persona…
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-6 md:grid-cols-2">
       <Card>
@@ -35,18 +163,20 @@ export function AIPersonaSettings() {
           <div className="flex flex-wrap items-center gap-2">
             <BrainCircuit className="h-5 w-5 text-primary" />
             <CardTitle>Auditor Persona</CardTitle>
-            <Badge variant="secondary">Preview — not saved</Badge>
+            <Badge variant="outline">v{persona.version}</Badge>
+            <Badge variant="secondary">{band}</Badge>
           </div>
           <CardDescription>
-            Conceptual controls for how the AI might evaluate notes. Disabled
-            until a persona API exists — they do not change live analysis.
+            Shapes advisory sufficiency, Deep Note voice, and coaching tone.
+            Majors/Minors stay under Audit Policy — persona never softens hard
+            clinical rules.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <Alert>
             <AlertDescription>
-              Preview only. Strictness and check toggles are not applied to the
-              production audit engine.
+              Saved persona applies to the next processed job sheets. Historical
+              audits keep the persona stamp from process time.
             </AlertDescription>
           </Alert>
 
@@ -56,21 +186,19 @@ export function AIPersonaSettings() {
                 <Scale className="h-4 w-4" />
                 Audit Strictness
               </Label>
-              <span className="font-mono text-sm">
-                {PREVIEW_STRICTNESS[0]}%
-              </span>
+              <span className="font-mono text-sm">{persona.strictness}%</span>
             </div>
             <Slider
-              value={PREVIEW_STRICTNESS}
+              value={[persona.strictness]}
               max={100}
               step={5}
-              disabled
+              onValueChange={v => update({ strictness: v[0] ?? 70 })}
               className="py-2"
-              aria-label="Audit strictness (preview only)"
+              aria-label="Audit strictness"
             />
             <p className="text-xs text-muted-foreground">
-              Higher strictness would flag minor omissions when this setting is
-              wired.
+              Higher strictness adds advisory gaps for thin write-ups — it does
+              not create new hard fails.
             </p>
           </div>
 
@@ -82,14 +210,14 @@ export function AIPersonaSettings() {
               </Label>
               <Switch
                 id="tone-check"
-                checked
-                disabled
-                aria-label="Tone and language analysis (preview only)"
+                checked={persona.toneCheck}
+                onCheckedChange={v => update({ toneCheck: v })}
+                aria-label="Tone and language analysis"
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Detect unprofessional language, frustration, or inappropriate
-              remarks in job notes.
+              Flag unprofessional language or non-technical close-outs in
+              advisory notes.
             </p>
           </div>
 
@@ -104,15 +232,14 @@ export function AIPersonaSettings() {
               </Label>
               <Switch
                 id="completeness-check"
-                checked
-                disabled
-                aria-label="Completeness check (preview only)"
+                checked={persona.completenessCheck}
+                onCheckedChange={v => update({ completenessCheck: v })}
+                aria-label="Completeness check"
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Identify missing technical details, unanswered questions, or vague
-              descriptions (e.g., &quot;parts ordered&quot; without part
-              numbers).
+              Emphasize missing next action, parts stance, or vague
+              descriptions.
             </p>
           </div>
         </CardContent>
@@ -122,11 +249,11 @@ export function AIPersonaSettings() {
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle>Custom Instructions</CardTitle>
-            <Badge variant="secondary">Preview — not saved</Badge>
+            {hasChanges && <Badge variant="destructive">Unsaved</Badge>}
           </div>
           <CardDescription>
-            Example prompt text for a future override. Read-only — not sent to
-            the analysis engine.
+            Appended to the advisory sufficiency and coaching prompts (capped /
+            sanitized).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -136,47 +263,90 @@ export function AIPersonaSettings() {
             </Label>
             <Textarea
               id="system-prompt-override"
-              className="min-h-[200px] font-mono text-sm"
-              value={PREVIEW_INSTRUCTIONS}
-              readOnly
-              disabled
+              className="min-h-[160px] font-mono text-sm"
+              value={persona.customInstructions}
+              maxLength={1500}
+              onChange={e => update({ customInstructions: e.target.value })}
               aria-describedby="prompt-override-hint"
             />
             <p
               id="prompt-override-hint"
               className="text-xs text-muted-foreground"
             >
-              Not editable — no persona persistence API.
+              {persona.customInstructions.length}/1500 characters
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline" className="opacity-60">
-              Focus: Safety Compliance
-            </Badge>
-            <Badge variant="outline" className="opacity-60">
-              Focus: Customer Interaction
-            </Badge>
-            <Badge variant="outline" className="opacity-60">
-              Focus: Parts Usage
-            </Badge>
+            {FOCUS_OPTIONS.map(opt => {
+              const active = persona.focusAreas.includes(opt.id);
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => toggleFocus(opt.id)}
+                  className={cn(
+                    "rounded-md border px-2 py-1 text-xs transition-colors",
+                    active
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border text-muted-foreground opacity-70 hover:opacity-100"
+                  )}
+                >
+                  Focus: {opt.label}
+                </button>
+              );
+            })}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Focus chips are labels only — they do not apply filters.
-          </p>
+
+          <div className="space-y-2 border-t pt-4">
+            <Label
+              htmlFor="sample-note"
+              className="flex items-center gap-2 text-sm"
+            >
+              <FlaskConical className="h-4 w-4" />
+              Try on sample note
+            </Label>
+            <Input
+              id="sample-note"
+              value={sampleNote}
+              onChange={e => setSampleNote(e.target.value)}
+              className="text-sm"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handlePreview}
+              disabled={previewMutation.isPending}
+            >
+              {previewMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <FlaskConical className="h-4 w-4 mr-2" />
+              )}
+              Preview advisory gaps
+            </Button>
+          </div>
         </CardContent>
         <CardFooter className="flex flex-wrap justify-between gap-2">
           <Button
             variant="ghost"
             size="sm"
-            disabled
-            title="Reset unavailable — settings are not persisted"
+            onClick={handleReset}
+            disabled={resetMutation.isPending}
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Reset to Default
           </Button>
-          <Button disabled title="Save unavailable — no persona settings API">
-            <Save className="h-4 w-4 mr-2" />
-            Save Configuration (not wired)
+          <Button
+            onClick={handleSave}
+            disabled={!hasChanges || saveMutation.isPending}
+          >
+            {saveMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            Save Configuration
           </Button>
         </CardFooter>
       </Card>

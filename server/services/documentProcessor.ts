@@ -111,6 +111,11 @@ import {
 import { evaluateCommentQuality } from "./commentQuality";
 import { buildCommentDeepNoteAdvisory } from "./commentQuality/advisory";
 import { buildSheetSufficiencyAdvisory } from "./commentQuality/llmSufficiencyJudge";
+import {
+  buildPersonaDecisionStamp,
+  type AiPersona,
+  type PersonaDecisionStamp,
+} from "./aiPersona";
 import { evaluatePartsUsed } from "./partsAssessment";
 import { evaluateEngineerAttribution } from "./engineerAttributionFindings";
 import {
@@ -2473,6 +2478,8 @@ async function processJobSheetWithOptions(
   let sheetSufficiencyAdvisory: Awaited<
     ReturnType<typeof buildSheetSufficiencyAdvisory>
   > | null = null;
+  let orgAiPersona: AiPersona | null = null;
+  let personaDecision: PersonaDecisionStamp | null = null;
   let photoEvidenceArtifact: ReturnType<
     typeof evaluatePhotoEvidenceConsistency
   > | null = null;
@@ -2566,6 +2573,19 @@ async function processJobSheetWithOptions(
             ? consistency.summary
             : undefined,
         });
+      }
+
+      // Org AI Persona (advisory voice) — fail-soft defaults if DB unavailable
+      try {
+        orgAiPersona = await db.getAiPersona();
+        personaDecision = buildPersonaDecisionStamp(orgAiPersona);
+      } catch (err) {
+        console.warn(
+          "[DocumentProcessor] AI persona load failed (using defaults):",
+          err
+        );
+        orgAiPersona = null;
+        personaDecision = null;
       }
 
       // Clinical comment quality (COMMENT-C* / FAULT-C010) — owns narrative + Fault Reason honesty
@@ -2766,7 +2786,9 @@ async function processJobSheetWithOptions(
         });
       }
       try {
-        commentDeepNote = await buildCommentDeepNoteAdvisory(commentResult);
+        commentDeepNote = await buildCommentDeepNoteAdvisory(commentResult, {
+          persona: orgAiPersona,
+        });
       } catch (err) {
         console.warn(
           "[DocumentProcessor] Comment Deep Note advisory failed (non-fatal):",
@@ -2783,7 +2805,8 @@ async function processJobSheetWithOptions(
             partsSummary: partsCatalogSummary ?? partsAssessmentSummary,
             photoSummary: null,
             jobSummarySignals: failurePathSignalSummary,
-          }
+          },
+          { persona: orgAiPersona }
         );
       } catch (err) {
         console.warn(
@@ -3408,6 +3431,7 @@ async function processJobSheetWithOptions(
         documentationQualityPenalties,
         llmConfidenceScore: llmConfidenceForReport,
         ...(auditPolicyDecision ? { auditPolicyDecision } : {}),
+        ...(personaDecision ? { personaDecision } : {}),
         extractedFields: finalExtractedFields,
         pageCount: ocrResult.totalPages,
         ...(typeof pageConfidencePrior === "number"
@@ -3643,7 +3667,14 @@ async function processJobSheetWithOptions(
       .auditCompleted(
         auditResultId,
         analysisResult.overallResult,
-        analysisResult.score
+        analysisResult.score,
+        {
+          pipelineVersion: PIPELINE_VERSION,
+          templateVersionId: usedTemplateVersionId ?? null,
+          policyVersion: auditPolicyDecision?.policyVersion ?? null,
+          personaVersion: personaDecision?.version ?? null,
+          personaSnapshotHash: personaDecision?.snapshotHash ?? null,
+        }
       )
       .catch(err =>
         console.warn(
