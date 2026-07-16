@@ -31,6 +31,7 @@ import { toast } from "sonner";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { useReviewQueueKeyboard } from "@/hooks/useReviewQueueKeyboard";
 import { usePersistFn } from "@/hooks/usePersistFn";
+import type { ReviewClaimStatus } from "@/hooks/useReviewClaim";
 import { deriveReasonChips } from "@/components/review/holdQueueReasons";
 import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
 import { cn } from "@/lib/utils";
@@ -145,6 +146,11 @@ export default function HoldQueue() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterChip, setFilterChip] = useState<FilterChip>("all");
   const [showLegend, setShowLegend] = useState(false);
+  const [activeClaim, setActiveClaim] = useState<{
+    jobSheetId?: number;
+    token?: string;
+    status: ReviewClaimStatus;
+  }>({ status: "idle" });
   const paneRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
 
@@ -321,9 +327,19 @@ export default function HoldQueue() {
     });
   };
 
-  const handleApprove = (jobSheetId: number) => {
+  const handleApprove = (jobSheetId: number, claimToken?: string) => {
+    const claimStatus =
+      activeClaim.jobSheetId === jobSheetId ? activeClaim.status : "claiming";
+    if (jobSheetId === activeId && (!claimToken || claimStatus !== "claimed")) {
+      toast.error(
+        claimStatus === "conflict"
+          ? "This review is claimed by another reviewer"
+          : "Wait for the review claim before approving"
+      );
+      return;
+    }
     approveJobSheet.mutate(
-      { jobSheetId, reason: "Approved from hold queue" },
+      { jobSheetId, reason: "Approved from hold queue", claimToken },
       {
         onSuccess: result => {
           utils.jobSheets.list.invalidate();
@@ -398,6 +414,8 @@ export default function HoldQueue() {
         approveJobSheet.mutateAsync({
           jobSheetId: id,
           reason: "Bulk approved from hold queue",
+          claimToken:
+            activeClaim.jobSheetId === id ? activeClaim.token : undefined,
         })
       )
     );
@@ -469,7 +487,12 @@ export default function HoldQueue() {
   });
 
   const onApproveSelected = usePersistFn(() => {
-    if (activeId != null) handleApprove(activeId);
+    if (activeId != null) {
+      handleApprove(
+        activeId,
+        activeClaim.jobSheetId === activeId ? activeClaim.token : undefined
+      );
+    }
   });
   const onRejectSelected = usePersistFn(() => {
     if (activeId != null) handleReject(activeId);
@@ -783,8 +806,25 @@ export default function HoldQueue() {
                                       size="sm"
                                       variant="ghost"
                                       className="h-7 w-7 p-0 text-emerald-700 hover:bg-emerald-50"
-                                      onClick={() => handleApprove(item.id)}
-                                      disabled={approveJobSheet.isPending}
+                                      onClick={() => {
+                                        if (item.id !== activeId) {
+                                          setSelectedId(item.id);
+                                          toast.info(
+                                            "Claiming review — approve once the claim is ready"
+                                          );
+                                          return;
+                                        }
+                                        handleApprove(
+                                          item.id,
+                                          activeClaim.token
+                                        );
+                                      }}
+                                      disabled={
+                                        approveJobSheet.isPending ||
+                                        (isActive &&
+                                          (activeClaim.jobSheetId !== item.id ||
+                                            activeClaim.status !== "claimed"))
+                                      }
                                       aria-label="Approve"
                                       title="Approve (a)"
                                     >
@@ -833,8 +873,13 @@ export default function HoldQueue() {
                     compact
                     showJobSheetActions
                     paneRef={paneRef}
-                    onApproveJobSheet={() => handleApprove(activeId)}
+                    onApproveJobSheet={claimToken =>
+                      handleApprove(activeId, claimToken)
+                    }
                     onRejectJobSheet={() => handleReject(activeId)}
+                    onReviewClaimChange={(token, status) =>
+                      setActiveClaim({ jobSheetId: activeId, token, status })
+                    }
                     approvePending={approveJobSheet.isPending}
                     rejectPending={updateStatus.isPending}
                   />

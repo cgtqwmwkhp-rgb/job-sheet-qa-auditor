@@ -24,6 +24,7 @@ import {
   type FindingRecord,
   type AuditResultRecord,
   type WaiverRecord,
+  AuditActionError,
 } from "../../services/auditActions";
 
 function createMemoryDeps() {
@@ -82,6 +83,10 @@ function createMemoryDeps() {
       });
     },
     getAuditResult: async id => audits.get(id),
+    getAuditResultByJobSheetId: async jobSheetId =>
+      Array.from(audits.values()).find(
+        audit => audit.jobSheetId === jobSheetId
+      ),
     updateAuditResultStatus: async (id, result) => {
       const existing = audits.get(id);
       if (!existing) throw new Error("not found");
@@ -419,8 +424,53 @@ describe("Audit Actions Contract (PR-10)", () => {
   });
 
   describe("job sheet approve / undo", () => {
-    it("approves job sheet out of review queue", async () => {
+    it("rejects approval while a Major finding is open", async () => {
       const mem = createMemoryDeps();
+
+      await expect(
+        approveJobSheet(mem.deps, {
+          jobSheetId: 100,
+          userId: 1,
+          previousStatus: "review_queue",
+        })
+      ).rejects.toMatchObject({
+        code: "PRECONDITION_FAILED",
+      } satisfies Partial<AuditActionError>);
+      expect(mem.logs.some(log => log.action === "JOB_SHEET_APPROVE")).toBe(
+        false
+      );
+    });
+
+    it("rejects an open actionable photo-pair cost risk", async () => {
+      const mem = createMemoryDeps();
+      mem.findings.set(1, {
+        ...mem.findings.get(1)!,
+        severity: "S2",
+        ruleId: "PHOTO-C012",
+      });
+
+      await expect(
+        approveJobSheet(mem.deps, {
+          jobSheetId: 100,
+          userId: 1,
+        })
+      ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    });
+
+    it("approves after Majors and photo cost risks are disposed", async () => {
+      const mem = createMemoryDeps();
+      mem.findings.set(1, {
+        ...mem.findings.get(1)!,
+        resolutionStatus: "overridden",
+      });
+      mem.findings.set(3, {
+        id: 3,
+        auditResultId: 10,
+        resolutionStatus: "waived",
+        severity: "S2",
+        ruleId: "PHOTO-C013",
+      });
+
       const result = await approveJobSheet(mem.deps, {
         jobSheetId: 100,
         userId: 1,
@@ -432,8 +482,27 @@ describe("Audit Actions Contract (PR-10)", () => {
       expect(result.undoToken).toContain("undo-js:100:");
     });
 
+    it("allows approval when an open Major has a corrected value", async () => {
+      const mem = createMemoryDeps();
+      mem.findings.set(1, {
+        ...mem.findings.get(1)!,
+        normalisedSnippet: "Corrected site",
+      });
+
+      await expect(
+        approveJobSheet(mem.deps, {
+          jobSheetId: 100,
+          userId: 1,
+        })
+      ).resolves.toMatchObject({ newStatus: "completed" });
+    });
+
     it("undoes job sheet approve", async () => {
       const mem = createMemoryDeps();
+      mem.findings.set(1, {
+        ...mem.findings.get(1)!,
+        resolutionStatus: "approved",
+      });
       await approveJobSheet(mem.deps, {
         jobSheetId: 100,
         userId: 1,

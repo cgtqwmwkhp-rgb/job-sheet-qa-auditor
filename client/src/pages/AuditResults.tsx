@@ -174,6 +174,10 @@ export default function AuditResults() {
   const [allAuditResults, setAllAuditResults] = useState<AuditListItem[]>([]);
   const [highlightIndex, setHighlightIndex] = useState(0);
   const [showLegend, setShowLegend] = useState(false);
+  const [reviewClaim, setReviewClaim] = useState<{
+    jobSheetId: number;
+    token?: string;
+  }>();
   const listRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
 
@@ -433,21 +437,32 @@ export default function AuditResults() {
     }
   );
 
-  const handleApprove = usePersistFn((jobSheetId: number) => {
-    approveJobSheet.mutate(
-      { jobSheetId, reason: "Approved from audit results" },
-      {
-        onSuccess: result => {
-          void invalidateAfterSheetAction();
-          if (selectedAuditId === jobSheetId) {
-            goBackToList();
-          }
-          showApproveUndo(jobSheetId, result.previousStatus);
+  const handleApprove = usePersistFn(
+    (jobSheetId: number, suppliedClaimToken?: string) => {
+      const claimToken =
+        suppliedClaimToken ??
+        (reviewClaim?.jobSheetId === jobSheetId
+          ? reviewClaim.token
+          : undefined);
+      approveJobSheet.mutate(
+        {
+          jobSheetId,
+          reason: "Approved from audit results",
+          claimToken,
         },
-        onError: err => toast.error(err.message || "Approve failed"),
-      }
-    );
-  });
+        {
+          onSuccess: result => {
+            void invalidateAfterSheetAction();
+            if (selectedAuditId === jobSheetId) {
+              goBackToList();
+            }
+            showApproveUndo(jobSheetId, result.previousStatus);
+          },
+          onError: err => toast.error(err.message || "Approve failed"),
+        }
+      );
+    }
+  );
 
   const handleReject = usePersistFn((jobSheetId: number) => {
     updateStatus.mutate(
@@ -1009,10 +1024,15 @@ export default function AuditResults() {
             onBack={goBackToList}
             showJobSheetActions={canSheetApprove}
             onApproveJobSheet={
-              canSheetApprove ? () => handleApprove(numericId) : undefined
+              canSheetApprove
+                ? claimToken => handleApprove(numericId, claimToken)
+                : undefined
             }
             onRejectJobSheet={
               canSheetApprove ? () => handleReject(numericId) : undefined
+            }
+            onReviewClaimChange={token =>
+              setReviewClaim({ jobSheetId: numericId, token })
             }
             approvePending={approveJobSheet.isPending}
             rejectPending={updateStatus.isPending}

@@ -234,6 +234,17 @@ function createDbDeps(tx?: DbExecutor): AuditActionDeps {
         templateVersionId: row.templateVersionId ?? null,
       };
     },
+    getAuditResultByJobSheetId: async jobSheetId => {
+      const row = await db.getAuditResultByJobSheetId(jobSheetId);
+      if (!row) return undefined;
+      return {
+        id: row.id,
+        jobSheetId: row.jobSheetId,
+        result: row.result,
+        templateId: row.templateId ?? null,
+        templateVersionId: row.templateVersionId ?? null,
+      };
+    },
     updateAuditResultStatus: (id, result) =>
       db.updateAuditResultStatus(id, result, tx),
     updateJobSheetStatus: (id, status) =>

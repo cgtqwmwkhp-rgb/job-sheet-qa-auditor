@@ -123,6 +123,25 @@ describe("Review claim + atomic bulk resolve (Wave-4 D1)", () => {
       expect(src).toContain("reviewClaimSupported: true");
     });
 
+    it("workstation auto-claims, heartbeats, releases, and forwards its token", () => {
+      const hookPath = path.resolve(
+        __dirname,
+        "../../../client/src/hooks/useReviewClaim.ts"
+      );
+      const panePath = path.resolve(
+        __dirname,
+        "../../../client/src/components/review/ReviewWorkstationPane.tsx"
+      );
+      const hook = fs.readFileSync(hookPath, "utf-8");
+      const pane = fs.readFileSync(panePath, "utf-8");
+
+      expect(hook).toContain("auditActions.claimReview");
+      expect(hook).toContain("auditActions.heartbeatClaim");
+      expect(hook).toContain("auditActions.releaseClaim");
+      expect(pane).toContain("Claimed by you");
+      expect(pane).toContain("claimToken");
+    });
+
     it("resolveFindingsBatch runs inside runTransaction", () => {
       const txPath = path.resolve(__dirname, "../../db/transactions.ts");
       const src = fs.readFileSync(txPath, "utf-8");

@@ -105,6 +105,8 @@ import {
 } from "@/components/review/mapSelectionMarks";
 import { useReviewFindingKeyboard } from "@/hooks/useReviewFindingKeyboard";
 import { usePersistFn } from "@/hooks/usePersistFn";
+import { useReviewClaim } from "@/hooks/useReviewClaim";
+import type { ReviewClaimStatus } from "@/hooks/useReviewClaim";
 import {
   RelationshipFindingsGroup,
   isRelationshipFinding,
@@ -324,8 +326,12 @@ export interface ReviewWorkstationPaneProps {
   documentUrl?: string;
   compact?: boolean;
   showJobSheetActions?: boolean;
-  onApproveJobSheet?: () => void;
+  onApproveJobSheet?: (claimToken?: string) => void;
   onRejectJobSheet?: () => void;
+  onReviewClaimChange?: (
+    claimToken: string | undefined,
+    status: ReviewClaimStatus
+  ) => void;
   approvePending?: boolean;
   rejectPending?: boolean;
   /** Ref for keyboard Enter → focus pane */
@@ -342,6 +348,7 @@ export function ReviewWorkstationPane({
   showJobSheetActions = false,
   onApproveJobSheet,
   onRejectJobSheet,
+  onReviewClaimChange,
   approvePending,
   rejectPending,
   paneRef,
@@ -569,6 +576,7 @@ export function ReviewWorkstationPane({
         showJobSheetActions={showJobSheetActions}
         onApproveJobSheet={onApproveJobSheet}
         onRejectJobSheet={onRejectJobSheet}
+        onReviewClaimChange={onReviewClaimChange}
         approvePending={approvePending}
         rejectPending={rejectPending}
         paneRef={paneRef}
@@ -594,6 +602,7 @@ function ReviewWorkstationContent({
   showJobSheetActions,
   onApproveJobSheet,
   onRejectJobSheet,
+  onReviewClaimChange,
   approvePending,
   rejectPending,
   paneRef,
@@ -612,8 +621,12 @@ function ReviewWorkstationContent({
   jobSheetId: number;
   compact: boolean;
   showJobSheetActions: boolean;
-  onApproveJobSheet?: () => void;
+  onApproveJobSheet?: (claimToken?: string) => void;
   onRejectJobSheet?: () => void;
+  onReviewClaimChange?: (
+    claimToken: string | undefined,
+    status: ReviewClaimStatus
+  ) => void;
   approvePending?: boolean;
   rejectPending?: boolean;
   paneRef?: RefObject<HTMLDivElement | null>;
@@ -714,7 +727,18 @@ function ReviewWorkstationContent({
   const [overrideReason, setOverrideReason] = useState("");
   const { hasRole } = useAuth();
   const canOverrideTemplate = hasRole(["admin", "qa_lead"]);
+  const reviewClaim = useReviewClaim(jobSheetId, canOverrideTemplate);
+  const claimToken = reviewClaim.claimToken;
   const utils = trpc.useUtils();
+  const notifyReviewClaimChange = usePersistFn(
+    (token: string | undefined, status: ReviewClaimStatus) => {
+      onReviewClaimChange?.(token, status);
+    }
+  );
+
+  useEffect(() => {
+    notifyReviewClaimChange(claimToken, reviewClaim.status);
+  }, [claimToken, notifyReviewClaimChange, reviewClaim.status]);
 
   const { data: supportedActions } =
     trpc.auditActions.supportedActions.useQuery();
@@ -829,7 +853,7 @@ function ReviewWorkstationContent({
         label: "Undo",
         onClick: () => {
           undoMutation.mutate(
-            { findingId },
+            { findingId, claimToken },
             {
               onSuccess: () => {
                 invalidateFindings();
@@ -859,7 +883,11 @@ function ReviewWorkstationContent({
       return;
     }
     flagMutation.mutate(
-      { findingId, reason: "Flagged for review from workstation" },
+      {
+        findingId,
+        reason: "Flagged for review from workstation",
+        claimToken,
+      },
       {
         onSuccess: () => {
           invalidateFindings();
@@ -934,6 +962,7 @@ function ReviewWorkstationContent({
         originalValue: correctionDialog.value,
         correctedValue: correctedValue.trim(),
         trainingReasonCode: correctionTrainingReason,
+        claimToken,
       },
       {
         onSuccess: result => {
@@ -1005,6 +1034,7 @@ function ReviewWorkstationContent({
                       {
                         findingId: result.findingId,
                         previousSnippet: result.previousSnippet,
+                        claimToken,
                       },
                       {
                         onSuccess: () => {
@@ -1037,6 +1067,7 @@ function ReviewWorkstationContent({
       {
         findingIds: openIds,
         reason: "Bulk approved open findings from workstation",
+        claimToken,
       },
       {
         onSuccess: result => {
@@ -1134,11 +1165,12 @@ function ReviewWorkstationContent({
           findingId,
           reason,
           trainingReasonCode: trainingReasonCode as TrainingReasonCode,
+          claimToken,
         },
         onActionSettled
       );
     } else {
-      waiveMutation.mutate({ findingId, reason }, onActionSettled);
+      waiveMutation.mutate({ findingId, reason, claimToken }, onActionSettled);
     }
   };
 
@@ -1200,8 +1232,9 @@ function ReviewWorkstationContent({
               reason,
               // Pair override: rule false-positive on PHOTO-C012/C013
               trainingReasonCode: "rule_wrong",
+              claimToken,
             })
-          : approveMutation.mutateAsync({ findingId, reason });
+          : approveMutation.mutateAsync({ findingId, reason, claimToken });
       })
     );
     const ok = results.filter(r => r.status === "fulfilled");
@@ -1484,6 +1517,23 @@ function ReviewWorkstationContent({
             {auditData.technician} · {auditData.date} · {failedFindings.length}{" "}
             issue{failedFindings.length === 1 ? "" : "s"}
           </span>
+          {canOverrideTemplate && (
+            <Badge
+              variant={
+                reviewClaim.status === "conflict" ? "destructive" : "outline"
+              }
+              className="text-[10px]"
+              title={reviewClaim.message}
+            >
+              {reviewClaim.status === "claimed"
+                ? "Claimed by you"
+                : reviewClaim.status === "claiming"
+                  ? "Claiming…"
+                  : reviewClaim.status === "conflict"
+                    ? "Claimed by another reviewer"
+                    : "Claim unavailable"}
+            </Badge>
+          )}
           {auditData.templateVersionId != null && (
             <Badge
               variant="outline"
@@ -1512,8 +1562,8 @@ function ReviewWorkstationContent({
               <Button
                 size="sm"
                 className="h-8"
-                onClick={onApproveJobSheet}
-                disabled={approvePending}
+                onClick={() => onApproveJobSheet?.(claimToken)}
+                disabled={approvePending || !reviewClaim.canMutate}
               >
                 {approvePending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -1539,7 +1589,9 @@ function ReviewWorkstationContent({
             className="h-8"
             onClick={handleBulkApproveFindings}
             disabled={
-              bulkApproveMutation.isPending || failedFindings.length === 0
+              bulkApproveMutation.isPending ||
+              failedFindings.length === 0 ||
+              !reviewClaim.canMutate
             }
           >
             {bulkApproveMutation.isPending ? (
@@ -1554,7 +1606,7 @@ function ReviewWorkstationContent({
             size="sm"
             className="h-8"
             onClick={handleFlagForReview}
-            disabled={flagMutation.isPending}
+            disabled={flagMutation.isPending || !reviewClaim.canMutate}
           >
             {flagMutation.isPending ? (
               <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
