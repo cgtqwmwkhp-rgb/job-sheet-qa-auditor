@@ -7,7 +7,7 @@
  */
 
 import type { AiPersona } from "../aiPersona";
-import { strictnessBand } from "../aiPersona";
+import { buildPersonaPromptBlock, strictnessBand } from "../aiPersona";
 import type { CommentQualityResult, CommentQualitySignals } from "./index";
 
 export const FEATURE_COMMENT_LLM_ADVISORY = "FEATURE_COMMENT_LLM_ADVISORY";
@@ -176,15 +176,97 @@ export async function buildCommentDeepNoteAdvisory(
     };
   }
 
-  // Key present but Deep Note enrichment is still the deterministic rubric.
-  // Mark readiness honestly — do not claim a live Gemini call occurred.
-  return {
-    ...base,
-    provider: "gemini-ready",
-    model: process.env.GEMINI_MODEL || "gemini-2.0-flash",
-    usedLlm: false,
-    summary: `${base.summary} [Gemini key present — rubric scores retained; live Deep Note enrich deferred.]`,
-  };
+  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const personaBlock = options.persona
+    ? buildPersonaPromptBlock(options.persona)
+    : "";
+  const prompt = `You are a senior field-service QA coach reviewing engineer comments.
+Assess documentation quality only. Do not decide asset pass/fail and do not invent facts.
+Return JSON only with this shape:
+{"completenessScore":0-100,"toneScore":0-100,"clarityScore":0-100,"gaps":["string"],"summary":"string","coachRewrite":"string","recommendEscalate":boolean}
+The deterministic COMMENT-C rubric remains authoritative; provide advisory coaching.
+
+${personaBlock ? `${personaBlock}\n` : ""}
+Comment: ${result.signals.snippet.slice(0, 2000)}
+Failure path: ${result.signals.onFailurePath}
+Parts still required: ${result.signals.partsStillRequired}
+Return visit: ${result.signals.returnVisit}
+Deterministic gaps: ${JSON.stringify(base.gaps)}
+Deterministic scores: ${JSON.stringify(result.scores)}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 768,
+          responseMimeType: "application/json",
+        },
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) return base;
+
+    const body = (await response.json()) as {
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string }> };
+      }>;
+    };
+    const text = body.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!text) return base;
+    const parsed = JSON.parse(text) as {
+      completenessScore?: unknown;
+      toneScore?: unknown;
+      clarityScore?: unknown;
+      gaps?: unknown;
+      summary?: unknown;
+      coachRewrite?: unknown;
+      recommendEscalate?: unknown;
+    };
+    const score = (value: unknown, fallback: number): number =>
+      typeof value === "number" && Number.isFinite(value)
+        ? Math.max(0, Math.min(100, Math.round(value)))
+        : fallback;
+    const llmGaps = Array.isArray(parsed.gaps)
+      ? parsed.gaps
+          .filter(
+            (gap): gap is string =>
+              typeof gap === "string" && gap.trim().length > 0
+          )
+          .map(gap => gap.trim().slice(0, 300))
+          .slice(0, 8)
+      : [];
+
+    return {
+      ...base,
+      provider: "gemini",
+      model,
+      usedLlm: true,
+      completenessScore: score(
+        parsed.completenessScore,
+        base.completenessScore
+      ),
+      toneScore: score(parsed.toneScore, base.toneScore),
+      clarityScore: score(parsed.clarityScore, base.clarityScore),
+      gaps: Array.from(new Set([...base.gaps, ...llmGaps])),
+      summary:
+        typeof parsed.summary === "string" && parsed.summary.trim()
+          ? parsed.summary.trim().slice(0, 500)
+          : base.summary,
+      coachRewrite:
+        typeof parsed.coachRewrite === "string" && parsed.coachRewrite.trim()
+          ? parsed.coachRewrite.trim().slice(0, 1000)
+          : base.coachRewrite,
+      recommendEscalate:
+        base.recommendEscalate || parsed.recommendEscalate === true,
+    };
+  } catch {
+    return base;
+  }
 }
 
 export function mapDeepNoteFromSignals(

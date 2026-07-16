@@ -43,7 +43,10 @@ export type {
 } from "./parseAzureDiResponse";
 export {
   FEATURE_ROI_CROP_REOCR,
+  FEATURE_CROP_HTR,
   isRoiCropReocrEnabled,
+  isCropHtrEnabled,
+  isCropHtrField,
   renderRoiCropFromPdf,
   reOcrRoiCrop,
   createCropOcrRunner,

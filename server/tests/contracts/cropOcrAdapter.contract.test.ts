@@ -7,7 +7,10 @@ import {
   valueFromCropOcrText,
   reOcrRoiCrop,
   isRoiCropReocrEnabled,
+  isCropHtrEnabled,
+  isCropHtrField,
   FEATURE_ROI_CROP_REOCR,
+  FEATURE_CROP_HTR,
   type CropOcrResult,
   type RoiCropImage,
 } from "../../services/ocrAdapter/cropOcrAdapter";
@@ -77,6 +80,17 @@ describe("cropOcrAdapter — PR-AI-05", () => {
       expect(isRoiCropReocrEnabled()).toBe(false);
       if (prev === undefined) delete process.env[FEATURE_ROI_CROP_REOCR];
       else process.env[FEATURE_ROI_CROP_REOCR] = prev;
+    });
+
+    it("gates handwriting fields explicitly", () => {
+      const prev = process.env[FEATURE_CROP_HTR];
+      process.env[FEATURE_CROP_HTR] = "true";
+      expect(isCropHtrEnabled()).toBe(true);
+      expect(isCropHtrField("technicianName")).toBe(true);
+      expect(isCropHtrField("engineerComments")).toBe(true);
+      expect(isCropHtrField("jobReference")).toBe(false);
+      if (prev === undefined) delete process.env[FEATURE_CROP_HTR];
+      else process.env[FEATURE_CROP_HTR] = prev;
     });
 
     it("enables only when explicitly set", () => {
@@ -156,6 +170,51 @@ describe("cropOcrAdapter — PR-AI-05", () => {
       expect(result.success).toBe(true);
       expect(result.value).toBe("14/07/2026");
       expect(result.crop?.cropHash).toBe("crop_rendered01");
+    });
+
+    it("uses Azure Read HTR first for handwriting and retains real confidence", async () => {
+      const prev = process.env[FEATURE_CROP_HTR];
+      process.env[FEATURE_CROP_HTR] = "true";
+      const primary = fakeAdapter("Wrong fallback");
+      const htr = fakeAdapter("Technician Name: Alex Morgan");
+      const result = await reOcrRoiCrop(
+        {
+          fieldId: "technicianName",
+          roi: { ...sampleRoi, name: "technicianName" },
+          cropImage: fakeCrop(),
+        },
+        { adapter: primary, htrAdapter: htr }
+      );
+      expect(result.success).toBe(true);
+      expect(result.value).toMatch(/Alex Morgan|Technician Name/);
+      expect(result.htrAttempted).toBe(true);
+      expect(result.htrUsed).toBe(true);
+      expect(result.confidence).toBe(0.91);
+      expect(primary.extractFromBase64).not.toHaveBeenCalled();
+      if (prev === undefined) delete process.env[FEATURE_CROP_HTR];
+      else process.env[FEATURE_CROP_HTR] = prev;
+    });
+
+    it("fails soft from HTR to configured crop OCR", async () => {
+      const prev = process.env[FEATURE_CROP_HTR];
+      process.env[FEATURE_CROP_HTR] = "true";
+      const primary = fakeAdapter("Morgan");
+      const htr = fakeAdapter("", false);
+      const result = await reOcrRoiCrop(
+        {
+          fieldId: "customerName",
+          roi: { ...sampleRoi, name: "customerName" },
+          cropImage: fakeCrop(),
+        },
+        { adapter: primary, htrAdapter: htr }
+      );
+      expect(result.success).toBe(true);
+      expect(result.value).toBe("Morgan");
+      expect(result.htrAttempted).toBe(true);
+      expect(result.htrUsed).toBe(false);
+      expect(primary.extractFromBase64).toHaveBeenCalled();
+      if (prev === undefined) delete process.env[FEATURE_CROP_HTR];
+      else process.env[FEATURE_CROP_HTR] = prev;
     });
   });
 });
