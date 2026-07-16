@@ -14,9 +14,14 @@ describe("normalized evidence entities contract", () => {
       path.join(repoRoot, "drizzle/0015_photo_parts_entities.sql"),
       "utf8"
     );
-    const schema = readFileSync(path.join(repoRoot, "drizzle/schema.ts"), "utf8");
+    const schema = readFileSync(
+      path.join(repoRoot, "drizzle/schema.ts"),
+      "utf8"
+    );
 
-    expect(migration).toContain("CREATE TABLE IF NOT EXISTS `photo_evidence_pairs`");
+    expect(migration).toContain(
+      "CREATE TABLE IF NOT EXISTS `photo_evidence_pairs`"
+    );
     expect(migration).toContain("CREATE TABLE IF NOT EXISTS `parts_lines`");
     expect(migration).toContain("UNIQUE(`auditResultId`,`pairIndex`)");
     expect(migration).toContain("UNIQUE(`auditResultId`,`lineIndex`)");

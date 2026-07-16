@@ -155,7 +155,10 @@ export default function HoldQueue() {
   const utils = trpc.useUtils();
   const { data: technicians } = trpc.jobSheets.listTechnicians.useQuery();
   const technicianNameById = useMemo(
-    () => new Map((technicians ?? []).map(technician => [technician.id, technician.name])),
+    () =>
+      new Map(
+        (technicians ?? []).map(technician => [technician.id, technician.name])
+      ),
     [technicians]
   );
 

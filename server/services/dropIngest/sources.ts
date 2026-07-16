@@ -223,7 +223,8 @@ export class GraphDriveDropSource implements DropSource {
 
     for (const item of items) {
       if (!item.id || !item.name || !item.file) continue;
-      if (!isSupportedFileName(item.name) || item.name.startsWith(".")) continue;
+      if (!isSupportedFileName(item.name) || item.name.startsWith("."))
+        continue;
       const size = item.size ?? 0;
       if (size > this.options.maxFileBytes) continue;
 
@@ -265,7 +266,8 @@ async function getGraphAccessToken(): Promise<string> {
     throw new Error(`Graph token request failed (${response.status})`);
   }
   const token = (await response.json()) as { access_token?: string };
-  if (!token.access_token) throw new Error("Graph token response missing access_token");
+  if (!token.access_token)
+    throw new Error("Graph token response missing access_token");
   return token.access_token;
 }
 
@@ -273,7 +275,11 @@ async function getGraphAccessToken(): Promise<string> {
 export async function createGraphDriveDropSource(
   config: DropIngestConfig
 ): Promise<GraphDriveDropSource> {
-  if (!config.graphEnabled || !config.graphDriveId || !config.graphCredentialsReady) {
+  if (
+    !config.graphEnabled ||
+    !config.graphDriveId ||
+    !config.graphCredentialsReady
+  ) {
     throw new Error(
       "Graph source requires FEATURE_DROP_GRAPH=true, DROP_INGEST_GRAPH_DRIVE_ID, and GRAPH_* credentials"
     );

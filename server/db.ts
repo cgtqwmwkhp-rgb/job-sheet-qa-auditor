@@ -718,7 +718,9 @@ export async function persistAuditEvidenceEntities(input: {
           description: part.description,
           quantity: part.qty ?? null,
           rawLine: part.raw,
-          isComplete: Boolean(part.partNumber?.trim() && part.description?.trim()),
+          isComplete: Boolean(
+            part.partNumber?.trim() && part.description?.trim()
+          ),
           source: "parts_used",
         }))
       )

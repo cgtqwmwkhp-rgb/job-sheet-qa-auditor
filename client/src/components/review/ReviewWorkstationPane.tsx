@@ -368,7 +368,10 @@ export function ReviewWorkstationPane({
   );
   const { data: technicians } = trpc.jobSheets.listTechnicians.useQuery();
   const technicianNameById = useMemo(
-    () => new Map((technicians ?? []).map(technician => [technician.id, technician.name])),
+    () =>
+      new Map(
+        (technicians ?? []).map(technician => [technician.id, technician.name])
+      ),
     [technicians]
   );
 
@@ -841,17 +844,22 @@ function ReviewWorkstationContent({
 
   const pairResolvedDecisions = useMemo(() => {
     const decisions: Record<number, "confirmed" | "overridden"> = {};
-    for (let index = 0; index < (photoPairCompare?.pairs.length ?? 0); index++) {
+    for (
+      let index = 0;
+      index < (photoPairCompare?.pairs.length ?? 0);
+      index++
+    ) {
       const pair = photoPairCompare!.pairs[index]!;
       const targets = resolvePhotoPairFindings(auditData.findings, pair, true);
       const statuses = targets
         .map(finding => finding.resolutionStatus)
-        .filter((status): status is string => Boolean(status && status !== "open"));
+        .filter((status): status is string =>
+          Boolean(status && status !== "open")
+        );
       if (targets.length > 0 && statuses.length === targets.length) {
-        decisions[index] =
-          statuses.every(status => status === "approved")
-            ? "confirmed"
-            : "overridden";
+        decisions[index] = statuses.every(status => status === "approved")
+          ? "confirmed"
+          : "overridden";
       }
     }
     return decisions;
@@ -1339,28 +1347,27 @@ function ReviewWorkstationContent({
   const handleConfirmPair = (pairIndex: number) =>
     applyBeforeAfterPairAction(pairIndex, "approve");
 
-  const handleOverridePair = (pairIndex: number) =>
-    {
-      const pair = photoPairCompare?.pairs?.[pairIndex];
-      const finding = pair
-        ? resolvePhotoPairFindings(auditData.findings, pair)[0]
-        : undefined;
-      if (!finding) {
-        toast.error("No PHOTO-C012/C013 finding mapped for this pair");
-        return Promise.resolve(false);
-      }
-      actionDialogTriggerRef.current =
-        document.activeElement instanceof HTMLElement
-          ? document.activeElement
-          : null;
-      setActionDialog({ finding, action: "override", pairIndex });
-      setActionReason("");
-      setOverrideTrainingReason("");
-      requestAnimationFrame(() => {
-        document.getElementById("override-reason")?.focus();
-      });
-      return Promise.resolve("deferred" as const);
-    };
+  const handleOverridePair = (pairIndex: number) => {
+    const pair = photoPairCompare?.pairs?.[pairIndex];
+    const finding = pair
+      ? resolvePhotoPairFindings(auditData.findings, pair)[0]
+      : undefined;
+    if (!finding) {
+      toast.error("No PHOTO-C012/C013 finding mapped for this pair");
+      return Promise.resolve(false);
+    }
+    actionDialogTriggerRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setActionDialog({ finding, action: "override", pairIndex });
+    setActionReason("");
+    setOverrideTrainingReason("");
+    requestAnimationFrame(() => {
+      document.getElementById("override-reason")?.focus();
+    });
+    return Promise.resolve("deferred" as const);
+  };
 
   const boxes: ViewerBoundingBox[] = findingsToViewerBoxes(
     displayFindings.map(f => ({
@@ -2735,12 +2742,8 @@ function IssuesTabContent({
   extractedEngineerName?: string | null;
   photoPairCompare?: PhotoPairCompareArtifact | null;
   pairResolvedDecisions?: Record<number, "confirmed" | "overridden">;
-  onConfirmPair?: (
-    pairIndex: number
-  ) => void | Promise<boolean | "deferred">;
-  onOverridePair?: (
-    pairIndex: number
-  ) => void | Promise<boolean | "deferred">;
+  onConfirmPair?: (pairIndex: number) => void | Promise<boolean | "deferred">;
+  onOverridePair?: (pairIndex: number) => void | Promise<boolean | "deferred">;
 }) {
   const relationshipFindings = findings.filter(isRelationshipFinding);
   const tyreFindings = findings.filter(

@@ -83,8 +83,7 @@ export function loadDropIngestConfig(
   const graphEnabled =
     (env.FEATURE_DROP_GRAPH ?? "").trim().toLowerCase() === "true";
   const graphDriveId = (env.DROP_INGEST_GRAPH_DRIVE_ID ?? "").trim() || null;
-  const graphFolderId =
-    (env.DROP_INGEST_GRAPH_FOLDER_ID ?? "").trim() || null;
+  const graphFolderId = (env.DROP_INGEST_GRAPH_FOLDER_ID ?? "").trim() || null;
   const graphCredentialsReady = Boolean(
     (env.GRAPH_TENANT_ID ?? "").trim() &&
       (env.GRAPH_CLIENT_ID ?? "").trim() &&

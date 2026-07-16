@@ -24,12 +24,8 @@ export interface PhotoEvidenceFindingsGroupProps {
   activeBoxId: string | number | null;
   onFindingClick: (id: string | number) => void;
   photoPairCompare?: PhotoPairCompareArtifact | null;
-  onConfirmPair?: (
-    pairIndex: number
-  ) => void | Promise<boolean | "deferred">;
-  onOverridePair?: (
-    pairIndex: number
-  ) => void | Promise<boolean | "deferred">;
+  onConfirmPair?: (pairIndex: number) => void | Promise<boolean | "deferred">;
+  onOverridePair?: (pairIndex: number) => void | Promise<boolean | "deferred">;
   pairResolvedDecisions?: Record<number, "confirmed" | "overridden">;
 }
 

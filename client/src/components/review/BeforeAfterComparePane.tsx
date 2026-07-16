@@ -60,12 +60,8 @@ export interface BeforeAfterComparePaneProps {
   defaultOpen?: boolean;
   className?: string;
   /** Resolve true only after server mutate succeeds (mutate-then-commit). */
-  onConfirmPair?: (
-    pairIndex: number
-  ) => void | Promise<boolean | "deferred">;
-  onOverridePair?: (
-    pairIndex: number
-  ) => void | Promise<boolean | "deferred">;
+  onConfirmPair?: (pairIndex: number) => void | Promise<boolean | "deferred">;
+  onOverridePair?: (pairIndex: number) => void | Promise<boolean | "deferred">;
   /** Server-resolved findings hydrate pair state after reopening a review. */
   resolvedDecisions?: Record<number, "confirmed" | "overridden">;
   onFocusPage?: (page: number) => void;
@@ -316,11 +312,7 @@ export function resolvePhotoPairFindings<
     box?: { page: number };
     status?: string;
   },
->(
-  findings: T[],
-  pair: PhotoPairResult,
-  includeResolved = false
-): T[] {
+>(findings: T[], pair: PhotoPairResult, includeResolved = false): T[] {
   const c012Page = pair.afterPage ?? pair.beforePage ?? 1;
   const c013Page = pair.afterPage ?? 1;
   const candidates = findings.filter(
