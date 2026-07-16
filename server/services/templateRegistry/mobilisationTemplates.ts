@@ -22,11 +22,14 @@ const logger = createSafeLogger("MobilisationTemplates");
 
 const JOB_SUMMARY_SLUG = "job-summary-v1";
 const WASTED_JOURNEY_SLUG = "wasted-journey-v1";
+const PTO_SERVICE_SLUG = "compliance-checklist-pto-service-v1";
 
 const JOB_SUMMARY_PACK =
   "data/templates-mobilisation/job-summary-import-pack.json";
 const WASTED_JOURNEY_PACK =
   "data/templates-mobilisation/wasted-journey-import-pack.json";
+const PTO_SERVICE_PACK =
+  "data/templates-mobilisation/compliance-checklist-pto-service-import-pack.json";
 
 function resolvePackPath(relativePath: string, label: string): string {
   const candidates = [
@@ -151,4 +154,25 @@ export function initializeWastedJourneyTemplate(
 
 export function hasWastedJourneyTemplate(): boolean {
   return hasActiveTemplate(WASTED_JOURNEY_SLUG);
+}
+
+/**
+ * Ensure compliance-checklist-pto-service-v1 is imported and active.
+ * Tall-page PTO/OVP compliance grids — beats generic job-summary when
+ * "PTO Service" + checklist tokens are present.
+ */
+export function initializePtoServiceTemplate(
+  createdBy: number = 0
+): number | null {
+  return bootActivateTemplate({
+    slug: PTO_SERVICE_SLUG,
+    packRelative: PTO_SERVICE_PACK,
+    label: "Compliance Checklist PTO Service",
+    createdBy,
+    expectedVersion: "1.0.0",
+  });
+}
+
+export function hasPtoServiceTemplate(): boolean {
+  return hasActiveTemplate(PTO_SERVICE_SLUG);
 }

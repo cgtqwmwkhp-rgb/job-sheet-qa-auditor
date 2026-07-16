@@ -145,6 +145,67 @@ describe("mapSelectionMarksToRows", () => {
       "N/A",
     ]);
   });
+
+  it("inferColumnOrder maps Pass|Fail|N/A without stuffing Adv", () => {
+    expect(inferColumnOrder("Item Check Pass Fail N/A")).toEqual([
+      "Ok",
+      "Fail",
+      "N/A",
+    ]);
+  });
+
+  it("maps N/A selected on 3-mark Ok|Adv|Fail|N/A row (missing Adv circle)", () => {
+    // Azure often skips empty Adv radios → 3 marks. Indexing into 4 names
+    // previously mapped the rightmost N/A tick to Fail.
+    const mk = (x: number, state: "selected" | "unselected") => ({
+      state,
+      confidence: 99,
+      pageNumber: 1,
+      bbox: {
+        x,
+        y: 80,
+        width: 1.2,
+        height: 1.2,
+        coordinateSpace: "percent" as const,
+      },
+    });
+    const marks = [
+      mk(58, "unselected"), // Ok
+      mk(75, "unselected"), // Fail (Adv undetected)
+      mk(83, "selected"), // N/A
+    ];
+    const rows = mapSelectionMarksToRows(marks, {
+      headerText: "Change Ok Adv. Fail N/A",
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].markCount).toBe(3);
+    expect(rows[0].choice).toBe("N/A");
+  });
+
+  it("maps live PTO Service layout fixture without false Fail cascade", () => {
+    const ptoFixture = JSON.parse(
+      readFileSync(
+        join(__dirname, "../fixtures/azure-di-layout-pto-service-wx65vmh.json"),
+        "utf8"
+      )
+    );
+    const parsed = parseAzureDiResponse(ptoFixture);
+    const rows = mapSelectionMarksToRows(parsed.selectionMarks, {
+      headerText: "Lubricate Ok Adv. Fail N/A",
+      lines: parsed.lines,
+    });
+    const counts = rows.reduce(
+      (acc, r) => {
+        acc[r.choice] = (acc[r.choice] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+    expect(rows.length).toBeGreaterThanOrEqual(28);
+    expect(counts.Fail ?? 0).toBe(0);
+    expect(counts.Ok ?? 0).toBeGreaterThanOrEqual(20);
+    expect(counts["N/A"] ?? 0).toBeGreaterThanOrEqual(6);
+  });
 });
 
 describe("selectionMarks artifact + hints", () => {

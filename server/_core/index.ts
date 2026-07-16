@@ -16,6 +16,8 @@ import {
   hasJobSummaryTemplate,
   initializeWastedJourneyTemplate,
   hasWastedJourneyTemplate,
+  initializePtoServiceTemplate,
+  hasPtoServiceTemplate,
   hydrateTemplateRegistryFromMysql,
   assertTemplateRegistryMysqlProdContract,
 } from "../services/templateRegistry";
@@ -156,6 +158,31 @@ async function startServer() {
     }
   } else {
     console.log("[Templates] wasted-journey-v1 already active");
+  }
+
+  // Gold mobilisation: Compliance Checklist PTO Service (tall-page Ok/Adv/Fail/N/A)
+  if (!hasPtoServiceTemplate()) {
+    console.log(
+      "[Templates] Initializing compliance-checklist-pto-service-v1..."
+    );
+    const ptoVersionId = initializePtoServiceTemplate();
+    if (ptoVersionId) {
+      console.log(
+        `[Templates] compliance-checklist-pto-service-v1 activated (version ID: ${ptoVersionId})`
+      );
+    } else if (hasPtoServiceTemplate()) {
+      console.log(
+        "[Templates] compliance-checklist-pto-service-v1 already active"
+      );
+    } else {
+      console.warn(
+        "[Templates] compliance-checklist-pto-service-v1 seed skipped or failed (non-fatal)"
+      );
+    }
+  } else {
+    console.log(
+      "[Templates] compliance-checklist-pto-service-v1 already active"
+    );
   }
 
   // Phase 1.10: restore in-memory DLQ from durable failed_jobs (fail-safe)
