@@ -117,11 +117,14 @@ describe("Review Workstation Contract (PR-13)", () => {
       expect(pane).toContain(
         'applyBeforeAfterPairAction(pairIndex, "approve")'
       );
-      expect(pane).toContain(
-        'applyBeforeAfterPairAction(pairIndex, "override")'
-      );
-      // Mutate-then-commit: optimistic ids + Promise<boolean> return
-      expect(pane).toContain("Promise<boolean>");
+      // Override opens reason dialog (deferred), then mutates with trainingReasonCode
+      expect(pane).toContain('action: "override", pairIndex');
+      expect(pane).toContain('Promise.resolve("deferred" as const)');
+      expect(pane).toContain("applyBeforeAfterPairAction(");
+      expect(pane).toContain('"override"');
+      expect(pane).toContain("trainingReasonCode");
+      // Mutate-then-commit: optimistic ids + boolean / deferred return
+      expect(pane).toContain('Promise<boolean | "deferred">');
       expect(pane).toContain("Failed to persist pair decision");
     });
 
@@ -218,9 +221,10 @@ describe("BeforeAfterComparePane pair resolution", () => {
   });
 
   it("accepts onConfirmPair and onOverridePair callbacks", () => {
-    expect(src).toContain("onConfirmPair?: (pairIndex: number) => void");
-    expect(src).toContain("onOverridePair?: (pairIndex: number) => void");
-    expect(src).toContain("Promise<boolean>");
+    expect(src).toContain("onConfirmPair?: (");
+    expect(src).toContain("onOverridePair?: (");
+    expect(src).toContain('Promise<boolean | "deferred">');
+    expect(src).toContain("resolvedDecisions");
     expect(src).toContain("PdfPageThumb");
     expect(src).toContain("commitDecision");
   });
