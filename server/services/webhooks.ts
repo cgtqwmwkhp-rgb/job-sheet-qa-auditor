@@ -12,6 +12,8 @@ import { createHash } from "crypto";
 import { desc, eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import {
+  auditResults,
+  jobSheets,
   webhookDeliveryLog,
   webhookSubscriptions,
   type WebhookDeliveryLogRow,
@@ -21,6 +23,13 @@ import { getDb } from "../db";
 import { withRetry } from "../utils/resilience";
 import { getCorrelationId } from "../utils/context";
 import { redactObject } from "../utils/piiRedaction";
+import {
+  drainWebhookDeliveryOutbox,
+  enqueueWebhookDelivery,
+  type EnqueueDeliveryInput,
+} from "./webhookDeliveryOutbox";
+import { buildErpWritebackDelivery } from "./erpBridge";
+import { buildTeamsAuditDelivery } from "./teamsNotify";
 
 export interface WebhookConfig {
   id: string;
@@ -94,6 +103,43 @@ function extractAuditId(data: Record<string, unknown>): number | undefined {
     return n > 0 ? n : undefined;
   }
   return undefined;
+}
+
+async function enrichAuditIdentity(
+  event: WebhookEvent,
+  data: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  if (event !== "audit.completed" && event !== "audit.failed") return data;
+  const auditId = extractAuditId(data);
+  if (!auditId || data.externalJobId) return data;
+
+  try {
+    const db = await getDb();
+    if (!db) return data;
+    const rows = await db
+      .select({
+        externalJobId: jobSheets.externalJobId,
+        sourceSystem: jobSheets.sourceSystem,
+        deviceId: jobSheets.deviceId,
+      })
+      .from(auditResults)
+      .innerJoin(jobSheets, eq(auditResults.jobSheetId, jobSheets.id))
+      .where(eq(auditResults.id, auditId))
+      .limit(1);
+    const identity = rows[0];
+    if (!identity) return data;
+    return {
+      ...data,
+      ...(identity.externalJobId
+        ? { externalJobId: identity.externalJobId }
+        : {}),
+      ...(identity.sourceSystem ? { sourceSystem: identity.sourceSystem } : {}),
+      ...(identity.deviceId ? { deviceId: identity.deviceId } : {}),
+    };
+  } catch (error) {
+    console.warn("[Webhooks] Could not enrich upstream job identity:", error);
+    return data;
+  }
 }
 
 // In-memory webhook registry (write-through to webhook_subscriptions when DB available)
@@ -552,13 +598,9 @@ export async function emitWebhookEvent(
     w => w.active && w.events.includes(event)
   );
 
-  if (subscribers.length === 0) {
-    console.log(`[Webhooks] No subscribers for event: ${event}`);
-    return [];
-  }
-
   // Redact PII from data by default (opt out with redactPII: false)
-  const safeData = redactPII ? redactObject(data) : data;
+  const enrichedData = await enrichAuditIdentity(event, data);
+  const safeData = redactPII ? redactObject(enrichedData) : enrichedData;
 
   const payload: WebhookPayload = {
     id: uuidv4(),
@@ -568,17 +610,103 @@ export async function emitWebhookEvent(
     data: safeData,
   };
 
+  const deliveryInputs: EnqueueDeliveryInput[] = subscribers.map(webhook => ({
+    targetType: "webhook" as const,
+    webhookId: webhook.id,
+    event,
+    payloadId: payload.id,
+    url: webhook.url,
+    secret: webhook.secret,
+    payload: payload as unknown as Record<string, unknown>,
+    headers: {
+      "X-Webhook-ID": webhook.id,
+      "X-Webhook-Event": event,
+      "X-Webhook-Timestamp": payload.timestamp,
+      "X-Correlation-ID": payload.correlationId || "",
+    },
+    maxAttempts: webhook.retryCount + 1,
+  }));
+
+  const auditId = extractAuditId(safeData);
+  if (event === "audit.completed" && auditId) {
+    const erp = buildErpWritebackDelivery({
+      auditId,
+      result: String(safeData.result ?? ""),
+      score: Number(safeData.score ?? 0),
+      externalJobId:
+        typeof safeData.externalJobId === "string"
+          ? safeData.externalJobId
+          : undefined,
+      findingsSummary: safeData.findingsSummary,
+    });
+    if (erp) deliveryInputs.push(erp);
+  }
+  if ((event === "audit.completed" || event === "audit.failed") && auditId) {
+    const teams = buildTeamsAuditDelivery({
+      auditId,
+      result:
+        event === "audit.failed" ? "failed" : String(safeData.result ?? ""),
+      score: typeof safeData.score === "number" ? safeData.score : undefined,
+      externalJobId:
+        typeof safeData.externalJobId === "string"
+          ? safeData.externalJobId
+          : undefined,
+      error: typeof safeData.error === "string" ? safeData.error : undefined,
+    });
+    if (teams) deliveryInputs.push(teams);
+  }
+
+  if (deliveryInputs.length === 0) {
+    console.log(`[Webhooks] No delivery targets for event: ${event}`);
+    return [];
+  }
+
   console.log(
-    `[Webhooks] Emitting ${event} to ${subscribers.length} subscribers`,
+    `[Webhooks] Queueing ${event} for ${deliveryInputs.length} target(s)`,
     {
       correlationId,
       payloadId: payload.id,
     }
   );
 
-  // Deliver to all subscribers in parallel
+  let queued;
+  try {
+    queued = await Promise.all(deliveryInputs.map(enqueueWebhookDelivery));
+  } catch (error) {
+    // Never POST when the persist-before-send boundary failed.
+    console.error("[Webhooks] Failed to persist delivery outbox row:", error);
+    return [];
+  }
+
+  // Draining all due rows also advances retries left pending by earlier emits.
+  const attempts = await drainWebhookDeliveryOutbox({ limit: 100 });
+  const subscriberAttempts = attempts.filter(attempt =>
+    queued.some(
+      row => row.id === attempt.outboxId && row.targetType === "webhook"
+    )
+  );
+
   const results = await Promise.all(
-    subscribers.map(webhook => deliverWebhook(webhook, payload))
+    subscriberAttempts.map(async attempt => {
+      const queuedRow = queued.find(row => row.id === attempt.outboxId)!;
+      const webhook = subscribers.find(w => w.id === queuedRow.webhookId)!;
+      const payloadString = JSON.stringify(payload);
+      return {
+        id: attempt.outboxId,
+        success: attempt.success,
+        webhookId: webhook.id,
+        event,
+        payloadId: payload.id,
+        auditId,
+        statusCode: attempt.statusCode,
+        responseTime: attempt.responseTimeMs,
+        error: attempt.error,
+        retryCount: Math.max(0, attempt.attempts - 1),
+        signature: await signPayload(payloadString, webhook.secret),
+        payloadHash: hashPayload(payloadString),
+        deliveredAt: new Date(),
+      } satisfies WebhookDeliveryResult;
+    })
   );
 
   // Log delivery results (in-memory + durable signed log)
@@ -782,6 +910,10 @@ export const webhookEvents = {
       policyVersion?: string | null;
       personaVersion?: string | null;
       personaSnapshotHash?: string | null;
+      externalJobId?: string | null;
+      sourceSystem?: string | null;
+      deviceId?: string | null;
+      findingsSummary?: unknown;
     }
   ) =>
     emitWebhookEvent(
@@ -802,6 +934,12 @@ export const webhookEvents = {
           : {}),
         ...(meta?.personaSnapshotHash
           ? { personaSnapshotHash: meta.personaSnapshotHash }
+          : {}),
+        ...(meta?.externalJobId ? { externalJobId: meta.externalJobId } : {}),
+        ...(meta?.sourceSystem ? { sourceSystem: meta.sourceSystem } : {}),
+        ...(meta?.deviceId ? { deviceId: meta.deviceId } : {}),
+        ...(meta?.findingsSummary !== undefined
+          ? { findingsSummary: meta.findingsSummary }
           : {}),
       },
       { redactPII: true }

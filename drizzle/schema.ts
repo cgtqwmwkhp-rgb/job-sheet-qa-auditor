@@ -62,38 +62,54 @@ export type InsertGoldSpec = typeof goldSpecs.$inferInsert;
 /**
  * Job Sheets - uploaded documents for auditing
  */
-export const jobSheets = mysqlTable("job_sheets", {
-  id: int("id").autoincrement().primaryKey(),
-  /** Reference number from the job sheet */
-  referenceNumber: varchar("referenceNumber", { length: 64 }),
-  /** S3 URL of the uploaded file */
-  fileUrl: varchar("fileUrl", { length: 512 }).notNull(),
-  fileKey: varchar("fileKey", { length: 256 }).notNull(),
-  fileName: varchar("fileName", { length: 255 }).notNull(),
-  fileType: varchar("fileType", { length: 64 }).notNull(),
-  fileSizeBytes: int("fileSizeBytes"),
-  /** SHA-256 hash for determinism verification */
-  fileHash: varchar("fileHash", { length: 64 }),
-  /** Processing status */
-  status: mysqlEnum("status", [
-    "pending",
-    "processing",
-    "completed",
-    "failed",
-    "review_queue",
-  ])
-    .default("pending")
-    .notNull(),
-  /** Technician who submitted the job sheet */
-  technicianId: int("technicianId").references(() => users.id),
-  /** Site/location information */
-  siteInfo: text("siteInfo"),
-  uploadedBy: int("uploadedBy")
-    .notNull()
-    .references(() => users.id),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+export const jobSheets = mysqlTable(
+  "job_sheets",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    /** Reference number from the job sheet */
+    referenceNumber: varchar("referenceNumber", { length: 64 }),
+    /** Stable identity supplied by an upstream ERP / ingest client. */
+    externalJobId: varchar("externalJobId", { length: 128 }),
+    sourceSystem: varchar("sourceSystem", { length: 64 }),
+    deviceId: varchar("deviceId", { length: 128 }),
+    /** S3 URL of the uploaded file */
+    fileUrl: varchar("fileUrl", { length: 512 }).notNull(),
+    fileKey: varchar("fileKey", { length: 256 }).notNull(),
+    fileName: varchar("fileName", { length: 255 }).notNull(),
+    fileType: varchar("fileType", { length: 64 }).notNull(),
+    fileSizeBytes: int("fileSizeBytes"),
+    /** SHA-256 hash for determinism verification */
+    fileHash: varchar("fileHash", { length: 64 }),
+    /** Processing status */
+    status: mysqlEnum("status", [
+      "pending",
+      "processing",
+      "completed",
+      "failed",
+      "review_queue",
+    ])
+      .default("pending")
+      .notNull(),
+    /** Technician who submitted the job sheet */
+    technicianId: int("technicianId").references(() => users.id),
+    /** Site/location information */
+    siteInfo: text("siteInfo"),
+    uploadedBy: int("uploadedBy")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => ({
+    externalJobIdIdx: index("job_sheets_externalJobId_idx").on(
+      table.externalJobId
+    ),
+    sourceSystemIdx: index("job_sheets_sourceSystem_idx").on(
+      table.sourceSystem
+    ),
+    deviceIdIdx: index("job_sheets_deviceId_idx").on(table.deviceId),
+  })
+);
 
 export type JobSheet = typeof jobSheets.$inferSelect;
 export type InsertJobSheet = typeof jobSheets.$inferInsert;
@@ -615,6 +631,48 @@ export const webhookDeliveryLog = mysqlTable("webhook_delivery_log", {
 
 export type WebhookDeliveryLogRow = typeof webhookDeliveryLog.$inferSelect;
 export type InsertWebhookDeliveryLog = typeof webhookDeliveryLog.$inferInsert;
+
+/**
+ * Webhook Delivery Outbox — persist-before-POST queue for subscriber, ERP,
+ * and Teams deliveries. Failed rows back off and eventually enter the DLQ.
+ */
+export const webhookDeliveryOutbox = mysqlTable(
+  "webhook_delivery_outbox",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    targetType: mysqlEnum("targetType", ["webhook", "erp", "teams"]).notNull(),
+    webhookId: varchar("webhookId", { length: 36 }),
+    event: varchar("event", { length: 64 }).notNull(),
+    payloadId: varchar("payloadId", { length: 36 }),
+    url: text("url").notNull(),
+    secret: varchar("secret", { length: 256 }),
+    payload: json("payload").$type<Record<string, unknown>>().notNull(),
+    headers: json("headers").$type<Record<string, string>>(),
+    status: mysqlEnum("status", ["pending", "processing", "delivered", "dlq"])
+      .default("pending")
+      .notNull(),
+    attempts: int("attempts").default(0).notNull(),
+    maxAttempts: int("maxAttempts").default(4).notNull(),
+    nextAttemptAt: timestamp("nextAttemptAt").notNull(),
+    lastError: text("lastError"),
+    statusCode: int("statusCode"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+    deliveredAt: timestamp("deliveredAt"),
+  },
+  table => ({
+    dueIdx: index("webhook_delivery_outbox_due_idx").on(
+      table.status,
+      table.nextAttemptAt
+    ),
+    eventIdx: index("webhook_delivery_outbox_event_idx").on(table.event),
+  })
+);
+
+export type WebhookDeliveryOutboxRow =
+  typeof webhookDeliveryOutbox.$inferSelect;
+export type InsertWebhookDeliveryOutbox =
+  typeof webhookDeliveryOutbox.$inferInsert;
 
 /**
  * Review Claims — exclusive reviewer lease on a job sheet (Wave-4 D1).

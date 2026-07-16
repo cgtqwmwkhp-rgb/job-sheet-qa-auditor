@@ -352,7 +352,12 @@ function mapReviewQueueReasons(
 
 function mapDbAuditToExportShape(
   audit: NonNullable<Awaited<ReturnType<typeof db.getAuditResultById>>>,
-  dbFindings: Awaited<ReturnType<typeof db.getAuditFindingsByResultId>>
+  dbFindings: Awaited<ReturnType<typeof db.getAuditFindingsByResultId>>,
+  upstreamIdentity?: {
+    externalJobId?: string | null;
+    sourceSystem?: string | null;
+    deviceId?: string | null;
+  }
 ): AuditResultResponse {
   const findings = mapDbFindingsToExport(dbFindings);
   const validatedFields = mapExtractedFieldsToValidated(
@@ -382,6 +387,15 @@ function mapDbAuditToExportShape(
       processingTimeMs: audit.processingTimeMs ?? 0,
       specVersion: audit.pipelineVersion || "unknown",
       extractionVersion: audit.ocrEngineVersion || "unknown",
+      ...(upstreamIdentity?.externalJobId
+        ? { externalJobId: upstreamIdentity.externalJobId }
+        : {}),
+      ...(upstreamIdentity?.sourceSystem
+        ? { sourceSystem: upstreamIdentity.sourceSystem }
+        : {}),
+      ...(upstreamIdentity?.deviceId
+        ? { deviceId: upstreamIdentity.deviceId }
+        : {}),
       ...(() => {
         const report =
           audit.reportJson && typeof audit.reportJson === "object"
@@ -436,7 +450,7 @@ async function resolveAuditForExport(
   enforceAuditAccess(audit, jobSheet, user);
 
   const findings = await db.getAuditFindingsByResultId(auditId);
-  return mapDbAuditToExportShape(audit, findings);
+  return mapDbAuditToExportShape(audit, findings, jobSheet);
 }
 
 /**
