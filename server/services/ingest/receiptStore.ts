@@ -105,7 +105,7 @@ export class MapIngestReceiptDurableBackend
   async getByExternalJobId(
     externalJobId: string
   ): Promise<IngestReceipt | undefined> {
-    for (const receipt of this.rows.values()) {
+    for (const receipt of Array.from(this.rows.values())) {
       if (receipt.externalJobId === externalJobId) return { ...receipt };
     }
     return undefined;
@@ -114,7 +114,7 @@ export class MapIngestReceiptDurableBackend
   async getByContentHash(
     contentHash: string
   ): Promise<IngestReceipt | undefined> {
-    for (const receipt of this.rows.values()) {
+    for (const receipt of Array.from(this.rows.values())) {
       if (receipt.contentHash === contentHash) return { ...receipt };
     }
     return undefined;

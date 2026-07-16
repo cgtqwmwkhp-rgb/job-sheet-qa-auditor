@@ -37,7 +37,6 @@ async function loadPdfJs(): Promise<PdfJsLib | null> {
       script.src = `${CDN}/pdf.min.js`;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error("pdf.js load failed"));
-      document.head.appendChild(script);
     });
     const pdfjsLib = (window as unknown as { pdfjsLib: PdfJsLib }).pdfjsLib;
     pdfjsLib.GlobalWorkerOptions.workerSrc = `${CDN}/pdf.worker.min.js`;
@@ -65,21 +64,25 @@ export function PdfPageThumb({
   className,
 }: PdfPageThumbProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [failed, setFailed] = useState(false);
-  const [ready, setReady] = useState(false);
+  const sourceKey = `${documentUrl ?? ""}|${page}|${maxHeight}`;
+  const [trackedKey, setTrackedKey] = useState(sourceKey);
+  const [loadState, setLoadState] = useState<"idle" | "ready" | "failed">(
+    "idle"
+  );
+  if (trackedKey !== sourceKey) {
+    setTrackedKey(sourceKey);
+    setLoadState("idle");
+  }
+  const invalid = !documentUrl || !page || page < 1;
 
   useEffect(() => {
+    if (invalid) return;
+
     let cancelled = false;
-    setFailed(false);
-    setReady(false);
-    if (!documentUrl || !page || page < 1) {
-      setFailed(true);
-      return;
-    }
     (async () => {
       const pdfjs = await loadPdfJs();
       if (!pdfjs || cancelled) {
-        if (!cancelled) setFailed(true);
+        if (!cancelled) setLoadState("failed");
         return;
       }
       try {
@@ -96,19 +99,21 @@ export function PdfPageThumb({
         canvas.height = viewport.height;
         const ctx = canvas.getContext("2d");
         if (!ctx) {
-          setFailed(true);
+          setLoadState("failed");
           return;
         }
         await pg.render({ canvasContext: ctx, viewport }).promise;
-        if (!cancelled) setReady(true);
+        if (!cancelled) setLoadState("ready");
       } catch {
-        if (!cancelled) setFailed(true);
+        if (!cancelled) setLoadState("failed");
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [documentUrl, page, maxHeight]);
+  }, [documentUrl, page, maxHeight, invalid, sourceKey]);
+
+  const showPlaceholder = invalid || loadState === "failed";
 
   return (
     <button
@@ -122,7 +127,7 @@ export function PdfPageThumb({
       )}
     >
       <div className="font-medium mb-1 text-xs">{label}</div>
-      {failed || !documentUrl ? (
+      {showPlaceholder ? (
         <p className="text-muted-foreground text-[10px]">
           {documentUrl
             ? `Open page ${page} in the PDF viewer`
@@ -133,7 +138,7 @@ export function PdfPageThumb({
           ref={canvasRef}
           className={cn(
             "max-w-full h-auto rounded border border-border/50 bg-white",
-            !ready && "opacity-0"
+            loadState !== "ready" && "opacity-0"
           )}
           style={{ maxHeight }}
         />

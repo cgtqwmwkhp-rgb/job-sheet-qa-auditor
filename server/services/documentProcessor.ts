@@ -1533,10 +1533,7 @@ async function processJobSheetWithOptions(
   // HTR model swap is follow-on (AI-15) via CropOcrRunner.
   // Retained PNG crops are passed to multimodal ROI (stage 1.96) as cropImages.
   const cropReocrStart = Date.now();
-  let multimodalCropImages: Record<
-    string,
-    { data: string; mediaType: "image/png" | "image/jpeg" | "image/webp" }
-  > = {};
+  let multimodalCropImages: ReturnType<typeof cropImagesFromRoiTrace> = {};
   if (isRoiCropReocrEnabled() && sharedPdfBuffer?.length) {
     try {
       const pinnedForCrop = usedTemplateVersionId

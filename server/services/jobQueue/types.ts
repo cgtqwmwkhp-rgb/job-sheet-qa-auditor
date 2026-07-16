@@ -3,7 +3,8 @@ export type JobSheetProcessingSource =
   | "reprocess"
   | "template-reprocess"
   | "dlq-retry"
-  | "async-queue";
+  | "async-queue"
+  | "ingest";
 
 export interface JobSheetProcessingPayload {
   source?: JobSheetProcessingSource;

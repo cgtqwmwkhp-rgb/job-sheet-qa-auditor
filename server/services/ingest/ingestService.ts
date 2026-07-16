@@ -65,11 +65,7 @@ async function maybeEnqueueAutoProcess(
       jobSheetId: number;
       documentUrl: string;
       contentHash: string;
-    }) =>
-      enqueueJobSheetProcessing(
-        // jobQueue source union does not yet list "ingest"; worker treats source as string.
-        payload as Parameters<typeof enqueueJobSheetProcessing>[0]
-      ));
+    }) => enqueueJobSheetProcessing(payload));
 
   try {
     await Promise.resolve(
