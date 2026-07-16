@@ -309,11 +309,7 @@ export async function drainWebhookDeliveryOutbox(options?: {
 }): Promise<DeliveryAttemptResult[]> {
   const now = options?.now ?? new Date();
   await recoverStaleClaims(now);
-  const rows = await loadDueRows(
-    now,
-    options?.ids,
-    options?.limit
-  );
+  const rows = await loadDueRows(now, options?.ids, options?.limit);
   return Promise.all(rows.map(attemptDelivery));
 }
 
