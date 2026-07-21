@@ -75,9 +75,7 @@ describe("Cache Headers Contract", () => {
       expect(viteContent).toContain("Not found");
       // Must use originalUrl — req.path is unreliable under app.use("*")
       expect(viteContent).toContain("req.originalUrl || req.url");
-      expect(viteContent).toContain(
-        "Use a bare middleware (not app.use(\"*\"))"
-      );
+      expect(viteContent).toContain('Use a bare middleware (not app.use("*"))');
       // Production SPA catch-all must not be mounted on "*"
       const prodCatchAll = viteContent.slice(
         viteContent.indexOf("export function serveStatic")
