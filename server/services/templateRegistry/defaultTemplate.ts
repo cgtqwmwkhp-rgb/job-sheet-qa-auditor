@@ -206,7 +206,7 @@ export const DEFAULT_SPEC_JSON: SpecJson = {
       description:
         "Job number pattern JOB-XXXXXX is a legacy format assumption. Real " +
         "PlantExpand job references are frequently plain numeric IDs (e.g. " +
-        "\"218\") and do not follow this shape — softened to non-blocking " +
+        '"218") and do not follow this shape — softened to non-blocking ' +
         "so it never false-fails real data (PX-113).",
       severity: "minor",
       type: "pattern",
