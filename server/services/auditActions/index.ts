@@ -863,6 +863,7 @@ export async function approveJobSheet(
   deps: Pick<
     AuditActionDeps,
     | "updateJobSheetStatus"
+    | "updateAuditResultStatus"
     | "logAction"
     | "getAuditResult"
     | "getAuditResultByJobSheetId"
@@ -881,6 +882,8 @@ export async function approveJobSheet(
   jobSheetId: number;
   previousStatus: string;
   newStatus: "completed";
+  auditResultId: number;
+  previousAuditResult: AuditResultRecord["result"];
   undoToken: string;
 }> {
   const audit = await deps.getAuditResultByJobSheetId?.(input.jobSheetId);
@@ -916,6 +919,14 @@ export async function approveJobSheet(
   }
 
   const previous = input.previousStatus ?? "review_queue";
+  const previousAuditResult = audit.result;
+
+  // PX-062: sheet approve must land on the terminal countable "pass" result
+  // (getDashboardStats only counts result='pass'). Set it directly here —
+  // do NOT route through recalculateSheetTruth, since standing `approved`
+  // findings are treated as unresolved defects there and would immediately
+  // force the sheet back into review_queue.
+  await deps.updateAuditResultStatus(audit.id, "pass");
   await deps.updateJobSheetStatus(input.jobSheetId, "completed");
   await deps.logAction({
     userId: input.userId,
@@ -925,6 +936,8 @@ export async function approveJobSheet(
     details: {
       previousStatus: previous,
       newStatus: "completed",
+      previousAuditResult,
+      newAuditResult: "pass",
       reason: input.reason ?? "Approved from hold queue",
     },
   });
@@ -934,6 +947,8 @@ export async function approveJobSheet(
     jobSheetId: input.jobSheetId,
     previousStatus: previous,
     newStatus: "completed",
+    auditResultId: audit.id,
+    previousAuditResult,
     undoToken: `undo-js:${input.jobSheetId}:${previous}->completed`,
   };
 }
@@ -942,11 +957,17 @@ export async function approveJobSheet(
  * Soft-undo job sheet approve: restore previous status (typically review_queue).
  */
 export async function undoJobSheetApprove(
-  deps: Pick<AuditActionDeps, "updateJobSheetStatus" | "logAction">,
+  deps: Pick<
+    AuditActionDeps,
+    "updateJobSheetStatus" | "updateAuditResultStatus" | "logAction"
+  >,
   input: {
     jobSheetId: number;
     userId: number;
     restoreStatus: string;
+    /** PX-062: restore the audit result that approve overwrote to "pass". */
+    auditResultId?: number;
+    restoreAuditResult?: AuditResultRecord["result"];
   }
 ): Promise<{
   success: true;
@@ -954,6 +975,12 @@ export async function undoJobSheetApprove(
   newStatus: string;
 }> {
   await deps.updateJobSheetStatus(input.jobSheetId, input.restoreStatus);
+  if (input.auditResultId != null && input.restoreAuditResult != null) {
+    await deps.updateAuditResultStatus(
+      input.auditResultId,
+      input.restoreAuditResult
+    );
+  }
   await deps.logAction({
     userId: input.userId,
     action: "JOB_SHEET_APPROVE_UNDO",
@@ -961,6 +988,7 @@ export async function undoJobSheetApprove(
     entityId: input.jobSheetId,
     details: {
       restoredStatus: input.restoreStatus,
+      restoredAuditResult: input.restoreAuditResult,
     },
   });
 

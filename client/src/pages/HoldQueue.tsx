@@ -87,48 +87,61 @@ function HoldItemReasonChips({
   /** Only fetch for active / nearby rows to avoid N+1 on large queues. */
   enabled: boolean;
 }) {
-  const { data: auditResult } = trpc.audits.getByJobSheet.useQuery(
+  const {
+    data: auditResult,
+    error: auditError,
+    isLoading: auditLoading,
+  } = trpc.audits.getByJobSheet.useQuery(
     { jobSheetId },
-    { staleTime: 60_000, enabled }
+    { staleTime: 60_000, enabled, retry: false }
   );
-  const { data: findings } = trpc.audits.getFindings.useQuery(
-    { auditResultId: auditResult?.id ?? 0 },
-    { enabled: enabled && !!auditResult?.id, staleTime: 60_000 }
-  );
+  const { data: findings, error: findingsError } =
+    trpc.audits.getFindings.useQuery(
+      { auditResultId: auditResult?.id ?? 0 },
+      { enabled: enabled && !!auditResult?.id, staleTime: 60_000, retry: false }
+    );
 
   const needsAuthoring = reportNeedsTemplateAuthoring(auditResult?.reportJson);
 
+  // PX-063: a job sheet stuck in review_queue with no audit result is an
+  // orphan (pipeline failed before writing findings) — never surface a
+  // console error or a misleading "Review Required" chip for it.
+  const hasNoAudit = enabled && !auditLoading && (!!auditError || !auditResult);
+
   const chips = useMemo(() => {
-    if (!findings || findings.length === 0) {
-      return deriveReasonChips([], {
-        hasMajorFails: auditResult?.reportJson
-          ? mapHasMajorFailsFromReport(auditResult.reportJson)
-          : false,
-        auditResult: auditResult?.result ?? null,
-        needsTemplateAuthoring: needsAuthoring,
-      });
-    }
-    return deriveReasonChips(findings, {
+    if (hasNoAudit) return [];
+    const safeFindings = findingsError ? [] : (findings ?? []);
+    return deriveReasonChips(safeFindings, {
       hasMajorFails: auditResult?.reportJson
         ? mapHasMajorFailsFromReport(auditResult.reportJson)
         : false,
       auditResult: auditResult?.result ?? null,
       needsTemplateAuthoring: needsAuthoring,
     });
-  }, [findings, auditResult, needsAuthoring]);
+  }, [hasNoAudit, findings, findingsError, auditResult, needsAuthoring]);
 
   return (
     <div className="flex flex-wrap items-center gap-1 min-w-0">
-      {chips.map(chip => (
+      {hasNoAudit ? (
         <Badge
-          key={chip.key}
           variant="secondary"
-          title={chip.label}
-          className={`text-[10px] px-1.5 py-0 leading-4 border max-w-[9rem] truncate ${chip.className}`}
+          title="No audit result found for this job sheet"
+          className="text-[10px] px-1.5 py-0 leading-4 border max-w-[9rem] truncate bg-slate-100 text-slate-500 border-slate-200"
         >
-          {chip.label}
+          No audit
         </Badge>
-      ))}
+      ) : (
+        chips.map(chip => (
+          <Badge
+            key={chip.key}
+            variant="secondary"
+            title={chip.label}
+            className={`text-[10px] px-1.5 py-0 leading-4 border max-w-[9rem] truncate ${chip.className}`}
+          >
+            {chip.label}
+          </Badge>
+        ))
+      )}
       {needsAuthoring && (
         <Link
           href={`/template-studio?fromJobSheet=${jobSheetId}`}
@@ -282,9 +295,12 @@ export default function HoldQueue() {
     void Promise.all(
       ids.map(async id => {
         try {
-          const audit = await utils.audits.getByJobSheet.fetch({
-            jobSheetId: id,
-          });
+          // PX-063: orphan review_queue rows have no audit — don't retry
+          // (and don't let a transient failure spam the console 3x).
+          const audit = await utils.audits.getByJobSheet.fetch(
+            { jobSheetId: id },
+            { retry: false }
+          );
           return [id, reportNeedsTemplateAuthoring(audit?.reportJson)] as const;
         } catch {
           return [id, false] as const;
@@ -343,7 +359,12 @@ export default function HoldQueue() {
     return sortedFilteredItems[0].id;
   }, [sortedFilteredItems, selectedId]);
 
-  const showApproveUndo = (jobSheetId: number, previousStatus: string) => {
+  const showApproveUndo = (
+    jobSheetId: number,
+    previousStatus: string,
+    auditResultId: number,
+    previousAuditResult: "pass" | "fail" | "review_queue" | "waived"
+  ) => {
     toast.success("Job sheet approved", {
       action: {
         label: "Undo",
@@ -357,6 +378,8 @@ export default function HoldQueue() {
                 | "completed"
                 | "failed"
                 | "review_queue",
+              auditResultId,
+              restoreAuditResult: previousAuditResult,
             },
             {
               onSuccess: () => {
@@ -400,7 +423,12 @@ export default function HoldQueue() {
               null;
             setSelectedId(nextItem?.id ?? null);
           }
-          showApproveUndo(jobSheetId, result.previousStatus);
+          showApproveUndo(
+            jobSheetId,
+            result.previousStatus,
+            result.auditResultId,
+            result.previousAuditResult
+          );
         },
         onError: err => toast.error(err.message || "Approve failed"),
       }
@@ -495,6 +523,8 @@ export default function HoldQueue() {
                       | "completed"
                       | "failed"
                       | "review_queue",
+                    auditResultId: result.auditResultId,
+                    restoreAuditResult: result.previousAuditResult,
                   });
                   undone++;
                 } catch {

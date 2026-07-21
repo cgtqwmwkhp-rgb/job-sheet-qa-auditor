@@ -33,4 +33,30 @@ describe("gateSummaryToResult (PX-101)", () => {
   it("handles empty summary on FAIL", () => {
     expect(gateSummaryToResult("", "FAIL")).toBe("Outcome: FAIL.");
   });
+
+  it("strips 'fully compliant' claims on FAIL", () => {
+    const gated = gateSummaryToResult(
+      "The job sheet is fully compliant with site safety standards.",
+      "FAIL"
+    );
+    expect(gated.startsWith("Outcome: FAIL.")).toBe(true);
+    expect(gated.toLowerCase()).not.toMatch(/compliant/);
+  });
+
+  it("strips bare 'compliant' / 'compliance' claims on FAIL", () => {
+    const gated = gateSummaryToResult(
+      "Documentation is compliant and shows good compliance overall.",
+      "FAIL"
+    );
+    expect(gated.toLowerCase()).not.toMatch(/compliant|compliance/);
+  });
+
+  it("strips 'meets requirements' / 'meets all requirements' on REVIEW_QUEUE", () => {
+    const gated = gateSummaryToResult(
+      "This sheet meets all requirements for sign-off.",
+      "REVIEW_QUEUE"
+    );
+    expect(gated.startsWith("Outcome: Needs review.")).toBe(true);
+    expect(gated.toLowerCase()).not.toMatch(/meets\s+(?:all\s+)?requirements?/);
+  });
 });

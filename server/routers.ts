@@ -446,7 +446,9 @@ export const appRouter = router({
 
     /**
      * PX-063/088: remove orphan / stuck pending uploads (and cascade).
-     * Staff only — deletes storage object when present.
+     * Staff only — deletes storage object when present. Also allows staff
+     * to purge review_queue sheets that never got an audit result (orphans
+     * stuck in the Hold Queue with nothing to review).
      */
     delete: qaLeadProcedure
       .input(
@@ -467,18 +469,36 @@ export const appRouter = router({
         const { enforceJobSheetAccess } = await import("./utils/authorization");
         enforceJobSheetAccess(jobSheet, ctx.user);
 
-        if (
-          jobSheet.status === "processing" ||
-          jobSheet.status === "completed" ||
-          jobSheet.status === "review_queue"
-        ) {
+        if (jobSheet.status === "processing") {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
             message:
-              jobSheet.status === "processing"
-                ? "Cannot delete a sheet that is currently processing — wait for it to finish or fail."
-                : "Cannot delete a processed sheet from Upload. Use audit retention controls instead.",
+              "Cannot delete a sheet that is currently processing — wait for it to finish or fail.",
           });
+        }
+        if (jobSheet.status === "completed") {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message:
+              "Cannot delete a processed sheet from Upload. Use audit retention controls instead.",
+          });
+        }
+
+        // PX-063: review_queue sheets are normally reviewed via Hold Queue,
+        // not deleted — but a sheet stuck there with no audit result is an
+        // orphan (pipeline failed before writing findings) and staff need a
+        // way to purge it instead of it sitting unreviewable forever.
+        let isOrphanReviewQueue = false;
+        if (jobSheet.status === "review_queue") {
+          const audit = await db.getAuditResultByJobSheetId(input.id);
+          if (audit) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message:
+                "Cannot delete a job sheet with audit findings. Use audit retention controls instead.",
+            });
+          }
+          isOrphanReviewQueue = true;
         }
 
         // Storage adapters do not yet expose delete; cascade removes DB rows.
@@ -492,7 +512,11 @@ export const appRouter = router({
           entityType: "job_sheet",
           entityId: input.id,
           details: {
-            reason: input.reason ?? "Removed orphan / stuck upload",
+            reason:
+              input.reason ??
+              (isOrphanReviewQueue
+                ? "Purged stuck review_queue sheet with no audit"
+                : "Removed orphan / stuck upload"),
             previousStatus: jobSheet.status,
             fileName: jobSheet.fileName,
           },
