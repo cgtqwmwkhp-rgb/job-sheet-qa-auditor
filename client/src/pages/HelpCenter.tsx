@@ -69,23 +69,67 @@ const HELP_CATEGORIES = [
   },
 ] as const;
 
+/** PX-095 — article-level search corpus (not category labels alone) */
 const SEARCHABLE_CONTENT = [
   {
     tab: "overview",
-    text: "Gold Standard Spec OCR AI Validator workflow ingestion scoring",
+    title: "The Why & How",
+    text: "Gold Standard Spec OCR AI Validator workflow ingestion scoring compliance return visits first-time fix rates",
   },
-  { tab: "guides", text: "upload disputes AI persona analytics users roles" },
+  {
+    tab: "overview",
+    title: "Gold Standard Spec",
+    text: "rules engine mandatory fields evidence quality client-specific requirements layered rule set",
+  },
+  {
+    tab: "overview",
+    title: "Workflow Engine",
+    text: "upload approval dispute lifecycle ingestion OCR extraction rule validation scoring technician feedback",
+  },
+  {
+    tab: "overview",
+    title: "Platform Architecture",
+    text: "PDF upload OCR engine AI validator analytics pipeline architecture",
+  },
+  {
+    tab: "guides",
+    title: "Uploading Job Sheets",
+    text: "upload disputes AI persona analytics users roles single batch uploads",
+  },
+  {
+    tab: "guides",
+    title: "Handling Disputes",
+    text: "review resolve engineer disputes effectively",
+  },
+  {
+    tab: "guides",
+    title: "Configuring AI Personas",
+    text: "advisory voice strictness tone focus audit policy fail law",
+  },
+  {
+    tab: "guides",
+    title: "Understanding Analytics",
+    text: "first fix rates defect analysis scorecards",
+  },
+  {
+    tab: "guides",
+    title: "Managing Users & Roles",
+    text: "technicians permissions admin qa_lead",
+  },
   {
     tab: "faqs",
-    text: "first fix rate handwritten OCR dispute gold standard deep note analysis",
+    title: "FAQs",
+    text: "first fix rate handwritten OCR dispute gold standard deep note analysis scoring confidence",
   },
   {
     tab: "best-practices",
-    text: "engineers photos notes QA leads hold queue coaching disputes",
+    title: "Best Practices",
+    text: "engineers photos notes QA leads hold queue coaching disputes sharp photos glare shadows",
   },
   {
     tab: "policies",
-    text: "doc quality extract confidence tyre tread PSI major minor VOR documentation",
+    title: "Policies & Standards",
+    text: "doc quality extract confidence tyre tread PSI major minor VOR documentation policy",
   },
 ];
 
@@ -134,15 +178,19 @@ export default function HelpCenter() {
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
+  const articleHits = useMemo(() => {
+    if (!normalizedQuery) return [];
+    const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+    return SEARCHABLE_CONTENT.filter(entry => {
+      const hay = `${entry.title} ${entry.text}`.toLowerCase();
+      return terms.every(term => hay.includes(term));
+    });
+  }, [normalizedQuery]);
+
   const matchingTabs = useMemo(() => {
     if (!normalizedQuery) return null;
-    const terms = normalizedQuery.split(/\s+/).filter(Boolean);
-    return new Set(
-      SEARCHABLE_CONTENT.filter(entry =>
-        terms.every(term => entry.text.toLowerCase().includes(term))
-      ).map(entry => entry.tab)
-    );
-  }, [normalizedQuery]);
+    return new Set(articleHits.map(entry => entry.tab));
+  }, [normalizedQuery, articleHits]);
 
   const filteredGuides = useMemo(() => {
     if (!normalizedQuery) return GUIDES;
@@ -179,13 +227,34 @@ export default function HelpCenter() {
               onChange={e => setSearchQuery(e.target.value)}
             />
             {normalizedQuery && (
-              <p className="text-left text-xs text-muted-foreground mt-2 pl-1">
-                {matchingTabs &&
-                matchingTabs.size === 0 &&
-                filteredGuides.length === 0
-                  ? `No results for "${searchQuery}"`
-                  : `Filtering across ${matchingTabs?.size ?? HELP_CATEGORIES.length} categories`}
-              </p>
+              <div className="text-left mt-2 pl-1 space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  {articleHits.length === 0 && filteredGuides.length === 0
+                    ? `No results for "${searchQuery}"`
+                    : `${articleHits.length} article match${articleHits.length === 1 ? "" : "es"} · ${matchingTabs?.size ?? 0} categor${(matchingTabs?.size ?? 0) === 1 ? "y" : "ies"}`}
+                </p>
+                {articleHits.length > 0 ? (
+                  <ul className="text-xs space-y-0.5">
+                    {articleHits.slice(0, 6).map(hit => (
+                      <li key={`${hit.tab}-${hit.title}`}>
+                        <button
+                          type="button"
+                          className="text-primary hover:underline"
+                          onClick={() => setActiveTab(hit.tab)}
+                        >
+                          {hit.title}
+                        </button>
+                        <span className="text-muted-foreground">
+                          {" "}
+                          ·{" "}
+                          {HELP_CATEGORIES.find(c => c.id === hit.tab)?.label ??
+                            hit.tab}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
             )}
           </div>
         </div>

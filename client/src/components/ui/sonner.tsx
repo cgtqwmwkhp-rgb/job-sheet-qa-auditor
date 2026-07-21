@@ -8,6 +8,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      // PX-098 — keep toasts off primary action chrome (top-right, short success)
+      position="top-right"
+      closeButton
+      duration={3000}
+      visibleToasts={3}
       style={
         {
           "--normal-bg": "var(--popover)",

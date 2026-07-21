@@ -511,12 +511,16 @@ export function DocumentViewer({
             </Button>
           </div>
         ) : !pdfFile ? (
-          <div className="flex items-center justify-center h-full w-full min-h-[240px] bg-muted/20">
+          <div className="flex flex-col items-center justify-center gap-3 h-full w-full min-h-[240px] bg-muted/20">
             <div
               className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"
               role="status"
               aria-label="Loading document"
             />
+            {/* PX-070 — explicit loading state for slow PDFs (avoid blank/offset look) */}
+            <p className="text-sm text-muted-foreground">
+              Loading document… large PDFs can take a few seconds.
+            </p>
           </div>
         ) : mediaKind === "image" ? (
           <div

@@ -336,8 +336,9 @@ export default function UploadPage() {
       />
       <div className="mx-auto max-w-4xl space-y-6">
         <p className="text-muted-foreground">
-          Drop a job sheet below — processing starts automatically. One clear
-          path from upload to audit result.
+          Select PDF, JPG, or PNG job sheets (max 10MB each), then click Start
+          Upload. Processing begins after the file is accepted — one clear path
+          from upload to audit result.
         </p>
 
         {uploadSuccess ? (
@@ -399,8 +400,8 @@ export default function UploadPage() {
             </div>
             <CardTitle className="mt-3">Upload job sheet</CardTitle>
             <CardDescription>
-              Drag and drop or browse. Processing begins as soon as the file is
-              accepted.
+              Drag and drop or browse, then click Start Upload. Processing
+              begins after the upload is accepted.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5 pt-5">
@@ -465,21 +466,12 @@ export default function UploadPage() {
               </Select>
             </div>
 
-            {isUploading ? (
-              <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-primary/40 bg-[rgba(190,218,65,0.08)] py-12">
-                <Loader2 className="mb-4 h-12 w-12 animate-spin text-primary" />
-                <p className="text-lg font-medium">Uploading files…</p>
-                <p className="text-sm text-muted-foreground">
-                  Please wait while we upload your documents.
-                </p>
-              </div>
-            ) : (
-              <FileUploader
-                onUpload={handleUpload}
-                maxFiles={50}
-                intakeHints={intakeRejections}
-              />
-            )}
+            <FileUploader
+              onUpload={handleUpload}
+              maxFiles={50}
+              isUploading={isUploading}
+              intakeHints={intakeRejections}
+            />
 
             {liveProgress && isActiveJobSheetStatus(liveProgress.status) ? (
               <ProcessingProgressPanel

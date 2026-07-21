@@ -34,7 +34,7 @@ describe("toastHelpers", () => {
       showSuccessToast("Operation successful");
       expect(toast.success).toHaveBeenCalledWith(
         "Operation successful",
-        expect.objectContaining({ duration: 4000 })
+        expect.objectContaining({ duration: 2500 })
       );
     });
 

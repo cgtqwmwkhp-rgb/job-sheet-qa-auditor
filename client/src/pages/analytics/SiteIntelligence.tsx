@@ -123,6 +123,8 @@ export default function SiteIntelligence() {
   }
 
   if (!summary || summary.totals.documentCount === 0) {
+    // PX-096 — site filter no-match is not the same as first-time onboarding
+    const filteredEmpty = Boolean(site?.trim());
     return (
       <AnalyticsLayout
         title="Site & Cohort Intelligence"
@@ -131,10 +133,15 @@ export default function SiteIntelligence() {
         <Card className="p-12">
           <div className="flex flex-col items-center justify-center text-center">
             <MapPin className="h-16 w-16 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">No Cohort Data Yet</h2>
+            <h2 className="text-xl font-semibold mb-2">
+              {filteredEmpty
+                ? `No data for site “${site.trim()}”`
+                : "No Cohort Data Yet"}
+            </h2>
             <p className="text-muted-foreground max-w-md">
-              Process job sheets with site info and template selection to unlock
-              site, asset-type, and work-type comparisons.
+              {filteredEmpty
+                ? "Clear or change the site filter to see other cohorts. This is a filter miss, not an empty product."
+                : "Process job sheets with site info and template selection to unlock site, asset-type, and work-type comparisons."}
             </p>
           </div>
         </Card>

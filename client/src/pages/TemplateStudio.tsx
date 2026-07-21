@@ -185,6 +185,7 @@ export default function TemplateStudio() {
     trpc.templates.studio.bootstrapFromJobSheet.useMutation();
   const saveDraft = trpc.templates.studio.saveDraft.useMutation();
   const updateRoi = trpc.templates.updateRoi.useMutation();
+  const updateTemplateStatus = trpc.templates.updateStatus.useMutation();
   const activateStaging = trpc.templates.studio.activateStaging.useMutation();
   const dryRunMut = trpc.templates.studio.dryRun.useMutation();
   const ackDryRun = trpc.templates.studio.acknowledgeDryRun.useMutation();
@@ -409,6 +410,27 @@ export default function TemplateStudio() {
     if (!name.trim()) {
       showErrorToast("Name required", "Enter a template name");
       return;
+    }
+    // PX-080 — warn before multiplying near-duplicate draft templates
+    const needle = name.trim().toLowerCase();
+    const existingDrafts = (templates ?? []).filter(
+      t =>
+        t.status === "draft" &&
+        (t.name.toLowerCase() === needle ||
+          t.name.toLowerCase().includes(needle) ||
+          needle.includes(t.name.toLowerCase()))
+    );
+    if (existingDrafts.length > 0) {
+      const openExisting = window.confirm(
+        `${existingDrafts.length} similar draft(s) already exist (e.g. “${existingDrafts[0].name}”).\n\nOK = open the first existing draft\nCancel = create another draft anyway`
+      );
+      if (openExisting) {
+        openTemplate(
+          existingDrafts[0].id,
+          existingDrafts[0].activeVersionId ?? null
+        );
+        return;
+      }
     }
     try {
       const result = await createDraft.mutateAsync({
@@ -932,28 +954,68 @@ export default function TemplateStudio() {
               ) : (
                 <div className="divide-y rounded-md border">
                   {templates.map(t => (
-                    <button
+                    <div
                       key={t.id}
-                      type="button"
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40"
-                      onClick={() => openTemplate(t.id, t.activeVersionId)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3"
                     >
-                      <div>
-                        <div className="font-medium">{t.name}</div>
+                      <button
+                        type="button"
+                        className="min-w-0 flex-1 text-left hover:bg-muted/40 rounded-md -mx-1 px-1 py-1"
+                        onClick={() => openTemplate(t.id, t.activeVersionId)}
+                      >
+                        <div className="font-medium truncate" title={t.name}>
+                          {t.name}
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           {t.templateId} · {t.versionCount} version
                           {t.versionCount === 1 ? "" : "s"}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
+                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
                         <Badge variant="secondary">{t.status}</Badge>
                         {t.activeVersion ? (
                           <Badge>v{t.activeVersion}</Badge>
                         ) : (
                           <Badge variant="outline">no active</Badge>
                         )}
+                        {/* PX-080 — archive abandoned drafts to curb sprawl */}
+                        {t.status === "draft" && canAuthor ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            disabled={updateTemplateStatus.isPending}
+                            onClick={e => {
+                              e.stopPropagation();
+                              if (
+                                !confirm(
+                                  `Archive draft “${t.name}”? It will leave the active catalog.`
+                                )
+                              ) {
+                                return;
+                              }
+                              updateTemplateStatus.mutate(
+                                { id: t.id, status: "archived" },
+                                {
+                                  onSuccess: () => {
+                                    void utils.templates.list.invalidate();
+                                    showSuccessToast("Draft archived", t.name);
+                                  },
+                                  onError: err =>
+                                    showErrorToast(
+                                      "Archive failed",
+                                      err.message
+                                    ),
+                                }
+                              );
+                            }}
+                          >
+                            Archive
+                          </Button>
+                        ) : null}
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -1823,6 +1885,27 @@ export default function TemplateStudio() {
                         )}
                         Run dry-run audit
                       </Button>
+                      {/* PX-084 — staged progress while dry-run runs (can take ~1–2 min) */}
+                      {dryRunMut.isPending ? (
+                        <div
+                          className="w-full rounded-md border bg-muted/40 px-3 py-2 text-xs space-y-1"
+                          data-testid="dry-run-progress"
+                        >
+                          <p className="font-medium text-foreground">
+                            Dry-run in progress…
+                          </p>
+                          <ol className="list-decimal pl-4 text-muted-foreground space-y-0.5">
+                            <li>Load studio sample / smoke sheets</li>
+                            <li>Run OCR + field extraction</li>
+                            <li>Apply draft rules &amp; score findings</li>
+                            <li>Build activation report</li>
+                          </ol>
+                          <p className="text-muted-foreground">
+                            This can take up to a couple of minutes — keep this
+                            tab open.
+                          </p>
+                        </div>
+                      ) : null}
                       <Button
                         size="sm"
                         variant="secondary"

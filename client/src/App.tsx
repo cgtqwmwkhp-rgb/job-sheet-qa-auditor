@@ -224,11 +224,11 @@ function Router() {
             allowedRoles={["admin", "qa_lead"]}
           />
         </Route>
-        {/* PR-OPS-FLAGS: read-only effective FEATURE_* + deploy matrix */}
+        {/* PR-OPS-FLAGS / PX-071 — admin-only diagnostics (hide from qa_lead floor) */}
         <Route path="/ops/feature-flags">
           <ProtectedRoute
             component={FeatureFlagMatrix}
-            allowedRoles={["admin", "qa_lead"]}
+            allowedRoles={["admin"]}
           />
         </Route>
         {/* Help stays public (E2E + support links) */}

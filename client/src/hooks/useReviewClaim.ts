@@ -87,9 +87,11 @@ export function useReviewClaim(jobSheetId: number, enabled = true) {
         const conflict = trpcErrorCode(error) === "CONFLICT";
         setStatus(conflict ? "conflict" : "error");
         setMessage(text);
-        toast.error(
-          conflict ? `Review claim conflict: ${text}` : `Claim failed: ${text}`
-        );
+        // PX-072 — conflict is expected when switching sheets; surface in UI only.
+        // Toast only on unexpected claim failures.
+        if (!conflict) {
+          toast.error(`Claim failed: ${text}`);
+        }
       });
 
     return () => {

@@ -461,7 +461,9 @@ export default function DisputeManagement() {
                           </div>
                           <div className="flex items-center gap-2 text-sm text-[#706D6D]">
                             <User className="h-4 w-4" />
-                            <span>Raised by user #{dispute.raisedBy}</span>
+                            <span>
+                              Raised by technician · account {dispute.raisedBy}
+                            </span>
                           </div>
                         </div>
 
@@ -472,7 +474,10 @@ export default function DisputeManagement() {
                           <div className="border border-[#EBE8E8] rounded-lg p-3 bg-white">
                             <div className="flex justify-between items-center mb-2">
                               <span className="font-medium text-sm text-[#333030]">
-                                Finding #{dispute.auditFindingId}
+                                Contested finding
+                                {dispute.jobSheetId
+                                  ? ` · job sheet ${dispute.jobSheetId}`
+                                  : ""}
                               </span>
                               {(() => {
                                 const urls = evidenceUrlList(
@@ -529,12 +534,12 @@ export default function DisputeManagement() {
                               })()}
                             </div>
                             <p className="text-sm text-[#706D6D]">
-                              Finding #{dispute.auditFindingId}
+                              Compare the technician claim with the original QA
+                              outcome
                               {dispute.jobSheetId
-                                ? ` · job sheet #${dispute.jobSheetId}`
+                                ? ` on job sheet ${dispute.jobSheetId}`
                                 : ""}
-                              . Compare technician claim with the original QA
-                              outcome.
+                              .
                             </p>
                           </div>
                         </div>
@@ -612,16 +617,21 @@ export default function DisputeManagement() {
                         </Badge>
                         <div>
                           <div className="font-medium text-[#333030]">
-                            User #{dispute.raisedBy}
+                            Technician account {dispute.raisedBy}
                           </div>
                           <div className="text-sm text-[#706D6D]">
-                            Resolved{" "}
-                            {dispute.resolvedAt
-                              ? formatDistanceToNow(
-                                  new Date(dispute.resolvedAt),
-                                  { addSuffix: true }
-                                )
-                              : "Unknown"}
+                            {dispute.status === "escalated" &&
+                            !dispute.resolvedAt
+                              ? "Escalated — awaiting onward review"
+                              : dispute.resolvedAt
+                                ? `Resolved ${formatDistanceToNow(
+                                    new Date(dispute.resolvedAt),
+                                    { addSuffix: true }
+                                  )}`
+                                : dispute.status === "accepted" ||
+                                    dispute.status === "rejected"
+                                  ? "Resolved (time not recorded)"
+                                  : "In progress"}
                           </div>
                         </div>
                       </div>
