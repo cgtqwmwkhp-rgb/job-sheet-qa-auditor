@@ -376,9 +376,9 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
         },
         {
           ruleId: "PARTS-C014",
-          label: "Parts Used (Repairs-Only, Unconfirmed)",
+          label: "Parts Used (Soft Implication, Unconfirmed)",
           description:
-            "Repairs Required noted but Parts Used empty/None and Consumables Used not Yes — weak repairs-only implication, not a confirmed defect",
+            "Parts Used empty/None with only repairs and/or Consumables Used=Yes — weak implication (consumables are not itemised); not a confirmed parts-listing defect",
           failClass: "informational",
           enabled: true,
           fieldAliases: ["Parts Used", "Parts Assessment"],

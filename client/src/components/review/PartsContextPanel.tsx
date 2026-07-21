@@ -266,6 +266,12 @@ export function PartsContextPanel({
       boolChip("Parts implied", assessmentSignals.partsImplied),
       boolChip("Parts Used", assessmentSignals.partsUsedPresent),
       {
+        label: "Consumables",
+        value: assessmentSignals.consumablesYes ? "Yes" : "No",
+        // Wave B: consumablesYes alone is soft (C014), not a MAJOR — neutral chip.
+        variant: "neutral",
+      },
+      {
         label: "Lines",
         value: `${assessmentSignals.completeCount}/${assessmentSignals.lineCount} complete`,
         variant:

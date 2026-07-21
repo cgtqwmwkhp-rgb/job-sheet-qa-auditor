@@ -59,6 +59,16 @@ None
 Technician Signature
 `;
 
+const CONSUMABLES_ONLY_NO_REPAIRS = `
+Job Summary Report
+All Works Completed? Yes
+Return Visit Needed? No
+Consumables Used? Yes
+Parts Used
+None
+Technician Signature
+`;
+
 const PARTS_USED_UNPARSEABLE = `
 Job Summary Report
 Repairs Required: Replace cracked hinge
@@ -174,12 +184,23 @@ describe("evaluatePartsUsed", () => {
     expect(result.signals.completeCount).toBe(0);
   });
 
-  it("PR-A: still emits MAJOR PARTS-C012 when Consumables Used is Yes but Parts Used is empty", () => {
+  it("Wave B: softens Consumables Used=Yes + empty Parts Used to PARTS-C014, not MAJOR PARTS-C012", () => {
     const result = evaluatePartsUsed(REPAIRS_ONLY_WITH_CONSUMABLES_YES);
-    expect(result.findings.some(f => f.ruleId === "PARTS-C012")).toBe(true);
-    expect(result.findings.some(f => f.ruleId === "PARTS-C014")).toBe(false);
-    const c012 = result.findings.find(f => f.ruleId === "PARTS-C012");
-    expect(c012?.severity).toBe("S1");
+    expect(result.findings.some(f => f.ruleId === "PARTS-C012")).toBe(false);
+    const c014 = result.findings.find(f => f.ruleId === "PARTS-C014");
+    expect(c014).toBeDefined();
+    expect(c014?.severity).toBe("S3");
+    expect(result.signals.consumablesYes).toBe(true);
+  });
+
+  it("Wave B: consumables-only (no repairs) + empty Parts Used emits C014, not C012", () => {
+    const result = evaluatePartsUsed(CONSUMABLES_ONLY_NO_REPAIRS);
+    expect(result.findings.some(f => f.ruleId === "PARTS-C012")).toBe(false);
+    const c014 = result.findings.find(f => f.ruleId === "PARTS-C014");
+    expect(c014).toBeDefined();
+    expect(c014?.severity).toBe("S3");
+    expect(result.signals.consumablesYes).toBe(true);
+    expect(result.signals.repairsPresent).toBe(false);
   });
 
   it("PR-A: still emits MAJOR PARTS-C012 when Parts Used has real but unparseable content", () => {
