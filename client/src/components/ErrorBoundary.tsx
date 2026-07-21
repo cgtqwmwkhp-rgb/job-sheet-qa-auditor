@@ -9,6 +9,7 @@ import React, { Component, ReactNode } from "react";
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { isChunkLoadError, reloadOnceForChunkError } from "@/lib/lazyRetry";
 
 interface Props {
   children: ReactNode;
@@ -48,6 +49,11 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Stale JS chunk after deploy — hard reload once instead of trapping the user
+    if (reloadOnceForChunkError(error)) {
+      return;
+    }
+
     // Log error to centralized tracking
     import("@/lib/errorTracking").then(({ logBoundaryError }) => {
       logBoundaryError(error, errorInfo);
@@ -99,8 +105,9 @@ export class ErrorBoundary extends Component<Props, State> {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                We encountered an unexpected error. This has been logged and
-                we'll look into it.
+                {this.state.error && isChunkLoadError(this.state.error)
+                  ? "The app was updated while this page was open. Reload to get the latest version."
+                  : "We encountered an unexpected error. This has been logged and we'll look into it."}
               </p>
 
               {this.state.error && (
@@ -119,9 +126,23 @@ export class ErrorBoundary extends Component<Props, State> {
               )}
 
               <div className="flex gap-3 pt-4">
-                <Button onClick={this.reset} className="gap-2">
+                <Button
+                  onClick={() => {
+                    if (
+                      this.state.error &&
+                      isChunkLoadError(this.state.error)
+                    ) {
+                      window.location.reload();
+                      return;
+                    }
+                    this.reset();
+                  }}
+                  className="gap-2"
+                >
                   <RefreshCw className="h-4 w-4" />
-                  Try Again
+                  {this.state.error && isChunkLoadError(this.state.error)
+                    ? "Reload app"
+                    : "Try Again"}
                 </Button>
                 <Button
                   variant="outline"

@@ -21,9 +21,11 @@ describe("Cache Headers Contract", () => {
       const vitePath = path.resolve(__dirname, "../../_core/vite.ts");
       const viteContent = fs.readFileSync(vitePath, "utf-8");
 
-      // Verify the index.html cache control pattern
-      expect(viteContent).toContain("'no-store, no-cache, must-revalidate'");
-      expect(viteContent).toContain("filePath.endsWith('index.html')");
+      // Verify the index.html cache control pattern (prettier may use " or ')
+      expect(viteContent).toMatch(
+        /["']no-store, no-cache, must-revalidate["']/
+      );
+      expect(viteContent).toMatch(/filePath\.endsWith\(["']index\.html["']\)/);
     });
 
     it("should have immutable for hashed assets in vite.ts", async () => {
@@ -31,7 +33,7 @@ describe("Cache Headers Contract", () => {
       const viteContent = fs.readFileSync(vitePath, "utf-8");
 
       // Verify the assets caching strategy
-      expect(viteContent).toContain("maxAge: '1y'");
+      expect(viteContent).toMatch(/maxAge:\s*["']1y["']/);
       expect(viteContent).toContain("immutable: true");
     });
 
@@ -41,7 +43,7 @@ describe("Cache Headers Contract", () => {
 
       // Verify service worker handling
       expect(viteContent).toContain("sw.js");
-      expect(viteContent).toContain("'no-cache, must-revalidate'");
+      expect(viteContent).toMatch(/["']no-cache, must-revalidate["']/);
     });
 
     it("should have reasonable cache for images", async () => {
@@ -61,7 +63,16 @@ describe("Cache Headers Contract", () => {
 
       // Verify Azure Easy Auth routes are excluded
       expect(viteContent).toContain("/.auth");
-      expect(viteContent).toContain("startsWith('/.auth')");
+      expect(viteContent).toContain('startsWith("/.auth")');
+    });
+
+    it("should 404 missing /assets/* instead of SPA HTML fallback", () => {
+      const vitePath = path.resolve(__dirname, "../../_core/vite.ts");
+      const viteContent = fs.readFileSync(vitePath, "utf-8");
+
+      expect(viteContent).toContain('pathname.startsWith("/assets/")');
+      expect(viteContent).toContain(".status(404)");
+      expect(viteContent).toContain("Not found");
     });
 
     it("should denylist .auth from PWA navigation fallback", () => {
