@@ -18,8 +18,22 @@ export type SummaryGateOutcome = "PASS" | "FAIL" | "REVIEW_QUEUE" | string;
 // the claim word leaves a dangling copula ("is does not pass with all
 // specified rules"). The copula+claim alternative is tried first so a single
 // pass replaces the whole phrase.
-const PASS_TERMS =
-  "passes?|passed|passing|all\\s+checks?\\s+pass(?:ed)?|audit\\s+pass(?:ed|es)?|fully\\s+compliant|compliant|compliance|meets\\s+(?:all\\s+)?requirements?";
+//
+// Wave B residual: longest phrase first so "all checks pass" is not chewed
+// into "All does not pass checks" by bare `pass`, then a second replace.
+// Collapse near-duplicate "does not pass" after substitution.
+const PASS_TERMS = [
+  "all\\s+checks?\\s+pass(?:ed)?",
+  "audit\\s+pass(?:ed|es)?",
+  "meets\\s+(?:all\\s+)?requirements?",
+  "fully\\s+compliant",
+  "passed",
+  "passing",
+  "passes?",
+  "compliant",
+  "compliance",
+].join("|");
+
 const PASS_CLAIM = new RegExp(
   `\\b(?:is|are|was|were)\\s+(?:${PASS_TERMS})\\b|\\b(?:${PASS_TERMS})\\b`,
   "gi"
@@ -30,6 +44,18 @@ function normalizeOutcome(outcome: SummaryGateOutcome): string {
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
+}
+
+/** Collapse a second "does not pass" within a short window (Wave B / PX-110). */
+function collapseDuplicateDoesNotPass(text: string): string {
+  return text
+    .replace(
+      /\bdoes\s+not\s+pass(?:\s+\S+){0,5}\s+does\s+not\s+pass\b/gi,
+      "does not pass"
+    )
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.,;:])/g, "$1")
+    .trim();
 }
 
 /**
@@ -47,7 +73,9 @@ export function gateSummaryToResult(
     return text;
   }
 
-  const neutralized = text ? text.replace(PASS_CLAIM, "does not pass") : "";
+  const neutralized = text
+    ? collapseDuplicateDoesNotPass(text.replace(PASS_CLAIM, "does not pass"))
+    : "";
 
   const prefix =
     outcome === "FAIL"

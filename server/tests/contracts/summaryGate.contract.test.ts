@@ -91,5 +91,22 @@ describe("gateSummaryToResult (PX-101)", () => {
         "Outcome: FAIL. Overall the job sheet does not pass QA requirements."
       );
     });
+
+    it('Wave B: does not produce "All does not pass checks does not pass"', () => {
+      const gated = gateSummaryToResult("All checks pass.", "FAIL");
+      expect(gated.toLowerCase()).not.toMatch(
+        /does\s+not\s+pass\s+checks\s+does\s+not\s+pass/
+      );
+      expect(gated).toBe("Outcome: FAIL. does not pass.");
+    });
+
+    it("Wave B: collapses near-duplicate does-not-pass substitutions", () => {
+      const gated = gateSummaryToResult(
+        "All pass checks pass the audit.",
+        "FAIL"
+      );
+      const matches = gated.match(/does\s+not\s+pass/gi) ?? [];
+      expect(matches.length).toBeLessThanOrEqual(1);
+    });
   });
 });

@@ -192,25 +192,34 @@ export function evaluatePartsUsed(text: string): PartsAssessmentResult {
     }
   }
 
-  // PARTS-C012 honesty (PR-A / PX-109): a bare "Repairs Required" note with
-  // no Parts Used content and no explicit "Consumables Used: Yes" is a weak,
-  // repairs-only implication — not proof parts were actually fitted. Do not
-  // hard-fail on that alone; surface it as informational (PARTS-C014)
-  // instead so it can't block AUTO_PASS or hard-fail a clean report.
-  const repairsOnlyImplication =
-    !partsUsedSection.present && !consumablesYes && repairsSection.present;
+  // PARTS-C014 soft path (Wave B): empty/None Parts Used with only a weak
+  // implication — repairs noted and/or Consumables Used? = Yes — must not
+  // hard-fail. Plantexpand forms never itemise oil/filters/grease under Parts
+  // Used, so consumablesYes alone is not a confirmed parts-listing defect.
+  // Keep MAJOR PARTS-C012 when Parts Used has real/incomplete/unparseable lines.
+  const emptyPartsSoftImplication =
+    !partsUsedSection.present &&
+    lines.length === 0 &&
+    (repairsSection.present || consumablesYes);
 
-  if (completeLines.length === 0 && repairsOnlyImplication) {
+  if (completeLines.length === 0 && emptyPartsSoftImplication) {
+    const softReason = consumablesYes
+      ? repairsSection.present
+        ? "Consumables Used is Yes and Repairs Required is noted, but Parts Used is empty/None."
+        : "Consumables Used is Yes but Parts Used is empty/None."
+      : "Repairs Required is noted but Parts Used is empty/None and Consumables Used is not marked Yes.";
     findings.push(
       issue(
         `${PARTS_ASSESSMENT_RULE_PREFIX}014`,
         "Parts Used",
         "S3",
         "LOW_CONFIDENCE",
-        "Repairs Required is noted but Parts Used is empty/None and Consumables Used is not marked Yes.",
-        "Repairs alone don't confirm parts were fitted — confirm whether a part was actually used before treating this as a defect.",
-        "If a part was fitted, list it under Parts Used as PN — description — qty; otherwise no action is required.",
-        signals.snippet || repairsBody.slice(0, 200),
+        softReason,
+        "Consumables (oil, filters, grease) are not line-itemised on these forms, and repairs alone don't confirm repair parts were fitted — treat as advisory unless Parts Used has incomplete lines.",
+        "If a repair part was fitted, list it under Parts Used as PN — description — qty; consumables-only needs no Parts Used lines.",
+        signals.snippet ||
+          repairsBody.slice(0, 200) ||
+          partsUsedBody.slice(0, 200),
         70
       )
     );
@@ -221,8 +230,8 @@ export function evaluatePartsUsed(text: string): PartsAssessmentResult {
         "Parts Used",
         "S1",
         "MISSING_FIELD",
-        "Parts or consumables are implied but no complete Parts Used lines (part number + description) were found.",
-        "When repairs, consumables, or a Parts Used section indicate parts were fitted, each line must pair a part number with a description for audit traceability.",
+        "Parts are implied but no complete Parts Used lines (part number + description) were found.",
+        "When a Parts Used section indicates parts were fitted, each line must pair a part number with a description for audit traceability.",
         "List every fitted part as PN — description — qty under Parts Used, e.g. WT158 — wheel — 1.",
         signals.snippet || partsUsedBody.slice(0, 200),
         82
