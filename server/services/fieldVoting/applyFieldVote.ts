@@ -13,6 +13,11 @@ import {
   votedFieldsToPreExtracted,
 } from "./voteField";
 import { voteHandwritingField } from "./handwriting";
+import {
+  filterGroundedDateCandidates,
+  gateDateVotes,
+  isDateFieldId,
+} from "./groundedDateGate";
 import type { FieldVoteBatchResult } from "./types";
 
 export interface ApplyFieldVoteInput {
@@ -24,6 +29,8 @@ export interface ApplyFieldVoteInput {
   azureCustom?: PreExtractedLike;
   crop?: PreExtractedLike;
   ensemble?: PreExtractedLike;
+  /** Text-layer label-anchored candidates (PR1) — preferred for headers. */
+  textLayer?: PreExtractedLike;
   /** @deprecated Use azureCustom for Azure DI custom-model candidates. */
   selectionMarks?: PreExtractedLike;
   multimodalRoi?: PreExtractedLike;
@@ -33,6 +40,11 @@ export interface ApplyFieldVoteInput {
     confidence: number;
     pageNumber?: number;
   } | null;
+  /**
+   * Source text for PX-103 grounded date gate (text-layer and/or OCR markdown).
+   * When set, date/dateOfService votes abstain unless value is label-anchored.
+   */
+  sourceText?: string;
   /** When true, force vote even if FEATURE_FIELD_VOTE unset (tests). */
   force?: boolean;
 }
@@ -72,10 +84,22 @@ export function applyFieldVote(
   const azureCustom = aliasPreExtractedForVote(input.azureCustom);
   const crop = aliasPreExtractedForVote(input.crop);
   const ensemble = aliasPreExtractedForVote(input.ensemble);
+  const textLayer = aliasPreExtractedForVote(input.textLayer);
   const selectionMarks = aliasPreExtractedForVote(input.selectionMarks);
   const multimodalRoi = aliasPreExtractedForVote(input.multimodalRoi);
+  const sourceText = input.sourceText ?? "";
 
   const engines = [
+    ...(textLayer
+      ? [
+          {
+            engine: "text_layer",
+            fields: textLayer,
+            evidenceStrength: "strong" as const,
+            evidence: "text_layer_label_anchor",
+          },
+        ]
+      : []),
     ...(primary ? [{ engine: "primary", fields: primary }] : []),
     ...(fallback ? [{ engine: "fallback", fields: fallback }] : []),
     ...(azure ? [{ engine: "azure", fields: azure }] : []),
@@ -104,8 +128,40 @@ export function applyFieldVote(
       : []),
   ];
 
-  const byField = buildCandidateMap(engines);
-  const batch = voteFields(byField);
+  const byFieldRaw = buildCandidateMap(engines);
+  // PX-103: drop ungrounded date candidates before vote when source text known
+  const byField: typeof byFieldRaw = {};
+  for (const [fieldId, cands] of Object.entries(byFieldRaw)) {
+    byField[fieldId] =
+      sourceText.trim() && isDateFieldId(fieldId)
+        ? filterGroundedDateCandidates(fieldId, cands, sourceText)
+        : cands;
+  }
+
+  let batch = voteFields(byField);
+  if (sourceText.trim()) {
+    const gated = gateDateVotes(batch.fields, sourceText);
+    let abstained = 0;
+    let consensus = 0;
+    let majority = 0;
+    let singleEngine = 0;
+    for (const v of Object.values(gated)) {
+      if (v.decision === "abstain") abstained++;
+      else if (v.decision === "consensus") consensus++;
+      else if (v.decision === "majority") majority++;
+      else if (v.decision === "single") singleEngine++;
+    }
+    batch = {
+      fields: gated,
+      summary: {
+        voted: Object.keys(gated).length,
+        consensus,
+        majority,
+        abstained,
+        singleEngine,
+      },
+    };
+  }
   const votedFields = votedFieldsToPreExtracted(batch);
 
   const handwritingVotes: ApplyFieldVoteResult["handwritingVotes"] = {};

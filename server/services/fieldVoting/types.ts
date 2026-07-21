@@ -48,7 +48,9 @@ export type VoteReasonCode =
   | "CONFIDENCE_GAP"
   | "SINGLE_ENGINE"
   | "ABSTAIN"
-  | "LABEL_ONLY_NO_INK";
+  | "LABEL_ONLY_NO_INK"
+  /** PX-103: date not present near a Date label in text-layer/OCR source. */
+  | "UNGROUNDED_DATE";
 
 export interface FieldVoteResult {
   fieldId: string;

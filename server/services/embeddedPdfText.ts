@@ -3,6 +3,9 @@
  *
  * Uses pdfjs-dist in-process — no pdftotext / poppler dependency (Alpine image).
  * Prefer this over OCR markdown when the PDF has a real text layer.
+ *
+ * PR1 / PX-100: also expose per-word bounding boxes from TextItem.transform so
+ * label-anchor extraction can ground fields before any generative OCR runs.
  */
 
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
@@ -12,7 +15,10 @@ export function usableTextLength(text: string): number {
   return text.replace(/\s+/g, " ").trim().length;
 }
 
-/** Prefer embedded text when it is meaningfully richer than OCR. */
+/**
+ * @deprecated Soft post-OCR length race — do NOT use as the born-digital gate.
+ * Kept for contract/backward-compat; Stage 1 now classifies text-layer-first.
+ */
 export function shouldPreferEmbeddedText(
   ocrText: string,
   embeddedText: string
@@ -29,12 +35,79 @@ export function isThinExtractedText(text: string): boolean {
   return usableTextLength(text) < THIN_TEXT_CHAR_THRESHOLD;
 }
 
+/** Axis-aligned word box in PDF user space (origin bottom-left). */
+export interface PdfTextWord {
+  text: string;
+  page: number;
+  /** Lower-left x (PDF user space). */
+  x: number;
+  /** Lower-left y (PDF user space). */
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface EmbeddedPdfPageLayout {
+  pageNumber: number;
+  text: string;
+  words: PdfTextWord[];
+  /** MediaBox width when available. */
+  width?: number;
+  /** MediaBox height when available. */
+  height?: number;
+}
+
 export interface EmbeddedPdfTextResult {
   success: boolean;
   fullText: string;
   pages: string[];
   pageCount: number;
+  /** Per-page layouts with word boxes (empty when parse failed). */
+  pageLayouts: EmbeddedPdfPageLayout[];
+  /** Flattened words across pages. */
+  words: PdfTextWord[];
   error?: string;
+}
+
+/**
+ * Derive an axis-aligned bbox from a pdfjs TextItem transform + width.
+ * transform = [a, b, c, d, e, f] where (e,f) is the glyph origin.
+ */
+export function textItemToWordBox(
+  item: { str?: string; transform?: number[]; width?: number; height?: number },
+  pageNumber: number
+): PdfTextWord | null {
+  const text = typeof item.str === "string" ? item.str : "";
+  if (!text.trim()) return null;
+  const t = item.transform;
+  if (!Array.isArray(t) || t.length < 6) return null;
+
+  const a = Number(t[0]) || 0;
+  const b = Number(t[1]) || 0;
+  const c = Number(t[2]) || 0;
+  const d = Number(t[3]) || 0;
+  const e = Number(t[4]) || 0;
+  const f = Number(t[5]) || 0;
+
+  const width =
+    typeof item.width === "number" && Number.isFinite(item.width)
+      ? Math.abs(item.width)
+      : Math.hypot(a, b) * Math.max(text.length, 1) * 0.5;
+  const height =
+    typeof item.height === "number" &&
+    Number.isFinite(item.height) &&
+    item.height > 0
+      ? Math.abs(item.height)
+      : Math.max(Math.hypot(c, d), Math.hypot(a, b), 8);
+
+  return {
+    text,
+    page: pageNumber,
+    x: e,
+    y: f,
+    width: width > 0 ? width : 1,
+    height: height > 0 ? height : 8,
+  };
 }
 
 /**
@@ -76,7 +149,7 @@ export async function fetchPdfBuffer(
 }
 
 /**
- * Extract embedded text layer from a PDF buffer via pdfjs.
+ * Extract embedded text layer (+ word boxes) from a PDF buffer via pdfjs.
  * Fail-soft: returns empty pages on any parse error.
  */
 export async function extractEmbeddedPdfText(
@@ -93,16 +166,53 @@ export async function extractEmbeddedPdfText(
     const doc = await loadingTask.promise;
     const pageCount = doc.numPages;
     const pages: string[] = [];
+    const pageLayouts: EmbeddedPdfPageLayout[] = [];
+    const allWords: PdfTextWord[] = [];
 
     for (let i = 1; i <= pageCount; i++) {
       const page = await doc.getPage(i);
+      const viewport = page.getViewport({ scale: 1 });
       const content = await page.getTextContent();
-      const pageText = content.items
-        .map(item => ("str" in item ? String(item.str) : ""))
+      const words: PdfTextWord[] = [];
+
+      for (const raw of content.items) {
+        if (!raw || typeof raw !== "object" || !("str" in raw)) continue;
+        const box = textItemToWordBox(
+          raw as {
+            str?: string;
+            transform?: number[];
+            width?: number;
+            height?: number;
+          },
+          i
+        );
+        if (box) {
+          words.push(box);
+          allWords.push(box);
+        }
+      }
+
+      // Reading-order join: sort by y desc (top→bottom), then x asc.
+      const sorted = [...words].sort((a, b) => {
+        const lineDelta = b.y - a.y;
+        if (Math.abs(lineDelta) > Math.max(a.height, b.height) * 0.5) {
+          return lineDelta;
+        }
+        return a.x - b.x;
+      });
+      const pageText = sorted
+        .map(w => w.text)
         .join(" ")
         .replace(/\s+/g, " ")
         .trim();
       pages.push(pageText);
+      pageLayouts.push({
+        pageNumber: i,
+        text: pageText,
+        words,
+        width: viewport?.width,
+        height: viewport?.height,
+      });
     }
 
     await doc.destroy();
@@ -113,6 +223,8 @@ export async function extractEmbeddedPdfText(
       fullText,
       pages: pages.length > 0 ? pages : [fullText],
       pageCount,
+      pageLayouts,
+      words: allWords,
     };
   } catch (error) {
     return {
@@ -120,6 +232,8 @@ export async function extractEmbeddedPdfText(
       fullText: "",
       pages: [],
       pageCount: 0,
+      pageLayouts: [],
+      words: [],
       error:
         error instanceof Error ? error.message : "Embedded text extract failed",
     };
@@ -195,6 +309,7 @@ export function decideEmbeddedEnrichment(
 
 /**
  * Fetch + extract embedded text and decide whether to prefer it over OCR.
+ * @deprecated Prefer text-layer-first classify in textLayerExtraction (Stage 1).
  */
 export async function enrichWithEmbeddedPdfText(
   documentUrl: string,
