@@ -470,6 +470,10 @@ describe("Winch jobNumber/jobRef date+label bleed rejection (PX-112)", () => {
     expect(isDateLabelBleedValue("21/07/2026Make")).toBe(true);
   });
 
+  it("Wave B: flags spaced date + Asset label bleed", () => {
+    expect(isDateLabelBleedValue("14 07 2026 Asset n")).toBe(true);
+  });
+
   it("leaves jobReference AND its jobNumber alias unread rather than persisting date+label bleed", () => {
     const fields = extractFieldsFromPlainText(bledWinchText, 1);
     const byId = Object.fromEntries(fields.map(f => [f.fieldId, f]));
@@ -477,6 +481,24 @@ describe("Winch jobNumber/jobRef date+label bleed rejection (PX-112)", () => {
     expect(byId.jobNumber).toBeUndefined();
     // The real date field is unaffected by jobRef's bleed rejection.
     expect(byId.date?.value).toBe("21/07/2026");
+  });
+
+  it("Wave B: spaced Winch jobRef bleed stays unread and abstains", () => {
+    const abstainFieldIds = new Set<string>();
+    const text = [
+      "Thorough Examination — Winch",
+      "Job Ref: 14 07 2026 Asset n",
+      "Asset No: WNCH-2201",
+      "Date: 14/07/2026",
+    ].join("\n");
+    const fields = extractFieldsFromPlainText(text, 1, undefined, {
+      abstainFieldIds,
+    });
+    const byId = Object.fromEntries(fields.map(f => [f.fieldId, f]));
+    expect(byId.jobReference).toBeUndefined();
+    expect(byId.jobNumber).toBeUndefined();
+    expect(abstainFieldIds.has("jobReference")).toBe(true);
+    expect(abstainFieldIds.has("jobNumber")).toBe(true);
   });
 });
 
@@ -534,6 +556,84 @@ describe("next-field label-bleed suffix stripping (PX-112)", () => {
     const result = buildTextLayerResult(embedded);
     expect(result.preExtracted.assetId?.value).toBe("3031532");
     expect(result.preExtracted.assetId?.value).not.toBe("3031532_MAKE");
+  });
+
+  /**
+   * Wave B PX-115: long-header layout — Asset No cell empty on the label
+   * row because Make sits on the same line; value lives on the next line.
+   * Must not overcorrect to empty (0/6) after the bleed strip.
+   */
+  function jetterWrappedHeaderLayout(): EmbeddedPdfPageLayout {
+    const pageH = 842;
+    const mk = (
+      text: string,
+      x: number,
+      yFromTop: number,
+      w = 40,
+      h = 10
+    ): PdfTextWord => ({
+      text,
+      page: 1,
+      x,
+      y: pageH - yFromTop - h,
+      width: w,
+      height: h,
+    });
+    const words: PdfTextWord[] = [
+      mk("Asset", 40, 80, 35),
+      mk("No", 80, 80, 20),
+      mk("Make", 220, 80, 35),
+      mk("JetterPro", 260, 80, 55),
+      mk("3031532", 40, 100, 55),
+      mk("Model", 220, 100, 35),
+      mk("X200", 260, 100, 35),
+      mk("Customer", 40, 140, 50),
+      mk("Thames", 100, 140, 45),
+      mk("Water", 150, 140, 40),
+      mk("Date", 40, 180, 30),
+      mk("14/07/2026", 90, 180, 70),
+      mk("Job", 40, 220, 25),
+      mk("ID", 70, 220, 20),
+      mk("629", 100, 220, 30),
+    ];
+    return {
+      pageNumber: 1,
+      text: [
+        "Asset No Make JetterPro",
+        "3031532 Model X200",
+        "Customer: Thames Water",
+        "Date: 14/07/2026",
+        "Job ID: 629",
+      ].join("\n"),
+      words,
+    };
+  }
+
+  it("Wave B PX-115: wrapped Jetter header yields assetId 3031532 (not empty, not *_MAKE)", () => {
+    const layout = jetterWrappedHeaderLayout();
+    const embedded: EmbeddedPdfTextResult = {
+      success: true,
+      fullText: layout.text,
+      pages: [layout.text],
+      pageCount: 1,
+      pageLayouts: [layout],
+      words: layout.words,
+    };
+    const result = buildTextLayerResult(embedded);
+    expect(result.preExtracted.assetId?.value).toBe("3031532");
+    expect(result.preExtracted.assetId?.value).not.toBe("3031532_MAKE");
+
+    const canonicalIds = [
+      "assetId",
+      "jobReference",
+      "date",
+      "makeModel",
+      "customerName",
+      "technicianName",
+    ];
+    const present = canonicalIds.filter(id => result.preExtracted[id]);
+    expect(present.length).toBeGreaterThanOrEqual(5);
+    expect(present).toContain("assetId");
   });
 });
 

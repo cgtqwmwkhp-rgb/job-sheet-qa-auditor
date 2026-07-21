@@ -66,4 +66,9 @@ export interface TextLayerExtractionResult {
     string,
     { value: string; confidence: number; pageNumber: number }
   >;
+  /**
+   * Field ids text-layer examined and rejected (e.g. date+label bleed).
+   * FieldAuthority must not fill these from Gemini/ensemble (Wave B PX-112).
+   */
+  abstainFieldIds?: string[];
 }

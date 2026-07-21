@@ -766,6 +766,8 @@ async function processJobSheetWithOptions(
   let usedEmbeddedText = false;
   let skippedPrimaryOcr = false;
   let textLayerPreExtracted: PreExtractedFieldMap = {};
+  /** Wave B: bleed-rejected fields — FieldAuthority must not refill from Gemini. */
+  let textLayerAbstainFields: string[] = [];
   /** Retained for PX-104 Result/Obs checklist readers (word boxes). */
   let textLayerPageLayouts: EmbeddedPdfPageLayout[] = [];
 
@@ -775,6 +777,7 @@ async function processJobSheetWithOptions(
     documentStrategyLogical = tl.result.classification.documentStrategy;
     skippedPrimaryOcr = tl.result.classification.skipPrimaryOcr;
     textLayerPreExtracted = tl.result.preExtracted;
+    textLayerAbstainFields = tl.result.abstainFieldIds ?? [];
     usedEmbeddedText = skippedPrimaryOcr;
     textLayerPageLayouts = tl.embedded?.pageLayouts ?? [];
     recordStage({
@@ -2578,6 +2581,7 @@ async function processJobSheetWithOptions(
       roiSpatial: roiSpatialFields,
       ensemble: ensembleResult?.ensembleExtractedFields,
       gemini: analysisResult.extractedFields,
+      textLayerAbstain: textLayerAbstainFields,
     });
 
     const templateVersion = usedTemplateVersionId

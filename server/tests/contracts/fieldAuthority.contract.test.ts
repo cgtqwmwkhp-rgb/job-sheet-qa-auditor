@@ -117,6 +117,18 @@ describe("buildFieldAuthority empty-stripping and aliasing (PX-111)", () => {
     const authority = buildFieldAuthority({});
     expect(authority.fields).toEqual({});
   });
+
+  it("Wave B: textLayerAbstain drops bleed fields so Gemini cannot re-inject junk", () => {
+    const authority = buildFieldAuthority({
+      gemini: {
+        jobReference: field("14 07 2026 Asset n"),
+        jobNumber: field("14 07 2026 Asset n"),
+      },
+      textLayerAbstain: ["jobReference"],
+    });
+    expect(authority.fields.jobReference).toBeUndefined();
+    expect(authority.fields.jobNumber).toBeUndefined();
+  });
 });
 
 describe("Pump-class contract: authority assetId satisfies a required-field rule even when only roiSpatial has it (PX-112)", () => {

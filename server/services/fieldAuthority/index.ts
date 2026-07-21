@@ -13,6 +13,9 @@
  * nonempty text-layer > roiSpatial/field-vote > ensemble > Gemini. This is a
  * ranked override, not a confidence tie-break — a high-confidence-but-wrong
  * Gemini value never survives over grounded text-layer evidence (PX-111).
+ *
+ * Wave B: textLayerAbstain — fields text-layer examined and rejected (bleed)
+ * must not be re-filled from lower-trust sources.
  */
 
 import {
@@ -36,6 +39,12 @@ export interface FieldAuthorityInput {
   ensemble?: FieldAuthorityFieldMap;
   /** Gemini analyzer extractedFields — weakest-trust, last resort. */
   gemini?: FieldAuthorityFieldMap;
+  /**
+   * Field ids text-layer rejected (e.g. date+label bleed). After ranking,
+   * these keys (and their canonical aliases) are removed so Gemini cannot
+   * re-inject junk the grounded path already refused (Wave B PX-112).
+   */
+  textLayerAbstain?: Iterable<string>;
 }
 
 export interface FieldAuthority {
@@ -49,8 +58,27 @@ export interface FieldAuthority {
 
 /** Lowest-rank first — each later (higher-rank) nonempty source overrides. */
 export const FIELD_AUTHORITY_RANK_LOW_TO_HIGH: ReadonlyArray<
-  keyof FieldAuthorityInput
+  keyof Omit<FieldAuthorityInput, "textLayerAbstain">
 > = ["gemini", "ensemble", "roiSpatial", "textLayer"];
+
+const ABSTAIN_ALIAS_GROUPS: ReadonlyArray<ReadonlyArray<string>> = [
+  ["jobReference", "jobNumber"],
+  ["assetId", "serialNumber"],
+  ["date", "dateOfService"],
+];
+
+function expandAbstainIds(ids: Iterable<string>): Set<string> {
+  const out = new Set<string>();
+  Array.from(ids).forEach(id => {
+    out.add(id);
+    ABSTAIN_ALIAS_GROUPS.forEach(group => {
+      if (group.includes(id)) {
+        group.forEach(alias => out.add(alias));
+      }
+    });
+  });
+  return out;
+}
 
 /**
  * Build the one authoritative field map for a document. Each source is
@@ -69,5 +97,12 @@ export function buildFieldAuthority(
       ...stripEmptyExtractedFields(input[source] ?? {}),
     };
   }
-  return { fields: aliasCanonicalExtractedFields(merged) };
+  const fields = aliasCanonicalExtractedFields(merged);
+  const abstain = expandAbstainIds(input.textLayerAbstain ?? []);
+  if (abstain.size > 0) {
+    Array.from(abstain).forEach(id => {
+      delete fields[id];
+    });
+  }
+  return { fields };
 }
