@@ -119,9 +119,14 @@ export function buildTextLayerResult(
   ]);
   const missingCanonical = Array.from(canonicalIds).some(id => !seen.has(id));
   if (missingCanonical && embedded.fullText) {
-    const fromFull = extractFieldsFromPlainText(embedded.fullText, 1, undefined, {
-      abstainFieldIds,
-    });
+    const fromFull = extractFieldsFromPlainText(
+      embedded.fullText,
+      1,
+      undefined,
+      {
+        abstainFieldIds,
+      }
+    );
     for (const f of fromFull) {
       if (!seen.has(f.fieldId) && !abstainFieldIds.has(f.fieldId)) {
         seen.add(f.fieldId);
