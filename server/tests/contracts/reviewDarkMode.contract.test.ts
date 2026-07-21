@@ -15,10 +15,7 @@ const files = [
 describe("review dark mode tokens (PX-066)", () => {
   for (const rel of files) {
     it(`${path.basename(rel)} avoids light-only hex chrome`, () => {
-      const src = readFileSync(
-        path.resolve(import.meta.dirname, rel),
-        "utf8"
-      );
+      const src = readFileSync(path.resolve(import.meta.dirname, rel), "utf8");
       expect(src).not.toContain("border-[#EBE8E8]");
       expect(src).not.toContain("text-[#333030]");
       expect(src).not.toContain("hover:bg-[#F5F4F4]");
