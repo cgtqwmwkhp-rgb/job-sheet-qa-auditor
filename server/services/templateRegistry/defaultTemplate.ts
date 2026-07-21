@@ -132,11 +132,16 @@ export const DEFAULT_SPEC_JSON: SpecJson = {
     {
       ruleId: "R-003",
       field: "serialNumber",
-      description: "Serial number must match the pattern SN-XXXXX-XX.",
-      severity: "critical",
+      description:
+        "Serial number pattern SN-XXXXX-XX is a legacy format assumption. " +
+        "Real PlantExpand asset/serial identifiers vary widely (e.g. " +
+        "registration-style alphanumerics like WX65VMH) and do not follow " +
+        "this shape — softened to non-blocking so it never false-fails real " +
+        "data (PX-113).",
+      severity: "minor",
       type: "pattern",
       pattern: "^SN-\\d{5}-[A-Z]{2}$",
-      enabled: true,
+      enabled: false,
       tags: ["asset-tracking"],
     },
     {
@@ -198,11 +203,15 @@ export const DEFAULT_SPEC_JSON: SpecJson = {
     {
       ruleId: "R-010",
       field: "jobNumber",
-      description: "Job number must match the pattern JOB-XXXXXX.",
-      severity: "critical",
+      description:
+        "Job number pattern JOB-XXXXXX is a legacy format assumption. Real " +
+        "PlantExpand job references are frequently plain numeric IDs (e.g. " +
+        '"218") and do not follow this shape — softened to non-blocking ' +
+        "so it never false-fails real data (PX-113).",
+      severity: "minor",
       type: "pattern",
       pattern: "^JOB-\\d{6}$",
-      enabled: true,
+      enabled: false,
       tags: ["reference"],
     },
   ],
