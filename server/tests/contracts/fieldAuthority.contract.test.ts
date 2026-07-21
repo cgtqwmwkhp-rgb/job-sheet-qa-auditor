@@ -166,10 +166,7 @@ describe("Pump-class contract: authority assetId satisfies a required-field rule
 });
 
 describe("documentProcessor wiring (source contract)", () => {
-  const dpPath = path.resolve(
-    __dirname,
-    "../../services/documentProcessor.ts"
-  );
+  const dpPath = path.resolve(__dirname, "../../services/documentProcessor.ts");
   const dp = fs.readFileSync(dpPath, "utf-8");
 
   it("imports buildFieldAuthority from the fieldAuthority module", () => {
@@ -181,11 +178,15 @@ describe("documentProcessor wiring (source contract)", () => {
   it("builds fieldAuthority once and feeds finding hygiene, ATTR, deterministic validation, and persist from it", () => {
     const authorityIdx = dp.indexOf("fieldAuthority = buildFieldAuthority({");
     const hygieneIdx = dp.indexOf("...fieldAuthority.fields,");
-    const attrIdx = dp.indexOf("const attrExtractedFields = fieldAuthority.fields;");
+    const attrIdx = dp.indexOf(
+      "const attrExtractedFields = fieldAuthority.fields;"
+    );
     const validationIdx = dp.indexOf(
       "const extractedForValidation = fieldAuthority.fields;"
     );
-    const persistIdx = dp.indexOf("let finalExtractedFields = fieldAuthority.fields;");
+    const persistIdx = dp.indexOf(
+      "let finalExtractedFields = fieldAuthority.fields;"
+    );
 
     expect(authorityIdx).toBeGreaterThan(-1);
     expect(hygieneIdx).toBeGreaterThan(authorityIdx);
