@@ -293,6 +293,27 @@ export async function waiveFinding(input: {
   );
 }
 
+/** PX-064: accepted disputes overturn the finding via the same override path. */
+export async function overrideFinding(input: {
+  findingId: number;
+  reason: string;
+  userId: number;
+  trainingReasonCode?: (typeof TRAINING_REASON_CODES)[number];
+  expectedStatus?: "open" | "waived" | "overridden" | "flagged" | "approved";
+}) {
+  await enforceReviewLimit(input.userId);
+  return runAuditAction(deps =>
+    applyFindingAction(deps, {
+      findingId: input.findingId,
+      action: "override",
+      reason: input.reason,
+      userId: input.userId,
+      trainingReasonCode: input.trainingReasonCode ?? "rule_wrong",
+      expectedStatus: input.expectedStatus,
+    })
+  );
+}
+
 const findingActionInput = z.object({
   findingId: z.number().int().positive(),
   reason: z.string().min(1).max(2000),

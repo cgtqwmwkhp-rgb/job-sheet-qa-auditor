@@ -150,7 +150,13 @@ describe("Review Workstation Contract (PR-13)", () => {
 
     it("uses ClinicalContextStack and composite outcome strip", () => {
       expect(pane).toContain("ClinicalContextStack");
-      expect(pane).toContain("Needs review");
+      // PX-061: outcome labels live in shared auditOutcome helper
+      expect(pane).toContain("deriveWorkstationOutcome");
+      const outcomeHelper = fs.readFileSync(
+        path.join(root, "client/src/lib/auditOutcome.ts"),
+        "utf8"
+      );
+      expect(outcomeHelper).toContain("Needs review");
       expect(pane).toContain("ErrorBoundary");
       expect(pane).toContain("CommentFindingsGroup");
       expect(pane).toContain("PartsFindingsGroup");

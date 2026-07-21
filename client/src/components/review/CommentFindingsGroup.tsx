@@ -77,7 +77,7 @@ export function CommentFindingsGroup({
               className={`p-3 rounded-md border cursor-pointer transition-all ${
                 activeBoxId === finding.id
                   ? "ring-2 ring-primary border-primary bg-primary/5"
-                  : "hover:bg-white/80"
+                  : "hover:bg-background/80"
               } ${
                 finding.status === "missing"
                   ? "bg-red-50/60 border-red-200"

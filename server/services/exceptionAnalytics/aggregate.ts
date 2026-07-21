@@ -243,7 +243,10 @@ export function buildOverturnAnalytics(input: {
   const rules: RuleOverturnMetrics[] = Array.from(byRule.entries()).map(
     ([key, e]) => {
       const resolved = e.overturned + e.waived + e.approved;
+      // PX-065/089 SSOT: overturn = human reversal (override + waive),
+      // matching overturnMetrics (approve is agreement, not an overturn).
       const humanReversal = e.overturned + e.waived;
+      const overturnRate = resolved > 0 ? humanReversal / resolved : null;
       return {
         ruleKey: key,
         ruleId: e.ruleId,
@@ -254,9 +257,9 @@ export function buildOverturnAnalytics(input: {
         waivedCount: e.waived,
         approvedCount: e.approved,
         openCount: e.open,
-        overturnRate: resolved > 0 ? e.overturned / resolved : null,
+        overturnRate,
         humanReversalCount: humanReversal,
-        reversalRate: resolved > 0 ? humanReversal / resolved : null,
+        reversalRate: overturnRate,
         sampleFindingIds: e.sampleIds,
       };
     }
@@ -269,10 +272,9 @@ export function buildOverturnAnalytics(input: {
     return b.overturnedCount - a.overturnedCount;
   });
 
-  const resolvedTotal =
-    overturnedCount +
-    waivedCount +
-    rules.reduce((s, r) => s + r.approvedCount, 0);
+  const approvedTotal = rules.reduce((s, r) => s + r.approvedCount, 0);
+  const resolvedTotal = overturnedCount + waivedCount + approvedTotal;
+  const humanReversalTotal = overturnedCount + waivedCount;
 
   return {
     period,
@@ -280,7 +282,7 @@ export function buildOverturnAnalytics(input: {
     overturnedCount,
     waivedCount,
     overallOverturnRate:
-      resolvedTotal > 0 ? overturnedCount / resolvedTotal : null,
+      resolvedTotal > 0 ? humanReversalTotal / resolvedTotal : null,
     byRule: rules,
     worstRules: rules
       .filter(r => (r.overturnRate ?? 0) > 0 || r.overturnedCount > 0)

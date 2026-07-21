@@ -212,12 +212,16 @@ describe("Exception Management - PR-17 Contract Tests", () => {
       expect(sig.totalFindings).toBe(4);
       expect(sig.overturnedCount).toBe(3);
       expect(sig.approvedCount).toBe(1);
-      // 3 overturned / (3+1) resolved = 0.75
+      // PX-065/089: overturn = human reversal (override+waive) / resolved
+      // RULE_SIG: 3 overturned + 0 waived / (3+1) = 0.75
       expect(sig.overturnRate).toBe(0.75);
       expect(sig.reversalRate).toBe(0.75);
 
-      expect(summary.worstRules[0].ruleId).toBe("RULE_SIG");
-      expect(summary.overallOverturnRate).toBeCloseTo(3 / 5, 5);
+      // RULE_DATE is 100% waived (= overturn under SSOT); RULE_SIG is 0.75.
+      expect(summary.worstRules[0].ruleId).toBe("RULE_DATE");
+      expect(summary.worstRules.some(r => r.ruleId === "RULE_SIG")).toBe(true);
+      // overall: (3 overridden + 1 waived) / 5 resolved = 0.8
+      expect(summary.overallOverturnRate).toBeCloseTo(4 / 5, 5);
     });
 
     it("handles findings without ruleId via reason key", () => {

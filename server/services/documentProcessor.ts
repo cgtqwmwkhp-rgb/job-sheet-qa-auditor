@@ -3301,6 +3301,18 @@ async function processJobSheetWithOptions(
     await deliverOpsAlert(opsAlert);
   }
 
+  // PX-101: neutralize contradictory "passes" language before persist.
+  {
+    const { gateSummaryToResult } = await import("./summaryGate");
+    analysisResult = {
+      ...analysisResult,
+      summary: gateSummaryToResult(
+        analysisResult.summary,
+        analysisResult.overallResult
+      ),
+    };
+  }
+
   // Stage 3: Store Results
   const storageStartTime = Date.now();
   let auditResultId: number | undefined;

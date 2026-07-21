@@ -82,7 +82,7 @@ export function RelationshipFindingsGroup({
               className={`p-3 rounded-md border cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-primary ${
                 activeBoxId === finding.id
                   ? "ring-2 ring-primary border-primary bg-primary/5"
-                  : "hover:bg-white/80"
+                  : "hover:bg-background/80"
               } ${
                 finding.status === "missing"
                   ? "bg-red-50/60 border-red-200"
@@ -122,7 +122,7 @@ export function RelationshipFindingsGroup({
                 </div>
                 <Badge
                   variant="outline"
-                  className="text-[10px] px-1 bg-white/50 shrink-0"
+                  className="text-[10px] px-1 bg-background/50 shrink-0"
                 >
                   {(finding.confidence * 100).toFixed(0)}%
                 </Badge>

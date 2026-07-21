@@ -30,7 +30,11 @@ import { validateMistralApiKey } from "./services/ocr";
 import { resolveProcessStatus } from "./services/processStatus";
 import { templateRouter } from "./routers/templateRouter";
 import { analyticsRouter } from "./routers/analyticsRouter";
-import { auditActionsRouter, waiveFinding } from "./routers/auditActionsRouter";
+import {
+  auditActionsRouter,
+  overrideFinding,
+  waiveFinding,
+} from "./routers/auditActionsRouter";
 import { fixPacksRouter } from "./routers/fixPacksRouter";
 import { portalRouter } from "./routers/portalRouter";
 import { commsRouter } from "./routers/commsRouter";
@@ -199,15 +203,23 @@ export const appRouter = router({
         };
       }),
 
-    /** Users eligible for technician attribution on upload / assign. */
+    /**
+     * Users eligible for technician attribution on upload / assign.
+     * PX-067/090: exclude synthetic OCR attribution phantoms from the roster SSOT.
+     */
     listTechnicians: staffProcedure.query(async () => {
       const all = await db.getAllUsers();
       return all
-        .filter(u => Boolean(u.name?.trim() || u.email))
+        .filter(
+          u =>
+            Boolean(u.name?.trim() || u.email) &&
+            u.loginMethod !== "attribution"
+        )
         .map(u => ({
           id: u.id,
           name: u.name?.trim() || u.email || `User ${u.id}`,
           role: u.role,
+          loginMethod: u.loginMethod ?? null,
         }))
         .sort((a, b) => {
           const rank = (role: string) =>
@@ -350,6 +362,41 @@ export const appRouter = router({
           }
         }
 
+        // PX-063: content-hash dedupe before storage — avoid orphan pending rows.
+        const fileHash = calculateHash(buffer);
+        const existing = await db.findJobSheetByContentHash(fileHash);
+        if (existing) {
+          const reason =
+            existing.status === "processing"
+              ? ("in_flight" as const)
+              : existing.status === "completed" ||
+                  existing.status === "review_queue"
+                ? ("already_processed" as const)
+                : ("duplicate_pending" as const);
+
+          await db.logAction({
+            userId: ctx.user.id,
+            action: "UPLOAD_JOB_SHEET_DEDUPED",
+            entityType: "job_sheet",
+            entityId: existing.id,
+            details: {
+              fileName: input.fileName,
+              reason,
+              reusedFromJobSheetId: existing.id,
+              existingStatus: existing.status,
+            },
+          });
+
+          return {
+            id: existing.id,
+            deduped: true as const,
+            reason,
+            reusedFromJobSheetId: existing.id,
+            existingStatus: existing.status,
+            ...(intake ? { intake } : {}),
+          };
+        }
+
         // Sanitize filename to prevent path traversal and special characters
         const sanitizedFileName = sanitizeFilename(input.fileName);
         const fileKey = `job-sheets/${ctx.user.id}/${nanoid()}-${sanitizedFileName}`;
@@ -366,7 +413,7 @@ export const appRouter = router({
           fileName: input.fileName,
           fileType: input.fileType,
           fileSizeBytes: buffer.length,
-          fileHash: calculateHash(buffer),
+          fileHash,
           status: "pending",
           technicianId: input.technicianId,
           siteInfo: input.siteInfo,
@@ -395,6 +442,63 @@ export const appRouter = router({
         });
 
         return intake ? { ...result, intake } : result;
+      }),
+
+    /**
+     * PX-063/088: remove orphan / stuck pending uploads (and cascade).
+     * Staff only — deletes storage object when present.
+     */
+    delete: qaLeadProcedure
+      .input(
+        z.object({
+          id: z.number().int().positive(),
+          reason: z.string().max(500).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const jobSheet = await db.getJobSheetById(input.id);
+        if (!jobSheet) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Job sheet not found",
+          });
+        }
+
+        const { enforceJobSheetAccess } = await import("./utils/authorization");
+        enforceJobSheetAccess(jobSheet, ctx.user);
+
+        if (
+          jobSheet.status === "processing" ||
+          jobSheet.status === "completed" ||
+          jobSheet.status === "review_queue"
+        ) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message:
+              jobSheet.status === "processing"
+                ? "Cannot delete a sheet that is currently processing — wait for it to finish or fail."
+                : "Cannot delete a processed sheet from Upload. Use audit retention controls instead.",
+          });
+        }
+
+        // Storage adapters do not yet expose delete; cascade removes DB rows.
+        // Orphan blobs are acceptable vs stuck pending queue rows (PX-063/088).
+        const { deleteJobSheetCascade } = await import("./db/transactions");
+        await deleteJobSheetCascade(input.id, ctx.user.id);
+
+        await db.logAction({
+          userId: ctx.user.id,
+          action: "DELETE_JOB_SHEET_ORPHAN",
+          entityType: "job_sheet",
+          entityId: input.id,
+          details: {
+            reason: input.reason ?? "Removed orphan / stuck upload",
+            previousStatus: jobSheet.status,
+            fileName: jobSheet.fileName,
+          },
+        });
+
+        return { success: true as const, id: input.id };
       }),
 
     updateStatus: qaLeadProcedure
@@ -628,7 +732,9 @@ export const appRouter = router({
           await import("./services/technicianAttribution");
 
         const users = await db.getAllUsers();
-        const candidates = users.map(u => ({
+        // PX-067/090: match against real roster first; phantoms stay out of picker.
+        const realUsers = users.filter(u => u.loginMethod !== "attribution");
+        const candidates = realUsers.map(u => ({
           id: u.id,
           name: u.name,
           email: u.email,
@@ -708,13 +814,22 @@ export const appRouter = router({
           attributionOpenIdForName,
         } = await import("./services/technicianAttribution");
 
+        const toCandidates = (
+          list: Awaited<ReturnType<typeof db.getAllUsers>>
+        ) => {
+          // PX-090: real roster first so phantoms never shadow AAD technicians.
+          const real = list.filter(u => u.loginMethod !== "attribution");
+          const phantoms = list.filter(u => u.loginMethod === "attribution");
+          return [...real, ...phantoms].map(u => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+          }));
+        };
+
         let users = await db.getAllUsers();
-        let candidates = users.map(u => ({
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          role: u.role,
-        }));
+        let candidates = toCandidates(users);
         const sheets = await db.getUnattributedJobSheets({
           limit: input?.limit ?? 200,
           startDate: input?.startDate ? new Date(input.startDate) : undefined,
@@ -753,12 +868,7 @@ export const appRouter = router({
             if (ensured.created) createdUsers++;
           }
           users = await db.getAllUsers();
-          candidates = users.map(u => ({
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            role: u.role,
-          }));
+          candidates = toCandidates(users);
         }
 
         let attributed = 0;
@@ -1300,6 +1410,14 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
+        const dispute = await db.getDisputeById(input.id);
+        if (!dispute) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Dispute not found",
+          });
+        }
+
         await db.updateDisputeStatus(
           input.id,
           input.status,
@@ -1307,15 +1425,59 @@ export const appRouter = router({
           input.reviewNotes
         );
 
+        let findingOverride:
+          | Awaited<ReturnType<typeof overrideFinding>>
+          | undefined;
+
+        // PX-064: accepting a dispute overturns the disputed finding.
+        if (input.status === "accepted" && dispute.auditFindingId) {
+          try {
+            findingOverride = await overrideFinding({
+              findingId: dispute.auditFindingId,
+              reason:
+                input.reviewNotes?.trim() ||
+                `Dispute #${input.id} accepted — finding overturned`,
+              userId: ctx.user.id,
+              trainingReasonCode: "rule_wrong",
+            });
+          } catch (err) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                err instanceof Error
+                  ? `Dispute accepted but finding overturn failed: ${err.message}`
+                  : "Dispute accepted but finding overturn failed",
+            });
+          }
+        }
+
         await db.logAction({
           userId: ctx.user.id,
           action: "UPDATE_DISPUTE_STATUS",
           entityType: "dispute",
           entityId: input.id,
-          details: { newStatus: input.status },
+          details: {
+            newStatus: input.status,
+            findingId: dispute.auditFindingId,
+            findingOverturned: Boolean(findingOverride),
+            auditResultStatus: findingOverride?.auditResultStatus,
+          },
         });
 
-        return { success: true };
+        void webhookEvents
+          .disputeResolved(input.id, input.status)
+          .catch(err =>
+            console.warn(
+              "[disputes.updateStatus] dispute.resolved webhook emit failed (non-fatal):",
+              err
+            )
+          );
+
+        return {
+          success: true as const,
+          findingOverturned: Boolean(findingOverride),
+          auditResultStatus: findingOverride?.auditResultStatus,
+        };
       }),
   }),
 

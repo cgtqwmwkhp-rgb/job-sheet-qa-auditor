@@ -505,6 +505,62 @@ export async function findProcessedJobSheetByContentHash(
 }
 
 /**
+ * Upload-time dedupe (PX-063): any prior sheet with the same content hash.
+ * Prefer processed/in-flight rows so re-uploads do not create orphans.
+ */
+export async function findJobSheetByContentHash(contentHash: string): Promise<{
+  id: number;
+  status: string;
+  fileHash: string | null;
+  fileName: string | null;
+} | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const normalized = contentHash.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const rows = await db
+    .select({
+      id: jobSheets.id,
+      status: jobSheets.status,
+      fileHash: jobSheets.fileHash,
+      fileName: jobSheets.fileName,
+    })
+    .from(jobSheets)
+    .where(eq(jobSheets.fileHash, normalized))
+    .orderBy(desc(jobSheets.updatedAt))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+export async function getDisputeById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const rows = await db
+    .select({
+      id: disputes.id,
+      auditFindingId: disputes.auditFindingId,
+      raisedBy: disputes.raisedBy,
+      status: disputes.status,
+      reason: disputes.reason,
+      evidenceUrls: disputes.evidenceUrls,
+      reviewerId: disputes.reviewerId,
+      reviewNotes: disputes.reviewNotes,
+      resolvedAt: disputes.resolvedAt,
+      createdAt: disputes.createdAt,
+      updatedAt: disputes.updatedAt,
+    })
+    .from(disputes)
+    .where(eq(disputes.id, id))
+    .limit(1);
+
+  return rows[0];
+}
+
+/**
  * Set / clear technician attribution on a job sheet (analytics scorecards).
  */
 export async function updateJobSheetTechnicianId(

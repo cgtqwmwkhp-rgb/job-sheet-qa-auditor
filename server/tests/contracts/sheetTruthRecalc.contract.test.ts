@@ -125,6 +125,24 @@ describe("Sheet truth recalculation (Wave-4 A2)", () => {
         ])
       ).toBe("review_queue");
     });
+
+    it("PX-062: approved critical findings keep the sheet as fail (never pass)", () => {
+      expect(
+        deriveSheetResultFromFindings([
+          { severity: "S0", resolutionStatus: "approved" },
+          { severity: "S1", resolutionStatus: "approved" },
+        ])
+      ).toBe("fail");
+    });
+
+    it("PX-062: approved minors keep review_queue (never pass)", () => {
+      expect(
+        deriveSheetResultFromFindings([
+          { severity: "S0", resolutionStatus: "overridden" },
+          { severity: "S2", resolutionStatus: "approved" },
+        ])
+      ).toBe("review_queue");
+    });
   });
 
   describe("applyFindingAction override recalc", () => {
@@ -176,11 +194,30 @@ describe("Sheet truth recalculation (Wave-4 A2)", () => {
       expect(mem.jobSheetStatuses.get(100)).toBe("completed");
     });
 
-    it("does not leave stale fail after single remaining S0 is waived", async () => {
+    it("PX-062: waiving last S0 with an approved S2 leaves review_queue (not pass)", async () => {
       mem.findings.set(2, {
         id: 2,
         auditResultId: 10,
         resolutionStatus: "approved",
+        severity: "S2",
+      });
+
+      const result = await applyFindingAction(mem.deps, {
+        findingId: 1,
+        action: "waive",
+        reason: "Accepted exception",
+        userId: 7,
+      });
+
+      expect(result.auditResultStatus).toBe("review_queue");
+      expect(mem.audits.get(10)?.result).toBe("review_queue");
+    });
+
+    it("passes after last critical is waived when no standing approved defects remain", async () => {
+      mem.findings.set(2, {
+        id: 2,
+        auditResultId: 10,
+        resolutionStatus: "overridden",
         severity: "S2",
       });
 

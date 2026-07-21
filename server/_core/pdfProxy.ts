@@ -228,6 +228,15 @@ router.get(
         req.query.download === "1" || req.query.download === "true";
       const fileName = jobSheet.fileName || `document-${jobSheetId}.pdf`;
       const disposition = isDownload ? "attachment" : "inline";
+      const storedMime =
+        typeof jobSheet.fileType === "string" && jobSheet.fileType.trim()
+          ? jobSheet.fileType.trim()
+          : null;
+      const defaultContentType =
+        storedMime &&
+        (storedMime.startsWith("image/") || storedMime === "application/pdf")
+          ? storedMime
+          : "application/pdf";
 
       // Cache only bounded range responses. Authorization has already completed above,
       // and clients still receive no-store headers, so bytes are never shared via a browser
@@ -289,9 +298,13 @@ router.get(
         return;
       }
 
-      // Set response headers
-      const contentType =
-        response.headers.get("content-type") || "application/pdf";
+      // Set response headers — prefer stored job-sheet MIME for JPG/PNG (PX-085).
+      const upstreamType = response.headers.get("content-type");
+      const contentType = storedMime?.startsWith("image/")
+        ? storedMime
+        : upstreamType && !upstreamType.includes("octet-stream")
+          ? upstreamType
+          : defaultContentType;
       const contentLength = response.headers.get("content-length");
       const contentRange = response.headers.get("content-range");
       const acceptRanges = response.headers.get("accept-ranges");
@@ -437,8 +450,14 @@ router.head(
       }
 
       const fileName = jobSheet.fileName || `document-${jobSheetId}.pdf`;
+      const headMime =
+        typeof jobSheet.fileType === "string" &&
+        (jobSheet.fileType.startsWith("image/") ||
+          jobSheet.fileType === "application/pdf")
+          ? jobSheet.fileType
+          : "application/pdf";
 
-      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Type", headMime);
       res.setHeader("Content-Disposition", `inline; filename="${fileName}"`);
       res.setHeader("Accept-Ranges", "bytes");
       res.setHeader("Cache-Control", "private, no-store");

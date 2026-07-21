@@ -109,6 +109,21 @@ import { usePersistFn } from "@/hooks/usePersistFn";
 import { useReviewClaim } from "@/hooks/useReviewClaim";
 import type { ReviewClaimStatus } from "@/hooks/useReviewClaim";
 import {
+  deriveWorkstationOutcome,
+  isFindingOpenForUi,
+  mapAuditResultToUiStatus,
+} from "@/lib/auditOutcome";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   RelationshipFindingsGroup,
   isRelationshipFinding,
 } from "@/components/review/RelationshipFindingsGroup";
@@ -246,8 +261,9 @@ export function mapFindingsFromApi(
   }>
 ): Finding[] {
   return findingsData.map(f => {
-    // Check if finding has been resolved (approved, waived, overridden)
-    const isResolved = f.resolutionStatus && f.resolutionStatus !== "open";
+    // PX-061: flagged stays open; only waive/override/approve resolve for UI status.
+    const isOpen = isFindingOpenForUi(f.resolutionStatus);
+    const isResolved = !isOpen;
 
     // Post–Audit Policy: S1 = Major, S2 = Minor, S3 = Passed/informational
     const failClass: Finding["failClass"] =
@@ -262,14 +278,14 @@ export function mapFindingsFromApi(
         : failClass === "minor"
           ? "major"
           : "minor";
-    // If finding is resolved, show as "passed"; otherwise use severity-based status
+    // Open S3 stays informational (not a Pass for the sheet); resolved → passed.
     const status = isResolved
       ? "passed"
       : failClass === "major"
         ? "missing"
         : failClass === "minor"
           ? "warning"
-          : "passed";
+          : "warning";
     const bb = f.boundingBox as
       | {
           x?: number;
@@ -398,17 +414,16 @@ export function ReviewWorkstationPane({
     !auditDataProp && jobSheetData
       ? {
           id: jobSheetData.referenceNumber || `JS-${jobSheetData.id}`,
-          status:
-            auditResult?.result === "pass"
-              ? "passed"
-              : auditResult?.result === "fail"
-                ? "failed"
-                : jobSheetData.status === "completed"
-                  ? "passed"
-                  : "pending",
+          status: mapAuditResultToUiStatus({
+            auditResult: auditResult?.result,
+            jobSheetStatus: jobSheetData.status,
+          }),
           score:
             auditResult?.confidenceScore ||
-            (jobSheetData.status === "completed" ? "100" : "-"),
+            (jobSheetData.status === "completed" &&
+            auditResult?.result === "pass"
+              ? "100"
+              : "-"),
           date: new Date(jobSheetData.createdAt).toLocaleDateString(),
           technician:
             technicianNameById.get(jobSheetData.uploadedBy) ??
@@ -690,6 +705,10 @@ function ReviewWorkstationContent({
   // Default true = auto-load PDF. Remount via key={jobSheetId} on parent resets state.
   const [showPdfViewer, setShowPdfViewer] = useState(true);
   const [showLegend, setShowLegend] = useState(false);
+  const [bulkApproveConfirmOpen, setBulkApproveConfirmOpen] = useState(false);
+  const [pendingBulkApproveIds, setPendingBulkApproveIds] = useState<number[]>(
+    []
+  );
   /** Instant UI: treat these ids as passed while override/waive is in flight. */
   const [optimisticPassedIds, setOptimisticPassedIds] = useState(
     () => new Set<string | number>()
@@ -1106,15 +1125,7 @@ function ReviewWorkstationContent({
     );
   };
 
-  const handleBulkApproveFindings = () => {
-    const openIds = displayFindings
-      .filter(f => f.status !== "passed")
-      .map(f => resolveFindingId(f))
-      .filter((id): id is number => id != null);
-    if (openIds.length === 0) {
-      toast.error("No open findings to approve");
-      return;
-    }
+  const runBulkApproveFindings = (openIds: number[]) => {
     bulkApproveMutation.mutate(
       {
         findingIds: openIds,
@@ -1124,16 +1135,61 @@ function ReviewWorkstationContent({
       {
         onSuccess: result => {
           invalidateFindings();
+          const tokens = result.undoTokens ?? [];
+          const approvedIds = result.approvedIds ?? [];
           toast.success(
-            `Approved ${result.approvedIds.length} finding(s)` +
+            `Approved ${approvedIds.length} finding(s)` +
               (result.skippedIds.length
                 ? ` (${result.skippedIds.length} skipped)`
-                : "")
+                : ""),
+            tokens.length > 0
+              ? {
+                  action: {
+                    label: "Undo",
+                    onClick: () => {
+                      void (async () => {
+                        let undone = 0;
+                        for (const findingId of approvedIds) {
+                          try {
+                            await undoMutation.mutateAsync({
+                              findingId,
+                              claimToken,
+                            });
+                            undone++;
+                          } catch {
+                            // continue remaining
+                          }
+                        }
+                        invalidateFindings();
+                        if (undone > 0) {
+                          toast.success(`Undid ${undone} approval(s)`);
+                        } else {
+                          toast.error("Undo failed");
+                        }
+                      })();
+                    },
+                  },
+                }
+              : undefined
           );
         },
         onError: err => toast.error(err.message || "Bulk approve failed"),
       }
     );
+  };
+
+  const handleBulkApproveFindings = () => {
+    const openIds = displayFindings
+      .filter(f => f.status !== "passed")
+      .map(f => resolveFindingId(f))
+      .filter((id): id is number => id != null);
+    if (openIds.length === 0) {
+      toast.error("No open findings to approve");
+      return;
+    }
+    // PX-086: confirm before approving open findings
+    setPendingBulkApproveIds(openIds);
+    setBulkApproveConfirmOpen(true);
   };
 
   const submitActionDialog = () => {
@@ -1635,16 +1691,25 @@ function ReviewWorkstationContent({
   const hasMajor =
     Boolean(auditData.hasMajorFails) ||
     displayFindings.some(f => f.failClass === "major" && f.status !== "passed");
-  const outcome: {
-    label: "Pass" | "Needs review" | "Fail";
-    variant: "default" | "secondary" | "destructive";
-  } = hasMajor
-    ? { label: "Fail", variant: "destructive" }
-    : failedFindings.length > 0
-      ? { label: "Needs review", variant: "secondary" }
-      : auditData.status === "failed"
-        ? { label: "Fail", variant: "destructive" }
-        : { label: "Pass", variant: "default" };
+  // PX-061: auditData.status is already SSOT-mapped (incl. review_queue).
+  const outcome = deriveWorkstationOutcome({
+    auditResult:
+      auditData.status === "needs_review"
+        ? "review_queue"
+        : auditData.status === "passed"
+          ? "pass"
+          : auditData.status === "failed"
+            ? "fail"
+            : auditData.status === "waived"
+              ? "waived"
+              : null,
+    jobSheetStatus:
+      auditData.status === "pending" ? "pending" : auditData.status,
+    hasOpenMajorFindings: hasMajor,
+    hasOpenNonMajorFindings: failedFindings.some(
+      f => f.failClass !== "major" && f.status !== "passed"
+    ),
+  });
 
   return (
     <div
@@ -1653,15 +1718,44 @@ function ReviewWorkstationContent({
       data-review-workstation
       className="flex flex-col outline-none overflow-hidden h-full min-h-0"
     >
+      <AlertDialog
+        open={bulkApproveConfirmOpen}
+        onOpenChange={setBulkApproveConfirmOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Approve open findings?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This confirms {pendingBulkApproveIds.length} open finding
+              {pendingBulkApproveIds.length === 1 ? "" : "s"} as valid defects.
+              Approved findings do not count as passes. You can undo from the
+              toast.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const ids = pendingBulkApproveIds;
+                setBulkApproveConfirmOpen(false);
+                setPendingBulkApproveIds([]);
+                runBulkApproveFindings(ids);
+              }}
+            >
+              Approve {pendingBulkApproveIds.length}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <div
-        className={`flex items-center justify-between shrink-0 gap-2 border-b border-[#EBE8E8] bg-white sticky top-0 z-10 ${compact ? "px-2 py-1.5" : "px-3 py-2"}`}
+        className={`flex items-center justify-between shrink-0 gap-2 border-b border-border bg-background sticky top-0 z-10 ${compact ? "px-2 py-1.5" : "px-3 py-2"}`}
       >
         <div className="min-w-0 flex items-center gap-2 flex-wrap">
           {onBack && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 px-2 text-[#333030] hover:bg-[#F5F4F4] shrink-0"
+              className="h-8 px-2 text-foreground hover:bg-accent shrink-0"
               onClick={onBack}
               aria-label="Back to audit list"
             >
@@ -1669,7 +1763,7 @@ function ReviewWorkstationContent({
               <span className="hidden sm:inline text-sm">All audits</span>
             </Button>
           )}
-          <h2 className="font-semibold tracking-tight truncate text-base text-[#333030]">
+          <h2 className="font-semibold tracking-tight truncate text-base text-foreground">
             {auditData.id}
           </h2>
           <Badge
@@ -1869,7 +1963,7 @@ function ReviewWorkstationContent({
 
       {canOverrideTemplate && auditData.needsTemplateAuthoring && (
         <div className="shrink-0 border-b border-[#BEDA41]/50 bg-[#BEDA41]/15 px-3 py-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-[#333030]">
+          <p className="text-sm text-foreground">
             Unknown or low-confidence form — teach the ordering tool what to
             look for in Template Studio.
           </p>
@@ -1898,7 +1992,7 @@ function ReviewWorkstationContent({
           minSize={40}
           className="min-w-0"
         >
-          <div className="flex flex-col min-h-0 min-w-0 h-full overflow-hidden bg-white border-r border-border">
+          <div className="flex flex-col min-h-0 min-w-0 h-full overflow-hidden bg-background border-r border-border">
             {!showPdfViewer ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/20 p-6">
                 <Eye className="w-12 h-12 mb-4 opacity-40" />
@@ -1928,7 +2022,7 @@ function ReviewWorkstationContent({
 
         <ResizableHandle
           withHandle
-          className="hidden lg:flex w-1.5 bg-[#EBE8E8] hover:bg-primary/40 transition-colors"
+          className="hidden lg:flex w-1.5 bg-border hover:bg-primary/40 transition-colors"
         />
 
         <ResizablePanel
@@ -2679,7 +2773,7 @@ function FindingsList({
               </div>
 
               {finding.value && (
-                <div className="mb-1 px-1.5 py-1 bg-white/60 rounded border border-black/5 font-mono text-xs truncate">
+                <div className="mb-1 px-1.5 py-1 bg-background/60 rounded border border-black/5 font-mono text-xs truncate">
                   {finding.value}
                 </div>
               )}
@@ -2996,7 +3090,7 @@ function IssuesTabContent({
               </div>
 
               {finding.value && (
-                <div className="mb-1 px-1.5 py-1 bg-white/60 rounded border border-black/5 font-mono text-xs truncate">
+                <div className="mb-1 px-1.5 py-1 bg-background/60 rounded border border-black/5 font-mono text-xs truncate">
                   {finding.value}
                 </div>
               )}
