@@ -9,6 +9,7 @@ import { createHash } from "crypto";
 import {
   ACTION_TO_STATUS,
   STATUS_TO_ACTION,
+  FORCE_PASS_MIN_REASON_LENGTH,
   type AuditActionResult,
   type BulkApproveResult,
   type BulkResolveResult,
@@ -35,6 +36,8 @@ export {
   type SheetResult,
   type SheetTruthFinding,
 } from "./sheetTruth";
+
+export { FORCE_PASS_MIN_REASON_LENGTH } from "./types";
 
 export type AuditActionErrorCode =
   | "NOT_FOUND"
@@ -859,6 +862,11 @@ export function getApprovalBlockers(
   );
 }
 
+export interface ForcePassOverriddenFinding {
+  id: number;
+  previousStatus: ResolutionStatus;
+}
+
 export async function approveJobSheet(
   deps: Pick<
     AuditActionDeps,
@@ -868,6 +876,7 @@ export async function approveJobSheet(
     | "getAuditResult"
     | "getAuditResultByJobSheetId"
     | "listFindingsByAuditResultId"
+    | "updateFindingResolution"
   > & {
     getJobSheetStatus?: (id: number) => Promise<string | undefined>;
   },
@@ -876,6 +885,14 @@ export async function approveJobSheet(
     userId: number;
     reason?: string;
     previousStatus?: string;
+    /**
+     * PR-A (PX-109): bypass open Major / photo-cost-risk approval blockers
+     * and force the sheet to pass. Never silent — requires a reason of at
+     * least FORCE_PASS_MIN_REASON_LENGTH chars, and every disposed finding
+     * plus the reason/who/when is stamped on the JOB_SHEET_FORCE_PASS log
+     * entry so the override is fully auditable and undoable.
+     */
+    forcePass?: boolean;
   }
 ): Promise<{
   success: true;
@@ -885,6 +902,9 @@ export async function approveJobSheet(
   auditResultId: number;
   previousAuditResult: AuditResultRecord["result"];
   undoToken: string;
+  forcePass: boolean;
+  /** Findings auto-overridden to clear the way for forcePass (empty otherwise). */
+  overriddenFindings: ForcePassOverriddenFinding[];
 }> {
   const audit = await deps.getAuditResultByJobSheetId?.(input.jobSheetId);
   if (!audit) {
@@ -901,7 +921,9 @@ export async function approveJobSheet(
     );
   }
   const blockers = getApprovalBlockers(findings);
-  if (blockers.length > 0) {
+  const forcePass = input.forcePass === true;
+
+  if (blockers.length > 0 && !forcePass) {
     const majorCount = blockers.filter(isMajorFinding).length;
     const photoCount = blockers.filter(isPhotoCostRiskFinding).length;
     const reasons = [
@@ -918,6 +940,32 @@ export async function approveJobSheet(
     );
   }
 
+  const trimmedReason = input.reason?.trim() ?? "";
+  if (forcePass && trimmedReason.length < FORCE_PASS_MIN_REASON_LENGTH) {
+    throw new AuditActionError(
+      "PRECONDITION_FAILED",
+      `forcePass requires a reason of at least ${FORCE_PASS_MIN_REASON_LENGTH} characters explaining the override`
+    );
+  }
+
+  const now = new Date();
+  const overriddenFindings: ForcePassOverriddenFinding[] = [];
+  if (forcePass && blockers.length > 0) {
+    for (const finding of blockers) {
+      overriddenFindings.push({
+        id: finding.id,
+        previousStatus: finding.resolutionStatus,
+      });
+      await deps.updateFindingResolution(finding.id, {
+        resolutionStatus: "overridden",
+        resolutionReason: trimmedReason,
+        resolvedBy: input.userId,
+        resolvedAt: now,
+        previousResolutionStatus: finding.resolutionStatus,
+      });
+    }
+  }
+
   const previous = input.previousStatus ?? "review_queue";
   const previousAuditResult = audit.result;
 
@@ -930,7 +978,7 @@ export async function approveJobSheet(
   await deps.updateJobSheetStatus(input.jobSheetId, "completed");
   await deps.logAction({
     userId: input.userId,
-    action: "JOB_SHEET_APPROVE",
+    action: forcePass ? "JOB_SHEET_FORCE_PASS" : "JOB_SHEET_APPROVE",
     entityType: "job_sheet",
     entityId: input.jobSheetId,
     details: {
@@ -939,6 +987,8 @@ export async function approveJobSheet(
       previousAuditResult,
       newAuditResult: "pass",
       reason: input.reason ?? "Approved from hold queue",
+      forcePass,
+      overriddenFindingIds: overriddenFindings.map(f => f.id),
     },
   });
 
@@ -950,6 +1000,8 @@ export async function approveJobSheet(
     auditResultId: audit.id,
     previousAuditResult,
     undoToken: `undo-js:${input.jobSheetId}:${previous}->completed`,
+    forcePass,
+    overriddenFindings,
   };
 }
 
@@ -959,7 +1011,10 @@ export async function approveJobSheet(
 export async function undoJobSheetApprove(
   deps: Pick<
     AuditActionDeps,
-    "updateJobSheetStatus" | "updateAuditResultStatus" | "logAction"
+    | "updateJobSheetStatus"
+    | "updateAuditResultStatus"
+    | "logAction"
+    | "updateFindingResolution"
   >,
   input: {
     jobSheetId: number;
@@ -968,11 +1023,17 @@ export async function undoJobSheetApprove(
     /** PX-062: restore the audit result that approve overwrote to "pass". */
     auditResultId?: number;
     restoreAuditResult?: AuditResultRecord["result"];
+    /**
+     * PR-A (PX-109): findings that forcePass auto-overrode — restored to
+     * their prior resolutionStatus so undo fully reverses the override.
+     */
+    restoreFindings?: ForcePassOverriddenFinding[];
   }
 ): Promise<{
   success: true;
   jobSheetId: number;
   newStatus: string;
+  restoredFindingIds: number[];
 }> {
   await deps.updateJobSheetStatus(input.jobSheetId, input.restoreStatus);
   if (input.auditResultId != null && input.restoreAuditResult != null) {
@@ -981,6 +1042,18 @@ export async function undoJobSheetApprove(
       input.restoreAuditResult
     );
   }
+
+  const restoreFindings = input.restoreFindings ?? [];
+  for (const finding of restoreFindings) {
+    await deps.updateFindingResolution(finding.id, {
+      resolutionStatus: finding.previousStatus,
+      resolutionReason: null,
+      resolvedBy: null,
+      resolvedAt: null,
+      previousResolutionStatus: "overridden",
+    });
+  }
+
   await deps.logAction({
     userId: input.userId,
     action: "JOB_SHEET_APPROVE_UNDO",
@@ -989,6 +1062,7 @@ export async function undoJobSheetApprove(
     details: {
       restoredStatus: input.restoreStatus,
       restoredAuditResult: input.restoreAuditResult,
+      restoredFindingIds: restoreFindings.map(f => f.id),
     },
   });
 
@@ -996,5 +1070,6 @@ export async function undoJobSheetApprove(
     success: true,
     jobSheetId: input.jobSheetId,
     newStatus: input.restoreStatus,
+    restoredFindingIds: restoreFindings.map(f => f.id),
   };
 }

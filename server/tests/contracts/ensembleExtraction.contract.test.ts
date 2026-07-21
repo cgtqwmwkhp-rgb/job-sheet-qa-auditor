@@ -20,6 +20,7 @@ import {
   runEnsembleExtraction,
   isEnsembleExtractionEnabled,
   mergeExtractedFields,
+  stripEmptyExtractedFields,
   buildEnsembleReviewFindings,
   ENSEMBLE_TO_GOLDSPEC,
 } from "../../services/ensembleExtraction";
@@ -341,6 +342,30 @@ Customer Name: Acme Corp
       );
       expect(merged.jobNumber.value).toBe("NEW");
     });
+
+    it("PR-A: stripEmptyExtractedFields drops blank/whitespace-only values", () => {
+      const stripped = stripEmptyExtractedFields({
+        jobReference: { value: "", confidence: 90, pageNumber: 1 },
+        assetId: { value: "   ", confidence: 90, pageNumber: 1 },
+        date: { value: "2026-01-01", confidence: 90, pageNumber: 1 },
+      });
+      expect(Object.keys(stripped)).toEqual(["date"]);
+    });
+
+    it("PR-A: an empty Gemini value cannot shadow a real ensemble/text-layer value once merged", () => {
+      const merged = mergeExtractedFields(
+        mergeExtractedFields(
+          stripEmptyExtractedFields({
+            jobReference: { value: "", confidence: 95, pageNumber: 1 },
+          }),
+          stripEmptyExtractedFields({
+            jobReference: { value: "JS-4412", confidence: 60, pageNumber: 1 },
+          })
+        ),
+        stripEmptyExtractedFields({})
+      );
+      expect(merged.jobReference.value).toBe("JS-4412");
+    });
   });
 
   describe("documentProcessor wiring (source contract)", () => {
@@ -355,6 +380,38 @@ Customer Name: Acme Corp
       expect(dp).toContain("runEnsembleExtraction");
       expect(dp).toContain("ensembleExtraction");
       expect(dp).toContain('PIPELINE_VERSION = "2.1.0"');
+    });
+
+    it("PR-A: deterministic validation merges Gemini ∪ ensemble ∪ text-layer (JSR-R001–3 honesty)", () => {
+      const validationIdx = dp.indexOf("runDeterministicValidation({");
+      const stripCallsBeforeValidation =
+        dp.slice(0, validationIdx).split("stripEmptyExtractedFields(").length -
+        1;
+      // Three sources feed the merge: analysisResult, ensembleResult, textLayerResult.
+      expect(stripCallsBeforeValidation).toBeGreaterThanOrEqual(3);
+      expect(dp.slice(0, validationIdx)).toContain(
+        "ensembleResult?.ensembleExtractedFields"
+      );
+      expect(dp.slice(0, validationIdx)).toContain(
+        "textLayerResult?.preExtracted"
+      );
+    });
+
+    it("PR-A (LOLER-R004): re-runs the sign-off honesty demote after deterministic validation and before applyAuditPolicy", () => {
+      const firstDemoteIdx = dp.indexOf(
+        "demoteSignOffMissingWhenInkUnverified"
+      );
+      const validationIdx = dp.indexOf("runDeterministicValidation({");
+      const secondDemoteIdx = dp.indexOf(
+        "demoteSignOffMissingWhenInkUnverified",
+        validationIdx
+      );
+      const auditPolicyIdx = dp.indexOf("applyAuditPolicy({");
+
+      expect(firstDemoteIdx).toBeGreaterThan(-1);
+      expect(firstDemoteIdx).toBeLessThan(validationIdx);
+      expect(secondDemoteIdx).toBeGreaterThan(validationIdx);
+      expect(secondDemoteIdx).toBeLessThan(auditPolicyIdx);
     });
 
     it("routes CONFLICT/low consensus to review_queue without promoting PASS", () => {

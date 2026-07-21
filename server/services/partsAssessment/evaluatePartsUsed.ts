@@ -173,7 +173,29 @@ export function evaluatePartsUsed(text: string): PartsAssessmentResult {
     }
   }
 
-  if (completeLines.length === 0) {
+  // PARTS-C012 honesty (PR-A / PX-109): a bare "Repairs Required" note with
+  // no Parts Used content and no explicit "Consumables Used: Yes" is a weak,
+  // repairs-only implication — not proof parts were actually fitted. Do not
+  // hard-fail on that alone; surface it as informational (PARTS-C014)
+  // instead so it can't block AUTO_PASS or hard-fail a clean report.
+  const repairsOnlyImplication =
+    !partsUsedSection.present && !consumablesYes && repairsSection.present;
+
+  if (completeLines.length === 0 && repairsOnlyImplication) {
+    findings.push(
+      issue(
+        `${PARTS_ASSESSMENT_RULE_PREFIX}014`,
+        "Parts Used",
+        "S3",
+        "LOW_CONFIDENCE",
+        "Repairs Required is noted but Parts Used is empty/None and Consumables Used is not marked Yes.",
+        "Repairs alone don't confirm parts were fitted — confirm whether a part was actually used before treating this as a defect.",
+        "If a part was fitted, list it under Parts Used as PN — description — qty; otherwise no action is required.",
+        signals.snippet || repairsBody.slice(0, 200),
+        70
+      )
+    );
+  } else if (completeLines.length === 0) {
     findings.push(
       issue(
         `${PARTS_ASSESSMENT_RULE_PREFIX}012`,

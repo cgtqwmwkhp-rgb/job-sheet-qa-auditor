@@ -378,6 +378,31 @@ export function buildEnsembleReviewFindings(
 }
 
 /**
+ * Drop entries whose value is empty/whitespace-only.
+ *
+ * PR-A (JSR honesty): an empty-string extraction must not count as "present"
+ * when merging multiple sources — otherwise a blank Gemini field can shadow
+ * a correctly-read ensemble/text-layer value for the same key.
+ */
+export function stripEmptyExtractedFields(
+  fields: Record<
+    string,
+    { value: string; confidence: number; pageNumber: number }
+  >
+): Record<string, { value: string; confidence: number; pageNumber: number }> {
+  const out: Record<
+    string,
+    { value: string; confidence: number; pageNumber: number }
+  > = {};
+  for (const [key, field] of Object.entries(fields)) {
+    if (field && typeof field.value === "string" && field.value.trim()) {
+      out[key] = field;
+    }
+  }
+  return out;
+}
+
+/**
  * Merge analyzer extractedFields with ensemble (ensemble wins on confidence tie / higher).
  */
 export function mergeExtractedFields(

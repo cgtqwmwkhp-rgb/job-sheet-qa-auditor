@@ -61,6 +61,7 @@ import {
   runEnsembleExtraction,
   buildEnsembleReviewFindings,
   mergeExtractedFields,
+  stripEmptyExtractedFields,
   isEnsembleExtractionEnabled,
   formatPreExtractedHints,
   aliasCanonicalExtractedFields,
@@ -3200,7 +3201,22 @@ async function processJobSheetWithOptions(
   {
     const validationStart = Date.now();
     try {
-      const extractedForValidation = analysisResult.extractedFields ?? {};
+      // PR-A (JSR honesty): validate against a merge of Gemini ∪ ensemble ∪
+      // text-layer extraction (+ canonical aliasing), not Gemini alone.
+      // Empty-string values are stripped before merging so JSR-R001–3
+      // (jobReference/assetId/date required) don't fire on headers that a
+      // non-Gemini source actually read correctly.
+      const extractedForValidation = aliasCanonicalExtractedFields(
+        mergeExtractedFields(
+          mergeExtractedFields(
+            stripEmptyExtractedFields(analysisResult.extractedFields ?? {}),
+            stripEmptyExtractedFields(
+              ensembleResult?.ensembleExtractedFields ?? {}
+            )
+          ),
+          stripEmptyExtractedFields(textLayerResult?.preExtracted ?? {})
+        )
+      );
       const deterministic = runDeterministicValidation({
         spec,
         extractedFields: extractedForValidation,
@@ -3250,6 +3266,21 @@ async function processJobSheetWithOptions(
       });
     }
   }
+
+  // PX-104/PR-A honesty (LOLER-R004): re-apply the sign-off honesty demote
+  // after deterministic validation. A GoldSpec/JSR required-field rule can
+  // re-emit a MAJOR "engineerSignOff missing" finding here even when VLM
+  // ink verification never ran — without this second pass, the re-emitted
+  // finding would reach applyAuditPolicy undemoted and undo the earlier fix.
+  analysisResult = {
+    ...analysisResult,
+    findings: demoteSignOffMissingWhenInkUnverified(analysisResult.findings, {
+      vlmUsed: vlmInkResult?.imageQa?.vlmUsed === true,
+      signatureLabelPresent:
+        hasSignatureLabelEvidence(extractedText) &&
+        vlmInkResult?.preExtractedHint?.value !== "Absent",
+    }),
+  };
 
   // Promote REVIEW_QUEUE → PASS only when findings are S3-only, deterministic
   // validation passed, score is strong, and no blocking fail marks.

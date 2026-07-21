@@ -80,3 +80,10 @@ export interface BulkResolveResult {
   jobSheetStatus?: string;
   undoTokens: string[];
 }
+
+/**
+ * PR-A (PX-109): forcePass bypasses open Major / photo-cost-risk approval
+ * blockers, but must never be silent — a reason of at least this length is
+ * required so the audit trail always records who/when/why.
+ */
+export const FORCE_PASS_MIN_REASON_LENGTH = 10;

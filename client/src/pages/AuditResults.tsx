@@ -426,30 +426,50 @@ export default function AuditResults() {
       jobSheetId: number,
       previousStatus: string,
       auditResultId: number,
-      previousAuditResult: "pass" | "fail" | "review_queue" | "waived"
+      previousAuditResult: "pass" | "fail" | "review_queue" | "waived",
+      options?: {
+        forcePass?: boolean;
+        overriddenFindings?: Array<{
+          id: number;
+          previousStatus:
+            | "open"
+            | "waived"
+            | "overridden"
+            | "flagged"
+            | "approved";
+        }>;
+      }
     ) => {
-      toast.success("Job sheet approved", {
-        action: {
-          label: "Undo",
-          onClick: () => {
-            undoApprove.mutate(
-              {
-                jobSheetId,
-                restoreStatus: previousStatus as JobSheetStatus,
-                auditResultId,
-                restoreAuditResult: previousAuditResult,
-              },
-              {
-                onSuccess: () => {
-                  void invalidateAfterSheetAction();
-                  toast.success("Approval undone");
+      toast.success(
+        options?.forcePass ? "Job sheet forced to pass" : "Job sheet approved",
+        {
+          action: {
+            label: "Undo",
+            onClick: () => {
+              undoApprove.mutate(
+                {
+                  jobSheetId,
+                  restoreStatus: previousStatus as JobSheetStatus,
+                  auditResultId,
+                  restoreAuditResult: previousAuditResult,
+                  restoreFindings: options?.overriddenFindings,
                 },
-                onError: err => toast.error(err.message || "Undo failed"),
-              }
-            );
+                {
+                  onSuccess: () => {
+                    void invalidateAfterSheetAction();
+                    toast.success(
+                      options?.forcePass
+                        ? "Force-pass undone"
+                        : "Approval undone"
+                    );
+                  },
+                  onError: err => toast.error(err.message || "Undo failed"),
+                }
+              );
+            },
           },
-        },
-      });
+        }
+      );
     }
   );
 
@@ -480,6 +500,43 @@ export default function AuditResults() {
             );
           },
           onError: err => toast.error(err.message || "Approve failed"),
+        }
+      );
+    }
+  );
+
+  const handleForcePass = usePersistFn(
+    (jobSheetId: number, reason: string, suppliedClaimToken?: string) => {
+      const claimToken =
+        suppliedClaimToken ??
+        (reviewClaim?.jobSheetId === jobSheetId
+          ? reviewClaim.token
+          : undefined);
+      approveJobSheet.mutate(
+        {
+          jobSheetId,
+          reason,
+          claimToken,
+          forcePass: true,
+        },
+        {
+          onSuccess: result => {
+            void invalidateAfterSheetAction();
+            if (selectedAuditId === jobSheetId) {
+              goBackToList();
+            }
+            showApproveUndo(
+              jobSheetId,
+              result.previousStatus,
+              result.auditResultId,
+              result.previousAuditResult,
+              {
+                forcePass: true,
+                overriddenFindings: result.overriddenFindings,
+              }
+            );
+          },
+          onError: err => toast.error(err.message || "Override to pass failed"),
         }
       );
     }
@@ -1028,6 +1085,10 @@ export default function AuditResults() {
   const pdfProxyUrl = `/api/documents/${numericId}/pdf`;
 
   const canSheetApprove = jobSheetData.status === "review_queue";
+  // PR-A (PX-109): "Override to pass" is a hard-fail escape hatch, kept
+  // separate from the review_queue-focused Approve/Reject pair so the Hold
+  // Queue flow is unaffected.
+  const canForcePass = jobSheetData.status === "failed";
 
   return (
     <DashboardLayout>
@@ -1092,6 +1153,13 @@ export default function AuditResults() {
             }
             approvePending={approveJobSheet.isPending}
             rejectPending={updateStatus.isPending}
+            showForcePassAction={canForcePass}
+            onForcePassJobSheet={
+              canForcePass
+                ? reason => handleForcePass(numericId, reason)
+                : undefined
+            }
+            forcePassPending={approveJobSheet.isPending}
           />
         </div>
       </div>

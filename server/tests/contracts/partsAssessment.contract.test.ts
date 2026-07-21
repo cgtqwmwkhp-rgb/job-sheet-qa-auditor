@@ -50,6 +50,23 @@ None
 Technician Signature
 `;
 
+const REPAIRS_ONLY_WITH_CONSUMABLES_YES = `
+Job Summary Report
+Repairs Required: Replace cracked hinge
+Consumables Used? Yes
+Parts Used
+None
+Technician Signature
+`;
+
+const PARTS_USED_UNPARSEABLE = `
+Job Summary Report
+Repairs Required: Replace cracked hinge
+Parts Used
+see attached sheet
+Technician Signature
+`;
+
 const NO_PARTS_CONTEXT = `
 Job Summary Report
 All Works Completed? Yes
@@ -131,10 +148,28 @@ describe("evaluatePartsUsed", () => {
     expect(result.findings.some(f => f.ruleId === "PARTS-C012")).toBe(true);
   });
 
-  it("emits PARTS-C012 when parts implied but no complete lines", () => {
+  it("PR-A: softens repairs-only implication (Parts Used empty, Consumables not Yes) to PARTS-C014 informational, not MAJOR PARTS-C012", () => {
     const result = evaluatePartsUsed(IMPLIED_NO_LINES);
-    expect(result.findings.some(f => f.ruleId === "PARTS-C012")).toBe(true);
+    expect(result.findings.some(f => f.ruleId === "PARTS-C012")).toBe(false);
+    const c014 = result.findings.find(f => f.ruleId === "PARTS-C014");
+    expect(c014).toBeDefined();
+    expect(c014?.severity).toBe("S3");
+    expect(c014?.reasonCode).toBe("LOW_CONFIDENCE");
     expect(result.signals.completeCount).toBe(0);
+  });
+
+  it("PR-A: still emits MAJOR PARTS-C012 when Consumables Used is Yes but Parts Used is empty", () => {
+    const result = evaluatePartsUsed(REPAIRS_ONLY_WITH_CONSUMABLES_YES);
+    expect(result.findings.some(f => f.ruleId === "PARTS-C012")).toBe(true);
+    expect(result.findings.some(f => f.ruleId === "PARTS-C014")).toBe(false);
+    const c012 = result.findings.find(f => f.ruleId === "PARTS-C012");
+    expect(c012?.severity).toBe("S1");
+  });
+
+  it("PR-A: still emits MAJOR PARTS-C012 when Parts Used has real but unparseable content", () => {
+    const result = evaluatePartsUsed(PARTS_USED_UNPARSEABLE);
+    expect(result.findings.some(f => f.ruleId === "PARTS-C012")).toBe(true);
+    expect(result.findings.some(f => f.ruleId === "PARTS-C014")).toBe(false);
   });
 
   it("skips when no parts context is implied", () => {
@@ -170,7 +205,7 @@ describe("evaluatePartsUsed", () => {
 });
 
 describe("policy seeds for parts assessment", () => {
-  it("includes PARTS-C010–C013 with correct failClass", () => {
+  it("includes PARTS-C010–C014 with correct failClass", () => {
     const rules = DEFAULT_AUDIT_POLICY.forms["job-summary-v1"].rules;
     expect(rules.find(r => r.ruleId === "PARTS-C010")!.failClass).toBe("minor");
     expect(rules.find(r => r.ruleId === "PARTS-C011")!.failClass).toBe("minor");
@@ -178,6 +213,18 @@ describe("policy seeds for parts assessment", () => {
     expect(rules.find(r => r.ruleId === "PARTS-C013")!.failClass).toBe(
       "informational"
     );
+    expect(rules.find(r => r.ruleId === "PARTS-C014")!.failClass).toBe(
+      "informational"
+    );
+  });
+});
+
+describe("PR-A: PARTS-C014 never blocks AUTO_PASS", () => {
+  it("is not in AUTO_PASS_BLOCKING_RULE_IDS", async () => {
+    const { AUTO_PASS_BLOCKING_RULE_IDS } = await import(
+      "../../services/validation/goldSpecBridge"
+    );
+    expect(AUTO_PASS_BLOCKING_RULE_IDS.has("PARTS-C014")).toBe(false);
   });
 });
 
