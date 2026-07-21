@@ -26,11 +26,38 @@ import {
 } from "../ocrAdapter/azureCustomFormAdapter";
 import { getOCRConfig } from "../ocrAdapter/types";
 import type { Finding } from "../analyzer";
+import type { EmbeddedPdfPageLayout } from "../embeddedPdfText";
+import {
+  readResultColumnRows,
+  readObsMarkRows,
+  mergeChecklistRowSources,
+} from "./checklistReaders";
 
 export const FEATURE_FLAG = "FEATURE_SELECTION_MARKS";
 export const ENGINE_VERSION = "selection-marks-v1";
 /** Engine stamp when custom JSR voter contributes checklist rows. */
 export const ENGINE_VERSION_WITH_CUSTOM_VOTER = "selection-marks-v1+custom-jsr";
+/** Engine stamp when Result-column / Obs. text readers contribute rows. */
+export const ENGINE_VERSION_WITH_TEXT_CHECKLIST =
+  "selection-marks-v1+text-checklist";
+
+export {
+  readResultColumnRows,
+  readObsMarkRows,
+  mergeChecklistRowSources,
+  detectResultColumnBands,
+  detectObsColumnBands,
+  normalizeResultChoice,
+  normalizeObsGlyph,
+  pageLayoutsToTokens,
+  tokensToLines,
+} from "./checklistReaders";
+export {
+  demoteSignOffMissingWhenInkUnverified,
+  wasVlmInkUsed,
+} from "./signOffHonesty";
+export type { SignOffHonestyOptions } from "./signOffHonesty";
+export type { TextChecklistRow, ChecklistRowSource } from "./checklistReaders";
 
 /** Minimum confidence for a Fail mark to drive S1 findings / block auto-PASS. */
 export const FAIL_CONFIDENCE_THRESHOLD = 80;
@@ -201,6 +228,44 @@ export function alignColumnsToMarkCount(
 }
 
 /**
+ * Adaptive Y clustering for dense / long checklists (PX-104 long-list recall).
+ * Fixed 1.5% tolerance merges neighbouring rows on tall grids; shrink toward
+ * the median inter-row gap when marks are dense.
+ */
+export function computeAdaptiveYTolerance(
+  marks: AzureSelectionMark[],
+  fallback = 1.5
+): number {
+  if (marks.length < 12) return fallback;
+
+  const byPage = new Map<number, number[]>();
+  for (const m of marks) {
+    const ys = byPage.get(m.pageNumber) ?? [];
+    ys.push(m.bbox.y + m.bbox.height / 2);
+    byPage.set(m.pageNumber, ys);
+  }
+
+  const rowGaps: number[] = [];
+  for (const ys of Array.from(byPage.values())) {
+    const uniq = Array.from(new Set(ys.map(y => Math.round(y * 10) / 10))).sort(
+      (a, b) => a - b
+    );
+    for (let i = 1; i < uniq.length; i++) {
+      const gap = uniq[i] - uniq[i - 1];
+      // Same-row duplicates are <0.4%; real row gaps are larger
+      if (gap >= 0.45 && gap <= 8) rowGaps.push(gap);
+    }
+  }
+  if (rowGaps.length < 4) return fallback;
+
+  const sorted = [...rowGaps].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  // Cluster tighter than the median gap so adjacent rows do not merge
+  const adaptive = Math.min(fallback, Math.max(0.55, median * 0.42));
+  return adaptive;
+}
+
+/**
  * Cluster marks by Y into rows, then map X-order to Ok/Adv/Fail/N/A.
  *
  * Azure DI often emits *two* marks per radio (outline + fill) at nearly the
@@ -215,11 +280,17 @@ export function mapSelectionMarksToRows(
     yTolerancePercent?: number;
     xTolerancePercent?: number;
     lines?: AzureTextLine[];
+    /** When true (default), tighten Y clustering on dense long lists. */
+    adaptiveYTolerance?: boolean;
   } = {}
 ): SelectionMarkRow[] {
   if (marks.length === 0) return [];
 
-  const yTol = options.yTolerancePercent ?? 1.5;
+  const yTol =
+    options.yTolerancePercent ??
+    (options.adaptiveYTolerance === false
+      ? 1.5
+      : computeAdaptiveYTolerance(marks, 1.5));
   const xTol = options.xTolerancePercent ?? 1.5;
   const columns = inferColumnOrder(options.headerText);
   const lines = options.lines ?? [];
@@ -650,14 +721,58 @@ export function countHighConfidenceFailMarks(
 }
 
 /**
+ * Enrich radio-mapped rows with Result-column / Obs. text readers (PX-104).
+ * Pure helper — also used by contract tests without Azure HTTP.
+ */
+export function enrichRowsWithTextChecklistReaders(
+  radioRows: SelectionMarkRow[],
+  options: {
+    lines?: AzureTextLine[];
+    pageLayouts?: EmbeddedPdfPageLayout[];
+  } = {}
+): {
+  rows: SelectionMarkRow[];
+  textRowsAdded: number;
+  resultRowCount: number;
+  obsRowCount: number;
+  preferredSource: "layout" | "result_column" | "obs_marks" | "merged";
+} {
+  const resultRows = readResultColumnRows({
+    lines: options.lines,
+    pageLayouts: options.pageLayouts,
+  });
+  const obsRows = readObsMarkRows({
+    lines: options.lines,
+    pageLayouts: options.pageLayouts,
+  });
+  const merged = mergeChecklistRowSources({
+    radioRows,
+    resultRows,
+    obsRows,
+  });
+  return {
+    rows: merged.rows,
+    textRowsAdded: merged.textRowsAdded,
+    resultRowCount: resultRows.length,
+    obsRowCount: obsRows.length,
+    preferredSource: merged.preferredSource,
+  };
+}
+
+/**
  * Run layout selection-mark detection for a document URL (fail-soft).
  * When the Azure DI custom JSR model is gated on, runs it as a parallel voter
  * for checklist rows + structured fields.
+ * Also merges Result-column / Obs. ✓✗ text readers (PX-104).
  * Returns null when disabled, not configured, or timed out; never throws.
  */
 export async function runSelectionMarkDetection(
   documentUrl: string,
-  options: { headerText?: string } = {}
+  options: {
+    headerText?: string;
+    /** Text-layer word boxes from Stage 1 (import/use — do not re-parse). */
+    pageLayouts?: EmbeddedPdfPageLayout[];
+  } = {}
 ): Promise<SelectionMarksResult | null> {
   if (!isSelectionMarksEnabled()) return null;
 
@@ -673,7 +788,8 @@ export async function runSelectionMarkDetection(
       !layout.success &&
       (layout.errorCode === "AZURE_DI_NOT_CONFIGURED" ||
         layout.errorCode === "AZURE_DI_TIMEOUT") &&
-      !(custom && custom.success)
+      !(custom && custom.success) &&
+      !(options.pageLayouts && options.pageLayouts.length > 0)
     ) {
       console.warn(
         `[SelectionMarks] skipped: ${layout.errorCode} — ${layout.error}`
@@ -688,15 +804,22 @@ export async function runSelectionMarkDetection(
         .join("\n")
         .slice(0, 4000);
 
-    const layoutRows = mapSelectionMarksToRows(layout.selectionMarks, {
+    const marks =
+      layout.selectionMarks.length > 0
+        ? layout.selectionMarks
+        : (custom?.selectionMarks ?? []);
+    const lines =
+      layout.lines.length > 0 ? layout.lines : (custom?.lines ?? []);
+
+    const layoutRows = mapSelectionMarksToRows(marks, {
       headerText,
-      lines: layout.lines,
+      lines,
     });
 
-    let preferredRows: SelectionMarkRow[] | undefined;
+    let preferredRows: SelectionMarkRow[] | undefined = layoutRows;
     let preferredSource: "layout" | "custom" | "merged" = "layout";
     let engineVersion = ENGINE_VERSION;
-    let model = layout.model;
+    let model = layout.model || "prebuilt-layout";
     let customVoter: SelectionMarksArtifact["customVoter"] | undefined;
     let extraPreExtracted:
       | SelectionMarksResult["preExtractedFields"]
@@ -734,17 +857,39 @@ export async function runSelectionMarkDetection(
       );
     }
 
+    // PX-104: Result-column + Obs. ✓/✗ text readers (layout lines + text layer)
+    const textEnrichment = enrichRowsWithTextChecklistReaders(
+      preferredRows ?? layoutRows,
+      {
+        lines,
+        pageLayouts: options.pageLayouts,
+      }
+    );
+    if (
+      textEnrichment.textRowsAdded > 0 ||
+      textEnrichment.preferredSource !== "layout"
+    ) {
+      preferredRows = textEnrichment.rows;
+      if (textEnrichment.preferredSource !== "layout") {
+        preferredSource = "merged";
+      }
+      engineVersion =
+        engineVersion === ENGINE_VERSION_WITH_CUSTOM_VOTER
+          ? `${ENGINE_VERSION_WITH_CUSTOM_VOTER}+text-checklist`
+          : ENGINE_VERSION_WITH_TEXT_CHECKLIST;
+      if (customVoter) {
+        customVoter = {
+          ...customVoter,
+          preferredSource: "merged",
+        };
+      }
+    }
+
     const processingTimeMs = Math.max(
       layout.processingTimeMs,
       custom?.processingTimeMs ?? 0
     );
 
-    const marks =
-      layout.selectionMarks.length > 0
-        ? layout.selectionMarks
-        : (custom?.selectionMarks ?? []);
-    const lines =
-      layout.lines.length > 0 ? layout.lines : (custom?.lines ?? []);
     const layoutText = layout.layoutText || custom?.layoutText;
 
     const artifact = buildSelectionMarksArtifact(marks, {
