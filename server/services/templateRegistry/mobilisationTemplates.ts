@@ -181,13 +181,30 @@ export function initializePtoServiceTemplate(
     packRelative: PTO_SERVICE_PACK,
     label: "Compliance Checklist PTO Service",
     createdBy,
-    expectedVersion: "1.0.0",
+    // Pack already carries Wave B negatives at 1.1.0; expectedVersion was
+    // stuck at 1.0.0 so MySQL-hydrated pods never re-imported (PX-116).
+    expectedVersion: "1.1.0",
   });
 }
 
 export function hasPtoServiceTemplate(): boolean {
   return hasActiveTemplate(PTO_SERVICE_SLUG);
 }
+
+/** Per-slug pack versions that must be active after boot (PX-116 drift reseed). */
+const FORM_FAMILY_EXPECTED_VERSIONS: Record<
+  (typeof FORM_FAMILY_CATALOG_SLUGS)[number],
+  string
+> = {
+  "ford-service-v1": "1.0.0",
+  "gas-boiler-v1": "1.0.0",
+  "generator-service-v1": "1.0.0",
+  "trailer-service-v1": "1.0.0",
+  "ukpn-v1": "1.0.0",
+  // Wave B LOLER thorough-exam tokens landed in JSON at 1.0.0 without a bump;
+  // 1.1.0 forces MySQL-hydrated pods to re-import selectionConfig (PX-116).
+  "loler-examination-v1": "1.1.0",
+};
 
 /**
  * Ensure Ford / Gas / Generator / Trailer / UKPN / LOLER selection catalogs
@@ -200,10 +217,14 @@ export function initializeFormFamilySelectionCatalogs(createdBy: number = 0): {
   const seeded: string[] = [];
   const skipped: string[] = [];
 
-  const allActive = FORM_FAMILY_CATALOG_SLUGS.every(slug =>
-    hasActiveTemplate(slug)
-  );
-  if (allActive) {
+  const needsReseed = FORM_FAMILY_CATALOG_SLUGS.some(slug => {
+    if (!hasActiveTemplate(slug)) return true;
+    const existing = getTemplateBySlug(slug);
+    const active = existing ? getActiveVersion(existing.id) : null;
+    return active?.version !== FORM_FAMILY_EXPECTED_VERSIONS[slug];
+  });
+
+  if (!needsReseed) {
     return { seeded, skipped: [...FORM_FAMILY_CATALOG_SLUGS] };
   }
 
@@ -218,10 +239,22 @@ export function initializeFormFamilySelectionCatalogs(createdBy: number = 0): {
     }
 
     for (const slug of FORM_FAMILY_CATALOG_SLUGS) {
-      if (hasActiveTemplate(slug)) {
+      const expectedVersion = FORM_FAMILY_EXPECTED_VERSIONS[slug];
+      const existing = getTemplateBySlug(slug);
+      const active = existing ? getActiveVersion(existing.id) : null;
+      if (active?.version === expectedVersion) {
         skipped.push(slug);
         continue;
       }
+
+      if (active) {
+        logger.info("Form-family catalog pack version changed — re-seeding", {
+          slug,
+          activeVersion: active.version,
+          expectedVersion,
+        });
+      }
+
       const created = result.results.find(r => r.templateId === slug);
       const versionId = created?.created.versionDbId;
       if (!versionId) {
@@ -235,6 +268,7 @@ export function initializeFormFamilySelectionCatalogs(createdBy: number = 0): {
       logger.info("Form-family selection catalog activated", {
         templateId: slug,
         versionId,
+        version: expectedVersion,
       });
     }
   } catch (err) {

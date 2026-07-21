@@ -163,49 +163,43 @@ async function startServer() {
   }
 
   // Gold mobilisation: Compliance Checklist PTO Service (tall-page Ok/Adv/Fail/N/A)
-  if (!hasPtoServiceTemplate()) {
+  // Always call initialize — drift-aware expectedVersion reseeds even when active (PX-116).
+  console.log(
+    "[Templates] Ensuring compliance-checklist-pto-service-v1 (drift-aware)..."
+  );
+  const ptoVersionId = initializePtoServiceTemplate();
+  if (ptoVersionId) {
     console.log(
-      "[Templates] Initializing compliance-checklist-pto-service-v1..."
+      `[Templates] compliance-checklist-pto-service-v1 activated (version ID: ${ptoVersionId})`
     );
-    const ptoVersionId = initializePtoServiceTemplate();
-    if (ptoVersionId) {
-      console.log(
-        `[Templates] compliance-checklist-pto-service-v1 activated (version ID: ${ptoVersionId})`
-      );
-    } else if (hasPtoServiceTemplate()) {
-      console.log(
-        "[Templates] compliance-checklist-pto-service-v1 already active"
-      );
-    } else {
-      console.warn(
-        "[Templates] compliance-checklist-pto-service-v1 seed skipped or failed (non-fatal)"
-      );
-    }
-  } else {
+  } else if (hasPtoServiceTemplate()) {
     console.log(
-      "[Templates] compliance-checklist-pto-service-v1 already active"
+      "[Templates] compliance-checklist-pto-service-v1 already active at expected version"
+    );
+  } else {
+    console.warn(
+      "[Templates] compliance-checklist-pto-service-v1 seed skipped or failed (non-fatal)"
     );
   }
 
   // PR4 / PX-105: Ford / Gas / Generator / Trailer / UKPN / LOLER selection catalogs
-  if (!hasFormFamilySelectionCatalogs()) {
+  // Always call initialize — per-slug version drift reseeds LOLER 1.1.0 etc (PX-116).
+  console.log(
+    "[Templates] Ensuring form-family selection catalogs (drift-aware)..."
+  );
+  const familyResult = initializeFormFamilySelectionCatalogs();
+  if (familyResult.seeded.length > 0) {
     console.log(
-      "[Templates] Initializing form-family selection catalogs (PR4)..."
+      `[Templates] Form-family catalogs activated: ${familyResult.seeded.join(", ")}`
     );
-    const familyResult = initializeFormFamilySelectionCatalogs();
-    if (familyResult.seeded.length > 0) {
-      console.log(
-        `[Templates] Form-family catalogs activated: ${familyResult.seeded.join(", ")}`
-      );
-    } else if (hasFormFamilySelectionCatalogs()) {
-      console.log("[Templates] Form-family selection catalogs already active");
-    } else {
-      console.warn(
-        "[Templates] Form-family selection catalog seed skipped or failed (non-fatal)"
-      );
-    }
+  } else if (hasFormFamilySelectionCatalogs()) {
+    console.log(
+      "[Templates] Form-family selection catalogs already active at expected versions"
+    );
   } else {
-    console.log("[Templates] Form-family selection catalogs already active");
+    console.warn(
+      "[Templates] Form-family selection catalog seed skipped or failed (non-fatal)"
+    );
   }
 
   // Phase 1.10: restore in-memory DLQ from durable failed_jobs (fail-safe)
