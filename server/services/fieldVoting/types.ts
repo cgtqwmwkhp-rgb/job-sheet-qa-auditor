@@ -36,11 +36,7 @@ export interface EngineFieldCandidate {
 }
 
 export type VoteDecision =
-  | "consensus"
-  | "majority"
-  | "confidence_gap"
-  | "single"
-  | "abstain";
+  "consensus" | "majority" | "confidence_gap" | "single" | "abstain";
 
 export type VoteReasonCode =
   | "AGREED"

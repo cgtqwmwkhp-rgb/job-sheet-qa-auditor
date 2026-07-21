@@ -250,7 +250,7 @@ export function extractFieldsFromPageLayout(
         .replace(/\s+/g, " ")
         .trim();
       // Strip leading colon leftovers
-      value = value.replace(/^[:.\-]\s*/, "").trim();
+      value = value.replace(/^[:.-]\s*/, "").trim();
       if (!value) continue;
       if (spec.accept && !spec.accept(value)) continue;
 

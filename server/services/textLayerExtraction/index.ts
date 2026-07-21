@@ -101,7 +101,10 @@ export function buildTextLayerResult(
           words: [],
         }));
 
-  let fields = extractLabelAnchoredFields(pageLayouts, JOB_SUMMARY_LABEL_SPECS);
+  const fields = extractLabelAnchoredFields(
+    pageLayouts,
+    JOB_SUMMARY_LABEL_SPECS
+  );
 
   // Document-level plain-text fill for any missing headers
   if (fields.length < 3 && embedded.fullText) {

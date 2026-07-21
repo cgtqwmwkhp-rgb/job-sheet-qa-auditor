@@ -278,8 +278,7 @@ export interface ProcessingOptions {
   skipProgress?: boolean;
 }
 
-export interface OrchestrateJobSheetProcessingRequest
-  extends ProcessingOptions {
+export interface OrchestrateJobSheetProcessingRequest extends ProcessingOptions {
   jobSheetId: number;
   /**
    * Primary HTTP callers already have this from their job sheet lookup. Retry
@@ -1192,9 +1191,8 @@ async function processJobSheetWithOptions(
   let forcedTemplateVersionId = options.templateVersionId;
   if (!options.templateVersionId) {
     try {
-      const { resolveTemplateOverride } = await import(
-        "./templateOverride/overrideService"
-      );
+      const { resolveTemplateOverride } =
+        await import("./templateOverride/overrideService");
       const override = await resolveTemplateOverride(jobSheetId);
       if (override?.versionId) {
         forcedTemplateVersionId = override.versionId;
@@ -2657,8 +2655,7 @@ async function processJobSheetWithOptions(
   let failurePathSignals: FailurePathSignals | null = null;
   let failurePathSignalSummary: string | null = null;
   let commentQualitySignals:
-    | ReturnType<typeof evaluateCommentQuality>["signals"]
-    | null = null;
+    ReturnType<typeof evaluateCommentQuality>["signals"] | null = null;
   let commentQualityResult: ReturnType<typeof evaluateCommentQuality> | null =
     null;
   let commentDeepNote: Awaited<
@@ -2678,16 +2675,13 @@ async function processJobSheetWithOptions(
   let evidenceCoherenceSummary: string | null = null;
   let evidenceFileHashToPersist: string | null = null;
   let engineerAttributionStamp:
-    | ReturnType<typeof evaluateEngineerAttribution>["attribution"]
-    | null = null;
+    ReturnType<typeof evaluateEngineerAttribution>["attribution"] | null = null;
   let partsAssessmentSignals:
-    | ReturnType<typeof evaluatePartsUsed>["signals"]
-    | null = null;
+    ReturnType<typeof evaluatePartsUsed>["signals"] | null = null;
   let partsAssessmentSummary: string | null = null;
   let partsLinesToPersist: ReturnType<typeof parsePartsUsedLines> = [];
   let partsCatalogSignals:
-    | Awaited<ReturnType<typeof verifyPartsCatalogWeb>>["signals"]
-    | null = null;
+    Awaited<ReturnType<typeof verifyPartsCatalogWeb>>["signals"] | null = null;
   let partsCatalogSummary: string | null = null;
   let partsCatalogLineResults: ReturnType<
     typeof toPersistedPartsCatalogLineResults
@@ -3614,9 +3608,7 @@ async function processJobSheetWithOptions(
       templateVersionId: lineageFinal.templateVersionId,
       runId,
       result: analysisResult.overallResult.toLowerCase() as
-        | "pass"
-        | "fail"
-        | "review_queue",
+        "pass" | "fail" | "review_queue",
       confidenceScore: String(analysisResult.score),
       documentStrategy: toDbDocumentStrategy(documentStrategyLogical),
       ocrEngineVersion: getOCREngineVersion(
@@ -3765,8 +3757,8 @@ async function processJobSheetWithOptions(
             isGeminiMultimodalEnabled() &&
             Boolean(
               sharedPdfBuffer &&
-                sharedPdfBuffer.length > 0 &&
-                sharedPdfBuffer.length <= VLM_PDF_MAX_BYTES
+              sharedPdfBuffer.length > 0 &&
+              sharedPdfBuffer.length <= VLM_PDF_MAX_BYTES
             ),
         },
         ...(pipelineIntegrationResult
