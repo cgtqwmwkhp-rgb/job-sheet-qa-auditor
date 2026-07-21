@@ -112,14 +112,16 @@ export function serveStatic(app: Express) {
   );
 
   // fall through to index.html if the file doesn't exist
-  // Skip .auth routes - these are handled by Azure Easy Auth middleware
-  app.use("*", (req, res, next) => {
+  // Skip .auth routes - these are handled by Azure Easy Auth middleware.
+  // Use a bare middleware (not app.use("*")) so req.originalUrl stays the
+  // real request path — under "*", Express can make req.path unusable.
+  app.use((req, res, next) => {
     // Don't intercept Azure Easy Auth routes
     if (req.originalUrl.startsWith("/.auth")) {
       return next();
     }
 
-    const pathname = (req.path || req.originalUrl || "").split("?")[0];
+    const pathname = (req.originalUrl || req.url || "").split("?")[0];
 
     // Critical: never SPA-fallback hashed build assets. After a deploy, stale
     // clients request old chunk names; serving index.html as text/html makes

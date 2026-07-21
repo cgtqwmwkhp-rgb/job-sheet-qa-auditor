@@ -73,6 +73,9 @@ describe("Cache Headers Contract", () => {
       expect(viteContent).toContain('pathname.startsWith("/assets/")');
       expect(viteContent).toContain(".status(404)");
       expect(viteContent).toContain("Not found");
+      // Must use originalUrl — req.path is unreliable under app.use("*")
+      expect(viteContent).toContain("req.originalUrl");
+      expect(viteContent).not.toMatch(/app\.use\(\s*"\*"\s*,/);
     });
 
     it("should denylist .auth from PWA navigation fallback", () => {
