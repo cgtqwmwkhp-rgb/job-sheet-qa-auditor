@@ -1,11 +1,12 @@
 /**
  * Template Studio — propose template fields/rules/ROI/tokens from a sample PDF.
  *
- * Live-engine unity (same split as documentProcessor production path):
- * 1. Live OCR text truth via extractTextFromDocument (Mistral primary by default)
- * 2. Azure DI layout geometry (+ selection marks) for ROI placement
- * 3. Heuristic seed from fallback/starter + live-OCR labels
- * 4. Optional Gemini structured propose (skipped cleanly when no API key)
+ * Live-engine unity (aligned with documentProcessor production path):
+ * 1. Text-layer-first geometry + text when born-digital (PX-105 / PR1)
+ * 2. Live OCR text truth via extractTextFromDocument (scans / thin text)
+ * 3. Azure DI layout geometry (+ selection marks) fallback for ROI placement
+ * 4. Heuristic seed from fallback/starter + text-truth labels
+ * 5. Optional Gemini structured propose (skipped cleanly when no API key)
  *
  * Authors must tune ROIs against the same text truth production audits read.
  * Never silently invents Fail/UNREADABLE without evidence — confidence + sources shown.
@@ -17,6 +18,11 @@ import {
   mapSelectionMarksToRows,
   type SelectionMarkRow,
 } from "../selectionMarks";
+import {
+  extractTextLayerFromUrl,
+  type TextLayerExtractionResult,
+} from "../textLayerExtraction";
+import type { EmbeddedPdfTextResult } from "../embeddedPdfText";
 import type {
   SpecJson,
   SelectionConfig,
@@ -34,11 +40,16 @@ import {
   suggestRoiFromLayoutEvidence,
   type ProposedRoiRegion,
 } from "./roiProposeFromLayout";
+import {
+  suggestRoiFromTextLayerEvidence,
+  textLayerGeometryAvailable,
+} from "./roiProposeFromTextLayer";
 
 export type { ProposedRoiRegion } from "./roiProposeFromLayout";
 
 /** Where field/token heuristics sourced their document text. */
 export type StudioTextTruthSource =
+  | "text-layer"
   | "live-ocr"
   | "azure-layout-fallback"
   | "none";
@@ -70,7 +81,7 @@ export interface ProposalArtifact {
   /** Provider/model id when live OCR succeeded (e.g. mistral / model name). */
   textTruthProvider?: string;
   /** Geometry source used for ROI placement. */
-  geometrySource: "azure-layout" | "none";
+  geometrySource: "text-layer" | "azure-layout" | "none";
   selectionMarkRows: Array<{
     rowIndex: number;
     label?: string;
@@ -429,11 +440,19 @@ export async function proposeFromSample(input: {
   let lines: string[] = [];
   let geometrySource: ProposalArtifact["geometrySource"] = "none";
 
+  let textLayerResult: TextLayerExtractionResult | null = null;
+  let embedded: EmbeddedPdfTextResult | null = null;
+
   if (!sample) {
     layoutError = "No sample attached — using starter proposal only";
   } else {
-    // Same dual-engine split as live audits: primary OCR text + Azure geometry.
-    const [ocrResult, layout] = await Promise.all([
+    // Prefer text-layer geometry (PX-105) when born-digital; keep Azure for scans/checklists.
+    const [textLayerBundle, ocrResult, layout] = await Promise.all([
+      extractTextLayerFromUrl(sample.url).catch(() => ({
+        buffer: null,
+        embedded: null,
+        result: null as TextLayerExtractionResult | null,
+      })),
       extractTextFromDocument(sample.url).catch(err => ({
         success: false as const,
         pages: [] as Array<{ pageNumber: number; markdown: string }>,
@@ -444,6 +463,9 @@ export async function proposeFromSample(input: {
       })),
       extractLayoutSelectionMarks(sample.url),
     ]);
+
+    textLayerResult = textLayerBundle.result;
+    embedded = textLayerBundle.embedded;
 
     if (ocrResult.success && ocrResult.pages.length > 0) {
       liveOcrText = joinLiveOcrPages(ocrResult.pages);
@@ -478,18 +500,27 @@ export async function proposeFromSample(input: {
           layoutError,
           "Azure DI layout returned no text geometry (0 lines/words with polygons). Cannot place accurate ROIs — draw manually or re-attach sample and retry Suggest fields."
         );
-        // Keep layoutAvailable for token heuristics fallback, but ROI path needs geometry
       } else {
         geometrySource = "azure-layout";
       }
     }
   }
 
-  const textTruthSource: StudioTextTruthSource = liveOcrText
-    ? "live-ocr"
-    : azureLayoutText || lines.length
-      ? "azure-layout-fallback"
-      : "none";
+  const textLayerText = textLayerResult?.fullText?.trim() || "";
+  const preferTextLayerTruth =
+    Boolean(textLayerText) &&
+    (textLayerResult?.classification.skipPrimaryOcr === true ||
+      (textLayerResult?.classification.digitalPageCount ?? 0) > 0);
+
+  const textTruthSource: StudioTextTruthSource = preferTextLayerTruth
+    ? "text-layer"
+    : liveOcrText
+      ? "live-ocr"
+      : azureLayoutText || lines.length
+        ? "azure-layout-fallback"
+        : textLayerText
+          ? "text-layer"
+          : "none";
 
   if (textTruthSource === "azure-layout-fallback") {
     layoutError = appendLayoutError(
@@ -498,8 +529,17 @@ export async function proposeFromSample(input: {
     );
   }
 
-  // Prefer live OCR (production text truth); Azure layout text is geometry-only fallback.
-  const searchText = liveOcrText || azureLayoutText || lines.join("\n");
+  // Prefer text-layer (born-digital) → live OCR → Azure layout text.
+  const searchText =
+    (preferTextLayerTruth ? textLayerText : "") ||
+    liveOcrText ||
+    textLayerText ||
+    azureLayoutText ||
+    lines.join("\n");
+
+  if (preferTextLayerTruth && textTruthSource === "text-layer") {
+    liveOcrProvider = liveOcrProvider || "text-layer";
+  }
 
   const hasChecklistGrid =
     selectionMarkRows.length >= 3 ||
@@ -521,9 +561,13 @@ export async function proposeFromSample(input: {
     });
   }
 
-  // Boost / add from label heuristics against live text truth
+  // Boost / add from label heuristics against text truth
   const labelSource =
-    textTruthSource === "live-ocr" ? "live-ocr-label" : "ocr-label";
+    textTruthSource === "text-layer"
+      ? "text-layer-label"
+      : textTruthSource === "live-ocr"
+        ? "live-ocr-label"
+        : "ocr-label";
   for (const mapping of LABEL_TO_FIELD) {
     if (!mapping.re.test(searchText)) continue;
     const existing = proposedFields.find(p => p.field.field === mapping.field);
@@ -633,18 +677,43 @@ export async function proposeFromSample(input: {
     "compliance",
   ].filter((t, i, arr) => arr.indexOf(t) === i);
 
-  const roiGeometryAvailable = layoutAvailable && layoutLines.length > 0;
-  const roiRegions = suggestRoiFromLayoutEvidence({
-    lines: layoutLines,
-    selectionRows: selectionMarkRows,
-    hasChecklist: hasChecklistGrid,
-    layoutAvailable: roiGeometryAvailable,
-    // Gate ROI field placement on production text truth when available
-    textTruth: liveOcrText || undefined,
-  });
+  const pageLayouts = embedded?.pageLayouts ?? [];
+  const hasTextLayerGeom = textLayerGeometryAvailable(pageLayouts);
+  let roiRegions: ProposedRoiRegion[] = [];
+
+  // PX-105: prefer text-layer word boxes / label anchors over Azure page bands
+  if (hasTextLayerGeom) {
+    roiRegions = suggestRoiFromTextLayerEvidence({
+      pageLayouts,
+      groundedFields: textLayerResult?.fields ?? [],
+      selectionRows: selectionMarkRows,
+      hasChecklist: hasChecklistGrid,
+      textTruth: searchText || undefined,
+    });
+    if (roiRegions.length > 0) {
+      geometrySource = "text-layer";
+      layoutAvailable = true;
+    }
+  }
+
+  const azureGeometryAvailable = layoutAvailable && layoutLines.length > 0;
+  if (roiRegions.length === 0 && azureGeometryAvailable) {
+    roiRegions = suggestRoiFromLayoutEvidence({
+      lines: layoutLines,
+      selectionRows: selectionMarkRows,
+      hasChecklist: hasChecklistGrid,
+      layoutAvailable: true,
+      textTruth: searchText || undefined,
+    });
+    if (roiRegions.length > 0) {
+      geometrySource = "azure-layout";
+    }
+  }
+
   if (
+    !hasTextLayerGeom &&
     layoutAvailable &&
-    !roiGeometryAvailable &&
+    !azureGeometryAvailable &&
     !layoutError?.includes("no text geometry")
   ) {
     layoutError = appendLayoutError(
@@ -652,10 +721,10 @@ export async function proposeFromSample(input: {
       "OCR layout had no usable line geometry for ROI placement"
     );
   }
-  if (roiGeometryAvailable && roiRegions.length === 0) {
+  if ((hasTextLayerGeom || azureGeometryAvailable) && roiRegions.length === 0) {
     layoutError = appendLayoutError(
       layoutError,
-      "OCR geometry present but no field labels matched live text truth — draw ROIs manually using Draw labels tooltips."
+      "Geometry present but no tight field ROIs matched (oversized blobs rejected) — draw ROIs manually using Draw labels tooltips, or re-attach a born-digital sample."
     );
   }
 

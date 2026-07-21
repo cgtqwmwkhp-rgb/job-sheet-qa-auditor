@@ -24,12 +24,24 @@ const JOB_SUMMARY_SLUG = "job-summary-v1";
 const WASTED_JOURNEY_SLUG = "wasted-journey-v1";
 const PTO_SERVICE_SLUG = "compliance-checklist-pto-service-v1";
 
+/** Form-family selection catalogs (PX-105 / PR4) — distinctive tokens after extract. */
+export const FORM_FAMILY_CATALOG_SLUGS = [
+  "ford-service-v1",
+  "gas-boiler-v1",
+  "generator-service-v1",
+  "trailer-service-v1",
+  "ukpn-v1",
+  "loler-examination-v1",
+] as const;
+
 const JOB_SUMMARY_PACK =
   "data/templates-mobilisation/job-summary-import-pack.json";
 const WASTED_JOURNEY_PACK =
   "data/templates-mobilisation/wasted-journey-import-pack.json";
 const PTO_SERVICE_PACK =
   "data/templates-mobilisation/compliance-checklist-pto-service-import-pack.json";
+const FORM_FAMILY_CATALOGS_PACK =
+  "data/templates-mobilisation/form-family-selection-catalogs-import-pack.json";
 
 function resolvePackPath(relativePath: string, label: string): string {
   const candidates = [
@@ -175,4 +187,65 @@ export function initializePtoServiceTemplate(
 
 export function hasPtoServiceTemplate(): boolean {
   return hasActiveTemplate(PTO_SERVICE_SLUG);
+}
+
+/**
+ * Ensure Ford / Gas / Generator / Trailer / UKPN / LOLER selection catalogs
+ * are imported and active. Idempotent per slug; re-seeds when version drifts.
+ */
+export function initializeFormFamilySelectionCatalogs(createdBy: number = 0): {
+  seeded: string[];
+  skipped: string[];
+} {
+  const seeded: string[] = [];
+  const skipped: string[] = [];
+
+  const allActive = FORM_FAMILY_CATALOG_SLUGS.every(slug =>
+    hasActiveTemplate(slug)
+  );
+  if (allActive) {
+    return { seeded, skipped: [...FORM_FAMILY_CATALOG_SLUGS] };
+  }
+
+  try {
+    const pack = loadPack(FORM_FAMILY_CATALOGS_PACK, "Form-family catalogs");
+    const result = importBulkPack(pack, createdBy);
+    if (!result.success || result.failureCount > 0) {
+      logger.warn("Form-family catalog pack import failed", {
+        errors: result.results.flatMap(r => r.errors ?? []),
+      });
+      return { seeded, skipped: [...FORM_FAMILY_CATALOG_SLUGS] };
+    }
+
+    for (const slug of FORM_FAMILY_CATALOG_SLUGS) {
+      if (hasActiveTemplate(slug)) {
+        skipped.push(slug);
+        continue;
+      }
+      const created = result.results.find(r => r.templateId === slug);
+      const versionId = created?.created.versionDbId;
+      if (!versionId) {
+        logger.warn("Form-family catalog missing version after import", {
+          slug,
+        });
+        continue;
+      }
+      activateVersion(versionId);
+      seeded.push(slug);
+      logger.info("Form-family selection catalog activated", {
+        templateId: slug,
+        versionId,
+      });
+    }
+  } catch (err) {
+    logger.warn("Form-family catalog boot seed failed soft", {
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  return { seeded, skipped };
+}
+
+export function hasFormFamilySelectionCatalogs(): boolean {
+  return FORM_FAMILY_CATALOG_SLUGS.every(slug => hasActiveTemplate(slug));
 }

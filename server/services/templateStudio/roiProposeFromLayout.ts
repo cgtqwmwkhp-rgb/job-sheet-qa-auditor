@@ -16,6 +16,7 @@
 
 import type { AzureTextLine } from "../ocrAdapter/parseAzureDiResponse";
 import type { SelectionMarkRow } from "../selectionMarks";
+import { filterOversizedProposedRegions } from "./roiQualityGates";
 // createStudioStarterRoi intentionally NOT used — never invent scaffold positions
 
 export interface ProposedRoiRegion {
@@ -372,6 +373,16 @@ function scoreLabelLine(
   return score;
 }
 
+/**
+ * Giant Azure/layout lines (page-wide bands) are the PX-105 oversized-blob
+ * root cause — never treat them as field labels.
+ */
+function isGiantLayoutLine(line: LayoutLineForRoi): boolean {
+  const w = line.widthPercent ?? 0;
+  const h = line.heightPercent ?? 0;
+  return w > 72 || h > 6 || (w > 55 && (line.content?.length ?? 0) > 90);
+}
+
 function pickBestLine(
   lines: LayoutLineForRoi[],
   re: RegExp,
@@ -380,6 +391,7 @@ function pickBestLine(
   let best: LayoutLineForRoi | null = null;
   let bestScore = -1;
   for (const line of lines) {
+    if (isGiantLayoutLine(line)) continue;
     const score = scoreLabelLine(line, re, reject);
     if (score > bestScore) {
       bestScore = score;
@@ -479,11 +491,14 @@ export function suggestRoiFromLayoutEvidence(input: {
     if (!line) continue;
     const bounds = expandCapture(line, matcher.expand);
 
-    // Skip if this box heavily overlaps an already-accepted region
+    // Skip if this box heavily overlaps an already-accepted *field* region.
+    // Header is a top band — Job Summary Date/Job ID often sit inside it and
+    // must not be suppressed (PX-105).
     const heavyOverlap = regions.some(
       r =>
-        overlapRatio(bounds, r.bounds) > 0.45 ||
-        overlapRatio(r.bounds, bounds) > 0.45
+        r.name !== "header" &&
+        (overlapRatio(bounds, r.bounds) > 0.45 ||
+          overlapRatio(r.bounds, bounds) > 0.45)
     );
     if (heavyOverlap) continue;
 
@@ -579,5 +594,16 @@ export function suggestRoiFromLayoutEvidence(input: {
     }
   }
 
-  return regions;
+  // PX-105: never hand authors a page-tall blob — drop oversized, prefer empty
+  const filtered = filterOversizedProposedRegions(regions);
+  if (
+    filtered.length <= 1 &&
+    regions.length > 0 &&
+    filtered.every(
+      r => r.name === "header" || r.bounds.width * r.bounds.height >= 0.2
+    )
+  ) {
+    return [];
+  }
+  return filtered;
 }

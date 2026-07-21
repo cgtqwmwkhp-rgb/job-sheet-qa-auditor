@@ -429,7 +429,12 @@ interface RoiEditorV2Props {
   specFields?: Array<{ field: string; label: string; type?: string }>;
   /** How current regions were produced — drives accuracy banners */
   roiProvenance?: {
-    mode: "ocr-layout" | "starter-fallback" | "manual" | "unknown";
+    mode:
+      | "text-layer"
+      | "ocr-layout"
+      | "starter-fallback"
+      | "manual"
+      | "unknown";
     ocrPlacedCount?: number;
     fallbackCount?: number;
   };
@@ -1872,20 +1877,35 @@ export function RoiEditorV2({
                 marginBottom: 8,
                 padding: "10px 12px",
                 backgroundColor:
-                  roiProvenance?.mode === "ocr-layout" ? "#ECFDF5" : "#FEF3C7",
+                  roiProvenance?.mode === "text-layer" ||
+                  roiProvenance?.mode === "ocr-layout"
+                    ? "#ECFDF5"
+                    : "#FEF3C7",
                 border:
+                  roiProvenance?.mode === "text-layer" ||
                   roiProvenance?.mode === "ocr-layout"
                     ? "2px solid #10B981"
                     : "2px solid #F59E0B",
                 borderRadius: 8,
                 fontSize: 12,
                 color:
-                  roiProvenance?.mode === "ocr-layout" ? "#064E3B" : "#78350F",
+                  roiProvenance?.mode === "text-layer" ||
+                  roiProvenance?.mode === "ocr-layout"
+                    ? "#064E3B"
+                    : "#78350F",
                 lineHeight: 1.45,
                 fontWeight: 500,
               }}
             >
-              {roiProvenance?.mode === "ocr-layout" ? (
+              {roiProvenance?.mode === "text-layer" ? (
+                <>
+                  <strong>Text-layer word boxes (PX-105).</strong> Each box is
+                  anchored to an embedded PDF label + value — not a page-tall
+                  blob. Oversized auto-map boxes are rejected so Promote-to-live
+                  stays gated until field ROIs are tight. Adjust with edge
+                  resize if a value sits further right than expected.
+                </>
+              ) : roiProvenance?.mode === "ocr-layout" ? (
                 <>
                   <strong>OCR-placed (tight row boxes).</strong> Each box should
                   cover one printed label + its value on the same row — not a

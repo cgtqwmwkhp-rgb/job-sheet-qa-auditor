@@ -18,6 +18,8 @@ import {
   hasWastedJourneyTemplate,
   initializePtoServiceTemplate,
   hasPtoServiceTemplate,
+  initializeFormFamilySelectionCatalogs,
+  hasFormFamilySelectionCatalogs,
   hydrateTemplateRegistryFromMysql,
   assertTemplateRegistryMysqlProdContract,
 } from "../services/templateRegistry";
@@ -183,6 +185,27 @@ async function startServer() {
     console.log(
       "[Templates] compliance-checklist-pto-service-v1 already active"
     );
+  }
+
+  // PR4 / PX-105: Ford / Gas / Generator / Trailer / UKPN / LOLER selection catalogs
+  if (!hasFormFamilySelectionCatalogs()) {
+    console.log(
+      "[Templates] Initializing form-family selection catalogs (PR4)..."
+    );
+    const familyResult = initializeFormFamilySelectionCatalogs();
+    if (familyResult.seeded.length > 0) {
+      console.log(
+        `[Templates] Form-family catalogs activated: ${familyResult.seeded.join(", ")}`
+      );
+    } else if (hasFormFamilySelectionCatalogs()) {
+      console.log("[Templates] Form-family selection catalogs already active");
+    } else {
+      console.warn(
+        "[Templates] Form-family selection catalog seed skipped or failed (non-fatal)"
+      );
+    }
+  } else {
+    console.log("[Templates] Form-family selection catalogs already active");
   }
 
   // Phase 1.10: restore in-memory DLQ from durable failed_jobs (fail-safe)
