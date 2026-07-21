@@ -1,6 +1,6 @@
 /**
  * Activation Gates
- * 
+ *
  * PR-D: Preconditions that must pass before a template version can be activated.
  * Prevents unsafe activation by validating:
  * - Selection config completeness
@@ -8,36 +8,37 @@
  * - Critical ROIs + field↔ROI parity (GIGO)
  */
 
-import type { SpecJson, SelectionConfig, RoiConfig, RoiRegion } from './types';
+import type { SpecJson, SelectionConfig, RoiConfig, RoiRegion } from "./types";
+import { assessRoiConfigQuality } from "../templateStudio/roiQualityGates";
 
 /**
  * Critical fields that must be present in any activated template spec
  */
 export const CRITICAL_FIELDS = [
-  'jobReference',
-  'assetId', 
-  'date',
-  'engineerSignOff',
+  "jobReference",
+  "assetId",
+  "date",
+  "engineerSignOff",
 ] as const;
 
 /**
  * Optional critical fields (warning if missing, not blocking)
  */
 export const RECOMMENDED_FIELDS = [
-  'expiryDate',
-  'complianceTickboxes',
-  'customerSignature',
+  "expiryDate",
+  "complianceTickboxes",
+  "customerSignature",
 ] as const;
 
 /**
  * Critical ROI region names that must be drawn before activate
  */
 export const CRITICAL_ROI_NAMES = [
-  'jobReference',
-  'assetId',
-  'date',
-  'tickboxBlock',
-  'signatureBlock',
+  "jobReference",
+  "assetId",
+  "date",
+  "tickboxBlock",
+  "signatureBlock",
 ] as const;
 
 /**
@@ -74,38 +75,41 @@ export function regionCoversField(region: RoiRegion, fieldId: string): boolean {
   if (region.name === fieldId) return true;
   if (region.fields?.includes(fieldId)) return true;
   // Canonical aliases used in Studio
-  if (fieldId === 'engineerSignOff') {
+  if (fieldId === "engineerSignOff") {
     return (
-      region.name === 'engineerSignature' ||
-      region.name === 'signatureBlock' ||
-      region.fields?.includes('engineerSignOff') === true
+      region.name === "engineerSignature" ||
+      region.name === "signatureBlock" ||
+      region.fields?.includes("engineerSignOff") === true
     );
   }
-  if (fieldId === 'customerSignature') {
+  if (fieldId === "customerSignature") {
     return (
-      region.name === 'customerSignature' ||
-      region.name === 'signatureBlock' ||
-      region.fields?.includes('customerSignature') === true
+      region.name === "customerSignature" ||
+      region.name === "signatureBlock" ||
+      region.fields?.includes("customerSignature") === true
     );
   }
-  if (fieldId === 'complianceTickboxes') {
-    return region.name === 'tickboxBlock' || region.fields?.includes('complianceTickboxes') === true;
+  if (fieldId === "complianceTickboxes") {
+    return (
+      region.name === "tickboxBlock" ||
+      region.fields?.includes("complianceTickboxes") === true
+    );
   }
   // Next Service Date on JSR is the usual stand-in for expiryDate
-  if (fieldId === 'expiryDate') {
+  if (fieldId === "expiryDate") {
     return (
-      region.name === 'expiryDate' ||
-      region.name === 'nextServiceDate' ||
-      region.fields?.includes('expiryDate') === true ||
-      region.fields?.includes('nextServiceDate') === true
+      region.name === "expiryDate" ||
+      region.name === "nextServiceDate" ||
+      region.fields?.includes("expiryDate") === true ||
+      region.fields?.includes("nextServiceDate") === true
     );
   }
-  if (fieldId === 'nextServiceDate') {
+  if (fieldId === "nextServiceDate") {
     return (
-      region.name === 'nextServiceDate' ||
-      region.name === 'expiryDate' ||
-      region.fields?.includes('nextServiceDate') === true ||
-      region.fields?.includes('expiryDate') === true
+      region.name === "nextServiceDate" ||
+      region.name === "expiryDate" ||
+      region.fields?.includes("nextServiceDate") === true ||
+      region.fields?.includes("expiryDate") === true
     );
   }
   return false;
@@ -131,29 +135,38 @@ export function checkActivationPreconditions(
   const fixPaths: Record<string, string> = {};
 
   // Check selection config completeness
-  if (!selectionConfigJson.requiredTokensAll || selectionConfigJson.requiredTokensAll.length === 0) {
-    if (!selectionConfigJson.requiredTokensAny || selectionConfigJson.requiredTokensAny.length === 0) {
+  if (
+    !selectionConfigJson.requiredTokensAll ||
+    selectionConfigJson.requiredTokensAll.length === 0
+  ) {
+    if (
+      !selectionConfigJson.requiredTokensAny ||
+      selectionConfigJson.requiredTokensAny.length === 0
+    ) {
       if (!selectionConfigJson.formCodeRegex) {
         blockingIssues.push({
-          code: 'SELECTION_CONFIG_EMPTY',
-          message: 'Selection config must have at least one of: requiredTokensAll, requiredTokensAny, or formCodeRegex',
+          code: "SELECTION_CONFIG_EMPTY",
+          message:
+            "Selection config must have at least one of: requiredTokensAll, requiredTokensAny, or formCodeRegex",
         });
-        fixPaths['SELECTION_CONFIG_EMPTY'] = 'Add tokens to selectionConfigJson.requiredTokensAll or requiredTokensAny, or add a formCodeRegex pattern';
+        fixPaths["SELECTION_CONFIG_EMPTY"] =
+          "Add tokens to selectionConfigJson.requiredTokensAll or requiredTokensAny, or add a formCodeRegex pattern";
       }
     }
   }
 
   // Check critical fields in spec
   const specFieldIds = new Set(specJson.fields.map(f => f.field));
-  
+
   for (const criticalField of CRITICAL_FIELDS) {
     if (!specFieldIds.has(criticalField)) {
       blockingIssues.push({
-        code: 'MISSING_CRITICAL_FIELD',
+        code: "MISSING_CRITICAL_FIELD",
         message: `Critical field '${criticalField}' is missing from spec`,
         field: criticalField,
       });
-      fixPaths[`MISSING_CRITICAL_FIELD:${criticalField}`] = `Add field definition for '${criticalField}' to specJson.fields`;
+      fixPaths[`MISSING_CRITICAL_FIELD:${criticalField}`] =
+        `Add field definition for '${criticalField}' to specJson.fields`;
     }
   }
 
@@ -161,7 +174,7 @@ export function checkActivationPreconditions(
   for (const recommendedField of RECOMMENDED_FIELDS) {
     if (!specFieldIds.has(recommendedField)) {
       warnings.push({
-        code: 'MISSING_RECOMMENDED_FIELD',
+        code: "MISSING_RECOMMENDED_FIELD",
         message: `Recommended field '${recommendedField}' is missing from spec`,
         field: recommendedField,
       });
@@ -171,9 +184,12 @@ export function checkActivationPreconditions(
   // Check that required fields have validation rules
   const fieldsWithRules = new Set(specJson.rules.map(r => r.field));
   for (const criticalField of CRITICAL_FIELDS) {
-    if (specFieldIds.has(criticalField) && !fieldsWithRules.has(criticalField)) {
+    if (
+      specFieldIds.has(criticalField) &&
+      !fieldsWithRules.has(criticalField)
+    ) {
       warnings.push({
-        code: 'CRITICAL_FIELD_NO_RULE',
+        code: "CRITICAL_FIELD_NO_RULE",
         message: `Critical field '${criticalField}' has no validation rule`,
         field: criticalField,
       });
@@ -183,10 +199,10 @@ export function checkActivationPreconditions(
   // Check spec has at least one rule
   if (specJson.rules.length === 0) {
     blockingIssues.push({
-      code: 'NO_VALIDATION_RULES',
-      message: 'Spec must have at least one validation rule',
+      code: "NO_VALIDATION_RULES",
+      message: "Spec must have at least one validation rule",
     });
-    fixPaths['NO_VALIDATION_RULES'] = 'Add at least one rule to specJson.rules';
+    fixPaths["NO_VALIDATION_RULES"] = "Add at least one rule to specJson.rules";
   }
 
   // --- ROI readiness (GIGO) ---
@@ -194,25 +210,25 @@ export function checkActivationPreconditions(
 
   if (!roiJson || regions.length === 0) {
     blockingIssues.push({
-      code: 'MISSING_ROI_CONFIG',
-      message: 'Template must have ROI regions drawn before activation',
+      code: "MISSING_ROI_CONFIG",
+      message: "Template must have ROI regions drawn before activation",
     });
-    fixPaths['MISSING_ROI_CONFIG'] =
-      'Open Draw regions, place critical ROIs, and Save ROI';
+    fixPaths["MISSING_ROI_CONFIG"] =
+      "Open Draw regions, place critical ROIs, and Save ROI";
   } else {
     for (const roiName of CRITICAL_ROI_NAMES) {
       const found =
-        roiName === 'signatureBlock'
+        roiName === "signatureBlock"
           ? regions.some(
               r =>
-                r.name === 'signatureBlock' ||
-                r.name === 'engineerSignature' ||
-                r.fields?.includes('engineerSignOff')
+                r.name === "signatureBlock" ||
+                r.name === "engineerSignature" ||
+                r.fields?.includes("engineerSignOff")
             )
           : regions.some(r => r.name === roiName);
       if (!found) {
         blockingIssues.push({
-          code: 'MISSING_CRITICAL_ROI',
+          code: "MISSING_CRITICAL_ROI",
           message: `Critical ROI '${roiName}' is missing`,
           field: roiName,
         });
@@ -226,7 +242,7 @@ export function checkActivationPreconditions(
       if (!specFieldIds.has(criticalField)) continue;
       if (!findRegionForField(regions, criticalField)) {
         blockingIssues.push({
-          code: 'CRITICAL_FIELD_NO_ROI',
+          code: "CRITICAL_FIELD_NO_ROI",
           message: `Critical field '${criticalField}' has no matching ROI region`,
           field: criticalField,
         });
@@ -240,7 +256,7 @@ export function checkActivationPreconditions(
       if (!specFieldIds.has(recommendedField)) continue;
       if (!findRegionForField(regions, recommendedField)) {
         warnings.push({
-          code: 'RECOMMENDED_FIELD_NO_ROI',
+          code: "RECOMMENDED_FIELD_NO_ROI",
           message: `Recommended field '${recommendedField}' has no matching ROI`,
           field: recommendedField,
         });
@@ -252,25 +268,47 @@ export function checkActivationPreconditions(
       const covered =
         specFieldIds.has(region.name) ||
         (region.fields ?? []).some(f => specFieldIds.has(f)) ||
-        region.name === 'header' ||
-        region.name === 'tickboxBlock' ||
-        region.name === 'complianceTickboxes' ||
-        region.name === 'signatureBlock' ||
-        region.name === 'completionDetails' ||
-        region.name === 'workDescription' ||
-        region.name === 'partsUsed' ||
-        region.name === 'partsRequired' ||
-        region.name === 'engineerSignature' ||
-        region.name === 'customerSignature' ||
+        region.name === "header" ||
+        region.name === "tickboxBlock" ||
+        region.name === "complianceTickboxes" ||
+        region.name === "signatureBlock" ||
+        region.name === "completionDetails" ||
+        region.name === "workDescription" ||
+        region.name === "partsUsed" ||
+        region.name === "partsRequired" ||
+        region.name === "engineerSignature" ||
+        region.name === "customerSignature" ||
         // Alias: next service covers recommended expiryDate linkage
-        (region.name === 'nextServiceDate' &&
-          (specFieldIds.has('nextServiceDate') ||
-            specFieldIds.has('expiryDate')));
+        (region.name === "nextServiceDate" &&
+          (specFieldIds.has("nextServiceDate") ||
+            specFieldIds.has("expiryDate")));
       if (!covered) {
         warnings.push({
-          code: 'ORPHAN_ROI',
+          code: "ORPHAN_ROI",
           message: `ROI '${region.name}' is not linked to a spec field — rename to a field id or set region.fields`,
           field: region.name,
+        });
+      }
+    }
+
+    // PX-105: gate Promote-to-live / activate on oversized auto-map blobs
+    for (const q of assessRoiConfigQuality(roiJson)) {
+      if (
+        q.code === "OVERSIZED_FIELD_ROI" ||
+        q.code === "OVERSIZED_STRUCTURAL_ROI" ||
+        q.code === "SINGLE_PAGE_BLOB"
+      ) {
+        blockingIssues.push({
+          code: q.code,
+          message: q.message,
+          field: q.field,
+        });
+        fixPaths[q.code + (q.field ? `:${q.field}` : "")] =
+          "Re-run Suggest fields (text-layer word boxes) or redraw tight label+value ROIs — Promote-to-live stays gated until boxes are field-sized";
+      } else if (q.code === "TOO_FEW_FIELD_ROIS") {
+        warnings.push({
+          code: q.code,
+          message: q.message,
         });
       }
     }
@@ -287,11 +325,15 @@ export function checkActivationPreconditions(
 /**
  * Format activation precondition failure as PIPELINE_ERROR message
  */
-export function formatActivationError(result: ActivationPreconditionResult): string {
-  const issues = result.blockingIssues.map(i => `- ${i.code}: ${i.message}`).join('\n');
+export function formatActivationError(
+  result: ActivationPreconditionResult
+): string {
+  const issues = result.blockingIssues
+    .map(i => `- ${i.code}: ${i.message}`)
+    .join("\n");
   const fixes = Object.entries(result.fixPaths)
     .map(([code, path]) => `  ${code}: ${path}`)
-    .join('\n');
-  
+    .join("\n");
+
   return `PIPELINE_ERROR: Activation preconditions not met.\n\nBlocking Issues:\n${issues}\n\nFix Paths:\n${fixes}`;
 }

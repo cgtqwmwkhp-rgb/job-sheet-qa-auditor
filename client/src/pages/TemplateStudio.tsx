@@ -127,7 +127,12 @@ export default function TemplateStudio() {
     fieldCount: number;
     rejectedFieldIds?: string[];
     roiProvenance?: {
-      mode: "ocr-layout" | "starter-fallback" | "manual" | "unknown";
+      mode:
+        | "text-layer"
+        | "ocr-layout"
+        | "starter-fallback"
+        | "manual"
+        | "unknown";
       ocrPlacedCount: number;
       fallbackCount: number;
     };
@@ -285,7 +290,10 @@ export default function TemplateStudio() {
         ? fieldConfs.reduce((a, b) => a + b, 0) / fieldConfs.length
         : (result.proposal.selectionTokens?.confidence ?? 0.5);
     const rois = result.proposal.roiRegions ?? [];
-    const ocrPlacedCount = rois.filter(r => r.source === "ocr-layout").length;
+    const textLayerCount = rois.filter(r => r.source === "text-layer").length;
+    const ocrPlacedCount = rois.filter(
+      r => r.source === "ocr-layout" || r.source === "text-layer"
+    ).length;
     const fallbackCount = rois.filter(
       r => r.source === "starter-roi-fallback"
     ).length;
@@ -293,19 +301,23 @@ export default function TemplateStudio() {
       confidence,
       source: result.proposal.geminiUsed
         ? "Gemini + OCR"
-        : result.proposal.layoutAvailable
-          ? "OCR heuristics"
-          : "Starter scaffold",
+        : textLayerCount > 0
+          ? "Text-layer ROI propose"
+          : result.proposal.layoutAvailable
+            ? "OCR heuristics"
+            : "Starter scaffold",
       fieldCount: result.proposal.proposedSpec.fields.length,
       roiProvenance: {
         mode:
-          ocrPlacedCount > 0
-            ? "ocr-layout"
-            : fallbackCount > 0
-              ? "starter-fallback"
-              : result.proposal.layoutAvailable
-                ? "unknown"
-                : "starter-fallback",
+          textLayerCount > 0
+            ? "text-layer"
+            : ocrPlacedCount > 0
+              ? "ocr-layout"
+              : fallbackCount > 0
+                ? "starter-fallback"
+                : result.proposal.layoutAvailable
+                  ? "unknown"
+                  : "starter-fallback",
         ocrPlacedCount,
         fallbackCount,
       },
@@ -459,7 +471,10 @@ export default function TemplateStudio() {
         await utils.templates.getVersion.invalidate({ versionId });
       }
       const rois = result.proposal.roiRegions ?? [];
-      const ocrPlacedCount = rois.filter(r => r.source === "ocr-layout").length;
+      const textLayerCount = rois.filter(r => r.source === "text-layer").length;
+      const ocrPlacedCount = rois.filter(
+        r => r.source === "ocr-layout" || r.source === "text-layer"
+      ).length;
       const fallbackCount = rois.filter(
         r => r.source === "starter-roi-fallback"
       ).length;
@@ -471,17 +486,21 @@ export default function TemplateStudio() {
             : result.proposal.selectionTokens.confidence,
         source: result.proposal.geminiUsed
           ? "Gemini + OCR"
-          : result.proposal.layoutAvailable
-            ? "OCR heuristics"
-            : "Starter scaffold (no sample OCR)",
+          : textLayerCount > 0
+            ? "Text-layer ROI propose"
+            : result.proposal.layoutAvailable
+              ? "OCR heuristics"
+              : "Starter scaffold (no sample OCR)",
         fieldCount: result.proposal.proposedSpec.fields.length,
         roiProvenance: {
           mode:
-            ocrPlacedCount > 0
-              ? ("ocr-layout" as const)
-              : fallbackCount > 0
-                ? ("starter-fallback" as const)
-                : ("unknown" as const),
+            textLayerCount > 0
+              ? ("text-layer" as const)
+              : ocrPlacedCount > 0
+                ? ("ocr-layout" as const)
+                : fallbackCount > 0
+                  ? ("starter-fallback" as const)
+                  : ("unknown" as const),
           ocrPlacedCount,
           fallbackCount,
         },
@@ -498,16 +517,20 @@ export default function TemplateStudio() {
         (() => {
           const base = result.proposal.geminiUsed
             ? "Gemini + OCR"
-            : result.proposal.layoutAvailable
-              ? "OCR heuristics"
-              : "Starter scaffold (no sample OCR)";
+            : textLayerCount > 0
+              ? "Text-layer ROI propose"
+              : result.proposal.layoutAvailable
+                ? "OCR heuristics"
+                : "Starter scaffold (no sample OCR)";
+          if (textLayerCount > 0)
+            return `${base} · ${textLayerCount} text-layer ROI boxes`;
           if (ocrPlacedCount > 0)
             return `${base} · ${ocrPlacedCount} OCR-placed ROI boxes`;
           if (result.proposal.layoutError) {
             return `ROI not placed — ${result.proposal.layoutError.slice(0, 120)}`;
           }
           if (!result.proposal.layoutAvailable) {
-            return `${base} · ROI empty until OCR geometry works`;
+            return `${base} · ROI empty until geometry works`;
           }
           return `${base} · ROI empty (draw manually)`;
         })()
@@ -541,8 +564,11 @@ export default function TemplateStudio() {
           rejectedFieldIds: Array.from(rejectedFields),
         });
         const rois = result.proposal.roiRegions ?? [];
+        const textLayerCount = rois.filter(
+          r => r.source === "text-layer"
+        ).length;
         const ocrPlacedCount = rois.filter(
-          r => r.source === "ocr-layout"
+          r => r.source === "ocr-layout" || r.source === "text-layer"
         ).length;
         const fallbackCount = rois.filter(
           r => r.source === "starter-roi-fallback"
@@ -564,17 +590,21 @@ export default function TemplateStudio() {
                 result.proposal.selectionTokens.confidence),
           source: result.proposal.geminiUsed
             ? "Gemini + OCR"
-            : result.proposal.layoutAvailable
-              ? "OCR heuristics"
-              : (prev?.source ?? "OCR map"),
+            : textLayerCount > 0
+              ? "Text-layer ROI propose"
+              : result.proposal.layoutAvailable
+                ? "OCR heuristics"
+                : (prev?.source ?? "OCR map"),
           fieldCount: result.proposal.proposedSpec.fields.length,
           roiProvenance: {
             mode:
-              ocrPlacedCount > 0
-                ? ("ocr-layout" as const)
-                : fallbackCount > 0
-                  ? ("starter-fallback" as const)
-                  : ("unknown" as const),
+              textLayerCount > 0
+                ? ("text-layer" as const)
+                : ocrPlacedCount > 0
+                  ? ("ocr-layout" as const)
+                  : fallbackCount > 0
+                    ? ("starter-fallback" as const)
+                    : ("unknown" as const),
             ocrPlacedCount,
             fallbackCount,
           },
@@ -584,7 +614,7 @@ export default function TemplateStudio() {
           setRoiLayoutError(result.proposal.layoutError);
         } else if (ocrPlacedCount === 0) {
           setRoiLayoutError(
-            "OCR ran but could not match field labels on this PDF. Draw boxes manually with Draw labels, or re-attach a clearer sample."
+            "Could not match tight field labels on this PDF (oversized blobs rejected). Draw boxes manually with Draw labels, or re-attach a born-digital sample."
           );
         } else {
           setRoiLayoutError(null);
@@ -596,12 +626,14 @@ export default function TemplateStudio() {
 
         if (ocrPlacedCount > 0) {
           showSuccessToast(
-            "OCR mapped regions",
+            textLayerCount > 0
+              ? "Text-layer mapped regions"
+              : "OCR mapped regions",
             `${ocrPlacedCount} boxes placed from this sample — adjust any that miss`
           );
         } else {
           showErrorToast(
-            "OCR could not place regions",
+            "Could not place regions",
             result.proposal.layoutError?.slice(0, 160) ||
               "Draw boxes manually with Draw labels"
           );
@@ -1373,16 +1405,25 @@ export default function TemplateStudio() {
                 </div>
               )}
 
-              {proposalPreview?.roiProvenance?.mode === "ocr-layout" &&
+              {(proposalPreview?.roiProvenance?.mode === "ocr-layout" ||
+                proposalPreview?.roiProvenance?.mode === "text-layer") &&
                 (proposalPreview.roiProvenance.ocrPlacedCount ?? 0) > 0 && (
                   <div
                     className="rounded-md border-2 border-emerald-500 bg-emerald-50 px-3 py-2 text-xs text-emerald-950"
                     data-testid="studio-roi-ocr-banner"
                   >
-                    <strong>OCR-placed regions loaded.</strong>{" "}
-                    {proposalPreview.roiProvenance.ocrPlacedCount} boxes from
-                    layout evidence — still drag/resize any that miss the
-                    printed field.
+                    <strong>
+                      {proposalPreview.roiProvenance.mode === "text-layer"
+                        ? "Text-layer regions loaded."
+                        : "OCR-placed regions loaded."}
+                    </strong>{" "}
+                    {proposalPreview.roiProvenance.ocrPlacedCount} tight boxes
+                    from{" "}
+                    {proposalPreview.roiProvenance.mode === "text-layer"
+                      ? "embedded word boxes / label anchors"
+                      : "layout evidence"}{" "}
+                    — still drag/resize any that miss the printed field.
+                    Promote-to-live stays gated if any box is oversized.
                   </div>
                 )}
 
@@ -1397,7 +1438,8 @@ export default function TemplateStudio() {
                     data-testid="studio-roi-empty-hint"
                   >
                     No regions yet. Click <strong>OCR map this PDF</strong> to
-                    let Azure DI place boxes, or draw them with Draw labels.
+                    place boxes from text-layer word boxes (born-digital) or
+                    Azure DI layout, or draw them with Draw labels.
                   </div>
                 )}
 

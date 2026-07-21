@@ -1,0 +1,749 @@
+{
+  "packVersion": "1.0.0",
+  "exportedAt": "2026-07-21T09:00:00.000Z",
+  "sourceSystem": "mobilisation-form-family-selection-catalogs",
+  "templates": [
+    {
+      "metadata": {
+        "templateId": "ford-service-v1",
+        "name": "Ford Service / Transit Job Sheet",
+        "description": "Selection catalog for Ford Transit / Ford commercial vehicle service sheets. Prefer text-layer ROI propose after extract; tokens disambiguate from generic Job Summary.",
+        "category": "vehicle-service",
+        "tags": ["ford", "transit", "vehicle", "service", "selection-catalog"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Ford Service Spec",
+        "version": "1.0.0",
+        "fields": [
+          {
+            "field": "jobReference",
+            "label": "Job Reference",
+            "type": "string",
+            "required": true,
+            "extractionHints": [
+              "job id",
+              "job no",
+              "job reference",
+              "work order"
+            ]
+          },
+          {
+            "field": "assetId",
+            "label": "Asset / Registration",
+            "type": "string",
+            "required": true,
+            "extractionHints": ["asset no", "registration", "reg no", "vehicle"]
+          },
+          {
+            "field": "date",
+            "label": "Date",
+            "type": "date",
+            "required": true,
+            "extractionHints": ["date", "service date"]
+          },
+          {
+            "field": "engineerSignOff",
+            "label": "Engineer Sign Off",
+            "type": "boolean",
+            "required": true,
+            "extractionHints": ["technician signature", "engineer sign off"]
+          },
+          {
+            "field": "makeModel",
+            "label": "Make/Model",
+            "type": "string",
+            "required": false,
+            "extractionHints": ["make/model", "ford", "transit"]
+          }
+        ],
+        "rules": [
+          {
+            "ruleId": "FORD-R001",
+            "field": "jobReference",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "FORD-R002",
+            "field": "assetId",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "FORD-R003",
+            "field": "date",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "FORD-R004",
+            "field": "engineerSignOff",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["ford"],
+        "requiredTokensAny": ["transit", "service", "commercial"],
+        "optionalTokens": ["vehicle", "van", "mileage", "plantexpand"],
+        "tokenWeights": {
+          "ford": 16,
+          "transit": 12,
+          "service": 6,
+          "commercial": 5
+        }
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          {
+            "name": "jobReference",
+            "x": 0.05,
+            "y": 0.08,
+            "w": 0.35,
+            "h": 0.04
+          },
+          { "name": "assetId", "x": 0.05, "y": 0.14, "w": 0.35, "h": 0.04 },
+          { "name": "date", "x": 0.65, "y": 0.04, "w": 0.28, "h": 0.04 },
+          { "name": "tickboxBlock", "x": 0.05, "y": 0.3, "w": 0.9, "h": 0.28 },
+          { "name": "signatureBlock", "x": 0.0, "y": 0.85, "w": 1.0, "h": 0.14 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "FORD-PASS-001",
+          "description": "Ford Transit service complete",
+          "inputText": "Ford Transit service commercial vehicle job reference FORD-100 asset id AB12CDE date 15/01/2024 make/model Ford Transit engineer sign off complete",
+          "expectedOutcome": "pass",
+          "required": true
+        },
+        {
+          "caseId": "FORD-FAIL-001",
+          "description": "Wrong family (invoice)",
+          "inputText": "Invoice Number INV-9 Amount Due 100.00",
+          "expectedOutcome": "fail",
+          "required": true
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "templateId": "gas-boiler-v1",
+        "name": "Gas Boiler Service Certificate",
+        "description": "Selection catalog for gas boiler / CP12-style service certificates. Distinctive tokens after text-layer extract.",
+        "category": "gas",
+        "tags": ["gas", "boiler", "cp12", "certificate", "selection-catalog"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Gas Boiler Service Spec",
+        "version": "1.0.0",
+        "fields": [
+          {
+            "field": "jobReference",
+            "label": "Job Reference",
+            "type": "string",
+            "required": true,
+            "extractionHints": ["job id", "job reference", "certificate number"]
+          },
+          {
+            "field": "assetId",
+            "label": "Asset / Boiler ID",
+            "type": "string",
+            "required": true,
+            "extractionHints": ["asset id", "boiler", "appliance"]
+          },
+          {
+            "field": "date",
+            "label": "Service Date",
+            "type": "date",
+            "required": true,
+            "extractionHints": ["date", "service date"]
+          },
+          {
+            "field": "expiryDate",
+            "label": "Next Service Due",
+            "type": "date",
+            "required": false,
+            "extractionHints": ["expiry", "next service", "valid until"]
+          },
+          {
+            "field": "engineerSignOff",
+            "label": "Engineer Sign Off",
+            "type": "boolean",
+            "required": true,
+            "extractionHints": ["engineer sign off", "gas safe"]
+          }
+        ],
+        "rules": [
+          {
+            "ruleId": "GAS-R001",
+            "field": "jobReference",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "GAS-R002",
+            "field": "assetId",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "GAS-R003",
+            "field": "date",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "GAS-R004",
+            "field": "engineerSignOff",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["gas", "boiler"],
+        "requiredTokensAny": ["service", "safety", "certificate", "cp12"],
+        "optionalTokens": ["appliance", "flue", "combustion", "gas-safe"],
+        "tokenWeights": {
+          "gas": 14,
+          "boiler": 14,
+          "certificate": 8,
+          "cp12": 10
+        }
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          {
+            "name": "jobReference",
+            "x": 0.05,
+            "y": 0.08,
+            "w": 0.35,
+            "h": 0.04
+          },
+          { "name": "assetId", "x": 0.05, "y": 0.14, "w": 0.35, "h": 0.04 },
+          { "name": "date", "x": 0.65, "y": 0.04, "w": 0.28, "h": 0.04 },
+          { "name": "expiryDate", "x": 0.65, "y": 0.1, "w": 0.28, "h": 0.04 },
+          { "name": "tickboxBlock", "x": 0.05, "y": 0.3, "w": 0.9, "h": 0.28 },
+          { "name": "signatureBlock", "x": 0.0, "y": 0.85, "w": 1.0, "h": 0.14 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "GAS-PASS-001",
+          "description": "Gas boiler certificate complete",
+          "inputText": "Gas boiler service safety certificate job reference GAS-111 asset id BLR-001 date 2024-01-15 expiry date 2025-01-15 engineer sign off complete",
+          "expectedOutcome": "pass",
+          "required": true
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "templateId": "generator-service-v1",
+        "name": "Generator Service Report",
+        "description": "Selection catalog for backup generator / genset service reports.",
+        "category": "generator",
+        "tags": ["generator", "genset", "backup", "power", "selection-catalog"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Generator Service Spec",
+        "version": "1.0.0",
+        "fields": [
+          {
+            "field": "jobReference",
+            "label": "Job Reference",
+            "type": "string",
+            "required": true,
+            "extractionHints": ["job id", "job reference"]
+          },
+          {
+            "field": "assetId",
+            "label": "Generator Asset ID",
+            "type": "string",
+            "required": true,
+            "extractionHints": ["asset id", "genset", "serial"]
+          },
+          {
+            "field": "date",
+            "label": "Date",
+            "type": "date",
+            "required": true,
+            "extractionHints": ["date", "service date"]
+          },
+          {
+            "field": "engineerSignOff",
+            "label": "Engineer Sign Off",
+            "type": "boolean",
+            "required": true,
+            "extractionHints": ["engineer sign off", "technician signature"]
+          }
+        ],
+        "rules": [
+          {
+            "ruleId": "GEN-R001",
+            "field": "jobReference",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "GEN-R002",
+            "field": "assetId",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "GEN-R003",
+            "field": "date",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "GEN-R004",
+            "field": "engineerSignOff",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["generator"],
+        "requiredTokensAny": ["service", "backup", "power", "genset"],
+        "optionalTokens": ["kva", "load", "hours", "diesel"],
+        "tokenWeights": {
+          "generator": 16,
+          "genset": 12,
+          "backup": 8,
+          "power": 6
+        }
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          {
+            "name": "jobReference",
+            "x": 0.05,
+            "y": 0.08,
+            "w": 0.35,
+            "h": 0.04
+          },
+          { "name": "assetId", "x": 0.05, "y": 0.14, "w": 0.35, "h": 0.04 },
+          { "name": "date", "x": 0.65, "y": 0.04, "w": 0.28, "h": 0.04 },
+          { "name": "tickboxBlock", "x": 0.05, "y": 0.3, "w": 0.9, "h": 0.28 },
+          { "name": "signatureBlock", "x": 0.0, "y": 0.85, "w": 1.0, "h": 0.14 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "GEN-PASS-001",
+          "description": "Generator service complete",
+          "inputText": "Generator service backup power genset job reference GEN-123 asset id GEN-001 date 2024-01-15 engineer sign off complete",
+          "expectedOutcome": "pass",
+          "required": true
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "templateId": "trailer-service-v1",
+        "name": "Trailer / PlantExpand Trailer Service",
+        "description": "Selection catalog for PlantExpand general trailer / DV23-class trailer service sheets (tyre, torque, checklist).",
+        "category": "trailer",
+        "tags": ["trailer", "plantexpand", "dv23", "vor", "selection-catalog"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "Trailer Service Spec",
+        "version": "1.0.0",
+        "fields": [
+          {
+            "field": "jobReference",
+            "label": "Job Reference",
+            "type": "string",
+            "required": true,
+            "extractionHints": ["job id", "job reference"]
+          },
+          {
+            "field": "assetId",
+            "label": "Asset No",
+            "type": "string",
+            "required": true,
+            "extractionHints": ["asset no", "trailer"]
+          },
+          {
+            "field": "date",
+            "label": "Date",
+            "type": "date",
+            "required": true,
+            "extractionHints": ["date", "service date"]
+          },
+          {
+            "field": "engineerSignOff",
+            "label": "Engineer Sign Off",
+            "type": "boolean",
+            "required": true,
+            "extractionHints": ["technician signature", "engineer sign off"]
+          },
+          {
+            "field": "makeModel",
+            "label": "Make/Model",
+            "type": "string",
+            "required": false,
+            "extractionHints": ["make/model", "trailer", "plantexpand"]
+          },
+          {
+            "field": "tyreTreadDepth",
+            "label": "Tyre Tread Depth",
+            "type": "number",
+            "required": false,
+            "extractionHints": ["tyre tread", "tread depth"]
+          }
+        ],
+        "rules": [
+          {
+            "ruleId": "TRL-R001",
+            "field": "jobReference",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "TRL-R002",
+            "field": "assetId",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "TRL-R003",
+            "field": "date",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "TRL-R004",
+            "field": "engineerSignOff",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["trailer"],
+        "requiredTokensAny": ["plantexpand", "service", "general", "dv23"],
+        "optionalTokens": ["tyre", "tread", "torque", "vor", "wheel"],
+        "tokenWeights": {
+          "trailer": 16,
+          "plantexpand": 10,
+          "tyre": 6,
+          "vor": 5
+        }
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          {
+            "name": "jobReference",
+            "x": 0.05,
+            "y": 0.08,
+            "w": 0.35,
+            "h": 0.04
+          },
+          { "name": "assetId", "x": 0.05, "y": 0.14, "w": 0.35, "h": 0.04 },
+          { "name": "date", "x": 0.65, "y": 0.04, "w": 0.28, "h": 0.04 },
+          { "name": "tickboxBlock", "x": 0.05, "y": 0.3, "w": 0.9, "h": 0.28 },
+          { "name": "signatureBlock", "x": 0.0, "y": 0.85, "w": 1.0, "h": 0.14 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "TRL-PASS-001",
+          "description": "PlantExpand trailer service",
+          "inputText": "PlantExpand General Trailer service job reference TRL-200 asset id DV23TRL date 15/01/2024 make/model PlantExpand General Trailer tyre tread depth engineer sign off complete",
+          "expectedOutcome": "pass",
+          "required": true
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "templateId": "ukpn-v1",
+        "name": "UKPN / Network Job Sheet",
+        "description": "Selection catalog for UK Power Networks (UKPN) / DNO network job sheets.",
+        "category": "network",
+        "tags": ["ukpn", "network", "dno", "selection-catalog"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "UKPN Job Sheet Spec",
+        "version": "1.0.0",
+        "fields": [
+          {
+            "field": "jobReference",
+            "label": "Job Reference",
+            "type": "string",
+            "required": true,
+            "extractionHints": ["job id", "job reference", "sap"]
+          },
+          {
+            "field": "assetId",
+            "label": "Asset ID",
+            "type": "string",
+            "required": true,
+            "extractionHints": ["asset id", "equipment", "plant"]
+          },
+          {
+            "field": "date",
+            "label": "Date",
+            "type": "date",
+            "required": true,
+            "extractionHints": ["date", "visit date"]
+          },
+          {
+            "field": "engineerSignOff",
+            "label": "Engineer Sign Off",
+            "type": "boolean",
+            "required": true,
+            "extractionHints": ["engineer sign off", "operative"]
+          }
+        ],
+        "rules": [
+          {
+            "ruleId": "UKPN-R001",
+            "field": "jobReference",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "UKPN-R002",
+            "field": "assetId",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "UKPN-R003",
+            "field": "date",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "UKPN-R004",
+            "field": "engineerSignOff",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["ukpn"],
+        "requiredTokensAny": ["network", "power", "dno", "cable"],
+        "optionalTokens": ["sap", "permit", "switching", "substation"],
+        "tokenWeights": {
+          "ukpn": 18,
+          "network": 8,
+          "dno": 10,
+          "power": 5
+        }
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          {
+            "name": "jobReference",
+            "x": 0.05,
+            "y": 0.08,
+            "w": 0.35,
+            "h": 0.04
+          },
+          { "name": "assetId", "x": 0.05, "y": 0.14, "w": 0.35, "h": 0.04 },
+          { "name": "date", "x": 0.65, "y": 0.04, "w": 0.28, "h": 0.04 },
+          { "name": "tickboxBlock", "x": 0.05, "y": 0.3, "w": 0.9, "h": 0.28 },
+          { "name": "signatureBlock", "x": 0.0, "y": 0.85, "w": 1.0, "h": 0.14 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "UKPN-PASS-001",
+          "description": "UKPN network job",
+          "inputText": "UKPN network power DNO job reference UKPN-55 asset id SUB-01 date 15/01/2024 engineer sign off complete",
+          "expectedOutcome": "pass",
+          "required": true
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "templateId": "loler-examination-v1",
+        "name": "LOLER Examination Report",
+        "description": "Selection catalog for LOLER thorough examination / lifting equipment reports.",
+        "category": "loler",
+        "tags": ["loler", "lifting", "examination", "selection-catalog"]
+      },
+      "version": "1.0.0",
+      "specJson": {
+        "name": "LOLER Examination Spec",
+        "version": "1.0.0",
+        "fields": [
+          {
+            "field": "jobReference",
+            "label": "Job / Certificate Reference",
+            "type": "string",
+            "required": true,
+            "extractionHints": ["job id", "certificate", "report number"]
+          },
+          {
+            "field": "assetId",
+            "label": "Equipment ID",
+            "type": "string",
+            "required": true,
+            "extractionHints": ["asset id", "plant no", "equipment"]
+          },
+          {
+            "field": "date",
+            "label": "Examination Date",
+            "type": "date",
+            "required": true,
+            "extractionHints": ["date", "examination date"]
+          },
+          {
+            "field": "expiryDate",
+            "label": "Next Examination Due",
+            "type": "date",
+            "required": false,
+            "extractionHints": ["next examination", "expiry", "due"]
+          },
+          {
+            "field": "engineerSignOff",
+            "label": "Competent Person Sign Off",
+            "type": "boolean",
+            "required": true,
+            "extractionHints": [
+              "competent person",
+              "engineer sign off",
+              "signature"
+            ]
+          }
+        ],
+        "rules": [
+          {
+            "ruleId": "LOLER-R001",
+            "field": "jobReference",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "LOLER-R002",
+            "field": "assetId",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "LOLER-R003",
+            "field": "date",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          },
+          {
+            "ruleId": "LOLER-R004",
+            "field": "engineerSignOff",
+            "description": "Required",
+            "severity": "critical",
+            "type": "required",
+            "enabled": true
+          }
+        ]
+      },
+      "selectionConfigJson": {
+        "requiredTokensAll": ["loler"],
+        "requiredTokensAny": [
+          "examination",
+          "thorough",
+          "lifting",
+          "equipment"
+        ],
+        "optionalTokens": ["6 month", "12 month", "swl", "competent"],
+        "tokenWeights": {
+          "loler": 18,
+          "thorough": 10,
+          "examination": 8,
+          "lifting": 8
+        }
+      },
+      "roiJson": {
+        "pageIndex": 0,
+        "regions": [
+          {
+            "name": "jobReference",
+            "x": 0.05,
+            "y": 0.08,
+            "w": 0.35,
+            "h": 0.04
+          },
+          { "name": "assetId", "x": 0.05, "y": 0.14, "w": 0.35, "h": 0.04 },
+          { "name": "date", "x": 0.65, "y": 0.04, "w": 0.28, "h": 0.04 },
+          { "name": "expiryDate", "x": 0.65, "y": 0.1, "w": 0.28, "h": 0.04 },
+          { "name": "tickboxBlock", "x": 0.05, "y": 0.3, "w": 0.9, "h": 0.28 },
+          { "name": "signatureBlock", "x": 0.0, "y": 0.85, "w": 1.0, "h": 0.14 }
+        ]
+      },
+      "fixtures": [
+        {
+          "caseId": "LOLER-PASS-001",
+          "description": "LOLER thorough examination",
+          "inputText": "LOLER thorough examination lifting equipment job reference LOL-77 asset id CRANE-1 date 15/01/2024 next examination due 15/07/2024 engineer sign off complete competent person",
+          "expectedOutcome": "pass",
+          "required": true
+        }
+      ]
+    }
+  ]
+}
