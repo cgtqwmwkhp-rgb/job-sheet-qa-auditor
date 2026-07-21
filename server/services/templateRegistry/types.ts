@@ -1,6 +1,6 @@
 /**
  * Template Registry Types
- * 
+ *
  * Type definitions for the template registry system.
  * Provides deterministic template management with versioning.
  */
@@ -8,12 +8,12 @@
 /**
  * Template status values
  */
-export type TemplateStatus = 'draft' | 'active' | 'deprecated' | 'archived';
+export type TemplateStatus = "draft" | "active" | "deprecated" | "archived";
 
 /**
  * Confidence band for template selection
  */
-export type ConfidenceBand = 'HIGH' | 'MEDIUM' | 'LOW';
+export type ConfidenceBand = "HIGH" | "MEDIUM" | "LOW";
 
 /**
  * Selection configuration for template matching
@@ -63,7 +63,7 @@ export interface FieldSpec {
   /** Human-readable label */
   label: string;
   /** Field data type */
-  type: 'string' | 'number' | 'date' | 'boolean' | 'currency' | 'list';
+  type: "string" | "number" | "date" | "boolean" | "currency" | "list";
   /** Whether field is required */
   required: boolean;
   /** Extraction hints for OCR */
@@ -83,9 +83,9 @@ export interface RuleSpec {
   /** Rule description */
   description: string;
   /** Rule severity */
-  severity: 'critical' | 'major' | 'minor' | 'info';
+  severity: "critical" | "major" | "minor" | "info";
   /** Validation type */
-  type: 'required' | 'format' | 'range' | 'pattern' | 'custom' | 'implies';
+  type: "required" | "format" | "range" | "pattern" | "custom" | "implies";
   /** Pattern for format/pattern rules */
   pattern?: string;
   /** Range for range rules */
@@ -98,7 +98,7 @@ export interface RuleSpec {
    * - over: value > min (strict)
    * When omitted, classic min/max (any present bound) applies.
    */
-  boundsMode?: 'between' | 'under' | 'at_least' | 'over';
+  boundsMode?: "between" | "under" | "at_least" | "over";
   /** Measurement unit for range rules (e.g. NM, mm, PSI) */
   unit?: string;
   /** Whether rule is enabled */

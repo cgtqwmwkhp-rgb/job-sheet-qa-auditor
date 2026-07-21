@@ -531,7 +531,7 @@ export function selectTemplateMultiSignal(
       score: adjustedScore,
       matchedTokens: tokenSignal.evidence.matched,
       missingRequired: tokenSignal.evidence.missing,
-      confidence: hardDisqualified ? 'LOW' : multiSignal.confidence,
+      confidence: hardDisqualified ? "LOW" : multiSignal.confidence,
       multiSignal,
     });
   }

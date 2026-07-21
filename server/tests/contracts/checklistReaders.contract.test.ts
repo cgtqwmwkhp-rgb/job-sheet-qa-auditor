@@ -28,7 +28,10 @@ import {
   type SelectionMarkRow,
 } from "../../services/selectionMarks";
 import type { AzureSelectionMark as Mark } from "../../services/ocrAdapter/parseAzureDiResponse";
-import { applyAuditPolicy, DEFAULT_AUDIT_POLICY } from "../../services/auditPolicy";
+import {
+  applyAuditPolicy,
+  DEFAULT_AUDIT_POLICY,
+} from "../../services/auditPolicy";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
