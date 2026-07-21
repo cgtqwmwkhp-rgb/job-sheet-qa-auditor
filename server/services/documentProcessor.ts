@@ -807,7 +807,11 @@ async function processJobSheetWithOptions(
   const ocrStartTime = Date.now();
   let ocrResult: OCRResult;
 
-  if (skippedPrimaryOcr && textLayerResult && textLayerResult.pageTexts.length) {
+  if (
+    skippedPrimaryOcr &&
+    textLayerResult &&
+    textLayerResult.pageTexts.length
+  ) {
     const synthetic = synthesizeOcrResultFromTextLayer(
       textLayerResult.pageTexts,
       { processingTimeMs: Date.now() - ocrStartTime }

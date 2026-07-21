@@ -36,7 +36,15 @@ export const JOB_SUMMARY_LABEL_SPECS: LabelFieldSpec[] = [
   {
     fieldId: "jobReference",
     aliases: ["jobNumber"],
-    labels: ["job id", "job id:", "job no", "job no.", "job number", "job ref", "job reference"],
+    labels: [
+      "job id",
+      "job id:",
+      "job no",
+      "job no.",
+      "job number",
+      "job ref",
+      "job reference",
+    ],
     accept: v => /^[A-Z0-9][A-Z0-9/_-]{1,24}$/i.test(v),
   },
   {
@@ -103,9 +111,7 @@ function findLabelRun(
   for (let i = 0; i < n; i++) {
     let joined = "";
     for (let j = i; j < Math.min(i + 6, n); j++) {
-      joined = normalizeLabel(
-        `${joined}${joined ? " " : ""}${words[j].text}`
-      );
+      joined = normalizeLabel(`${joined}${joined ? " " : ""}${words[j].text}`);
       // Strip trailing colon for comparison flexibility
       const joinedBare = joined.replace(/:$/, "");
       const targetBare = target.replace(/:$/, "");
@@ -365,7 +371,9 @@ export function extractFieldsFromPlainText(
       if (match) {
         // Reject Next Service Date / Expiry Date windows
         const idx = match.index ?? 0;
-        const window = normalized.slice(Math.max(0, idx - 24), idx).toLowerCase();
+        const window = normalized
+          .slice(Math.max(0, idx - 24), idx)
+          .toLowerCase();
         if (
           window.includes("next service") ||
           window.includes("service date") ||

@@ -280,7 +280,7 @@ describe("documentProcessor Stage 1 invert wiring", () => {
   it("stamps logical documentStrategy text_layer and maps DB enum", () => {
     expect(dp).toContain("documentStrategyLogical");
     expect(dp).toContain("toDbDocumentStrategy");
-    expect(dp).toContain('documentStrategy: documentStrategyLogical');
+    expect(dp).toContain("documentStrategy: documentStrategyLogical");
   });
 
   it("wires grounded date gate sourceText into field vote", () => {
@@ -300,8 +300,8 @@ describe("synthesizeOcrResultFromTextLayer", () => {
     expect(syn.provider).toBe("text_layer");
     expect(syn.totalPages).toBe(2);
     expect(syn.pages[0].markdown).toBe("page one");
-    expect(usableTextLength(syn.pages.map(p => p.markdown).join("\n"))).toBeGreaterThan(
-      0
-    );
+    expect(
+      usableTextLength(syn.pages.map(p => p.markdown).join("\n"))
+    ).toBeGreaterThan(0);
   });
 });

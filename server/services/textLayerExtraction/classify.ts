@@ -73,7 +73,9 @@ export function classifyDocument(
       usableChars: 0,
       digitalPageCount: 0,
       scanPageCount: 0,
-      reason: embedded?.error ? `EXTRACT_FAILED:${embedded.error}` : "NO_TEXT_LAYER",
+      reason: embedded?.error
+        ? `EXTRACT_FAILED:${embedded.error}`
+        : "NO_TEXT_LAYER",
     };
   }
 

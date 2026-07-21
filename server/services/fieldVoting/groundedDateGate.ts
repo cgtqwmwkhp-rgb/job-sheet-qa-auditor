@@ -21,7 +21,8 @@ export const DATE_VOTE_FIELD_IDS = new Set([
 
 export const UNGROUNDED_DATE_REASON: VoteReasonCode = "UNGROUNDED_DATE";
 
-const DATE_TOKEN_RE = /\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{4}[./-]\d{1,2}[./-]\d{1,2}/g;
+const DATE_TOKEN_RE =
+  /\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{4}[./-]\d{1,2}[./-]\d{1,2}/g;
 
 /**
  * Normalize date tokens for equality (slashes, case).
@@ -146,7 +147,9 @@ export function isDateCandidateGrounded(
     return (
       dateValueAppearsInText(value, sourceText) &&
       (dateLabelNearValue(value, sourceText, fieldId) ||
-        /text_layer|label_anchor|ocr_regex_date/i.test(candidate.evidence ?? ""))
+        /text_layer|label_anchor|ocr_regex_date/i.test(
+          candidate.evidence ?? ""
+        ))
     );
   }
 
@@ -170,7 +173,9 @@ export function filterGroundedDateCandidates(
   sourceText: string
 ): EngineFieldCandidate[] {
   if (!isDateFieldId(fieldId)) return candidates;
-  return candidates.filter(c => isDateCandidateGrounded(fieldId, c, sourceText));
+  return candidates.filter(c =>
+    isDateCandidateGrounded(fieldId, c, sourceText)
+  );
 }
 
 /**
