@@ -59,4 +59,37 @@ describe("gateSummaryToResult (PX-101)", () => {
     expect(gated.startsWith("Outcome: Needs review.")).toBe(true);
     expect(gated.toLowerCase()).not.toMatch(/meets\s+(?:all\s+)?requirements?/);
   });
+
+  describe("PX-110: grammar — copula + claim must not leave a dangling 'is'", () => {
+    it('does not produce "is does not pass" when a copula precedes the claim', () => {
+      const gated = gateSummaryToResult(
+        "This document is compliant with all specified rules.",
+        "FAIL"
+      );
+      expect(gated.toLowerCase()).not.toMatch(/\bis\s+does\s+not\s+pass\b/);
+      expect(gated.toLowerCase()).toContain("does not pass");
+      expect(gated).toBe(
+        "Outcome: FAIL. This document does not pass with all specified rules."
+      );
+    });
+
+    it('handles "was/are/were + claim" the same way', () => {
+      expect(
+        gateSummaryToResult("The checklist was compliant.", "FAIL")
+      ).toBe("Outcome: FAIL. The checklist does not pass.");
+      expect(
+        gateSummaryToResult("These items are fully compliant.", "FAIL")
+      ).toBe("Outcome: FAIL. These items does not pass.");
+    });
+
+    it("still reads naturally with no copula present", () => {
+      const gated = gateSummaryToResult(
+        "Overall the job sheet passes QA requirements.",
+        "FAIL"
+      );
+      expect(gated).toBe(
+        "Outcome: FAIL. Overall the job sheet does not pass QA requirements."
+      );
+    });
+  });
 });

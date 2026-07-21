@@ -209,11 +209,17 @@ export function runDeterministicValidation(params: {
 /**
  * Wave-6 honesty: these rule IDs must never AUTO_PASS even if severity is
  * remapped or policy failClass is misconfigured.
+ *
+ * PX-067: ATTR-C011 (engineer name extracted but unmatched) is deliberately
+ * excluded — an empty or phantom-only technician roster makes every genuine
+ * engineer name "unmatched" by construction, which would otherwise block
+ * AUTO_PASS on spotless reports for no defect-related reason. The finding
+ * still surfaces for coaching/analytics via ATTR-C010/C011 (minor, score
+ * only) — it just cannot hard-block promotion.
  */
 export const AUTO_PASS_BLOCKING_RULE_IDS = new Set([
   "FAULT-C010",
   "ATTR-C010",
-  "ATTR-C011",
   "PARTS-C010",
   "PARTS-C011",
   "PARTS-C012",

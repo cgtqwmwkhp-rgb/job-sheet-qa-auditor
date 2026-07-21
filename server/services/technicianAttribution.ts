@@ -12,6 +12,20 @@ export interface TechnicianCandidate {
   name: string | null;
   email: string | null;
   role?: string;
+  /**
+   * PX-067/090: "attribution" marks synthetic OCR-derived technician
+   * accounts (created via `ensureAttributionTechnicianUser`), not real
+   * roster members. Callers that have this signal should pass it through
+   * so attribution-gap findings can tell a genuinely empty roster apart
+   * from a roster that is only phantom accounts.
+   */
+  loginMethod?: string | null;
+}
+
+/** True when every candidate is a synthetic OCR-attribution phantom (or the list is empty). */
+export function isPhantomOnlyRoster(candidates: TechnicianCandidate[]): boolean {
+  if (candidates.length === 0) return true;
+  return candidates.every(c => c.loginMethod === "attribution");
 }
 
 export type MatchConfidence = "exact" | "strong" | "probable" | "none";

@@ -44,6 +44,22 @@ function issue(
   };
 }
 
+// PX-109 residual: some templates (e.g. Vacuum-class plant) have technicians
+// write an explicit "not required" style note in Parts Used for a routine
+// visit rather than leaving it blank/"None". sectionHasContent() only
+// recognises bare none/n-a/nil style placeholders, so a note like "Nil
+// required" or "No parts required" was previously treated as unparseable
+// "real content" — over-firing MAJOR PARTS-C012 from a Repairs Required note
+// alone even though no parts were actually implied. Treat these explicit
+// not-required phrasings the same as an empty/None Parts Used section.
+const PARTS_NOT_REQUIRED_RE =
+  /^(?:no(?:t)?\s+parts?\s+(?:required|needed|used)|not\s+(?:required|applicable|needed)|nil\s*(?:required|needed)?|none\s+(?:required|needed)|n\/?a[\s.,-]*(?:required|needed)?)$/i;
+
+function isPartsNotRequiredNote(body: string): boolean {
+  const cleaned = body.replace(/\s+/g, " ").trim();
+  return cleaned.length > 0 && PARTS_NOT_REQUIRED_RE.test(cleaned);
+}
+
 function detectPartsImplied(
   text: string,
   partsUsedPresent: boolean,
@@ -83,7 +99,10 @@ export function evaluatePartsUsed(text: string): PartsAssessmentResult {
 
   const partsUsedBody = extractNamedSection(text, "Parts Used");
   const repairsBody = extractNamedSection(text, "Repairs Required");
-  const partsUsedSection = sectionHasContent(partsUsedBody);
+  const partsNotRequired = isPartsNotRequiredNote(partsUsedBody);
+  const partsUsedSection = partsNotRequired
+    ? { present: false, snippet: "" }
+    : sectionHasContent(partsUsedBody);
   const repairsSection = sectionHasContent(repairsBody);
   const consumablesAnswer = extractCompletionYesNo(text, [
     /Consumables\s+Used\??/i,
@@ -95,7 +114,7 @@ export function evaluatePartsUsed(text: string): PartsAssessmentResult {
     repairsSection.present
   );
 
-  const lines = parsePartsUsedLines(partsUsedBody);
+  const lines = partsNotRequired ? [] : parsePartsUsedLines(partsUsedBody);
   const completeLines = lines.filter(isCompletePartsLine);
   const incompleteLines = lines.filter(line => !isCompletePartsLine(line));
 

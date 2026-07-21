@@ -79,7 +79,6 @@ describe("Wave-6 Issues honesty", () => {
     for (const ruleId of [
       "FAULT-C010",
       "ATTR-C010",
-      "ATTR-C011",
       "PARTS-C020",
       "PARTS-C022",
       "PHOTO-C014",
@@ -104,6 +103,28 @@ describe("Wave-6 Issues honesty", () => {
         })
       ).toBe(false);
     }
+  });
+
+  it("PX-067: ATTR-C011 (unmatched engineer name) no longer blocks AUTO_PASS", () => {
+    const findings = [
+      finding({
+        ruleId: "ATTR-C011",
+        fieldName: "Engineer Attribution (Unmatched)",
+        severity: "S2",
+      }),
+    ];
+    expect(findingsBlockAutoPass(findings)).toBe(false);
+    expect(
+      canPromoteAutoPass({
+        overallResult: "REVIEW_QUEUE",
+        score: 95,
+        threshold: 80,
+        findings,
+        validationPassed: true,
+        hasBlockingFailMarks: false,
+        onlyInformational: true,
+      })
+    ).toBe(true);
   });
 
   it("AUTO_PASS still allowed for pure informational PARTS-C013 / COMMENT-C041", () => {

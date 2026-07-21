@@ -9,6 +9,7 @@
 import type { Finding } from "../analyzer";
 import {
   extractTechnicianNameFromReport,
+  isPhantomOnlyRoster,
   prettifyExtractedName,
   resolveTechnicianMatch,
   type TechnicianCandidate,
@@ -163,14 +164,16 @@ export function evaluateEngineerAttribution(
   const display = stamp.displayName ?? extractedName;
 
   if (match.technicianId == null) {
-    // PR-A: with no real technician roster candidates, a match failure is
-    // an empty-roster artifact, not a genuine unmatched-name defect — skip
-    // ATTR-C011 rather than false-flag every spotless report.
-    if (candidates.length === 0) {
+    // PR-A/PX-067: with no real technician roster candidates — either the
+    // roster is empty, or every candidate is a synthetic OCR-attribution
+    // phantom (no genuine registered technician to match against) — a match
+    // failure is a roster artifact, not a genuine unmatched-name defect.
+    // Skip ATTR-C011 rather than false-flag every spotless report.
+    if (isPhantomOnlyRoster(candidates)) {
       return {
         signals: buildSignals(stamp),
         findings: [],
-        summary: `Engineer name "${display}" extracted but no technician roster candidates were available to match against; ATTR-C011 skipped.`,
+        summary: `Engineer name "${display}" extracted but no real technician roster candidates were available to match against; ATTR-C011 skipped.`,
         attribution: stamp,
       };
     }
