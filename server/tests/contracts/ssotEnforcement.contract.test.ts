@@ -83,7 +83,15 @@ describe('SSOT Enforcement', () => {
       
       expect(goldSpec.name).toBe(DEFAULT_SPEC_JSON.name);
       expect(goldSpec.version).toBe(DEFAULT_SPEC_JSON.version);
-      expect(goldSpec.rules.length).toBe(DEFAULT_SPEC_JSON.rules.length);
+      // PX-113: R-003/R-010 are intentionally disabled (softened legacy
+      // serial/job-number regex patterns that false-fail real PlantExpand
+      // data). specJsonToGoldSpec filters disabled rules by design
+      // (PX-108), so the GoldSpec rule count reflects only enabled rules.
+      const enabledRuleCount = DEFAULT_SPEC_JSON.rules.filter(
+        r => r.enabled !== false
+      ).length;
+      expect(goldSpec.rules.length).toBe(enabledRuleCount);
+      expect(goldSpec.rules.length).toBeLessThan(DEFAULT_SPEC_JSON.rules.length);
       
       // Check rule structure
       const firstRule = goldSpec.rules[0];
@@ -248,19 +256,36 @@ describe('SSOT Enforcement', () => {
       }
     });
 
-    it('should have DEFAULT_SPEC_JSON match legacy getDefaultGoldSpec structure', async () => {
-      // Verify migration accuracy - the default template should have equivalent rules
+    it('should have DEFAULT_SPEC_JSON match legacy getDefaultGoldSpec structure (modulo PX-113 softened rules)', async () => {
+      // Verify migration accuracy - the default template should have equivalent rules,
+      // EXCEPT for rules intentionally softened/disabled post-migration.
+      // PX-113: R-003 (serial number ^SN-\d{5}-[A-Z]{2}$) and R-010 (job
+      // number ^JOB-\d{6}$) false-fail real PlantExpand data (e.g. serial
+      // "WX65VMH", job "218") and are intentionally disabled — this is a
+      // deliberate, documented divergence, not drift.
       const { getDefaultGoldSpec } = await import('../../services/analyzer');
       const legacySpec = getDefaultGoldSpec();
       const newGoldSpec = specJsonToGoldSpec(DEFAULT_SPEC_JSON);
+
+      const softenedRuleIds = new Set(['R-003', 'R-010']);
+      const expectedIds = legacySpec.rules
+        .map(r => r.id)
+        .filter(id => !softenedRuleIds.has(id))
+        .sort();
+
+      // Compare rule count (legacy minus softened)
+      expect(newGoldSpec.rules.length).toBe(
+        legacySpec.rules.length - softenedRuleIds.size
+      );
       
-      // Compare rule count
-      expect(newGoldSpec.rules.length).toBe(legacySpec.rules.length);
-      
-      // Compare rule IDs
-      const legacyIds = legacySpec.rules.map(r => r.id).sort();
+      // Compare rule IDs (legacy minus softened)
       const newIds = newGoldSpec.rules.map(r => r.id).sort();
-      expect(newIds).toEqual(legacyIds);
+      expect(newIds).toEqual(expectedIds);
+
+      // Guard against accidentally softening any *other* legacy rule
+      for (const id of softenedRuleIds) {
+        expect(newIds).not.toContain(id);
+      }
     });
   });
 

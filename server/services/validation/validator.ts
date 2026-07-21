@@ -18,6 +18,41 @@ import { getCorrelationId } from '../../utils/context';
 const VALIDATION_VERSION = '1.0.0';
 
 /**
+ * PX-113: Known human-readable format tokens compiled to real regexes.
+ *
+ * Legacy/default spec rules store `pattern` as a display token (e.g.
+ * "DD/MM/YYYY") rather than a regex source. Passing a token like that
+ * straight into `new RegExp(...)` produces a literal-string matcher that
+ * can never match real dates — it looks for the text "DD/MM/YYYY" itself.
+ * Known tokens are compiled here; anything else falls back to being
+ * treated as literal regex source (the pre-existing behavior for
+ * `pattern`-type rules like `^SN-\d{5}-[A-Z]{2}$`).
+ */
+const KNOWN_FORMAT_TOKEN_PATTERNS: Record<string, RegExp> = {
+  'DD/MM/YYYY': /^\d{1,2}\/\d{1,2}\/\d{4}$/,
+  'MM/DD/YYYY': /^\d{1,2}\/\d{1,2}\/\d{4}$/,
+  'DD-MM-YYYY': /^\d{1,2}-\d{1,2}-\d{4}$/,
+  'MM-DD-YYYY': /^\d{1,2}-\d{1,2}-\d{4}$/,
+  'YYYY-MM-DD': /^\d{4}-\d{2}-\d{2}$/,
+  'YYYY/MM/DD': /^\d{4}\/\d{1,2}\/\d{1,2}$/,
+  'HH:MM': /^([01]?\d|2[0-3]):[0-5]\d$/,
+  'HH:MM:SS': /^([01]?\d|2[0-3]):[0-5]\d:[0-5]\d$/,
+};
+
+/**
+ * Compile a rule `pattern` string into a RegExp.
+ *
+ * Known human-readable format tokens are compiled to their matching regex.
+ * Anything else (e.g. an actual regex source like `^JOB-\d{6}$`) is
+ * compiled as literal regex source, matching pre-existing behavior.
+ */
+function compileFormatPattern(pattern: string): RegExp {
+  const knownToken = KNOWN_FORMAT_TOKEN_PATTERNS[pattern.trim().toUpperCase()];
+  if (knownToken) return knownToken;
+  return new RegExp(pattern);
+}
+
+/**
  * Custom validator registry
  */
 const customValidators: Map<string, (value: any, param?: string) => boolean> = new Map([
@@ -70,7 +105,7 @@ function validateRule(
     case 'pattern':
       if (rule.pattern) {
         try {
-          const regex = new RegExp(rule.pattern);
+          const regex = compileFormatPattern(rule.pattern);
           const stringValue = String(value);
           if (regex.test(stringValue)) {
             return { status: 'passed' };
