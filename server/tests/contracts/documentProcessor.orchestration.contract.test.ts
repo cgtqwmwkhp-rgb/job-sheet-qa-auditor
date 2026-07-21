@@ -29,6 +29,15 @@ describe("documentProcessor orchestration contract", () => {
     expect(deadLetterQueue).not.toContain("reprocessJobSheet(");
   });
 
+  it("remints a fresh SAS from fileKey at orchestrate time", () => {
+    const documentProcessor = readRepoFile(
+      "server/services/documentProcessor.ts"
+    );
+    expect(documentProcessor).toContain("resolveDocumentUrlForProcessing");
+    expect(documentProcessor).toContain("getStorageAdapter");
+    expect(documentProcessor).toContain("fileKey");
+  });
+
   it("keeps pipeline integration behind documentProcessor", () => {
     const documentProcessor = readRepoFile(
       "server/services/documentProcessor.ts"

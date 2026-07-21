@@ -68,4 +68,17 @@ describe("File URL Endpoint Contract", () => {
       expect(getFileUrlSection).toContain("jobSheet.fileUrl");
     });
   });
+
+  describe("reprocess fresh SAS", () => {
+    it("mints a fresh storage URL from fileKey before enqueue/orchestrate", () => {
+      const reprocessSection = routersContent.substring(
+        routersContent.indexOf("reprocess: protectedProcedure"),
+        routersContent.indexOf("reprocess: protectedProcedure") + 2200
+      );
+      expect(reprocessSection).toContain("fileKey");
+      expect(reprocessSection).toContain("getStorageAdapter()");
+      expect(reprocessSection).toContain("storage.get(");
+      expect(reprocessSection).toContain("documentUrl");
+    });
+  });
 });

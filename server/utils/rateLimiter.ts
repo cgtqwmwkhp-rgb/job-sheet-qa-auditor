@@ -607,13 +607,14 @@ export const RATE_LIMITS = {
   },
   upload: {
     windowMs: 60 * 1000,
-    maxRequests: 10,
+    maxRequests: 25,
     message:
       "Upload rate limit exceeded. Please wait before uploading more files.",
   },
   processing: {
     windowMs: 60 * 1000,
-    maxRequests: 5,
+    // Census / UAT reprocess batches need headroom; was 5 and forced multi-window grinds.
+    maxRequests: 20,
     message:
       "Processing rate limit exceeded. Please wait before processing more documents.",
   },
