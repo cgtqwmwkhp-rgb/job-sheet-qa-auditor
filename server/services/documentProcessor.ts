@@ -356,7 +356,7 @@ function resolveAuditTemplateLineage(
 
 /** PX-116: falsifiable deploy stamp (Wave B was invisible while this stayed 2.1.0). */
 const PIPELINE_VERSION = "2.2.0-waveB";
-const WAVE_B_REVISION = "R1";
+const WAVE_B_REVISION = "R2";
 
 function pipelineReportStamps(): {
   pipelineVersion: string;

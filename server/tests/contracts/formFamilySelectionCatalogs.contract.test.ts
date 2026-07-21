@@ -31,7 +31,9 @@ describe("Form-family selection catalogs (PR4)", () => {
       expect(t, slug).toBeTruthy();
       const active = getActiveVersion(t!.id);
       expect(active, slug).toBeTruthy();
-      expect(active!.version).toBe("1.0.0");
+      const expectedVersion =
+        slug === "loler-examination-v1" ? "1.1.0" : "1.0.0";
+      expect(active!.version).toBe(expectedVersion);
 
       const gates = checkActivationPreconditions(
         active!.specJson,
@@ -50,11 +52,26 @@ describe("Form-family selection catalogs (PR4)", () => {
     }
   });
 
-  it("is idempotent on second boot", () => {
+  it("is idempotent on second boot when versions match expected", () => {
     initializeFormFamilySelectionCatalogs();
     const again = initializeFormFamilySelectionCatalogs();
     expect(again.seeded).toEqual([]);
     expect(again.skipped.length).toBe(FORM_FAMILY_CATALOG_SLUGS.length);
+  });
+
+  it("PX-116: LOLER 1.1.0 selectionConfig has empty requiredTokensAll and thorough in any-of", () => {
+    initializeFormFamilySelectionCatalogs();
+    const t = getTemplateBySlug("loler-examination-v1");
+    const active = t ? getActiveVersion(t.id) : null;
+    expect(active?.version).toBe("1.1.0");
+    const sel = active?.selectionConfigJson as {
+      requiredTokensAll?: string[];
+      requiredTokensAny?: string[];
+    };
+    expect(sel.requiredTokensAll ?? []).toEqual([]);
+    expect(sel.requiredTokensAny).toEqual(
+      expect.arrayContaining(["loler", "thorough"])
+    );
   });
 
   it("selects Ford / Gas / Trailer / LOLER by distinctive tokens", () => {
