@@ -422,7 +422,12 @@ export default function AuditResults() {
   });
 
   const showApproveUndo = usePersistFn(
-    (jobSheetId: number, previousStatus: string) => {
+    (
+      jobSheetId: number,
+      previousStatus: string,
+      auditResultId: number,
+      previousAuditResult: "pass" | "fail" | "review_queue" | "waived"
+    ) => {
       toast.success("Job sheet approved", {
         action: {
           label: "Undo",
@@ -431,6 +436,8 @@ export default function AuditResults() {
               {
                 jobSheetId,
                 restoreStatus: previousStatus as JobSheetStatus,
+                auditResultId,
+                restoreAuditResult: previousAuditResult,
               },
               {
                 onSuccess: () => {
@@ -465,7 +472,12 @@ export default function AuditResults() {
             if (selectedAuditId === jobSheetId) {
               goBackToList();
             }
-            showApproveUndo(jobSheetId, result.previousStatus);
+            showApproveUndo(
+              jobSheetId,
+              result.previousStatus,
+              result.auditResultId,
+              result.previousAuditResult
+            );
           },
           onError: err => toast.error(err.message || "Approve failed"),
         }

@@ -23,6 +23,15 @@ describe("upload dedupe + delete (PX-063/088)", () => {
     expect(src).toContain("Cannot delete a sheet that is currently processing");
   });
 
+  it("PX-063: allows staff to purge review_queue sheets orphaned without an audit", () => {
+    expect(src).toContain("isOrphanReviewQueue");
+    expect(src).toContain(
+      "Cannot delete a job sheet with audit findings. Use audit retention controls instead."
+    );
+    // Still blocks review_queue sheets that do have audit findings.
+    expect(src).toContain("getAuditResultByJobSheetId(input.id)");
+  });
+
   it("Upload UI wires delete for stuck pending rows", () => {
     const uploadUi = readFileSync(
       path.resolve(import.meta.dirname, "../../../client/src/pages/Upload.tsx"),

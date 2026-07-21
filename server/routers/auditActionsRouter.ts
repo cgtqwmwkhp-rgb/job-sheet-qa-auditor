@@ -733,6 +733,11 @@ export const auditActionsRouter = router({
             "review_queue",
           ])
           .default("review_queue"),
+        // PX-062: restore the audit result approve overwrote to "pass".
+        auditResultId: z.number().int().positive().optional(),
+        restoreAuditResult: z
+          .enum(["pass", "fail", "review_queue", "waived"])
+          .optional(),
         claimToken: z.string().uuid().optional(),
       })
     )
@@ -748,6 +753,8 @@ export const auditActionsRouter = router({
             jobSheetId: input.jobSheetId,
             userId: ctx.user.id,
             restoreStatus: input.restoreStatus,
+            auditResultId: input.auditResultId,
+            restoreAuditResult: input.restoreAuditResult,
           })
         );
       } catch (err) {

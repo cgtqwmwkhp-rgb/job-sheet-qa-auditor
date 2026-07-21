@@ -236,6 +236,32 @@ describe("Audit Actions Contract (PR-10)", () => {
       expect(content).toContain("handleApprove");
       expect(content).toContain('label: "Undo"');
     });
+
+    it("PX-063: HoldQueue is null-safe for orphan job sheets with no audit", () => {
+      const pagePath = path.resolve(
+        __dirname,
+        "../../../client/src/pages/HoldQueue.tsx"
+      );
+      const content = fs.readFileSync(pagePath, "utf-8");
+      expect(content).toContain("hasNoAudit");
+      expect(content).toContain("No audit");
+      expect(content).toContain("retry: false");
+    });
+
+    it("PX-062: approve/undo wire audit result restore, not just job sheet status", () => {
+      const holdQueue = fs.readFileSync(
+        path.resolve(__dirname, "../../../client/src/pages/HoldQueue.tsx"),
+        "utf-8"
+      );
+      const auditResults = fs.readFileSync(
+        path.resolve(__dirname, "../../../client/src/pages/AuditResults.tsx"),
+        "utf-8"
+      );
+      for (const content of [holdQueue, auditResults]) {
+        expect(content).toContain("restoreAuditResult");
+        expect(content).toContain("auditResultId");
+      }
+    });
   });
 
   describe("helpers", () => {
@@ -480,6 +506,10 @@ describe("Audit Actions Contract (PR-10)", () => {
       expect(result.newStatus).toBe("completed");
       expect(mem.jobSheetStatuses.get(100)).toBe("completed");
       expect(result.undoToken).toContain("undo-js:100:");
+      // PX-062: approve must set the terminal countable "pass" result —
+      // getDashboardStats only counts result === 'pass'.
+      expect(result.previousAuditResult).toBe("fail");
+      expect(mem.audits.get(10)?.result).toBe("pass");
     });
 
     it("allows approval when an open Major has a corrected value", async () => {
@@ -503,20 +533,26 @@ describe("Audit Actions Contract (PR-10)", () => {
         ...mem.findings.get(1)!,
         resolutionStatus: "approved",
       });
-      await approveJobSheet(mem.deps, {
+      const approved = await approveJobSheet(mem.deps, {
         jobSheetId: 100,
         userId: 1,
         previousStatus: "review_queue",
       });
+      expect(mem.audits.get(10)?.result).toBe("pass");
 
       const undone = await undoJobSheetApprove(mem.deps, {
         jobSheetId: 100,
         userId: 1,
         restoreStatus: "review_queue",
+        auditResultId: approved.auditResultId,
+        restoreAuditResult: approved.previousAuditResult,
       });
 
       expect(undone.newStatus).toBe("review_queue");
       expect(mem.jobSheetStatuses.get(100)).toBe("review_queue");
+      // PX-062: undo must restore the audit result approve overwrote, not
+      // just the job sheet status — otherwise pass-rate stays inflated.
+      expect(mem.audits.get(10)?.result).toBe("fail");
     });
   });
 

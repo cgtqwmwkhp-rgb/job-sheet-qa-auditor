@@ -8,8 +8,12 @@
 
 export type SummaryGateOutcome = "PASS" | "FAIL" | "REVIEW_QUEUE" | string;
 
+// PX-101: also strip compliance-flavoured claims ("fully compliant", "meets
+// all requirements") — reviewers phrase honesty violations many ways, and
+// any of these on a FAIL/REVIEW_QUEUE sheet contradicts the outcome exactly
+// like "passes" does.
 const PASS_CLAIM =
-  /\b(passes?|passed|passing|all\s+checks?\s+pass(?:ed)?|audit\s+pass(?:ed|es)?)\b/gi;
+  /\b(passes?|passed|passing|all\s+checks?\s+pass(?:ed)?|audit\s+pass(?:ed|es)?|fully\s+compliant|compliant|compliance|meets\s+(?:all\s+)?requirements?)\b/gi;
 
 function normalizeOutcome(outcome: SummaryGateOutcome): string {
   return String(outcome ?? "")
