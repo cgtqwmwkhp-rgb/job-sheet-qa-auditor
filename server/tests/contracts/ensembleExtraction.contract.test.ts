@@ -379,7 +379,7 @@ Customer Name: Acme Corp
       expect(dp).toContain('stage: "Ensemble Extraction"');
       expect(dp).toContain("runEnsembleExtraction");
       expect(dp).toContain("ensembleExtraction");
-      expect(dp).toContain('PIPELINE_VERSION = "2.1.0"');
+      expect(dp).toContain('PIPELINE_VERSION = "2.2.0-waveB"');
     });
 
     it("PR-A (PX-111): deterministic validation reuses the single ranked FieldAuthority map (JSR-R001–3 honesty)", () => {

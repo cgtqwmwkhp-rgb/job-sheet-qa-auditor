@@ -354,7 +354,19 @@ function resolveAuditTemplateLineage(
   };
 }
 
-const PIPELINE_VERSION = "2.1.0"; // PR-8: ensemble extraction stage
+/** PX-116: falsifiable deploy stamp (Wave B was invisible while this stayed 2.1.0). */
+const PIPELINE_VERSION = "2.2.0-waveB";
+const WAVE_B_REVISION = "R1";
+
+function pipelineReportStamps(): {
+  gitSha: string;
+  waveBRevision: string;
+} {
+  return {
+    gitSha: process.env.GIT_SHA || "unknown",
+    waveBRevision: WAVE_B_REVISION,
+  };
+}
 
 function sha256(input: string | Buffer): string {
   return createHash("sha256").update(input).digest("hex");
@@ -1083,6 +1095,7 @@ async function processJobSheetWithOptions(
         ),
         pipelineVersion: PIPELINE_VERSION,
         reportJson: {
+          ...pipelineReportStamps(),
           summary: hybridResult.llmSummary || hybridResult.reviewExplanation,
           // Keep reportJson compact. Reviewers open the original evidence on demand
           // through the authorized jobSheets.getFileUrl route rather than reading
@@ -1356,6 +1369,7 @@ async function processJobSheetWithOptions(
           ),
           pipelineVersion: PIPELINE_VERSION,
           reportJson: {
+            ...pipelineReportStamps(),
             summary: hybridResult.llmSummary || hybridResult.reviewExplanation,
             documentStrategy: documentStrategyLogical,
             textLayer: textLayerResult
@@ -3710,6 +3724,7 @@ async function processJobSheetWithOptions(
       ),
       pipelineVersion: PIPELINE_VERSION,
       reportJson: {
+        ...pipelineReportStamps(),
         summary: analysisResult.summary,
         documentStrategy: documentStrategyLogical,
         textLayer: textLayerResult
