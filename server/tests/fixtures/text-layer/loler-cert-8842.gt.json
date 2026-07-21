@@ -1,0 +1,12 @@
+{
+  "formId": "loler-cert-8842",
+  "defectRefs": ["PX-106"],
+  "headers": {
+    "assetId": "JCB-CRANE-04",
+    "jobReference": "LOLER-8842",
+    "date": "12/07/2026",
+    "makeModel": "JCB 3CX Backhoe Loader",
+    "customerName": "Acme Construction Ltd",
+    "technicianName": "J. Wilson"
+  }
+}

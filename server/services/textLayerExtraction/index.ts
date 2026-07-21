@@ -106,10 +106,17 @@ export function buildTextLayerResult(
     JOB_SUMMARY_LABEL_SPECS
   );
 
-  // Document-level plain-text fill for any missing headers
-  if (fields.length < 3 && embedded.fullText) {
+  // Document-level plain-text backfill for any canonical header still
+  // missing after geometry-based extraction — always run, regardless of
+  // how many fields (incl. aliases) were already grounded (PX-106).
+  const seen = new Set(fields.map(f => f.fieldId));
+  const canonicalIds = new Set([
+    ...JOB_SUMMARY_LABEL_SPECS.map(s => s.fieldId),
+    ...JOB_SUMMARY_LABEL_SPECS.flatMap(s => s.aliases ?? []),
+  ]);
+  const missingCanonical = Array.from(canonicalIds).some(id => !seen.has(id));
+  if (missingCanonical && embedded.fullText) {
     const fromFull = extractFieldsFromPlainText(embedded.fullText, 1);
-    const seen = new Set(fields.map(f => f.fieldId));
     for (const f of fromFull) {
       if (!seen.has(f.fieldId)) {
         seen.add(f.fieldId);
