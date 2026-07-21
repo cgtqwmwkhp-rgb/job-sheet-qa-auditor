@@ -63,7 +63,7 @@ export function AttrFindingsGroup({
         {extractedName ? (
           <Badge
             variant="outline"
-            className="text-[10px] px-1.5 bg-white/70 text-violet-900 border-violet-200 truncate max-w-[140px]"
+            className="text-[10px] px-1.5 bg-background/70 text-violet-900 border-violet-200 truncate max-w-[140px]"
             title={extractedName}
           >
             {extractedName}
@@ -86,7 +86,7 @@ export function AttrFindingsGroup({
               className={`p-3 rounded-md border cursor-pointer transition-all ${
                 activeBoxId === finding.id
                   ? "ring-2 ring-primary border-primary bg-primary/5"
-                  : "hover:bg-white/80"
+                  : "hover:bg-background/80"
               } ${
                 finding.status === "missing"
                   ? "bg-red-50/60 border-red-200"

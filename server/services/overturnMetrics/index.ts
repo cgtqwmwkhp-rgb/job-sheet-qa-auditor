@@ -24,24 +24,32 @@ export function isOverturnMetricsEnabled(): boolean {
 
 const FINDING_ACTION_PREFIX = "FINDING_";
 
-const OVERTURN_ACTION_SUFFIXES = new Set(["OVERRIDE", "WAIVE"]);
-const AGREEMENT_ACTION_SUFFIXES = new Set(["APPROVE"]);
+/** Single-finding and bulk suffixes (PX-065: bulk must count). */
+const OVERTURN_ACTION_SUFFIXES = new Set([
+  "OVERRIDE",
+  "WAIVE",
+  "BULK_OVERRIDE",
+  "BULK_WAIVE",
+]);
+const AGREEMENT_ACTION_SUFFIXES = new Set(["APPROVE", "BULK_APPROVE"]);
 const FIELD_CORRECTION_ACTION = "FIELD_CORRECTION";
 
 function isFindingAction(action: string): boolean {
   return action.startsWith(FINDING_ACTION_PREFIX);
 }
 
+function findingActionSuffix(action: string): string {
+  return action.slice(FINDING_ACTION_PREFIX.length);
+}
+
 function isOverturnAction(action: string): boolean {
   if (!isFindingAction(action)) return false;
-  const suffix = action.slice(FINDING_ACTION_PREFIX.length);
-  return OVERTURN_ACTION_SUFFIXES.has(suffix);
+  return OVERTURN_ACTION_SUFFIXES.has(findingActionSuffix(action));
 }
 
 function isAgreementAction(action: string): boolean {
   if (!isFindingAction(action)) return false;
-  const suffix = action.slice(FINDING_ACTION_PREFIX.length);
-  return AGREEMENT_ACTION_SUFFIXES.has(suffix);
+  return AGREEMENT_ACTION_SUFFIXES.has(findingActionSuffix(action));
 }
 
 function isFieldCorrection(action: string): boolean {
@@ -51,9 +59,9 @@ function isFieldCorrection(action: string): boolean {
 function classifyOverturnCategory(action: string): OverturnCategory | null {
   if (action === FIELD_CORRECTION_ACTION) return "field_correction";
   if (!isFindingAction(action)) return null;
-  const suffix = action.slice(FINDING_ACTION_PREFIX.length).toLowerCase();
-  if (suffix === "override") return "override";
-  if (suffix === "waive") return "waive";
+  const suffix = findingActionSuffix(action).toLowerCase();
+  if (suffix === "override" || suffix === "bulk_override") return "override";
+  if (suffix === "waive" || suffix === "bulk_waive") return "waive";
   return null;
 }
 

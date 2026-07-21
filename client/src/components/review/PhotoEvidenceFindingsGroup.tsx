@@ -164,7 +164,7 @@ export function PhotoEvidenceFindingsGroup({
               className={`w-full text-left px-2 py-1.5 rounded-md border text-xs flex items-center gap-2 transition-all ${
                 activeBoxId === finding.id
                   ? "ring-2 ring-primary border-primary bg-primary/5"
-                  : "hover:bg-white/80 border-sky-100 bg-white/40"
+                  : "hover:bg-background/80 border-sky-100 bg-background/40"
               }`}
               onClick={() => onFindingClick(finding.id)}
             >

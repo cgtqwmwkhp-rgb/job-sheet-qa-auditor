@@ -108,6 +108,23 @@ describe("Overturn Metrics Contract", () => {
       expect(result.agreementRate).toBeCloseTo(1 / 3);
     });
 
+    it("PX-065: counts FINDING_BULK_* the same as single-finding actions", async () => {
+      const { computeOverturnMetrics } = await import(
+        "../../services/overturnMetrics"
+      );
+
+      const result = computeOverturnMetrics([
+        entry("FINDING_BULK_OVERRIDE"),
+        entry("FINDING_BULK_WAIVE"),
+        entry("FINDING_BULK_APPROVE"),
+      ]);
+
+      expect(result.totalActions).toBe(3);
+      expect(result.overturns).toBe(2);
+      expect(result.agreements).toBe(1);
+      expect(result.overturnRate).toBeCloseTo(2 / 3);
+    });
+
     it("counts FIELD_CORRECTION separately", async () => {
       const { computeOverturnMetrics } = await import(
         "../../services/overturnMetrics"

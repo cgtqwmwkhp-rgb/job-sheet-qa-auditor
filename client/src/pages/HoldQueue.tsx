@@ -35,6 +35,16 @@ import type { ReviewClaimStatus } from "@/hooks/useReviewClaim";
 import { deriveReasonChips } from "@/components/review/holdQueueReasons";
 import { mapHasMajorFailsFromReport } from "@/components/review/mapAuditPolicy";
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type FilterChip = "all" | "critical" | "new_form";
 
@@ -124,8 +134,8 @@ function HoldItemReasonChips({
 
 function priorityBorderClass(item: HoldItem): string {
   if (item.slaBreached) return "border-l-[#DC2626]";
-  if (item.severity === "critical") return "border-l-[#333030]";
-  return "border-l-[#EBE8E8]";
+  if (item.severity === "critical") return "border-l-foreground";
+  return "border-l-border";
 }
 
 function sortByPriority(items: HoldItem[]): HoldItem[] {
@@ -146,6 +156,10 @@ export default function HoldQueue() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterChip, setFilterChip] = useState<FilterChip>("all");
   const [showLegend, setShowLegend] = useState(false);
+  const [bulkApproveConfirmOpen, setBulkApproveConfirmOpen] = useState(false);
+  const [pendingBulkApproveIds, setPendingBulkApproveIds] = useState<number[]>(
+    []
+  );
   const [activeClaim, setActiveClaim] = useState<{
     jobSheetId?: number;
     token?: string;
@@ -409,16 +423,7 @@ export default function HoldQueue() {
     );
   };
 
-  const handleBulkApprove = async () => {
-    const ids =
-      selectedIds.size > 0
-        ? Array.from(selectedIds)
-        : sortedFilteredItems.map(i => i.id);
-    if (ids.length === 0) {
-      toast.error("No items to approve");
-      return;
-    }
-
+  const runBulkApprove = async (ids: number[]) => {
     const results = await Promise.allSettled(
       ids.map(id =>
         approveJobSheet.mutateAsync({
@@ -433,41 +438,62 @@ export default function HoldQueue() {
     await utils.jobSheets.list.invalidate();
     setSelectedIds(new Set());
 
-    const succeeded = results.filter(r => r.status === "fulfilled");
+    const succeeded = results.flatMap(r =>
+      r.status === "fulfilled" ? [r.value] : []
+    );
     const failed = results.filter(r => r.status === "rejected");
 
     if (succeeded.length > 0) {
-      const last = succeeded[succeeded.length - 1];
-      if (last.status === "fulfilled") {
-        toast.success(`Approved ${succeeded.length} job sheet(s)`, {
-          action: {
-            label: "Undo last",
-            onClick: () => {
-              undoApprove.mutate(
-                {
-                  jobSheetId: last.value.jobSheetId,
-                  restoreStatus: last.value.previousStatus as
-                    | "pending"
-                    | "processing"
-                    | "completed"
-                    | "failed"
-                    | "review_queue",
-                },
-                {
-                  onSuccess: () => {
-                    utils.jobSheets.list.invalidate();
-                    toast.success("Last approval undone");
-                  },
+      toast.success(`Approved ${succeeded.length} job sheet(s)`, {
+        action: {
+          label: "Undo all",
+          onClick: () => {
+            void (async () => {
+              let undone = 0;
+              for (const result of succeeded) {
+                try {
+                  await undoApprove.mutateAsync({
+                    jobSheetId: result.jobSheetId,
+                    restoreStatus: result.previousStatus as
+                      | "pending"
+                      | "processing"
+                      | "completed"
+                      | "failed"
+                      | "review_queue",
+                  });
+                  undone++;
+                } catch {
+                  // continue remaining
                 }
-              );
-            },
+              }
+              await utils.jobSheets.list.invalidate();
+              if (undone > 0) {
+                toast.success(`Undid ${undone} approval(s)`);
+              } else {
+                toast.error("Undo failed");
+              }
+            })();
           },
-        });
-      }
+        },
+      });
     }
     if (failed.length > 0) {
       toast.error(`${failed.length} approval(s) failed`);
     }
+  };
+
+  const handleBulkApprove = () => {
+    const ids =
+      selectedIds.size > 0
+        ? Array.from(selectedIds)
+        : sortedFilteredItems.map(i => i.id);
+    if (ids.length === 0) {
+      toast.error("No items to approve");
+      return;
+    }
+    // PX-087: confirm before bulk sheet approve
+    setPendingBulkApproveIds(ids);
+    setBulkApproveConfirmOpen(true);
   };
 
   const toggleSelect = (id: number) => {
@@ -524,13 +550,41 @@ export default function HoldQueue() {
 
   return (
     <DashboardLayout>
+      <AlertDialog
+        open={bulkApproveConfirmOpen}
+        onOpenChange={setBulkApproveConfirmOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bulk approve job sheets?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Approve {pendingBulkApproveIds.length} sheet
+              {pendingBulkApproveIds.length === 1 ? "" : "s"} for release. You
+              can undo all from the success toast.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const ids = pendingBulkApproveIds;
+                setBulkApproveConfirmOpen(false);
+                setPendingBulkApproveIds([]);
+                void runBulkApprove(ids);
+              }}
+            >
+              Approve {pendingBulkApproveIds.length}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <div className="space-y-4" tabIndex={0}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-3xl font-heading font-bold tracking-tight text-[#333030]">
+            <h1 className="text-3xl font-heading font-bold tracking-tight text-foreground">
               Hold Queue
             </h1>
-            <p className="text-[#706D6D] mt-1">
+            <p className="text-muted-foreground mt-1">
               Priority-sorted review queue — SLA breaches and critical items
               first.
             </p>
@@ -538,7 +592,7 @@ export default function HoldQueue() {
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              className="border-[#EBE8E8] text-[#333030] hover:bg-[#F5F4F4]"
+              className="border-border text-foreground hover:bg-accent"
               onClick={() => setShowLegend(v => !v)}
               aria-label="Toggle keyboard shortcuts"
             >
@@ -547,7 +601,7 @@ export default function HoldQueue() {
             </Button>
             <Button
               variant="outline"
-              className="border-[#EBE8E8] text-[#333030] hover:bg-[#F5F4F4]"
+              className="border-border text-foreground hover:bg-accent"
               onClick={() =>
                 setFilterChip(f => (f === "all" ? "critical" : "all"))
               }
@@ -558,7 +612,7 @@ export default function HoldQueue() {
             <Button
               onClick={() => void handleBulkApprove()}
               disabled={approveJobSheet.isPending || totalItems === 0}
-              className="bg-primary text-[#333030] hover:bg-primary/90"
+              className="bg-primary text-foreground hover:bg-primary/90"
             >
               {approveJobSheet.isPending ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -574,17 +628,17 @@ export default function HoldQueue() {
         {showLegend && (
           <ReviewShortcutsLegend
             variant="queue"
-            className="bg-white border border-[#EBE8E8]"
+            className="bg-background border border-border"
           />
         )}
 
         <div className="flex items-center gap-4 flex-wrap">
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[#706D6D]" />
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Search by ID, technician, or site..."
-              className="pl-9 bg-white border-[#EBE8E8]"
+              className="pl-9 bg-background border-border"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
@@ -597,7 +651,7 @@ export default function HoldQueue() {
               className={cn(
                 "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors duration-[var(--duration-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 filterChip === "all"
-                  ? "border-transparent bg-primary text-[#333030] hover:bg-primary/90"
+                  ? "border-transparent bg-primary text-foreground hover:bg-primary/90"
                   : "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80"
               )}
             >
@@ -610,7 +664,7 @@ export default function HoldQueue() {
               className={cn(
                 "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors duration-[var(--duration-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 filterChip === "critical"
-                  ? "border-transparent bg-primary text-[#333030] hover:bg-primary/90"
+                  ? "border-transparent bg-primary text-foreground hover:bg-primary/90"
                   : "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80"
               )}
             >
@@ -623,7 +677,7 @@ export default function HoldQueue() {
               className={cn(
                 "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors duration-[var(--duration-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 filterChip === "new_form"
-                  ? "border-transparent bg-primary text-[#333030] hover:bg-primary/90"
+                  ? "border-transparent bg-primary text-foreground hover:bg-primary/90"
                   : "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80"
               )}
             >
@@ -637,7 +691,7 @@ export default function HoldQueue() {
             )}
             <Link
               href="/analytics/defects"
-              className="text-sm text-[#333030] hover:underline ml-1 font-medium"
+              className="text-sm text-foreground hover:underline ml-1 font-medium"
             >
               Exception analytics
             </Link>
@@ -645,13 +699,13 @@ export default function HoldQueue() {
         </div>
 
         {isLoading && (
-          <Card className="border-[#EBE8E8] bg-white overflow-hidden">
+          <Card className="border-border bg-background overflow-hidden">
             <ListSkeleton items={6} />
           </Card>
         )}
 
         {error && (
-          <Card className="p-12 border-[#EBE8E8]">
+          <Card className="p-12 border-border">
             <div
               role="status"
               aria-live="polite"
@@ -660,13 +714,13 @@ export default function HoldQueue() {
             >
               <AlertCircle className="h-16 w-16 mb-4" />
               <p className="font-semibold">Failed to load review queue</p>
-              <p className="text-sm text-[#706D6D]">{error.message}</p>
+              <p className="text-sm text-muted-foreground">{error.message}</p>
             </div>
           </Card>
         )}
 
         {!isLoading && !error && holdItems.length === 0 && (
-          <Card className="p-4 border-[#EBE8E8] bg-white">
+          <Card className="p-4 border-border bg-background">
             <div role="status" aria-live="polite" aria-atomic="true">
               <EmptyState
                 icon={Inbox}
@@ -679,16 +733,16 @@ export default function HoldQueue() {
 
         {!isLoading && !error && holdItems.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4 min-h-[calc(100vh-14rem)] h-[calc(100vh-14rem)]">
-            <Card className="flex flex-col min-h-0 h-full overflow-hidden border-[#EBE8E8] bg-white">
-              <CardHeader className="px-4 py-3 border-b border-[#EBE8E8] shrink-0">
-                <CardTitle className="text-base text-[#333030]">
+            <Card className="flex flex-col min-h-0 h-full overflow-hidden border-border bg-background">
+              <CardHeader className="px-4 py-3 border-b border-border shrink-0">
+                <CardTitle className="text-base text-foreground">
                   Pending Reviews ({sortedFilteredItems.length}
                   {sortedFilteredItems.length !== totalItems
                     ? ` of ${totalItems}`
                     : ""}
                   )
                 </CardTitle>
-                <CardDescription className="text-[#706D6D]">
+                <CardDescription className="text-muted-foreground">
                   Sorted by SLA breach, severity, then age. j/k to navigate.
                 </CardDescription>
               </CardHeader>
@@ -710,7 +764,7 @@ export default function HoldQueue() {
                     />
                   </div>
                 ) : (
-                  <ul className="divide-y divide-[#EBE8E8]">
+                  <ul className="divide-y divide-border">
                     {sortedFilteredItems.map((item, index) => {
                       const isActive = activeId === item.id;
                       const activeIndex = sortedFilteredItems.findIndex(
@@ -730,7 +784,7 @@ export default function HoldQueue() {
                               priorityBorderClass(item),
                               isActive
                                 ? "bg-[rgba(190,218,65,0.12)] ring-1 ring-inset ring-primary"
-                                : "hover:bg-[#F5F4F4] bg-white"
+                                : "hover:bg-accent bg-background"
                             )}
                             onClick={() => setSelectedId(item.id)}
                             onKeyDown={e => {
@@ -751,7 +805,7 @@ export default function HoldQueue() {
                               />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between gap-2">
-                                  <span className="font-mono font-medium text-sm text-[#333030]">
+                                  <span className="font-mono font-medium text-sm text-foreground">
                                     {item.referenceNumber}
                                   </span>
                                   <div className="flex items-center gap-1 text-xs shrink-0">
@@ -763,14 +817,14 @@ export default function HoldQueue() {
                                         SLA
                                       </Badge>
                                     ) : item.ageHours != null ? (
-                                      <span className="text-[#706D6D] flex items-center gap-1">
+                                      <span className="text-muted-foreground flex items-center gap-1">
                                         <Clock className="w-3 h-3" />
                                         {item.ageHours < 24
                                           ? `${Math.round(item.ageHours)}h`
                                           : `${Math.round(item.ageHours / 24)}d`}
                                       </span>
                                     ) : (
-                                      <span className="text-[#706D6D] flex items-center gap-1">
+                                      <span className="text-muted-foreground flex items-center gap-1">
                                         <Clock className="w-3 h-3" />
                                         pending
                                       </span>
@@ -778,12 +832,12 @@ export default function HoldQueue() {
                                   </div>
                                 </div>
                                 <div
-                                  className="text-sm truncate text-[#333030]"
+                                  className="text-sm truncate text-foreground"
                                   title={item.fileName}
                                 >
                                   {item.fileName}
                                 </div>
-                                <div className="text-xs text-[#706D6D] truncate">
+                                <div className="text-xs text-muted-foreground truncate">
                                   {item.site} • {item.date}
                                 </div>
                                 <div className="mt-1 flex items-center gap-2">
@@ -855,7 +909,7 @@ export default function HoldQueue() {
                                       <Button
                                         size="sm"
                                         variant="ghost"
-                                        className="h-7 w-7 p-0 text-[#706D6D] hover:bg-[#F5F4F4]"
+                                        className="h-7 w-7 p-0 text-muted-foreground hover:bg-accent"
                                         aria-label="Open full audit"
                                         title="Open full audit"
                                       >
@@ -875,7 +929,7 @@ export default function HoldQueue() {
               </CardContent>
             </Card>
 
-            <Card className="flex flex-col min-h-0 h-full overflow-hidden p-0 gap-0 border-[#EBE8E8] bg-white">
+            <Card className="flex flex-col min-h-0 h-full overflow-hidden p-0 gap-0 border-border bg-background">
               {activeId != null ? (
                 <div className="flex-1 min-h-0 h-full p-3">
                   <ReviewWorkstationPane

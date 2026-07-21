@@ -86,6 +86,8 @@ export function DocumentViewer({
   } | null>(null);
   /** Authenticated blob: URL — never pass raw ArrayBuffer into pdf.js render. */
   const [pdfFile, setPdfFile] = useState<string | null>(null);
+  /** PX-085: raster job sheets (JPEG/PNG) render as <img>, not PDF.js. */
+  const [mediaKind, setMediaKind] = useState<"pdf" | "image">("pdf");
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null);
   /** PDF user-space size per page (from pdf.js) for View-on-Doc zoom targets. */
   const [pageSizes, setPageSizes] = useState<
@@ -101,30 +103,84 @@ export function DocumentViewer({
     assertNoDirectBlobUrl(url);
   }, [url]);
 
-  // Credentialed fetch → blob URL (Easy Auth cookies). Native iframe renders it.
+  // Credentialed fetch → blob URL (Easy Auth cookies). PDF iframe or image.
   useEffect(() => {
     let cancelled = false;
     const gen = ++fetchGenRef.current;
     setPdfFile(null);
     setPdfLoadError(null);
     setNumPages(0);
+    setMediaKind("pdf");
     pdfBytesRef.current = null;
 
     if (!url) return;
+
+    const sniffImageMime = (
+      bytes: Uint8Array,
+      contentType: string | null
+    ): string | null => {
+      const ct = (contentType ?? "").toLowerCase();
+      if (ct.includes("image/jpeg") || ct.includes("image/jpg"))
+        return "image/jpeg";
+      if (ct.includes("image/png")) return "image/png";
+      if (ct.includes("image/webp")) return "image/webp";
+      // Magic bytes
+      if (
+        bytes.length >= 3 &&
+        bytes[0] === 0xff &&
+        bytes[1] === 0xd8 &&
+        bytes[2] === 0xff
+      ) {
+        return "image/jpeg";
+      }
+      if (
+        bytes.length >= 8 &&
+        bytes[0] === 0x89 &&
+        bytes[1] === 0x50 &&
+        bytes[2] === 0x4e &&
+        bytes[3] === 0x47
+      ) {
+        return "image/png";
+      }
+      return null;
+    };
 
     (async () => {
       try {
         const res = await fetch(url, {
           credentials: "include",
-          headers: { Accept: "application/pdf" },
+          headers: { Accept: "application/pdf,image/jpeg,image/png,image/*" },
         });
         if (!res.ok) {
-          throw new Error(`PDF fetch failed (${res.status})`);
+          throw new Error(`Document fetch failed (${res.status})`);
         }
+        const contentType = res.headers.get("content-type");
         const buffer = await res.arrayBuffer();
         if (cancelled || gen !== fetchGenRef.current) return;
 
         const bytes = new Uint8Array(buffer);
+        const imageMime = sniffImageMime(bytes, contentType);
+        if (imageMime) {
+          const blob = new Blob([bytes], { type: imageMime });
+          const objectUrl = URL.createObjectURL(blob);
+          const previous = objectUrlRef.current;
+          objectUrlRef.current = objectUrl;
+          pdfBytesRef.current = null;
+          setMediaKind("image");
+          setPdfFile(objectUrl);
+          setNumPages(1);
+          setPageSizes({ 1: { width: 1, height: 1 } });
+          if (previous) URL.revokeObjectURL(previous);
+
+          perfMark(PERF_MARKS.PDF_FIRST_BYTE);
+          perfMeasure(
+            PERF_MEASURES.PDF_TTFB,
+            PERF_MARKS.PDF_VIEW_CLICK,
+            PERF_MARKS.PDF_FIRST_BYTE
+          );
+          return;
+        }
+
         const header = String.fromCharCode(
           bytes[0] ?? 0,
           bytes[1] ?? 0,
@@ -133,7 +189,7 @@ export function DocumentViewer({
         );
         if (bytes.byteLength < 5 || header !== "%PDF") {
           throw new Error(
-            "Response was not a PDF (check Easy Auth / proxy). Try Download."
+            "Response was not a PDF or image (check Easy Auth / proxy). Try Download."
           );
         }
 
@@ -142,6 +198,7 @@ export function DocumentViewer({
         const previous = objectUrlRef.current;
         objectUrlRef.current = objectUrl;
         pdfBytesRef.current = bytes;
+        setMediaKind("pdf");
         setPdfFile(objectUrl);
         if (previous) URL.revokeObjectURL(previous);
 
@@ -174,11 +231,14 @@ export function DocumentViewer({
           }
         }
       } catch (err) {
-        console.error("[DocumentViewer] Authenticated PDF fetch failed:", err);
+        console.error(
+          "[DocumentViewer] Authenticated document fetch failed:",
+          err
+        );
         if (!cancelled && gen === fetchGenRef.current) {
           setPdfFile(null);
           setPdfLoadError(
-            err instanceof Error ? err.message : "PDF fetch failed"
+            err instanceof Error ? err.message : "Document fetch failed"
           );
         }
       }
@@ -323,11 +383,11 @@ export function DocumentViewer({
   const iframeSrc = pdfFile ? `${pdfFile}#${hashParts.join("&")}` : null;
 
   return (
-    <Card className="flex flex-col h-full min-h-0 overflow-hidden border-0 shadow-none rounded-none bg-white">
-      <CardHeader className="py-2.5 px-3 border-b flex flex-row items-center justify-between shrink-0 bg-white gap-2">
+    <Card className="flex flex-col h-full min-h-0 overflow-hidden border-0 shadow-none rounded-none bg-background">
+      <CardHeader className="py-2.5 px-3 border-b border-border flex flex-row items-center justify-between shrink-0 bg-background gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <CardTitle className="text-sm font-medium shrink-0">
-            Document
+            {mediaKind === "image" ? "Image" : "Document"}
           </CardTitle>
           {headerFocusLabel && (
             <span
@@ -450,6 +510,30 @@ export function DocumentViewer({
               Retry
             </Button>
           </div>
+        ) : !pdfFile ? (
+          <div className="flex items-center justify-center h-full w-full min-h-[240px] bg-muted/20">
+            <div
+              className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"
+              role="status"
+              aria-label="Loading document"
+            />
+          </div>
+        ) : mediaKind === "image" ? (
+          <div
+            className="relative w-full h-full min-h-[240px] bg-muted/20 overflow-auto flex items-center justify-center p-2"
+            ref={containerRef}
+          >
+            <img
+              src={pdfFile}
+              alt="Job sheet scan"
+              className="max-w-full max-h-full object-contain"
+              style={
+                scale === "page-width"
+                  ? undefined
+                  : { transform: `scale(${scale})`, transformOrigin: "center" }
+              }
+            />
+          </div>
         ) : !iframeSrc ? (
           <div className="flex items-center justify-center h-full w-full min-h-[240px] bg-muted/20">
             <div
@@ -467,7 +551,7 @@ export function DocumentViewer({
               key={`pdf-${pageNumber}-${focusNonce}-${scale === "page-width" ? "fit" : scale}`}
               title="PDF document"
               src={iframeSrc}
-              className="absolute inset-0 w-full h-full border-0 bg-white"
+              className="absolute inset-0 w-full h-full border-0 bg-background"
             />
 
             {/* Non-interactive highlight for the active finding bbox */}

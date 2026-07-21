@@ -29,6 +29,7 @@ import {
   User,
   ArrowRight,
   Upload as UploadIcon,
+  Trash2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -88,6 +89,7 @@ export default function UploadPage() {
   const { data: technicians } = trpc.jobSheets.listTechnicians.useQuery();
   const uploadMutation = trpc.jobSheets.upload.useMutation();
   const processMutation = trpc.jobSheets.process.useMutation();
+  const deleteMutation = trpc.jobSheets.delete.useMutation();
   const utils = trpc.useUtils();
 
   const selectedTechnician = useMemo(
@@ -130,6 +132,9 @@ export default function UploadPage() {
         const uploadResult = result as {
           id?: number;
           rejected?: boolean;
+          deduped?: boolean;
+          reason?: string;
+          reusedFromJobSheetId?: number;
           retakeFeedback?: string[];
           intake?: {
             qualityScore: number | null;
@@ -148,6 +153,20 @@ export default function UploadPage() {
               uploadResult.intake?.retakeFeedback ??
               [],
           });
+          continue;
+        }
+
+        if (uploadResult.deduped && typeof uploadResult.id === "number") {
+          const reuseId = uploadResult.reusedFromJobSheetId ?? uploadResult.id;
+          toast.info(
+            `"${file.name}" matches an existing upload (#${reuseId}) — no orphan row created. Open the original instead of waiting forever.`,
+            {
+              action: {
+                label: "Open",
+                onClick: () => setLocation(`/audits?id=${reuseId}`),
+              },
+            }
+          );
           continue;
         }
 
@@ -316,13 +335,13 @@ export default function UploadPage() {
         ]}
       />
       <div className="mx-auto max-w-4xl space-y-6">
-        <p className="text-[#706D6D]">
+        <p className="text-muted-foreground">
           Drop a job sheet below — processing starts automatically. One clear
           path from upload to audit result.
         </p>
 
         {uploadSuccess ? (
-          <Alert className="border-primary/30 bg-[rgba(190,218,65,0.12)] text-[#333030]">
+          <Alert className="border-primary/30 bg-[rgba(190,218,65,0.12)] text-foreground">
             <CheckCircle2 className="h-4 w-4 text-primary" />
             <AlertTitle>Upload complete</AlertTitle>
             <AlertDescription className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -355,9 +374,9 @@ export default function UploadPage() {
         </Alert>
 
         <Card id="upload-area" className="overflow-hidden">
-          <CardHeader className="border-b border-[#EBE8E8] bg-white pb-4">
-            <div className="flex flex-wrap items-center gap-3 text-xs font-medium uppercase tracking-wider text-[#8A8787]">
-              <span className="flex items-center gap-1.5 rounded-full bg-[rgba(190,218,65,0.15)] px-2.5 py-1 text-[#333030]">
+          <CardHeader className="border-b border-border bg-background pb-4">
+            <div className="flex flex-wrap items-center gap-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <span className="flex items-center gap-1.5 rounded-full bg-[rgba(190,218,65,0.15)] px-2.5 py-1 text-foreground">
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                   1
                 </span>
@@ -365,14 +384,14 @@ export default function UploadPage() {
               </span>
               <span className="text-[#C5C2C2]">→</span>
               <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[#EBE8E8] text-[10px] font-bold">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-border text-[10px] font-bold">
                   2
                 </span>
                 Upload file
               </span>
               <span className="text-[#C5C2C2]">→</span>
               <span className="flex items-center gap-1.5 rounded-full px-2.5 py-1">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[#EBE8E8] text-[10px] font-bold">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-border text-[10px] font-bold">
                   3
                 </span>
                 Review result
@@ -390,21 +409,21 @@ export default function UploadPage() {
                 "rounded-lg border p-4 transition-colors duration-[var(--duration-normal)]",
                 technicianId
                   ? "border-primary/40 bg-[rgba(190,218,65,0.08)]"
-                  : "border-[#EBE8E8] bg-[#F9F9F9]"
+                  : "border-border bg-[#F9F9F9]"
               )}
             >
               <div className="mb-3 flex items-start gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-background shadow-sm">
                   <User className="h-4 w-4 text-primary" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <label
                     htmlFor="upload-technician"
-                    className="text-sm font-semibold text-[#333030]"
+                    className="text-sm font-semibold text-foreground"
                   >
                     Assign technician
                   </label>
-                  <p className="text-xs text-[#706D6D]">
+                  <p className="text-xs text-muted-foreground">
                     Required for scorecards. Pick now or let OCR auto-match the
                     engineer name on the sheet.
                   </p>
@@ -414,7 +433,7 @@ export default function UploadPage() {
                     Assigned
                   </span>
                 ) : (
-                  <span className="shrink-0 rounded-full border border-[#EBE8E8] bg-white px-2.5 py-0.5 text-xs text-[#8A8787]">
+                  <span className="shrink-0 rounded-full border border-border bg-background px-2.5 py-0.5 text-xs text-muted-foreground">
                     Optional
                   </span>
                 )}
@@ -428,7 +447,7 @@ export default function UploadPage() {
               >
                 <SelectTrigger
                   id="upload-technician"
-                  className="w-full bg-white"
+                  className="w-full bg-background"
                 >
                   <SelectValue placeholder="Select technician" />
                 </SelectTrigger>
@@ -450,7 +469,7 @@ export default function UploadPage() {
               <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-primary/40 bg-[rgba(190,218,65,0.08)] py-12">
                 <Loader2 className="mb-4 h-12 w-12 animate-spin text-primary" />
                 <p className="text-lg font-medium">Uploading files…</p>
-                <p className="text-sm text-[#706D6D]">
+                <p className="text-sm text-muted-foreground">
                   Please wait while we upload your documents.
                 </p>
               </div>
@@ -505,7 +524,7 @@ export default function UploadPage() {
             <CardHeader>
               <CardTitle>Upload guidelines</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm text-[#706D6D]">
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
               <p>• Ensure the entire page is visible in the photo.</p>
               <p>• Avoid glare and shadows on the document.</p>
               <p>• Text should be sharp and readable.</p>
@@ -524,14 +543,14 @@ export default function UploadPage() {
             <CardContent>
               {uploadsLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-[#8A8787]" />
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : (recentUploads?.items.length ?? 0) > 0 ? (
                 <div className="space-y-3">
                   {recentUploads!.items.map(upload => (
                     <div
                       key={upload.id}
-                      className="flex items-center gap-3 rounded-lg p-2 transition-colors duration-[var(--duration-normal)] hover:bg-[#F5F4F4]"
+                      className="flex items-center gap-3 rounded-lg p-2 transition-colors duration-[var(--duration-normal)] hover:bg-accent"
                     >
                       <div
                         className={cn(
@@ -549,7 +568,7 @@ export default function UploadPage() {
                         <p className="truncate text-sm font-medium">
                           {upload.fileName}
                         </p>
-                        <p className="text-xs text-[#8A8787]">
+                        <p className="text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(upload.createdAt), {
                             addSuffix: true,
                           })}
@@ -558,16 +577,51 @@ export default function UploadPage() {
                       {(upload.status === "pending" ||
                         upload.status === "failed") &&
                       !processingIds.includes(upload.id) ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            handleProcessSingle(upload.id, upload.fileName)
-                          }
-                        >
-                          <Play className="mr-1 h-3 w-3" />
-                          Process
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              handleProcessSingle(upload.id, upload.fileName)
+                            }
+                          >
+                            <Play className="mr-1 h-3 w-3" />
+                            Process
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            title="Remove stuck / orphan upload"
+                            disabled={deleteMutation.isPending}
+                            onClick={() => {
+                              if (
+                                !confirm(
+                                  `Remove "${upload.fileName}"? This deletes the stuck upload so it cannot sit in Pending forever.`
+                                )
+                              ) {
+                                return;
+                              }
+                              deleteMutation.mutate(
+                                {
+                                  id: upload.id,
+                                  reason: "Removed orphan / stuck upload",
+                                },
+                                {
+                                  onSuccess: () => {
+                                    toast.success("Upload removed");
+                                    refetch();
+                                    utils.jobSheets.list.invalidate();
+                                  },
+                                  onError: err =>
+                                    toast.error(err.message || "Delete failed"),
+                                }
+                              );
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
                       ) : null}
                       <span
                         className={cn(

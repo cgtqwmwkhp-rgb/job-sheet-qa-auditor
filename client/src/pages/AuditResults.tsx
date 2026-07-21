@@ -33,6 +33,7 @@ import {
   isActiveJobSheetStatus,
   isTerminalJobSheetStatus,
 } from "@shared/processingProgress";
+import { mapAuditResultToUiStatus } from "@/lib/auditOutcome";
 import {
   ReviewWorkstationPane,
   mapFindingsFromApi,
@@ -110,7 +111,7 @@ function JobSheetStatusChip({ status }: { status: string }) {
     },
     completed: {
       label: "Completed",
-      className: "bg-[#BEDA41]/15 text-[#333030] border-[#BEDA41]/40",
+      className: "bg-[#BEDA41]/15 text-foreground border-[#BEDA41]/40",
       icon: <CheckCircle2 className="w-3 h-3" />,
     },
     processing: {
@@ -120,14 +121,14 @@ function JobSheetStatusChip({ status }: { status: string }) {
     },
     pending: {
       label: "Pending",
-      className: "bg-[#F5F4F4] text-[#706D6D] border-[#EBE8E8]",
+      className: "bg-muted text-muted-foreground border-border",
       icon: <Clock className="w-3 h-3" />,
     },
   };
 
   const chip = config[status] ?? {
     label: status.replace("_", " "),
-    className: "bg-[#F5F4F4] text-[#706D6D] border-[#EBE8E8]",
+    className: "bg-muted text-muted-foreground border-border",
     icon: null,
   };
 
@@ -150,7 +151,7 @@ function AuditListSkeleton() {
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
-          className="flex items-center gap-4 p-3 border border-[#EBE8E8] rounded-lg bg-white"
+          className="flex items-center gap-4 p-3 border border-border rounded-lg bg-background"
         >
           <Skeleton className="h-9 w-9 rounded-full shrink-0" />
           <div className="flex-1 space-y-2">
@@ -574,7 +575,7 @@ export default function AuditResults() {
               <Skeleton className="h-4 w-96" />
             </div>
           </div>
-          <div className="flex-1 flex items-center justify-center gap-2 text-[#706D6D]">
+          <div className="flex-1 flex items-center justify-center gap-2 text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
             <span className="text-sm">Loading audit…</span>
           </div>
@@ -590,10 +591,10 @@ export default function AuditResults() {
           <div className="rounded-full bg-red-50 p-4 mb-4">
             <AlertCircle className="h-10 w-10 text-[#BA3737]" />
           </div>
-          <h2 className="text-xl font-semibold text-[#333030] mb-2">
+          <h2 className="text-xl font-semibold text-foreground mb-2">
             Failed to load audit
           </h2>
-          <p className="text-[#706D6D] mb-6 max-w-md text-center">
+          <p className="text-muted-foreground mb-6 max-w-md text-center">
             {jobSheetError.message}
           </p>
           <Button onClick={goBackToList} variant="outline">
@@ -617,15 +618,15 @@ export default function AuditResults() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="mb-2 -ml-2 text-[#706D6D] hover:text-[#333030]"
+                className="mb-2 -ml-2 text-muted-foreground hover:text-foreground"
                 onClick={goBackToList}
               >
                 ← All audits
               </Button>
-              <h1 className="text-2xl font-heading font-bold tracking-tight text-[#333030]">
+              <h1 className="text-2xl font-heading font-bold tracking-tight text-foreground">
                 {jobSheetData.referenceNumber || `JS-${jobSheetData.id}`}
               </h1>
-              <p className="text-[#706D6D] mt-1 text-sm">
+              <p className="text-muted-foreground mt-1 text-sm">
                 {jobSheetData.fileName} is still processing — this page updates
                 automatically.
               </p>
@@ -669,10 +670,10 @@ export default function AuditResults() {
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-heading font-bold tracking-tight text-[#333030]">
+              <h1 className="text-2xl font-heading font-bold tracking-tight text-foreground">
                 Audit Results
               </h1>
-              <p className="text-[#706D6D] mt-1 text-sm">
+              <p className="text-muted-foreground mt-1 text-sm">
                 Select an audit to review findings, documentation quality, and
                 reports. Use j/k to move, a/r to approve or reject in-review
                 sheets, Enter to open.
@@ -694,17 +695,17 @@ export default function AuditResults() {
           {showLegend ? (
             <ReviewShortcutsLegend
               variant="list"
-              className="bg-white border border-[#EBE8E8]"
+              className="bg-background border border-border"
             />
           ) : null}
 
           <div className="sticky top-0 z-10 -mx-1 px-1 py-2 bg-[#F9F9F9]/95 backdrop-blur-sm space-y-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8A8787]" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
                 placeholder="Search by reference, file, or site…"
-                className="pl-9 h-10 bg-white border-[#EBE8E8] focus-visible:ring-[#BEDA41]/40"
+                className="pl-9 h-10 bg-background border-border focus-visible:ring-[#BEDA41]/40"
                 value={listSearch}
                 onChange={e => {
                   setListSearch(e.target.value);
@@ -727,17 +728,15 @@ export default function AuditResults() {
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors duration-[var(--duration-normal)]",
                     statusFilter === chip.key
-                      ? "bg-[#BEDA41]/20 border-[#BEDA41] text-[#333030]"
-                      : "bg-white border-[#EBE8E8] text-[#706D6D] hover:border-[#333030]/30"
+                      ? "bg-[#BEDA41]/20 border-[#BEDA41] text-foreground"
+                      : "bg-background border-border text-muted-foreground hover:border-[#333030]/30"
                   )}
                 >
                   {chip.label}
                   <span
                     className={cn(
                       "tabular-nums rounded-full px-1.5 py-px text-[10px]",
-                      statusFilter === chip.key
-                        ? "bg-[#BEDA41]/30"
-                        : "bg-[#F5F4F4]"
+                      statusFilter === chip.key ? "bg-[#BEDA41]/30" : "bg-muted"
                     )}
                   >
                     {statusCounts[chip.key]}
@@ -748,11 +747,11 @@ export default function AuditResults() {
           </div>
 
           {listLoading ? (
-            <Card className="border-[#EBE8E8] bg-white overflow-hidden">
+            <Card className="border-border bg-background overflow-hidden">
               <AuditListSkeleton />
             </Card>
           ) : allJobSheets.length === 0 ? (
-            <Card className="border-[#EBE8E8] bg-white p-4">
+            <Card className="border-border bg-background p-4">
               <EmptyState
                 icon={FileText}
                 title="No audits yet"
@@ -761,7 +760,7 @@ export default function AuditResults() {
               />
             </Card>
           ) : filteredJobSheets.length === 0 ? (
-            <Card className="border-dashed border-[#EBE8E8] bg-white p-4">
+            <Card className="border-dashed border-border bg-background p-4">
               <EmptyState
                 compact
                 icon={Search}
@@ -790,9 +789,9 @@ export default function AuditResults() {
               ) : null}
             </Card>
           ) : (
-            <Card className="border-[#EBE8E8] bg-white overflow-hidden">
-              <CardHeader className="py-3 px-4 border-b border-[#EBE8E8] bg-white">
-                <CardTitle className="text-sm font-semibold text-[#333030]">
+            <Card className="border-border bg-background overflow-hidden">
+              <CardHeader className="py-3 px-4 border-b border-border bg-background">
+                <CardTitle className="text-sm font-semibold text-foreground">
                   {filteredJobSheets.length} audit
                   {filteredJobSheets.length === 1 ? "" : "s"}
                   {filteredJobSheets.length !== allJobSheets.length
@@ -834,7 +833,7 @@ export default function AuditResults() {
                               : sheet.status === "review_queue"
                                 ? "bg-amber-50 text-[#D4A337] border-amber-200"
                                 : sheet.status === "completed"
-                                  ? "bg-[#BEDA41]/15 text-[#333030] border-[#BEDA41]/40"
+                                  ? "bg-[#BEDA41]/15 text-foreground border-[#BEDA41]/40"
                                   : "bg-[#2868CE]/10 text-[#2868CE] border-[#2868CE]/25"
                           )}
                         >
@@ -851,12 +850,12 @@ export default function AuditResults() {
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-medium font-mono text-sm text-[#333030]">
+                            <p className="font-medium font-mono text-sm text-foreground">
                               {sheet.referenceNumber || `JS-${sheet.id}`}
                             </p>
                             <JobSheetStatusChip status={sheet.status} />
                           </div>
-                          <p className="text-xs text-[#706D6D] truncate mt-0.5">
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">
                             {sheet.fileName}
                             {sheet.siteInfo ? ` · ${sheet.siteInfo}` : ""}
                           </p>
@@ -909,17 +908,17 @@ export default function AuditResults() {
                               </Button>
                             </div>
                           )}
-                          <span className="text-[11px] text-[#8A8787] tabular-nums hidden sm:inline">
+                          <span className="text-[11px] text-muted-foreground tabular-nums hidden sm:inline">
                             {new Date(sheet.createdAt).toLocaleDateString()}
                           </span>
-                          <ChevronRight className="w-4 h-4 text-[#8A8787] group-hover:text-[#333030] transition-colors" />
+                          <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                         </div>
                       </div>
                     );
                   })}
                   {hasMoreJobSheets ? (
                     <div className="px-2 pt-3 pb-1 text-center">
-                      <p className="mb-2 text-xs text-[#706D6D]">
+                      <p className="mb-2 text-xs text-muted-foreground">
                         Showing {allJobSheets.length} loaded audits. Load more
                         to see older results.
                       </p>
@@ -946,7 +945,7 @@ export default function AuditResults() {
   if (auditLoading && jobSheetData) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-[50vh] gap-2 text-[#706D6D]">
+        <div className="flex items-center justify-center h-[50vh] gap-2 text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin" />
           <span className="text-sm">Loading audit results…</span>
         </div>
@@ -959,17 +958,15 @@ export default function AuditResults() {
 
   const auditData: AuditData = {
     id: jobSheetData.referenceNumber || `JS-${jobSheetData.id}`,
-    status:
-      auditResult?.result === "pass"
-        ? "passed"
-        : auditResult?.result === "fail"
-          ? "failed"
-          : jobSheetData.status === "completed"
-            ? "passed"
-            : "pending",
+    status: mapAuditResultToUiStatus({
+      auditResult: auditResult?.result,
+      jobSheetStatus: jobSheetData.status,
+    }),
     score:
       auditResult?.confidenceScore ||
-      (jobSheetData.status === "completed" ? "100" : "-"),
+      (jobSheetData.status === "completed" && auditResult?.result === "pass"
+        ? "100"
+        : "-"),
     date: new Date(jobSheetData.createdAt).toLocaleDateString(),
     technician:
       technicianNameById.get(jobSheetData.uploadedBy) ??
@@ -988,7 +985,7 @@ export default function AuditResults() {
       <div className="-m-6 h-[calc(100vh-3.5rem)] min-h-0 overflow-hidden flex flex-col">
         {auditResult?.id ? (
           <div
-            className="shrink-0 flex items-center justify-between gap-2 border-b border-[#EBE8E8] bg-white px-4 py-2"
+            className="shrink-0 flex items-center justify-between gap-2 border-b border-border bg-background px-4 py-2"
             data-testid="audit-export-toolbar"
           >
             <div
