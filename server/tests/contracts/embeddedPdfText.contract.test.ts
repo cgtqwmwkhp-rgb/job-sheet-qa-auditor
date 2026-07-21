@@ -77,6 +77,8 @@ describe("embeddedPdfText enrichment", () => {
       fullText: rich,
       pages: [rich],
       pageCount: 1,
+      pageLayouts: [{ pageNumber: 1, text: rich, words: [] }],
+      words: [],
     });
     expect(decision.usedEmbedded).toBe(true);
     expect(decision.stageStatus).toBe("success");
@@ -107,9 +109,13 @@ describe("documentProcessor quality-slice wiring", () => {
   const dpPath = path.resolve(__dirname, "../../services/documentProcessor.ts");
   const dp = fs.readFileSync(dpPath, "utf-8");
 
-  it("wires embedded enrichment before template selection", () => {
-    expect(dp).toContain("enrichWithEmbeddedPdfText");
-    expect(dp).toContain("Embedded Text Enrichment");
+  it("wires text-layer-first classify before OCR / template selection", () => {
+    expect(dp).toContain("extractTextLayerFromUrl");
+    expect(dp).toContain("Text Layer Classification");
+    const classifyIdx = dp.indexOf("Text Layer Classification");
+    const thinIdx = dp.indexOf("Thin Text Guard");
+    expect(classifyIdx).toBeGreaterThan(-1);
+    expect(thinIdx).toBeGreaterThan(classifyIdx);
   });
 
   it("guards thin text with hybrid THIN_OCR_TEXT path (no Gemini)", () => {

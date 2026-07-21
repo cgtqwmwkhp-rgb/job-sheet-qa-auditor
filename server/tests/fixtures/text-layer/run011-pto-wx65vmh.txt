@@ -1,0 +1,25 @@
+Job Summary Report
+Asset Details
+Asset No: WX65VMH
+Make/Model: PTO On Board Air System
+Customer: SGN - C/O Enterprise Fleet Solutions
+Site Address / Contact: SGN - South Operations E016
+Miles/Hours: 92095
+Serial No: nul
+Completion Details
+Date: 16/07/2026
+Compliance Type: Service - Other - Specify in Repairs
+Next Service Date: 16/07/2027
+Compliance Title: PTO Service
+Service Completed? Yes
+Additional Tasks Complete? Yes
+All Works Completed? Yes
+Return Visit Needed? No
+Consumables Used? No
+Asset Safe To Use? Yes
+Job ID : 218
+Technician Details
+Technician Name: richard.newton
+Technician Signature: [signature image]
+Engineer Comments: PTO service completed. All checklist items Ok.
+Customer Signature: [signature image]

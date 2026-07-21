@@ -9,3 +9,4 @@ export * from "./buildCandidates";
 export * from "./aliasFields";
 export * from "./scrapeOcrFields";
 export * from "./applyFieldVote";
+export * from "./groundedDateGate";

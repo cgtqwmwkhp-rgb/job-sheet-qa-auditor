@@ -24,11 +24,18 @@ import {
 import { analyzeJobSheet, AnalysisResult, GoldSpec } from "./analyzer";
 import { selectTemplateMultiSignal } from "./templateSelector";
 import {
-  enrichWithEmbeddedPdfText,
   fetchPdfBuffer,
   isThinExtractedText,
   THIN_TEXT_CHAR_THRESHOLD,
 } from "./embeddedPdfText";
+import {
+  extractTextLayerFromUrl,
+  synthesizeOcrResultFromTextLayer,
+  toDbDocumentStrategy,
+  formatGroundedFieldsForReport,
+  type DocumentStrategyLogical,
+  type TextLayerExtractionResult,
+} from "./textLayerExtraction";
 import {
   getTemplateVersion,
   getTemplate,
@@ -745,35 +752,142 @@ async function processJobSheetWithOptions(
     console.warn("[DocumentProcessor] progress begin failed:", err);
   }
 
-  // Stage 1: OCR Text Extraction
+  // =========================================================================
+  // Stage 1: Text-layer-first (PR1 / PX-100)
+  //
+  // Classify born-digital vs scan BEFORE Mistral. When the PDF has a usable
+  // text layer, label-anchor headers and skip primary generative OCR.
+  // =========================================================================
+  const textLayerStart = Date.now();
+  let textLayerResult: TextLayerExtractionResult | null = null;
+  let documentStrategyLogical: DocumentStrategyLogical = "ocr";
+  let usedEmbeddedText = false;
+  let skippedPrimaryOcr = false;
+  let textLayerPreExtracted: PreExtractedFieldMap = {};
+
+  try {
+    const tl = await extractTextLayerFromUrl(documentUrl);
+    textLayerResult = tl.result;
+    documentStrategyLogical = tl.result.classification.documentStrategy;
+    skippedPrimaryOcr = tl.result.classification.skipPrimaryOcr;
+    textLayerPreExtracted = tl.result.preExtracted;
+    usedEmbeddedText = skippedPrimaryOcr;
+    recordStage({
+      stage: "Text Layer Classification",
+      status: tl.result.classification.kind === "empty" ? "skipped" : "success",
+      durationMs: Date.now() - textLayerStart,
+      error:
+        tl.result.classification.kind === "empty"
+          ? tl.result.classification.reason
+          : undefined,
+    });
+    if (skippedPrimaryOcr) {
+      console.log(
+        "[DocumentProcessor] Born-digital text layer — skipping primary Mistral OCR",
+        {
+          jobSheetId,
+          kind: tl.result.classification.kind,
+          reason: tl.result.classification.reason,
+          usableChars: tl.result.classification.usableChars,
+          fieldCount: Object.keys(tl.result.preExtracted).length,
+        }
+      );
+    }
+  } catch (error) {
+    recordStage({
+      stage: "Text Layer Classification",
+      status: "failed",
+      durationMs: Date.now() - textLayerStart,
+      error:
+        error instanceof Error ? error.message : "text layer classify failed",
+    });
+  }
+
+  // Stage 1b: OCR Text Extraction (skipped when text-layer path is authoritative)
   const ocrStartTime = Date.now();
   let ocrResult: OCRResult;
 
-  try {
-    ocrResult = await extractTextFromDocument(documentUrl, { jobSheetId });
+  if (skippedPrimaryOcr && textLayerResult && textLayerResult.pageTexts.length) {
+    const synthetic = synthesizeOcrResultFromTextLayer(
+      textLayerResult.pageTexts,
+      { processingTimeMs: Date.now() - ocrStartTime }
+    );
+    ocrResult = {
+      success: synthetic.success,
+      pages: synthetic.pages,
+      totalPages: synthetic.totalPages,
+      model: synthetic.model,
+      provider: synthetic.provider,
+      processingTimeMs: synthetic.processingTimeMs,
+    };
     recordStage(
       {
         stage: "OCR Text Extraction",
-        status: ocrResult.success ? "success" : "failed",
+        status: "skipped",
+        durationMs: Date.now() - ocrStartTime,
+        error: "SKIPPED_TEXT_LAYER",
+      },
+      "Template Selection"
+    );
+    recordStage({
+      stage: "Text Layer Extraction",
+      status: "success",
+      durationMs: Date.now() - textLayerStart,
+    });
+  } else {
+    try {
+      ocrResult = await extractTextFromDocument(documentUrl, { jobSheetId });
+      recordStage(
+        {
+          stage: "OCR Text Extraction",
+          status: ocrResult.success ? "success" : "failed",
+          durationMs: Date.now() - ocrStartTime,
+          error: ocrResult.error,
+        },
+        ocrResult.success ? "Template Selection" : undefined
+      );
+    } catch (error) {
+      ocrResult = {
+        success: false,
+        pages: [],
+        totalPages: 0,
+        model: getOCRConfig().model,
+        error: error instanceof Error ? error.message : "OCR failed",
+      };
+      recordStage({
+        stage: "OCR Text Extraction",
+        status: "failed",
         durationMs: Date.now() - ocrStartTime,
         error: ocrResult.error,
-      },
-      ocrResult.success ? "Template Selection" : undefined
-    );
-  } catch (error) {
-    ocrResult = {
-      success: false,
-      pages: [],
-      totalPages: 0,
-      model: getOCRConfig().model,
-      error: error instanceof Error ? error.message : "OCR failed",
-    };
-    recordStage({
-      stage: "OCR Text Extraction",
-      status: "failed",
-      durationMs: Date.now() - ocrStartTime,
-      error: ocrResult.error,
-    });
+      });
+    }
+
+    // Soft fallback: if OCR failed but we have usable text layer, use it
+    if (
+      (!ocrResult.success || ocrResult.pages.length === 0) &&
+      textLayerResult &&
+      textLayerResult.pageTexts.some(p => p.trim().length > 0)
+    ) {
+      const synthetic = synthesizeOcrResultFromTextLayer(
+        textLayerResult.pageTexts
+      );
+      ocrResult = {
+        success: synthetic.success,
+        pages: synthetic.pages,
+        totalPages: synthetic.totalPages,
+        model: synthetic.model,
+        provider: synthetic.provider,
+      };
+      documentStrategyLogical = "text_layer";
+      usedEmbeddedText = true;
+      skippedPrimaryOcr = true;
+      recordStage({
+        stage: "Text Layer Extraction",
+        status: "success",
+        durationMs: 0,
+        error: "OCR_FALLBACK_TEXT_LAYER",
+      });
+    }
   }
 
   // If OCR failed, mark as failed and return
@@ -803,9 +917,11 @@ async function processJobSheetWithOptions(
   // Soft gate: low OCR page confidence must NOT abort before template selection /
   // Gemini judgment. Earlier hard-abort produced score≈OCR% with 0 findings in ~1s
   // (e.g. JOB-20260709-3AZPKT). Continue the pipeline and force review_queue later.
+  // Born-digital text-layer path has synthetic confidence=1 — skip this gate.
   const pageConfidencePrior = computePageConfidencePrior(ocrResult);
   const ocrThreshold = (processingSettings.ocrConfidenceThreshold ?? 60) / 100;
   const lowOcrConfidence =
+    !skippedPrimaryOcr &&
     typeof pageConfidencePrior === "number" &&
     pageConfidencePrior < ocrThreshold;
   if (lowOcrConfidence) {
@@ -825,42 +941,47 @@ async function processJobSheetWithOptions(
     });
   }
 
-  // Combine all page text (OCR baseline; may be replaced by embedded enrichment)
-  let extractedText = ocrResult.pages
-    .map(page => `--- Page ${page.pageNumber} ---\n${page.markdown}`)
-    .join("\n\n");
-  let pageTextsForPipeline = ocrResult.pages.map(p => p.markdown);
-  let usedEmbeddedText = false;
+  // Combine page text — text-layer path already authoritative when skipped OCR
+  let extractedText =
+    skippedPrimaryOcr && textLayerResult?.fullText
+      ? textLayerResult.fullText
+      : ocrResult.pages
+          .map(page => `--- Page ${page.pageNumber} ---\n${page.markdown}`)
+          .join("\n\n");
+  let pageTextsForPipeline =
+    skippedPrimaryOcr && textLayerResult?.pageTexts?.length
+      ? textLayerResult.pageTexts
+      : ocrResult.pages.map(p => p.markdown);
 
-  // Stage 1.25: Prefer embedded PDF text when richer than thin OCR markdown
-  const enrichStartTime = Date.now();
-  try {
-    const enrichment = await enrichWithEmbeddedPdfText(
-      documentUrl,
-      ocrResult.pages.map(p => p.markdown)
-    );
-    extractedText = enrichment.extractedText;
-    pageTextsForPipeline = enrichment.pageTexts;
-    usedEmbeddedText = enrichment.usedEmbedded;
-    recordStage({
-      stage: "Embedded Text Enrichment",
-      status: enrichment.stageStatus,
-      durationMs: Date.now() - enrichStartTime,
-      error: enrichment.stageError,
-    });
-    if (enrichment.usedEmbedded) {
-      console.log("[DocumentProcessor] Preferring embedded PDF text over OCR", {
-        jobSheetId,
-        ocrLength: enrichment.ocrLength,
-        embeddedLength: enrichment.embeddedLength,
+  // Stage 1.25: Legacy post-OCR embed enrich RETIRED as digital gate (PX-100).
+  // When we did not skip OCR but text layer still has usable content, merge it
+  // for judgment text only — never as a length race against Mistral markdown.
+  if (!skippedPrimaryOcr && textLayerResult && textLayerResult.fullText) {
+    const tlChars = textLayerResult.classification.usableChars;
+    if (tlChars >= 80 && textLayerResult.classification.digitalPageCount > 0) {
+      extractedText = textLayerResult.fullText;
+      pageTextsForPipeline = textLayerResult.pageTexts;
+      usedEmbeddedText = true;
+      documentStrategyLogical = "hybrid";
+      recordStage({
+        stage: "Text Layer Merge",
+        status: "success",
+        durationMs: 0,
+      });
+    } else {
+      recordStage({
+        stage: "Text Layer Merge",
+        status: "skipped",
+        durationMs: 0,
+        error: "OCR_PRIMARY_SCAN",
       });
     }
-  } catch (error) {
+  } else if (skippedPrimaryOcr) {
     recordStage({
-      stage: "Embedded Text Enrichment",
-      status: "failed",
-      durationMs: Date.now() - enrichStartTime,
-      error: error instanceof Error ? error.message : "enrichment failed",
+      stage: "Text Layer Merge",
+      status: "skipped",
+      durationMs: 0,
+      error: "ALREADY_TEXT_LAYER",
     });
   }
 
@@ -942,7 +1063,7 @@ async function processJobSheetWithOptions(
         runId,
         result: "review_queue",
         confidenceScore: "0",
-        documentStrategy: usedEmbeddedText ? "embedded_text" : "ocr",
+        documentStrategy: toDbDocumentStrategy(documentStrategyLogical),
         ocrEngineVersion: getOCREngineVersion(
           ocrResult.model,
           getOCRConfig(),
@@ -959,6 +1080,15 @@ async function processJobSheetWithOptions(
             characterCount: extractedText.length,
             source: "original_job_sheet",
           },
+          documentStrategy: documentStrategyLogical,
+          textLayer: textLayerResult
+            ? {
+                kind: textLayerResult.classification.kind,
+                reason: textLayerResult.classification.reason,
+                skippedPrimaryOcr,
+                fields: formatGroundedFieldsForReport(textLayerResult.fields),
+              }
+            : undefined,
           extractedFields: Object.fromEntries(
             hybridResult.extractedFields.map(f => [
               f.field,
@@ -1206,7 +1336,7 @@ async function processJobSheetWithOptions(
           runId,
           result: "review_queue",
           confidenceScore: String(selectionResult.topScore),
-          documentStrategy: usedEmbeddedText ? "embedded_text" : "ocr",
+          documentStrategy: toDbDocumentStrategy(documentStrategyLogical),
           ocrEngineVersion: getOCREngineVersion(
             ocrResult.model,
             getOCRConfig(),
@@ -1215,6 +1345,15 @@ async function processJobSheetWithOptions(
           pipelineVersion: PIPELINE_VERSION,
           reportJson: {
             summary: hybridResult.llmSummary || hybridResult.reviewExplanation,
+            documentStrategy: documentStrategyLogical,
+            textLayer: textLayerResult
+              ? {
+                  kind: textLayerResult.classification.kind,
+                  reason: textLayerResult.classification.reason,
+                  skippedPrimaryOcr,
+                  fields: formatGroundedFieldsForReport(textLayerResult.fields),
+                }
+              : undefined,
             // Raw OCR text is deliberately not duplicated in reportJson; reviewers
             // can retrieve the original job sheet through jobSheets.getFileUrl.
             ocrText: {
@@ -1457,7 +1596,9 @@ async function processJobSheetWithOptions(
   // Fail-soft; prefers geometry inside drawn boxes for GIGO.
   // =========================================================================
   const roiSpatialStartTime = Date.now();
-  let roiSpatialFields: PreExtractedFieldMap = {};
+  // Seed with text-layer label-anchored headers (PX-100) — later stages may
+  // enrich but must not invent ungrounded dates over these without a source span.
+  let roiSpatialFields: PreExtractedFieldMap = { ...textLayerPreExtracted };
   const pinnedVersionForRoi = usedTemplateVersionId
     ? getTemplateVersion(usedTemplateVersionId)
     : null;
@@ -1473,7 +1614,14 @@ async function processJobSheetWithOptions(
         fieldSpecs: pinnedVersion?.specJson?.fields,
         headerText: extractedText.slice(0, 4000),
       });
-      roiSpatialFields = spatial.fields;
+      // Prefer text-layer headers over ROI guesses; fill gaps from spatial
+      roiSpatialFields = mergeRoiSpatialFields(
+        spatial.fields,
+        textLayerPreExtracted,
+        {
+          preferRoiFor: new Set(Object.keys(textLayerPreExtracted)),
+        }
+      );
       if (spatial.warnings.length) {
         console.info(
           "[DocumentProcessor] ROI spatial warnings:",
@@ -1829,12 +1977,17 @@ async function processJobSheetWithOptions(
         // Only this map originates from the provisioned custom model; layout
         // candidates above remain independently attributable to Azure OCR.
         azureCustom: selectionMarksResult?.customPreExtractedFields,
+        textLayer: Object.keys(textLayerPreExtracted).length
+          ? textLayerPreExtracted
+          : undefined,
         crop: Object.keys(roiSpatialFields).length
           ? roiSpatialFields
           : undefined,
         ensemble: ensembleResult?.ensembleExtractedFields,
         multimodalRoi: multimodalRoiResult?.preExtractedFields,
         vlmHint: vlmInkResult?.preExtractedHint ?? null,
+        // PX-103 grounded date gate — abstain unless value near Date label
+        sourceText: extractedText,
       });
       if (
         fieldVoteResult.votedFields &&
@@ -3461,7 +3614,7 @@ async function processJobSheetWithOptions(
         | "fail"
         | "review_queue",
       confidenceScore: String(analysisResult.score),
-      documentStrategy: usedEmbeddedText ? "embedded_text" : "ocr",
+      documentStrategy: toDbDocumentStrategy(documentStrategyLogical),
       ocrEngineVersion: getOCREngineVersion(
         ocrResult.model,
         getOCRConfig(),
@@ -3470,6 +3623,15 @@ async function processJobSheetWithOptions(
       pipelineVersion: PIPELINE_VERSION,
       reportJson: {
         summary: analysisResult.summary,
+        documentStrategy: documentStrategyLogical,
+        textLayer: textLayerResult
+          ? {
+              kind: textLayerResult.classification.kind,
+              reason: textLayerResult.classification.reason,
+              skippedPrimaryOcr,
+              fields: formatGroundedFieldsForReport(textLayerResult.fields),
+            }
+          : undefined,
         // Do not persist a full OCR copy in every audit row. The original document
         // remains available to authorized reviewers on demand via getFileUrl.
         ocrText: {
