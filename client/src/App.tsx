@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 // QueryClient is now only in main.tsx - removed duplicate provider
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,6 +16,7 @@ import { Loader2 } from "lucide-react";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { useProcessingWatchdog } from "@/hooks/useProcessingWatch";
 import { initializeErrorTracking } from "@/lib/errorTracking";
+import { lazyRetry } from "@/lib/lazyRetry";
 
 const STAFF_ROLES: UserRole[] = ["admin", "qa_lead", "viewer"];
 const TECH_ROLES: UserRole[] = ["technician"];
@@ -25,42 +26,48 @@ function ProcessingWatchdog() {
   return null;
 }
 
-// Lazy load pages for performance optimization
-const Login = lazy(() => import("./pages/Login"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const UploadPage = lazy(() => import("./pages/Upload"));
-const AuditResults = lazy(() => import("./pages/AuditResults"));
-const HoldQueue = lazy(() => import("./pages/HoldQueue"));
-const TemplateStudio = lazy(() => import("./pages/TemplateStudio"));
-const SearchPage = lazy(() => import("./pages/Search"));
-const UserManagement = lazy(() => import("./pages/UserManagement"));
-const ExecutiveDashboard = lazy(
+// Lazy load pages — retry + one-shot reload on stale post-deploy chunks
+const Login = lazyRetry(() => import("./pages/Login"));
+const Dashboard = lazyRetry(() => import("./pages/Dashboard"));
+const UploadPage = lazyRetry(() => import("./pages/Upload"));
+const AuditResults = lazyRetry(() => import("./pages/AuditResults"));
+const HoldQueue = lazyRetry(() => import("./pages/HoldQueue"));
+const TemplateStudio = lazyRetry(() => import("./pages/TemplateStudio"));
+const SearchPage = lazyRetry(() => import("./pages/Search"));
+const UserManagement = lazyRetry(() => import("./pages/UserManagement"));
+const ExecutiveDashboard = lazyRetry(
   () => import("./pages/analytics/ExecutiveDashboard")
 );
-const DefectAnalysis = lazy(() => import("./pages/analytics/DefectAnalysis"));
-const TechnicianPerformance = lazy(
+const DefectAnalysis = lazyRetry(
+  () => import("./pages/analytics/DefectAnalysis")
+);
+const TechnicianPerformance = lazyRetry(
   () => import("./pages/analytics/TechnicianPerformance")
 );
-const EngineerCoachingPack = lazy(
+const EngineerCoachingPack = lazyRetry(
   () => import("./pages/analytics/EngineerCoachingPack")
 );
-const SiteIntelligence = lazy(
+const SiteIntelligence = lazyRetry(
   () => import("./pages/analytics/SiteIntelligence")
 );
-const DriftDetection = lazy(() => import("./pages/analytics/DriftDetection"));
-const PredictiveRisk = lazy(() => import("./pages/analytics/PredictiveRisk"));
-const PortalLogin = lazy(() => import("./pages/portal/PortalLogin"));
-const DemoGateway = lazy(() => import("./pages/DemoGateway"));
-const TechnicianDashboard = lazy(
+const DriftDetection = lazyRetry(
+  () => import("./pages/analytics/DriftDetection")
+);
+const PredictiveRisk = lazyRetry(
+  () => import("./pages/analytics/PredictiveRisk")
+);
+const PortalLogin = lazyRetry(() => import("./pages/portal/PortalLogin"));
+const DemoGateway = lazyRetry(() => import("./pages/DemoGateway"));
+const TechnicianDashboard = lazyRetry(
   () => import("./pages/portal/TechnicianDashboard")
 );
-const DisputeManagement = lazy(() => import("./pages/DisputeManagement"));
-const AuditLog = lazy(() => import("./pages/AuditLog"));
-const Settings = lazy(() => import("./pages/Settings"));
-const HelpCenter = lazy(() => import("./pages/HelpCenter"));
-const Monitoring = lazy(() => import("./pages/Monitoring"));
-const FeatureFlagMatrix = lazy(() => import("./pages/FeatureFlagMatrix"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+const DisputeManagement = lazyRetry(() => import("./pages/DisputeManagement"));
+const AuditLog = lazyRetry(() => import("./pages/AuditLog"));
+const Settings = lazyRetry(() => import("./pages/Settings"));
+const HelpCenter = lazyRetry(() => import("./pages/HelpCenter"));
+const Monitoring = lazyRetry(() => import("./pages/Monitoring"));
+const FeatureFlagMatrix = lazyRetry(() => import("./pages/FeatureFlagMatrix"));
+const NotFound = lazyRetry(() => import("./pages/NotFound"));
 
 // Loading fallback — no app chrome (Phase 0 portal cleanliness)
 const PageLoader = () => (

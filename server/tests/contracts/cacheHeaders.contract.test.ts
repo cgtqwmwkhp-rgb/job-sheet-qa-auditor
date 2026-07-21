@@ -61,7 +61,16 @@ describe("Cache Headers Contract", () => {
 
       // Verify Azure Easy Auth routes are excluded
       expect(viteContent).toContain("/.auth");
-      expect(viteContent).toContain("startsWith('/.auth')");
+      expect(viteContent).toContain('startsWith("/.auth")');
+    });
+
+    it("should 404 missing /assets/* instead of SPA HTML fallback", () => {
+      const vitePath = path.resolve(__dirname, "../../_core/vite.ts");
+      const viteContent = fs.readFileSync(vitePath, "utf-8");
+
+      expect(viteContent).toContain('pathname.startsWith("/assets/")');
+      expect(viteContent).toContain(".status(404)");
+      expect(viteContent).toContain("Not found");
     });
 
     it("should denylist .auth from PWA navigation fallback", () => {
