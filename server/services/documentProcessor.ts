@@ -27,6 +27,7 @@ import {
   fetchPdfBuffer,
   isThinExtractedText,
   THIN_TEXT_CHAR_THRESHOLD,
+  type EmbeddedPdfPageLayout,
 } from "./embeddedPdfText";
 import {
   extractTextLayerFromUrl,
@@ -154,6 +155,7 @@ import {
   reconcileSelectionMarksWithJudgment,
   hasBlockingFailMarks,
   countHighConfidenceFailMarks,
+  demoteSignOffMissingWhenInkUnverified,
   type SelectionMarksResult,
 } from "./selectionMarks";
 import {
@@ -764,6 +766,8 @@ async function processJobSheetWithOptions(
   let usedEmbeddedText = false;
   let skippedPrimaryOcr = false;
   let textLayerPreExtracted: PreExtractedFieldMap = {};
+  /** Retained for PX-104 Result/Obs checklist readers (word boxes). */
+  let textLayerPageLayouts: EmbeddedPdfPageLayout[] = [];
 
   try {
     const tl = await extractTextLayerFromUrl(documentUrl);
@@ -772,6 +776,7 @@ async function processJobSheetWithOptions(
     skippedPrimaryOcr = tl.result.classification.skipPrimaryOcr;
     textLayerPreExtracted = tl.result.preExtracted;
     usedEmbeddedText = skippedPrimaryOcr;
+    textLayerPageLayouts = tl.embedded?.pageLayouts ?? [];
     recordStage({
       stage: "Text Layer Classification",
       status: tl.result.classification.kind === "empty" ? "skipped" : "success",
@@ -1551,6 +1556,7 @@ async function processJobSheetWithOptions(
     try {
       selectionMarksResult = await runSelectionMarkDetection(documentUrl, {
         headerText: extractedText.slice(0, 4000),
+        pageLayouts: textLayerPageLayouts,
       });
       const marksOk =
         !!selectionMarksResult && !selectionMarksResult.artifact.error;
@@ -2588,6 +2594,13 @@ async function processJobSheetWithOptions(
       documentText: extractedText,
       optionalTemplateFields,
       optionalFieldAliases,
+    });
+
+    // PX-104 / VLM honesty: demote false MAJOR sign-off missing when ink
+    // verification did not run (vlmUsed:false / FEATURE_VLM off).
+    cleaned = demoteSignOffMissingWhenInkUnverified(cleaned, {
+      vlmUsed: vlmInkResult?.imageQa?.vlmUsed === true,
+      signatureLabelPresent: signatureLabelPresent && !vlmSaysAbsent,
     });
 
     // Wasted Journey: drop job number / serial noise from any stage
