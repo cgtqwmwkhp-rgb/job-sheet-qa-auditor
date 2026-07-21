@@ -217,7 +217,9 @@ export function evaluatePartsUsed(text: string): PartsAssessmentResult {
         softReason,
         "Consumables (oil, filters, grease) are not line-itemised on these forms, and repairs alone don't confirm repair parts were fitted — treat as advisory unless Parts Used has incomplete lines.",
         "If a repair part was fitted, list it under Parts Used as PN — description — qty; consumables-only needs no Parts Used lines.",
-        signals.snippet || repairsBody.slice(0, 200) || partsUsedBody.slice(0, 200),
+        signals.snippet ||
+          repairsBody.slice(0, 200) ||
+          partsUsedBody.slice(0, 200),
         70
       )
     );
