@@ -135,7 +135,12 @@ export async function verifySignatureInk(options: {
     return {
       ran: false,
       skippedReason: "FEATURE_VLM_VERIFICATION off",
-      artifact: { enabled: false },
+      artifact: {
+        enabled: false,
+        ran: false,
+        vlmUsed: false,
+        skippedReason: "FEATURE_VLM_VERIFICATION off",
+      },
     };
   }
 
@@ -152,13 +157,17 @@ export async function verifySignatureInk(options: {
   ).slice(0, Math.max(1, config.maxCropsPerDoc));
 
   if (!documentPdf && !options.pageImages?.length && !options.cropImages) {
+    const reason = buffer ? "pdf_too_large_or_empty" : "pdf_fetch_failed";
     return {
       ran: false,
-      skippedReason: buffer ? "pdf_too_large_or_empty" : "pdf_fetch_failed",
+      skippedReason: reason,
       artifact: {
         enabled: true,
+        ran: false,
+        vlmUsed: false,
+        skippedReason: reason,
         provider: config.provider,
-        error: buffer ? "pdf_too_large_or_empty" : "pdf_fetch_failed",
+        error: reason,
         bytes: buffer?.length,
       },
     };
@@ -229,16 +238,26 @@ export async function verifySignatureInk(options: {
       pixelCropped: best.cropReference?.pixelCropped === true,
     });
 
+    const skippedReason =
+      imageQa.vlmUsed === true
+        ? undefined
+        : imageQa.available === false
+          ? "image_qa_unavailable"
+          : "vlm_not_used";
+
     return {
       ran: true,
+      skippedReason,
       imageQa,
       preExtractedHint: hint,
       cropResults,
       artifact: {
         enabled: true,
+        ran: true,
         provider: imageQa.vlmProvider || config.provider,
         model: imageQa.vlmModel || config.model,
         vlmUsed: imageQa.vlmUsed === true,
+        ...(skippedReason ? { skippedReason } : {}),
         passed: imageQa.passed,
         confidence: imageQa.confidence,
         details: imageQa.details,
@@ -267,6 +286,9 @@ export async function verifySignatureInk(options: {
       skippedReason: "exception",
       artifact: {
         enabled: true,
+        ran: false,
+        vlmUsed: false,
+        skippedReason: "exception",
         provider: config.provider,
         error: message,
       },

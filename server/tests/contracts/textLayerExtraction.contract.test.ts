@@ -635,6 +635,32 @@ describe("next-field label-bleed suffix stripping (PX-112)", () => {
     expect(present.length).toBeGreaterThanOrEqual(5);
     expect(present).toContain("assetId");
   });
+
+  it("PX-116: wrapped Jetter without word boxes still extracts assetId via plain-text newline", () => {
+    const text = [
+      "Asset No",
+      "3031532",
+      "Make/Model: JetterPro X200",
+      "Customer: Thames Water",
+      "Date: 14/07/2026",
+      "Job ID",
+      "629",
+    ].join("\n");
+    const fields = extractFieldsFromPlainText(text, 1);
+    expect(fields.find(f => f.fieldId === "assetId")?.value).toBe("3031532");
+    expect(fields.find(f => f.fieldId === "jobReference")?.value).toBe("629");
+
+    const embedded: EmbeddedPdfTextResult = {
+      success: true,
+      fullText: text,
+      pages: [text],
+      pageCount: 1,
+      pageLayouts: [{ pageNumber: 1, text, words: [] }],
+      words: [],
+    };
+    const result = buildTextLayerResult(embedded);
+    expect(result.preExtracted.assetId?.value).toBe("3031532");
+  });
 });
 
 describe("embeddedPdfText words+bboxes", () => {
