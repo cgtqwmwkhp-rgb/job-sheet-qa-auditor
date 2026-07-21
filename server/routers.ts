@@ -1135,11 +1135,24 @@ export const appRouter = router({
           details: { previousStatus: jobSheet.status },
         });
 
+        // Mint a fresh SAS when fileKey exists — upload-time fileUrl expires (~60m).
+        // orchestrateJobSheetProcessing also remints at execution (queue/DLQ safety).
+        let documentUrl = jobSheet.fileUrl;
+        if (jobSheet.fileKey) {
+          try {
+            const storage = getStorageAdapter();
+            const { url } = await storage.get(jobSheet.fileKey);
+            if (url) documentUrl = url;
+          } catch {
+            // fall back to stored fileUrl; orchestrate will retry mint
+          }
+        }
+
         if (isAsyncProcessingEnabled()) {
           return enqueueJobSheetProcessing({
             source: "reprocess",
             jobSheetId: input.id,
-            documentUrl: jobSheet.fileUrl,
+            documentUrl,
             userId: ctx.user.id,
             correlationId: getCorrelationId(),
           });
@@ -1148,7 +1161,7 @@ export const appRouter = router({
         const result = await orchestrateJobSheetProcessing({
           source: "reprocess",
           jobSheetId: input.id,
-          documentUrl: jobSheet.fileUrl,
+          documentUrl,
           userId: ctx.user.id,
         });
 

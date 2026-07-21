@@ -627,6 +627,40 @@ export async function processJobSheet(
 }
 
 /**
+ * Resolve a usable document URL for processing.
+ * Prefer a freshly minted SAS from fileKey — stored fileUrl expires (~60m on Azure).
+ * Falls back to request.documentUrl / persisted fileUrl when storage mint fails.
+ */
+async function resolveDocumentUrlForProcessing(
+  jobSheetId: number,
+  requestedUrl?: string
+): Promise<string> {
+  const jobSheet = await db.getJobSheetById(jobSheetId);
+  if (!jobSheet) {
+    throw new Error(`Job sheet ${jobSheetId} not found`);
+  }
+
+  if (jobSheet.fileKey) {
+    try {
+      const { getStorageAdapter } = await import("../storage");
+      const { url } = await getStorageAdapter().get(jobSheet.fileKey);
+      if (url) return url;
+    } catch (err) {
+      console.warn(
+        `[orchestrate] fresh SAS mint failed for jobSheet ${jobSheetId}; falling back`,
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  const fallback = requestedUrl || jobSheet.fileUrl;
+  if (!fallback) {
+    throw new Error(`Job sheet ${jobSheetId} has no document URL`);
+  }
+  return fallback;
+}
+
+/**
  * Sole external orchestration entry for job-sheet processing. HTTP/tRPC,
  * reprocess, and DLQ retry paths should call this instead of assembling a
  * second pipeline outside documentProcessor.
@@ -634,15 +668,10 @@ export async function processJobSheet(
 export async function orchestrateJobSheetProcessing(
   request: OrchestrateJobSheetProcessingRequest
 ): Promise<ProcessingResult> {
-  let documentUrl = request.documentUrl;
-
-  if (!documentUrl) {
-    const jobSheet = await db.getJobSheetById(request.jobSheetId);
-    if (!jobSheet) {
-      throw new Error(`Job sheet ${request.jobSheetId} not found`);
-    }
-    documentUrl = jobSheet.fileUrl;
-  }
+  const documentUrl = await resolveDocumentUrlForProcessing(
+    request.jobSheetId,
+    request.documentUrl
+  );
 
   // Wrap processing with timeout to prevent hung jobs
   try {
