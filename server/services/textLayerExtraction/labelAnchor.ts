@@ -26,6 +26,24 @@ export interface LabelFieldSpec {
 const DATE_RE = /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/;
 const ISO_DATE_RE = /^\d{4}[./-]\d{1,2}[./-]\d{1,2}$/;
 
+/** A date-shaped run anywhere inside the candidate value (not anchored). */
+const DATE_SHAPED_ANYWHERE_RE = /\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/;
+/** Another header's label text glued onto the value (no-space OCR bleed). */
+const ADJACENT_LABEL_TOKEN_RE =
+  /assetno|assetnumber|assetid|serialno|serialnumber|jobno|jobid|customer|technician|makemodel/i;
+
+/**
+ * LOLER-style jobRef hygiene (PX-106): reject values where a date run is
+ * glued to an unrelated header label (e.g. "12072026AssetNo") — this is
+ * date+label bleed from flattened/no-space text, never a real reference.
+ * Leave the field unread rather than persist wrong adjacent text.
+ */
+export function isDateLabelBleedValue(value: string): boolean {
+  return (
+    DATE_SHAPED_ANYWHERE_RE.test(value) && ADJACENT_LABEL_TOKEN_RE.test(value)
+  );
+}
+
 export const JOB_SUMMARY_LABEL_SPECS: LabelFieldSpec[] = [
   {
     fieldId: "assetId",
@@ -45,7 +63,8 @@ export const JOB_SUMMARY_LABEL_SPECS: LabelFieldSpec[] = [
       "job ref",
       "job reference",
     ],
-    accept: v => /^[A-Z0-9][A-Z0-9/_-]{1,24}$/i.test(v),
+    accept: v =>
+      /^[A-Z0-9][A-Z0-9/_-]{1,24}$/i.test(v) && !isDateLabelBleedValue(v),
   },
   {
     fieldId: "date",

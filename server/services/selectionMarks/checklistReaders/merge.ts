@@ -42,7 +42,7 @@ function yFromRow(row: MergeableChecklistRow): number {
 }
 
 /**
- * Merge layout radio rows with Result/Obs text rows.
+ * Merge layout radio rows with Result/Obs/radio-column text rows.
  * - Readable radio wins on the same label
  * - Text rows fill missing labels (long-list recall)
  * - When radio produced zero readable rows, text becomes authoritative
@@ -51,17 +51,25 @@ export function mergeChecklistRowSources(options: {
   radioRows: MergeableChecklistRow[];
   resultRows?: TextChecklistRow[];
   obsRows?: TextChecklistRow[];
+  /** Ok/Adv/Fail/N/A text-glyph grid rows (PX-106) — mirrors resultRows/obsRows. */
+  radioColumnRows?: TextChecklistRow[];
 }): {
   rows: MergeableChecklistRow[];
-  preferredSource: "layout" | "result_column" | "obs_marks" | "merged";
+  preferredSource:
+    | "layout"
+    | "result_column"
+    | "obs_marks"
+    | "radio_column"
+    | "merged";
   textRowsAdded: number;
 } {
   const radio = options.radioRows ?? [];
   const result = options.resultRows ?? [];
   const obs = options.obsRows ?? [];
+  const radioColumn = options.radioColumnRows ?? [];
 
   const radioReadable = radio.filter(r => r.choice !== "UNREADABLE");
-  const textAll = [...result, ...obs];
+  const textAll = [...result, ...obs, ...radioColumn];
 
   if (textAll.length === 0) {
     return {
@@ -72,7 +80,12 @@ export function mergeChecklistRowSources(options: {
   }
 
   if (radioReadable.length === 0 && textAll.length > 0) {
-    const source = result.length >= obs.length ? "result_column" : "obs_marks";
+    const counts = [
+      { source: "result_column" as const, n: result.length },
+      { source: "obs_marks" as const, n: obs.length },
+      { source: "radio_column" as const, n: radioColumn.length },
+    ];
+    const source = counts.reduce((a, b) => (b.n > a.n ? b : a)).source;
     const rows = textAll.map((r, i) => textRowToSelectionMarkRow(r, i));
     return { rows, preferredSource: source, textRowsAdded: rows.length };
   }
@@ -84,8 +97,11 @@ export function mergeChecklistRowSources(options: {
   const merged: MergeableChecklistRow[] = [...radio];
   let added = 0;
 
-  // Prefer Result over Obs when both claim the same label
+  // Prefer Result over Obs/radio-column when both claim the same label
   const byLabel = new Map<string, TextChecklistRow>();
+  for (const r of radioColumn) {
+    byLabel.set(labelKey(r.label, r.pageNumber, r.yPercent), r);
+  }
   for (const r of obs) {
     byLabel.set(labelKey(r.label, r.pageNumber, r.yPercent), r);
   }

@@ -16,15 +16,18 @@ import type { Finding } from "../../services/analyzer";
 import {
   readResultColumnRows,
   readObsMarkRows,
+  readRadioColumnRows,
   mergeChecklistRowSources,
   detectResultColumnBands,
   detectObsColumnBands,
+  detectRadioColumnBands,
   normalizeResultChoice,
   normalizeObsGlyph,
   computeAdaptiveYTolerance,
   mapSelectionMarksToRows,
   enrichRowsWithTextChecklistReaders,
   demoteSignOffMissingWhenInkUnverified,
+  pageLayoutsToTokens,
   type SelectionMarkRow,
 } from "../../services/selectionMarks";
 import type { AzureSelectionMark as Mark } from "../../services/ocrAdapter/parseAzureDiResponse";
@@ -180,6 +183,96 @@ describe("Obs. marks reader (LOLER)", () => {
       1
     );
     expect(rows.every(r => r.source === "obs_marks")).toBe(true);
+  });
+});
+
+describe("radio-column text-glyph reader (PX-106 Sprint1.5 PR-B)", () => {
+  /** Ok|Adv|Fail|N/A header + row marks rendered as text glyphs, not Azure DI selectionMarks. */
+  function mk(
+    text: string,
+    xCenterPercent: number,
+    yTopPercent: number,
+    w = 6,
+    h = 2
+  ): {
+    text: string;
+    page: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } {
+    return {
+      text,
+      page: 1,
+      x: xCenterPercent - w / 2,
+      y: 100 - yTopPercent - h / 2,
+      width: w,
+      height: h,
+    };
+  }
+
+  function radioGridPageLayout(): EmbeddedPdfPageLayout {
+    return {
+      pageNumber: 1,
+      text: "",
+      width: 100,
+      height: 100,
+      words: [
+        // Header row: Ok | Adv | Fail | N/A
+        mk("Ok", 60, 20),
+        mk("Adv", 70, 20),
+        mk("Fail", 80, 20),
+        mk("N/A", 90, 20),
+        // Row 1: Fail marked with an X glyph
+        mk("Hydraulic hose condition", 10, 30, 40),
+        mk("X", 80, 30),
+        // Row 2: Ok marked with a check glyph
+        mk("Chain wear and stretch", 10, 40, 40),
+        mk("✓", 60, 40),
+        // Row 3: no mark at all — must stay unread, not guessed
+        mk("Hook deformation or cracks", 10, 50, 40),
+        // Row 4: two columns marked — ambiguous, must stay unread
+        mk("Load plate legible", 10, 60, 40),
+        mk("X", 60, 60),
+        mk("X", 80, 60),
+      ],
+    };
+  }
+
+  it("detects the Ok|Adv|Fail|N/A header column bands", () => {
+    const tokens = pageLayoutsToTokens([radioGridPageLayout()]);
+    const bands = detectRadioColumnBands(tokens);
+    const choices = new Set(bands.map(b => b.choice));
+    expect(choices.has("Ok")).toBe(true);
+    expect(choices.has("Adv")).toBe(true);
+    expect(choices.has("Fail")).toBe(true);
+    expect(choices.has("N/A")).toBe(true);
+  });
+
+  it("reads exactly the unambiguous X/✓ marks — was 0/0 with Azure selectionMarks empty", () => {
+    const rows = readRadioColumnRows({ pageLayouts: [radioGridPageLayout()] });
+    expect(rows.length).toBe(2);
+    expect(rows.some(r => r.choice === "Fail")).toBe(true);
+    expect(rows.some(r => r.choice === "Ok")).toBe(true);
+    expect(rows.every(r => r.source === "radio_column")).toBe(true);
+  });
+
+  it("skips rows with zero or multiple marked columns rather than guessing", () => {
+    const rows = readRadioColumnRows({ pageLayouts: [radioGridPageLayout()] });
+    // Row @ y=50 (no mark) and y=60 (two marks) must not appear.
+    expect(rows.some(r => Math.abs(r.yPercent - 50) < 1)).toBe(false);
+    expect(rows.some(r => Math.abs(r.yPercent - 60) < 1)).toBe(false);
+  });
+
+  it("enrichRowsWithTextChecklistReaders fills a radio grid when Azure selectionMarks are empty", () => {
+    const enriched = enrichRowsWithTextChecklistReaders([], {
+      pageLayouts: [radioGridPageLayout()],
+    });
+    expect(enriched.radioColumnRowCount).toBeGreaterThanOrEqual(2);
+    expect(enriched.rows.length).toBeGreaterThanOrEqual(2);
+    expect(enriched.rows.some(r => r.choice === "Fail")).toBe(true);
+    expect(enriched.preferredSource).toBe("radio_column");
   });
 });
 
