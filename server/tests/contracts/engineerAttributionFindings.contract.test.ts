@@ -105,6 +105,26 @@ describe("evaluateEngineerAttribution", () => {
     expect(result.attribution.technicianId).toBe(9);
   });
 
+  it("PR-A: skips ATTR-C011 when no real technician roster candidates exist", () => {
+    const result = evaluateEngineerAttribution({
+      report: REPORT_UNKNOWN_NAME,
+      candidates: [],
+    });
+    expect(result.findings).toHaveLength(0);
+    expect(result.summary).toMatch(/ATTR-C011 skipped/i);
+    expect(result.attribution.extractedName).toBe("Unknown Tech XYZ");
+    expect(result.attribution.technicianId).toBeNull();
+  });
+
+  it("still emits ATTR-C011 when a real (non-empty) roster fails to match", () => {
+    const result = evaluateEngineerAttribution({
+      report: REPORT_UNKNOWN_NAME,
+      candidates: RICHARD_USER,
+    });
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].ruleId).toBe("ATTR-C011");
+  });
+
   it("returns no findings when feature flag is off", () => {
     process.env[FEATURE_ENGINEER_ATTR_FINDING] = "false";
     const result = evaluateEngineerAttribution({

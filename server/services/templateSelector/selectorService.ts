@@ -491,6 +491,15 @@ export function selectTemplateMultiSignal(
     // Combine signals
     const multiSignal = combineSignals(signals, input.signalWeights);
 
+    // PX-107: hard-disqualify when requiredTokensAll is missing or a
+    // negative/excluded token matched — layout/ROI/plausibility signals
+    // must never outvote a missing distinguishing keyword (e.g. a pump job
+    // sheet scoring MEDIUM on generic layout signals must not win over the
+    // PTO compliance checklist just because "pto"/"service" are absent).
+    const hardDisqualified = Boolean(
+      tokenSignal.evidence.details.hardDisqualified
+    );
+
     // Apply metadata boosting
     let adjustedScore = multiSignal.combinedScore;
     if (matchMetadata) {
@@ -511,6 +520,10 @@ export function selectTemplateMultiSignal(
       }
     }
 
+    if (hardDisqualified) {
+      adjustedScore = 0;
+    }
+
     candidates.push({
       templateId: template.id,
       versionId: version.id,
@@ -518,7 +531,7 @@ export function selectTemplateMultiSignal(
       score: adjustedScore,
       matchedTokens: tokenSignal.evidence.matched,
       missingRequired: tokenSignal.evidence.missing,
-      confidence: multiSignal.confidence,
+      confidence: hardDisqualified ? 'LOW' : multiSignal.confidence,
       multiSignal,
     });
   }

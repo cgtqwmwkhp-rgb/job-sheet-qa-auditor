@@ -70,6 +70,13 @@ export interface Finding {
   failClass?: "major" | "minor" | "informational";
   /** True when this finding forces overallResult FAIL. */
   blocksOverallPass?: boolean;
+  /**
+   * PX-104/PR-A honesty guard: set when an upstream honesty pass (e.g.
+   * sign-off VLM-skip demote) already downgraded this finding to
+   * informational. `applyAuditPolicy` must not let a fieldName/alias rule
+   * match (e.g. DEF-C040) remap it back to major/minor.
+   */
+  honestyDemoted?: boolean;
 }
 
 export interface AnalysisResult {

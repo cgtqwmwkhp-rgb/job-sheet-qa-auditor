@@ -29,6 +29,13 @@ export interface SelectionConfig {
   optionalTokens: string[];
   /** Token weights for scoring (optional, defaults to 1.0) */
   tokenWeights?: Record<string, number>;
+  /**
+   * PX-107: Tokens whose presence hard-disqualifies this template even if
+   * requiredTokensAll/Any otherwise match (e.g. exclude "pump"/"pumps" from
+   * a PTO — power take-off — compliance checklist to avoid cross-family
+   * false positives).
+   */
+  negativeTokens?: string[];
 }
 
 /**

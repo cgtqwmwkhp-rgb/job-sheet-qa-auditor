@@ -156,9 +156,22 @@ export function extractTokenSignal(
     }
   }
   
-  if (!allRequiredPresent) {
-    score = Math.max(0, score - 50);
+  // PX-107: negative/excluded tokens (e.g. "pump" on a PTO checklist)
+  // hard-disqualify regardless of any other match.
+  const matchedNegative: string[] = [];
+  for (const token of config.negativeTokens ?? []) {
+    if (documentTokens.has(token.toLowerCase())) {
+      matchedNegative.push(token);
+    }
   }
+  if (matchedNegative.length > 0) {
+    missing.push(...matchedNegative.map(t => `EXCLUDED:${t}`));
+  }
+
+  // PX-107: missing requiredTokensAll or a matched negative token
+  // hard-disqualifies the token signal (score pinned to 0) so it can't be
+  // outvoted by layout/ROI/plausibility noise downstream.
+  const hardDisqualified = !allRequiredPresent || matchedNegative.length > 0;
   
   // Check requiredTokensAny
   let anyRequiredPresent = config.requiredTokensAny.length === 0;
@@ -204,15 +217,17 @@ export function extractTokenSignal(
     (config.formCodeRegex ? 15 : 0) +
     config.optionalTokens.length * 2;
   
-  const normalizedScore = maxPossibleScore > 0 
-    ? Math.min(100, Math.round((score / maxPossibleScore) * 100))
-    : 0;
+  const normalizedScore = hardDisqualified
+    ? 0
+    : maxPossibleScore > 0 
+      ? Math.min(100, Math.round((score / maxPossibleScore) * 100))
+      : 0;
   
   return {
     type: 'token',
     score: normalizedScore,
     weight: DEFAULT_SIGNAL_WEIGHTS.tokenWeight,
-    confidence: getConfidenceFromScore(normalizedScore),
+    confidence: hardDisqualified ? 'LOW' : getConfidenceFromScore(normalizedScore),
     evidence: {
       matched,
       missing,
@@ -221,6 +236,7 @@ export function extractTokenSignal(
         requiredAnyCount: config.requiredTokensAny.length,
         optionalCount: config.optionalTokens.length,
         matchedCount: matched.length,
+        hardDisqualified,
       },
     },
   };

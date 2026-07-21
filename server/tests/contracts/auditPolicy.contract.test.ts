@@ -26,6 +26,7 @@ function finding(
     pageNumber: partial.pageNumber ?? 1,
     whyItMatters: partial.whyItMatters ?? "test",
     suggestedFix: partial.suggestedFix ?? "test",
+    honestyDemoted: partial.honestyDemoted,
   };
 }
 
@@ -242,6 +243,47 @@ describe("auditPolicy", () => {
     });
     expect(classifyFinding(dateFormat, "default", DEFAULT_AUDIT_POLICY)).toBe(
       "minor"
+    );
+  });
+
+  it("PR-A: honestyDemoted finding stays informational even when DEF-C040 matches by fieldName alias", () => {
+    // Mirrors what demoteSignOffMissingWhenInkUnverified produces when
+    // vlmUsed:false — severity S3/LOW_CONFIDENCE plus the honesty lock.
+    const demoted = finding({
+      ruleId: "G001",
+      fieldName: "engineerSignOff",
+      severity: "S3",
+      reasonCode: "LOW_CONFIDENCE",
+      honestyDemoted: true,
+    });
+    expect(classifyFinding(demoted, "default", DEFAULT_AUDIT_POLICY)).toBe(
+      "informational"
+    );
+
+    const applied = applyAuditPolicy({
+      findings: [demoted],
+      formFamily: "default",
+      policy: DEFAULT_AUDIT_POLICY,
+      currentResult: "PASS",
+    });
+    expect(applied.hasMajorFails).toBe(false);
+    expect(applied.overallResult).toBe("PASS");
+    expect(applied.findings[0].failClass).toBe("informational");
+    expect(applied.findings[0].blocksOverallPass).toBe(false);
+    expect(applied.findings[0].severity).toBe("S3");
+  });
+
+  it("PR-A: non-demoted engineerSignOff finding still classifies major via DEF-C040", () => {
+    // Guards against over-broadening the honesty exception — a genuine
+    // (non-demoted) missing sign-off must still hard-fail.
+    const genuine = finding({
+      ruleId: "G002",
+      fieldName: "engineerSignOff",
+      severity: "S1",
+      reasonCode: "MISSING_FIELD",
+    });
+    expect(classifyFinding(genuine, "default", DEFAULT_AUDIT_POLICY)).toBe(
+      "major"
     );
   });
 

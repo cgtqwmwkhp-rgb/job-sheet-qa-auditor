@@ -94,4 +94,21 @@ describe("Form-family selection catalogs (PR4)", () => {
       expect(t?.templateId, c.slug).toBe(c.slug);
     }
   });
+
+  it("PX-108: LOLER jobReference is not required and LOLER-R001 is disabled", () => {
+    initializeFormFamilySelectionCatalogs();
+
+    const t = getTemplateBySlug("loler-examination-v1");
+    expect(t).toBeTruthy();
+    const active = getActiveVersion(t!.id);
+    expect(active).toBeTruthy();
+
+    const jobReferenceField = active!.specJson.fields.find(
+      f => f.field === "jobReference"
+    );
+    expect(jobReferenceField?.required).toBe(false);
+
+    const rule = active!.specJson.rules.find(r => r.ruleId === "LOLER-R001");
+    expect(rule?.enabled).toBe(false);
+  });
 });

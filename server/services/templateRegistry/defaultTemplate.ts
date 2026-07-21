@@ -370,14 +370,18 @@ export function specJsonToGoldSpec(specJson: SpecJson): {
   return {
     name: specJson.name,
     version: specJson.version,
-    rules: specJson.rules.map(rule => ({
-      id: rule.ruleId,
-      field: rule.field,
-      type: rule.type === 'required' ? 'presence' : rule.type,
-      required: rule.type === 'required' || rule.severity === 'critical',
-      description: rule.description,
-      pattern: rule.pattern,
-      format: rule.pattern, // For format type rules
-    })),
+    // PX-108: admin/import-pack disabled rules (enabled:false) must never
+    // reach the GoldSpec/deterministic validator as a required rule.
+    rules: specJson.rules
+      .filter(rule => rule.enabled !== false)
+      .map(rule => ({
+        id: rule.ruleId,
+        field: rule.field,
+        type: rule.type === 'required' ? 'presence' : rule.type,
+        required: rule.type === 'required' || rule.severity === 'critical',
+        description: rule.description,
+        pattern: rule.pattern,
+        format: rule.pattern, // For format type rules
+      })),
   };
 }

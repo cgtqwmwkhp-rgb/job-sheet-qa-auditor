@@ -16,6 +16,8 @@ import {
   calculateScore,
   getConfidenceBand,
   selectTemplate,
+  selectTemplateMultiSignal,
+  extractTokenSignal,
   createSelectionTraceArtifact,
 } from '../../services/templateSelector';
 import {
@@ -23,6 +25,9 @@ import {
   uploadTemplateVersion,
   activateVersion,
   resetRegistry,
+  resetFixtureStore,
+  initializePtoServiceTemplate,
+  getTemplateBySlug,
   type SelectionConfig,
   type SpecJson,
 } from '../../services/templateRegistry';
@@ -412,6 +417,74 @@ describe('Template Selector - PR-B Contract Tests', () => {
       expect(result.confidenceBand).toBe('LOW');
       expect(result.autoProcessingAllowed).toBe(false);
       expect(result.selected).toBe(false);
+    });
+  });
+
+  describe('PX-107: hard-disqualify on missing requiredTokensAll / negative tokens', () => {
+    it('extractTokenSignal pins score to 0 when a requiredTokensAll token is missing', () => {
+      const config: SelectionConfig = {
+        requiredTokensAll: ['pto', 'service'],
+        requiredTokensAny: ['compliance', 'checklist'],
+        optionalTokens: ['job', 'summary', 'asset', 'technician'],
+      };
+      // "service" present, "pto" missing — plus lots of optional noise that
+      // would previously have kept the score non-zero (just -50 penalty).
+      const tokens = new Set([
+        'job',
+        'summary',
+        'asset',
+        'technician',
+        'service',
+        'compliance',
+      ]);
+      const signal = extractTokenSignal(tokens, config);
+      expect(signal.score).toBe(0);
+      expect(signal.confidence).toBe('LOW');
+      expect(signal.evidence.details.hardDisqualified).toBe(true);
+    });
+
+    it('extractTokenSignal pins score to 0 when a negativeToken is present', () => {
+      const config: SelectionConfig = {
+        requiredTokensAll: ['pto', 'service'],
+        requiredTokensAny: ['compliance', 'checklist'],
+        optionalTokens: ['job', 'summary'],
+        negativeTokens: ['pump', 'pumps'],
+      };
+      const tokens = new Set([
+        'pto',
+        'service',
+        'compliance',
+        'job',
+        'summary',
+        'pump',
+      ]);
+      const signal = extractTokenSignal(tokens, config);
+      expect(signal.score).toBe(0);
+      expect(signal.confidence).toBe('LOW');
+      expect(signal.evidence.missing).toContain('EXCLUDED:pump');
+    });
+
+    it('pump-like job sheet text never selects compliance-checklist-pto-service-v1', () => {
+      resetFixtureStore();
+      initializePtoServiceTemplate();
+      const ptoTemplate = getTemplateBySlug(
+        'compliance-checklist-pto-service-v1'
+      );
+      expect(ptoTemplate).toBeTruthy();
+
+      const result = selectTemplateMultiSignal({
+        documentText:
+          'Maintenance Report Equipment serviced Pump-01 Service Date 15/01/2024 Work done Oil change and filter replacement Engineer J. Smith Job Summary Asset No PUMP-01 Technician Signature present',
+      });
+      const ptoCandidate = result.multiSignalCandidates?.find(
+        c => c.templateSlug === 'compliance-checklist-pto-service-v1'
+      );
+      expect(ptoCandidate).toBeTruthy();
+      expect(ptoCandidate!.score).toBe(0);
+      expect(ptoCandidate!.confidence).toBe('LOW');
+      expect(result.confidenceBand).toBe('LOW');
+      expect(result.selected).toBe(false);
+      expect(result.autoProcessingAllowed).toBe(false);
     });
   });
 });

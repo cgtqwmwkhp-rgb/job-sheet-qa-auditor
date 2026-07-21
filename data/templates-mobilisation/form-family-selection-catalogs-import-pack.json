@@ -631,7 +631,7 @@
             "field": "jobReference",
             "label": "Job / Certificate Reference",
             "type": "string",
-            "required": true,
+            "required": false,
             "extractionHints": ["job id", "certificate", "report number"]
           },
           {
@@ -671,10 +671,10 @@
           {
             "ruleId": "LOLER-R001",
             "field": "jobReference",
-            "description": "Required",
-            "severity": "critical",
+            "description": "Job/certificate reference is often absent on LOLER thorough-examination reports — softened to non-blocking (PX-108)",
+            "severity": "minor",
             "type": "required",
-            "enabled": true
+            "enabled": false
           },
           {
             "ruleId": "LOLER-R002",

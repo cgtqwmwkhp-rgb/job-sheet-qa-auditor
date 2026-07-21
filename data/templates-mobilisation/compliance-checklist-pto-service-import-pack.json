@@ -280,6 +280,7 @@
           "asset",
           "technician"
         ],
+        "negativeTokens": ["pump", "pumps"],
         "tokenWeights": {
           "pto": 20,
           "service": 10,

@@ -58,6 +58,9 @@ export function demoteSignOffMissingWhenInkUnverified(
           "Signature/sign-off label detected but ink verification was skipped (vlmUsed:false). Recorded as Present — confirm handwritten ink on the document.",
         suggestedFix:
           "Scroll to the sign-off box and confirm the handwritten signature is present.",
+        // Locks classification informational — prevents applyAuditPolicy's
+        // DEF-C040/WJ-C040 fieldName-alias match from undoing this demote.
+        honestyDemoted: true,
       };
     }
 
@@ -69,6 +72,7 @@ export function demoteSignOffMissingWhenInkUnverified(
         "Sign-off ink was not verified because the VLM ink stage did not run (vlmUsed:false). Do not treat this as a confirmed MAJOR missing sign-off — confirm on the document.",
       suggestedFix:
         "Inspect the technician/customer sign-off area on the PDF. Re-run with FEATURE_VLM_VERIFICATION enabled for grounded ink checks.",
+      honestyDemoted: true,
     };
   });
 }
