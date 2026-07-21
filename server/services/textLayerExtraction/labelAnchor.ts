@@ -51,12 +51,18 @@ export const JOB_SUMMARY_LABEL_SPECS: LabelFieldSpec[] = [
     fieldId: "date",
     aliases: ["dateOfService"],
     // Prefer exact "Date" / "Date:" — not "Next Service Date"
-    labels: ["date:", "date"],
+    labels: ["date:", "date", "date of examination", "inspection date"],
     accept: v => DATE_RE.test(v) || ISO_DATE_RE.test(v),
   },
   {
     fieldId: "makeModel",
-    labels: ["make/model", "make / model", "make model"],
+    labels: [
+      "make/model",
+      "make / model",
+      "make model",
+      "make and model",
+      "model",
+    ],
     accept: v => v.length >= 2 && v.length <= 80,
   },
   {
@@ -66,10 +72,19 @@ export const JOB_SUMMARY_LABEL_SPECS: LabelFieldSpec[] = [
   },
   {
     fieldId: "technicianName",
-    labels: ["technician name", "engineer name", "technician:", "engineer:"],
+    labels: [
+      "technician name",
+      "engineer name",
+      "print name",
+      "technician:",
+      "engineer:",
+    ],
     accept: v => v.length >= 2 && v.length <= 80 && !/signature/i.test(v),
   },
 ];
+
+/** Shared label-alternation source for LOLER-style date phrasing (PX-106). */
+const DATE_LABEL_SRC = "(?:Date(?:\\s+of\\s+Examination)?|Inspection\\s*Date)";
 
 function normalizeLabel(s: string): string {
   return s.toLowerCase().replace(/\s+/g, " ").trim();
@@ -112,9 +127,10 @@ function findLabelRun(
     let joined = "";
     for (let j = i; j < Math.min(i + 6, n); j++) {
       joined = normalizeLabel(`${joined}${joined ? " " : ""}${words[j].text}`);
-      // Strip trailing colon for comparison flexibility
-      const joinedBare = joined.replace(/:$/, "");
-      const targetBare = target.replace(/:$/, "");
+      // Strip trailing (whitespace +) colon for comparison flexibility —
+      // handles tokens like "ID :" where a space precedes the colon.
+      const joinedBare = joined.replace(/\s*:\s*$/, "").trim();
+      const targetBare = target.replace(/\s*:\s*$/, "").trim();
 
       if (joinedBare === targetBare || joined === target) {
         // Reject when a longer left-context makes this a different label
@@ -175,14 +191,15 @@ function collectValueWords(
     if (out.length === 0 && gap > opts.maxGapX) break;
     if (out.length > 0 && gap > opts.maxGapX * 1.5) break;
 
-    const token = normalizeLabel(w.text.replace(/:$/, ""));
+    const token = normalizeLabel(w.text.replace(/\s*:\s*$/, ""));
     if (opts.stopLabels.some(l => token === l || token.startsWith(l + " "))) {
       break;
     }
-    // Stop at another known field label word
+    // Stop at another known field label word, or a signature marker
+    // trailing the value (e.g. "Technician: John Smith Signature:").
     if (
-      /^(asset|job|make|customer|technician|engineer|compliance|location|serial|site|miles|hours)$/i.test(
-        w.text.replace(/:$/, "")
+      /^(asset|job|make|customer|technician|engineer|compliance|location|serial|site|miles|hours|signature)$/i.test(
+        w.text.replace(/\s*:\s*$/, "")
       )
     ) {
       break;
@@ -338,7 +355,7 @@ export function extractFieldsFromPlainText(
     },
     {
       fieldId: "makeModel",
-      re: /(?:make\s*\/\s*model|make\s*model)\s*[:.-]?\s*([^\n]{2,80}?)(?=\s{2,}|\s+Asset\b|\s+Customer\b|\s+Location\b|\n|$)/i,
+      re: /(?:make\s*(?:and|\/)?\s*model|model)\s*[:.-]?\s*([^\n]{2,80}?)(?=\s{2,}|\s+Asset\b|\s+Customer\b|\s+Location\b|\n|$)/i,
       label: "Make/Model",
     },
     {
@@ -348,17 +365,22 @@ export function extractFieldsFromPlainText(
     },
     {
       fieldId: "technicianName",
-      re: /(?:technician\s*name|engineer\s*name)\s*[:.-]?\s*([A-Za-z][A-Za-z0-9._' -]{1,60})/i,
+      re: /(?:technician\s*name|engineer\s*name|print\s*name)\s*[:.-]?\s*([A-Za-z][A-Za-z0-9._' -]{1,60})/i,
       label: "Technician Name",
     },
   ];
 
-  // Safer date pattern without lookbehind (JS engines vary): line-oriented
-  const dateLineRe =
-    /(?:^|\n)\s*Date\s*[:.-]\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i;
+  // Safer date pattern without lookbehind (JS engines vary): line-oriented.
+  // Also matches LOLER-style "Date of Examination" / "Inspection Date".
+  const dateLineRe = new RegExp(
+    `(?:^|\\n)\\s*${DATE_LABEL_SRC}\\s*[:.-]\\s*(\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4})`,
+    "i"
+  );
   // Also allow inline "Date: dd/mm/yyyy" not preceded by Service/Next/Expiry
-  const dateInlineRe =
-    /(?<![A-Za-z])Date\s*[:.-]\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i;
+  const dateInlineRe = new RegExp(
+    `(?<![A-Za-z])${DATE_LABEL_SRC}\\s*[:.-]\\s*(\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4})`,
+    "i"
+  );
 
   for (const spec of specs) {
     if (seen.has(spec.fieldId)) continue;
@@ -383,7 +405,10 @@ export function extractFieldsFromPlainText(
           // Try to find a Completion "Date:" earlier — scan all Date: hits
           const all = Array.from(
             normalized.matchAll(
-              /Date\s*[:.-]\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/gi
+              new RegExp(
+                `${DATE_LABEL_SRC}\\s*[:.-]\\s*(\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4})`,
+                "gi"
+              )
             )
           );
           match = null;

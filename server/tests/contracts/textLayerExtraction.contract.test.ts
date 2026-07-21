@@ -22,6 +22,8 @@ import {
   textItemToWordBox,
   usableTextLength,
   type EmbeddedPdfTextResult,
+  type EmbeddedPdfPageLayout,
+  type PdfTextWord,
 } from "../../services/embeddedPdfText";
 import {
   applyFieldVote,
@@ -44,6 +46,22 @@ const RUN011_GT = JSON.parse(
   ungroundedDateMustAbstain: string;
   documentStrategyExpected: string;
 };
+
+const JETTER_TEXT = fs.readFileSync(
+  path.join(FIXTURE_DIR, "jetter-job-629.txt"),
+  "utf-8"
+);
+const JETTER_GT = JSON.parse(
+  fs.readFileSync(path.join(FIXTURE_DIR, "jetter-job-629.gt.json"), "utf-8")
+) as { headers: Record<string, string> };
+
+const LOLER_TEXT = fs.readFileSync(
+  path.join(FIXTURE_DIR, "loler-cert-8842.txt"),
+  "utf-8"
+);
+const LOLER_GT = JSON.parse(
+  fs.readFileSync(path.join(FIXTURE_DIR, "loler-cert-8842.gt.json"), "utf-8")
+) as { headers: Record<string, string> };
 
 const MINIMAL_TEXT_PDF = `%PDF-1.1
 1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
@@ -155,6 +173,149 @@ describe("label-anchor header extract (PX-100)", () => {
     expect(result.preExtracted.assetId?.value).toBe("WX65VMH");
     expect(result.preExtracted.jobReference?.value).toBe("218");
     expect(result.preExtracted.date?.value).toBe("16/07/2026");
+  });
+});
+
+describe("label-anchor extract coverage (PX-106)", () => {
+  /** Synthetic geometry mirroring a Jetter job sheet's word boxes. */
+  function jetterPageLayout(): EmbeddedPdfPageLayout {
+    const pageH = 842;
+    const mk = (
+      text: string,
+      x: number,
+      yFromTop: number,
+      w = 40,
+      h = 10
+    ): PdfTextWord => ({
+      text,
+      page: 1,
+      x,
+      y: pageH - yFromTop - h,
+      width: w,
+      height: h,
+    });
+    const words: PdfTextWord[] = [
+      mk("Asset", 40, 80, 35),
+      mk("No", 80, 80, 20),
+      mk("JT99XYZ", 120, 80, 55),
+      mk("Date", 40, 120, 30),
+      mk("22/07/2026", 90, 120, 70),
+      // "ID :" merged as one word — space before colon (root cause 1).
+      mk("Job", 40, 160, 25),
+      mk("ID :", 70, 160, 30),
+      mk("629", 105, 160, 30),
+      // Same-line Technician + trailing Signature marker (root cause 2).
+      mk("Technician:", 40, 200, 65),
+      mk("John", 110, 200, 30),
+      mk("Smith", 145, 200, 35),
+      mk("Signature", 185, 200, 55),
+    ];
+    return {
+      pageNumber: 1,
+      text: JETTER_TEXT,
+      words,
+    };
+  }
+
+  it("resolves Job ID with space-before-colon token via geometry", () => {
+    const embedded: EmbeddedPdfTextResult = {
+      success: true,
+      fullText: JETTER_TEXT,
+      pages: [JETTER_TEXT],
+      pageCount: 1,
+      pageLayouts: [jetterPageLayout()],
+      words: jetterPageLayout().words,
+    };
+    const result = buildTextLayerResult(embedded);
+
+    expect(result.preExtracted.jobReference?.value).toBe(
+      JETTER_GT.headers.jobReference
+    );
+    expect(result.preExtracted.technicianName?.value).toBe(
+      JETTER_GT.headers.technicianName
+    );
+  });
+
+  it("extracts ≥5/6 canonical headers from Jetter-like text + geometry", () => {
+    const embedded: EmbeddedPdfTextResult = {
+      success: true,
+      fullText: JETTER_TEXT,
+      pages: [JETTER_TEXT],
+      pageCount: 1,
+      pageLayouts: [jetterPageLayout()],
+      words: jetterPageLayout().words,
+    };
+    const result = buildTextLayerResult(embedded);
+
+    const canonicalIds = [
+      "assetId",
+      "jobReference",
+      "date",
+      "makeModel",
+      "customerName",
+      "technicianName",
+    ];
+    const present = canonicalIds.filter(id => result.preExtracted[id]);
+    expect(present.length).toBeGreaterThanOrEqual(5);
+    expect(present).toContain("jobReference");
+    expect(present).toContain("technicianName");
+
+    for (const id of canonicalIds) {
+      if (JETTER_GT.headers[id] && result.preExtracted[id]) {
+        expect(result.preExtracted[id]?.value).toBe(JETTER_GT.headers[id]);
+      }
+    }
+  });
+
+  it("backfills missing canonical headers from plain text even when geometry already grounded ≥3 fields", () => {
+    // makeModel/customerName have no geometry words above — only reachable
+    // via the document-level plain-text backfill (root cause 3).
+    const embedded: EmbeddedPdfTextResult = {
+      success: true,
+      fullText: JETTER_TEXT,
+      pages: [JETTER_TEXT],
+      pageCount: 1,
+      pageLayouts: [jetterPageLayout()],
+      words: jetterPageLayout().words,
+    };
+    const result = buildTextLayerResult(embedded);
+
+    expect(result.preExtracted.makeModel?.value).toBe(
+      JETTER_GT.headers.makeModel
+    );
+    expect(result.preExtracted.customerName?.value).toBe(
+      JETTER_GT.headers.customerName
+    );
+  });
+
+  it("extracts LOLER-style Make and Model / Print Name / Date of Examination", () => {
+    const fields = extractFieldsFromPlainText(LOLER_TEXT, 1);
+    const byId = Object.fromEntries(fields.map(f => [f.fieldId, f]));
+
+    expect(byId.assetId?.value).toBe(LOLER_GT.headers.assetId);
+    expect(byId.jobReference?.value).toBe(LOLER_GT.headers.jobReference);
+    expect(byId.date?.value).toBe(LOLER_GT.headers.date);
+    expect(byId.makeModel?.value).toBe(LOLER_GT.headers.makeModel);
+    expect(byId.customerName?.value).toBe(LOLER_GT.headers.customerName);
+    expect(byId.technicianName?.value).toBe(LOLER_GT.headers.technicianName);
+  });
+
+  it("buildTextLayerResult surfaces LOLER headers end-to-end", () => {
+    const result = buildTextLayerResult({
+      success: true,
+      fullText: LOLER_TEXT,
+      pages: [LOLER_TEXT],
+      pageCount: 1,
+      pageLayouts: [{ pageNumber: 1, text: LOLER_TEXT, words: [] }],
+      words: [],
+    });
+    expect(result.preExtracted.makeModel?.value).toBe(
+      LOLER_GT.headers.makeModel
+    );
+    expect(result.preExtracted.technicianName?.value).toBe(
+      LOLER_GT.headers.technicianName
+    );
+    expect(result.preExtracted.date?.value).toBe(LOLER_GT.headers.date);
   });
 });
 
