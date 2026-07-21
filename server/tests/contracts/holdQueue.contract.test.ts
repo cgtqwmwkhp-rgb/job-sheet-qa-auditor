@@ -89,8 +89,11 @@ describe("Hold Queue Contract", () => {
     });
 
     it("has controlled search", () => {
+      // PX-076 — input binds to searchInput; debounced searchQuery filters list
+      expect(holdQueueContent).toContain("searchInput");
       expect(holdQueueContent).toContain("searchQuery");
-      expect(holdQueueContent).toMatch(/value=\{searchQuery\}/);
+      expect(holdQueueContent).toMatch(/value=\{searchInput\}/);
+      expect(holdQueueContent).toMatch(/setSearchQuery\(searchInput\)/);
     });
 
     it("references captureFieldCorrection via workstation pane", () => {

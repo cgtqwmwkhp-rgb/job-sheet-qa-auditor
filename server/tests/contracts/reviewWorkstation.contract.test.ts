@@ -57,10 +57,13 @@ describe("Review Workstation Contract (PR-13)", () => {
     });
 
     it("has controlled search input", () => {
+      // PX-076 — controlled input + debounced filter (avoids keystroke swallow)
+      expect(holdQueue).toContain("searchInput");
+      expect(holdQueue).toContain("setSearchInput");
       expect(holdQueue).toContain("searchQuery");
       expect(holdQueue).toContain("setSearchQuery");
-      expect(holdQueue).toMatch(/value=\{searchQuery\}/);
-      expect(holdQueue).toMatch(/onChange=\{e => setSearchQuery/);
+      expect(holdQueue).toMatch(/value=\{searchInput\}/);
+      expect(holdQueue).toMatch(/onChange=\{e => setSearchInput/);
     });
 
     it("wires bulk approve with Promise.allSettled", () => {
