@@ -305,6 +305,38 @@ export default function Settings() {
                 <Card>
                   <CardHeader>
                     <div className="flex items-center gap-2">
+                      <CardTitle>Runtime environment</CardTitle>
+                      <Badge variant="outline">
+                        {version?.environment ?? "unknown"}
+                      </Badge>
+                    </div>
+                    <CardDescription>
+                      {/* PX-083 — honest env labelling (not “prod” when staging) */}
+                      Deployed build reported by the API. Use this when
+                      confirming whether you are on production, staging, or
+                      local.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <p>
+                      <span className="text-muted-foreground">
+                        Environment:
+                      </span>{" "}
+                      <span className="font-medium">
+                        {version?.environment ?? "unavailable"}
+                      </span>
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Build:</span>{" "}
+                      <span className="font-mono text-xs">
+                        {version?.gitShaShort ?? version?.gitSha ?? "—"}
+                      </span>
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
                       <CardTitle>General Settings</CardTitle>
                       <Badge variant="secondary">Preview — not saved</Badge>
                     </div>

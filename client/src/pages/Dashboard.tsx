@@ -27,6 +27,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Link, useLocation } from "wouter";
 import { perfMark, perfClear, PERF_MARKS } from "@/lib/perf";
 import { cn } from "@/lib/utils";
+import { formatDateUk } from "@/lib/formatDateUk";
 import { useMemo, useState } from "react";
 import type { Activity } from "@/lib/api";
 import {
@@ -483,9 +484,10 @@ export default function Dashboard() {
                 <TabsTrigger value="recent">Recent Audits</TabsTrigger>
                 <TabsTrigger value="hold">
                   Hold Queue
-                  {(holdQueueSheets?.items.length ?? 0) > 0 ? (
+                  {/* PX-082 — KPI count, not the preview page length (limit 5) */}
+                  {(statsData?.reviewQueue ?? 0) > 0 ? (
                     <Badge variant="secondary" className="ml-1.5 h-5 px-1.5">
-                      {holdQueueSheets!.items.length}
+                      {statsData!.reviewQueue}
                     </Badge>
                   ) : null}
                 </TabsTrigger>
@@ -589,7 +591,7 @@ export default function Dashboard() {
                                 {sheet.status.toUpperCase().replace("_", " ")}
                               </p>
                               <p className="text-xs text-[#8A8787]">
-                                {new Date(sheet.createdAt).toLocaleDateString()}
+                                {formatDateUk(sheet.createdAt)}
                               </p>
                             </div>
                           </div>

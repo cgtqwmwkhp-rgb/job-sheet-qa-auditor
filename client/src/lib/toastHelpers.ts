@@ -28,7 +28,9 @@ import { toast } from "sonner";
 export function showSuccessToast(message: string, description?: string) {
   return toast.success(message, {
     description,
-    duration: 4000,
+    // PX-098 — short success so Save / primary actions stay clickable
+    duration: 2500,
+    position: "top-right",
   });
 }
 
@@ -39,6 +41,7 @@ export function showErrorToast(message: string, description?: string) {
   return toast.error(message, {
     description,
     duration: 6000, // Longer duration for errors
+    position: "top-right",
   });
 }
 
@@ -48,7 +51,8 @@ export function showErrorToast(message: string, description?: string) {
 export function showInfoToast(message: string, description?: string) {
   return toast.info(message, {
     description,
-    duration: 4000,
+    duration: 3000,
+    position: "top-right",
   });
 }
 
@@ -112,7 +116,11 @@ export function showUploadErrorToast(fileName: string, error?: string) {
  * Save success toast
  */
 export function showSaveSuccessToast(itemType: string = "Changes") {
-  return showSuccessToast(`${itemType} saved`, "Your changes have been saved");
+  return toast.success(`${itemType} saved`, {
+    description: "Your changes have been saved",
+    duration: 2000,
+    position: "top-right",
+  });
 }
 
 /**

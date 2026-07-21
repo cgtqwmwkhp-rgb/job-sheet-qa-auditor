@@ -512,9 +512,17 @@ export const appRouter = router({
             "failed",
             "review_queue",
           ]),
+          /** PX-074 — required by Hold Queue reject dialog for failed status */
+          reason: z.string().trim().min(3).max(500).optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
+        if (input.status === "failed" && !input.reason) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "A rejection reason is required",
+          });
+        }
         await db.updateJobSheetStatus(input.id, input.status);
 
         await db.logAction({
@@ -522,7 +530,10 @@ export const appRouter = router({
           action: "UPDATE_JOB_SHEET_STATUS",
           entityType: "job_sheet",
           entityId: input.id,
-          details: { newStatus: input.status },
+          details: {
+            newStatus: input.status,
+            ...(input.reason ? { reason: input.reason } : {}),
+          },
         });
 
         return { success: true };

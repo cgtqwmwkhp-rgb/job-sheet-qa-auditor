@@ -23,7 +23,13 @@ function StageIcon({ status }: { status: StageRunStatus }) {
     case "running":
       return <Loader2 className="h-4 w-4 animate-spin text-[#2868CE]" />;
     case "skipped":
-      return <SkipForward className="h-4 w-4 text-muted-foreground" />;
+      // PX-093 — N/A / skipped stages stay neutral (never red ✗)
+      return (
+        <SkipForward
+          className="h-4 w-4 text-muted-foreground"
+          aria-label="Skipped"
+        />
+      );
     default:
       return <Circle className="h-4 w-4 text-muted-foreground/50" />;
   }
@@ -31,7 +37,7 @@ function StageIcon({ status }: { status: StageRunStatus }) {
 
 function stageLabel(stage: ProcessingStageSnapshot): string {
   if (stage.status === "running") return `${stage.stage}…`;
-  if (stage.status === "skipped") return `${stage.stage} (skipped)`;
+  if (stage.status === "skipped") return `${stage.stage} (N/A)`;
   return stage.stage;
 }
 
@@ -90,7 +96,8 @@ export function ProcessingProgressPanel({
               className={cn(
                 stage.status === "pending" && "text-muted-foreground",
                 stage.status === "running" && "font-medium text-blue-800",
-                stage.status === "failed" && "text-red-700"
+                stage.status === "failed" && "text-red-700",
+                stage.status === "skipped" && "text-muted-foreground"
               )}
             >
               {stageLabel(stage)}

@@ -12,7 +12,17 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { ListSkeleton } from "@/components/ui/loading-skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertCircle,
   CheckCircle2,
@@ -113,7 +123,8 @@ function HoldItemReasonChips({
         <Badge
           key={chip.key}
           variant="secondary"
-          className={`text-[10px] px-1.5 py-0 leading-4 border ${chip.className}`}
+          title={chip.label}
+          className={`text-[10px] px-1.5 py-0 leading-4 border max-w-[9rem] truncate ${chip.className}`}
         >
           {chip.label}
         </Badge>
@@ -153,9 +164,12 @@ function sortByPriority(items: HoldItem[]): HoldItem[] {
 export default function HoldQueue() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterChip, setFilterChip] = useState<FilterChip>("all");
   const [showLegend, setShowLegend] = useState(false);
+  const [rejectTargetId, setRejectTargetId] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
   const [bulkApproveConfirmOpen, setBulkApproveConfirmOpen] = useState(false);
   const [pendingBulkApproveIds, setPendingBulkApproveIds] = useState<number[]>(
     []
@@ -182,8 +196,14 @@ export default function HoldQueue() {
     error,
   } = trpc.jobSheets.list.useQuery({
     status: "review_queue",
-    limit: 50,
+    limit: 100,
   });
+
+  // PX-076 — debounce filter so typing never remounts the workstation pane
+  useEffect(() => {
+    const t = window.setTimeout(() => setSearchQuery(searchInput), 200);
+    return () => window.clearTimeout(t);
+  }, [searchInput]);
 
   const { data: slaSummary } = trpc.analytics.getHoldQueueSla.useQuery(
     undefined,
@@ -387,12 +407,26 @@ export default function HoldQueue() {
     );
   };
 
-  const handleReject = (jobSheetId: number) => {
+  const openRejectDialog = (jobSheetId: number) => {
+    setRejectTargetId(jobSheetId);
+    setRejectReason("");
+  };
+
+  const confirmReject = () => {
+    if (rejectTargetId == null) return;
+    const reason = rejectReason.trim();
+    if (reason.length < 3) {
+      toast.error("Enter a rejection reason (at least 3 characters)");
+      return;
+    }
+    const jobSheetId = rejectTargetId;
     updateStatus.mutate(
-      { id: jobSheetId, status: "failed" },
+      { id: jobSheetId, status: "failed", reason },
       {
         onSuccess: () => {
           utils.jobSheets.list.invalidate();
+          setRejectTargetId(null);
+          setRejectReason("");
           if (selectedId === jobSheetId) {
             const idx = sortedFilteredItems.findIndex(i => i.id === jobSheetId);
             const nextItem =
@@ -402,6 +436,7 @@ export default function HoldQueue() {
             setSelectedId(nextItem?.id ?? null);
           }
           toast.success("Job sheet rejected", {
+            duration: 2500,
             action: {
               label: "Undo",
               onClick: () => {
@@ -531,7 +566,7 @@ export default function HoldQueue() {
     }
   });
   const onRejectSelected = usePersistFn(() => {
-    if (activeId != null) handleReject(activeId);
+    if (activeId != null) openRejectDialog(activeId);
   });
 
   const keyboardHandlers = useMemo(
@@ -639,8 +674,8 @@ export default function HoldQueue() {
               type="search"
               placeholder="Search by ID, technician, or site..."
               className="pl-9 bg-background border-border"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -758,6 +793,7 @@ export default function HoldQueue() {
                         label: "Clear filters",
                         onClick: () => {
                           setFilterChip("all");
+                          setSearchInput("");
                           setSearchQuery("");
                         },
                       }}
@@ -898,7 +934,7 @@ export default function HoldQueue() {
                                       size="sm"
                                       variant="ghost"
                                       className="h-7 w-7 p-0 text-red-600 hover:bg-red-50"
-                                      onClick={() => handleReject(item.id)}
+                                      onClick={() => openRejectDialog(item.id)}
                                       disabled={updateStatus.isPending}
                                       aria-label="Reject"
                                       title="Reject (r)"
@@ -940,7 +976,7 @@ export default function HoldQueue() {
                     onApproveJobSheet={claimToken =>
                       handleApprove(activeId, claimToken)
                     }
-                    onRejectJobSheet={() => handleReject(activeId)}
+                    onRejectJobSheet={() => openRejectDialog(activeId)}
                     onReviewClaimChange={(token, status) =>
                       setActiveClaim({ jobSheetId: activeId, token, status })
                     }
@@ -960,6 +996,61 @@ export default function HoldQueue() {
             </Card>
           </div>
         )}
+
+        {/* PX-074 — require rejection reason */}
+        <Dialog
+          open={rejectTargetId != null}
+          onOpenChange={open => {
+            if (!open) {
+              setRejectTargetId(null);
+              setRejectReason("");
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reject job sheet</DialogTitle>
+              <DialogDescription>
+                Provide a short reason. This is recorded in the audit log and
+                helps coaching.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="hold-reject-reason">Rejection reason</Label>
+              <Textarea
+                id="hold-reject-reason"
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                placeholder="e.g. Missing engineer signature / unreadable photo evidence"
+                rows={3}
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRejectTargetId(null);
+                  setRejectReason("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={
+                  updateStatus.isPending || rejectReason.trim().length < 3
+                }
+                onClick={confirmReject}
+              >
+                {updateStatus.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
+                Reject
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

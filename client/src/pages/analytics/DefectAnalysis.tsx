@@ -29,6 +29,7 @@ import {
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import { useAnalyticsFilters } from "@/hooks/useAnalyticsFilters";
 import { useMemo } from "react";
 import {
@@ -117,6 +118,9 @@ function WorstRuleActions({
 
 export default function DefectAnalysis() {
   const { startDate, endDate, site } = useAnalyticsFilters();
+  const { hasRole } = useAuth();
+  // PX-091 — admin-only DLQ retry (qa_lead gets 403 otherwise)
+  const isAdmin = hasRole(["admin"]);
   const {
     data: summary,
     isLoading,
@@ -132,6 +136,7 @@ export default function DefectAnalysis() {
 
   const { data: dlqStatus } = trpc.analytics.getDlqStatus.useQuery(undefined, {
     retry: false,
+    enabled: isAdmin,
   });
 
   const runRetry = trpc.analytics.runDlqRetry.useMutation({
@@ -551,31 +556,42 @@ export default function DefectAnalysis() {
             <div>
               <CardTitle>Dead-letter queue</CardTitle>
               <CardDescription>
-                Durable failed_jobs (PR-3) — light retry without live OCR/LLM
+                Durable failed_jobs — light retry without live OCR/LLM
               </CardDescription>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={runRetry.isPending}
-              onClick={() => runRetry.mutate({ limit: 25 })}
-            >
-              {runRetry.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
-              )}
-              Run retry pass
-            </Button>
+            {isAdmin ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={runRetry.isPending}
+                onClick={() => runRetry.mutate({ limit: 25 })}
+              >
+                {runRetry.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Run retry pass
+              </Button>
+            ) : (
+              <Badge variant="secondary" className="text-xs">
+                Admin only
+              </Badge>
+            )}
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            {dlqStatus ? (
+            {!isAdmin ? (
+              <p>
+                DLQ retry is restricted to admins. Ask an admin to run a
+                recovery pass if jobs are stuck.
+              </p>
+            ) : dlqStatus ? (
               <p>
                 {dlqStatus.totalFailed} failed · {dlqStatus.recoverable}{" "}
                 recoverable · {dlqStatus.unrecoverable} unrecoverable
               </p>
             ) : (
-              <p>DLQ status unavailable (admin-only or empty).</p>
+              <p>DLQ status unavailable or empty.</p>
             )}
           </CardContent>
         </Card>

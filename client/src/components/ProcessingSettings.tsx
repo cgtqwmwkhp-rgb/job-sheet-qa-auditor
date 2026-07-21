@@ -26,12 +26,14 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ProcessingConfig {
   llmFallbackEnabled: boolean;
@@ -56,6 +58,9 @@ const DEFAULT_CONFIG: ProcessingConfig = {
 };
 
 export function ProcessingSettings() {
+  const { hasRole } = useAuth();
+  // PX-099 — qa_lead can view but not save (admin-only mutation)
+  const canEdit = hasRole(["admin"]);
   const [config, setConfig] = useState<ProcessingConfig>(DEFAULT_CONFIG);
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -74,11 +79,16 @@ export function ProcessingSettings() {
   }, [serverConfig]);
 
   const handleChange = (key: keyof ProcessingConfig, value: any) => {
+    if (!canEdit) return;
     setConfig(prev => ({ ...prev, [key]: value }));
     setHasChanges(true);
   };
 
   const handleSave = async () => {
+    if (!canEdit) {
+      toast.error("Only admins can save processing settings");
+      return;
+    }
     setIsSaving(true);
     try {
       const settings = Object.entries(config).map(([key, value]) => ({
@@ -87,7 +97,7 @@ export function ProcessingSettings() {
       }));
 
       await updateBatch.mutateAsync({ settings });
-      toast.success("Processing settings saved successfully");
+      toast.success("Processing settings saved", { duration: 2000 });
       setHasChanges(false);
       refetch();
     } catch (error) {
@@ -116,6 +126,16 @@ export function ProcessingSettings() {
   return (
     <TooltipProvider>
       <div className="space-y-6">
+        {!canEdit ? (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertTitle>Read-only for QA leads</AlertTitle>
+            <AlertDescription>
+              You can view current processing settings. Saving requires an admin
+              account.
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {/* LLM Fallback Settings */}
         <Card>
           <CardHeader>
@@ -167,6 +187,7 @@ export function ProcessingSettings() {
               </div>
               <Switch
                 checked={config.llmFallbackEnabled}
+                disabled={!canEdit}
                 onCheckedChange={checked =>
                   handleChange("llmFallbackEnabled", checked)
                 }
@@ -192,6 +213,7 @@ export function ProcessingSettings() {
                     max={95}
                     step={5}
                     className="w-full"
+                    disabled={!canEdit}
                   />
                   <p className="text-xs text-muted-foreground">
                     Fields with confidence below this threshold will trigger LLM
@@ -235,6 +257,7 @@ export function ProcessingSettings() {
               </div>
               <Switch
                 checked={config.ocrEnabled}
+                disabled={!canEdit}
                 onCheckedChange={checked => handleChange("ocrEnabled", checked)}
               />
             </div>
@@ -258,6 +281,7 @@ export function ProcessingSettings() {
                     max={90}
                     step={5}
                     className="w-full"
+                    disabled={!canEdit}
                   />
                   <p className="text-xs text-muted-foreground">
                     OCR results below this confidence will be flagged for review
@@ -302,6 +326,7 @@ export function ProcessingSettings() {
               </div>
               <Switch
                 checked={config.fuzzyMatchingEnabled}
+                disabled={!canEdit}
                 onCheckedChange={checked =>
                   handleChange("fuzzyMatchingEnabled", checked)
                 }
@@ -327,6 +352,7 @@ export function ProcessingSettings() {
                     max={95}
                     step={5}
                     className="w-full"
+                    disabled={!canEdit}
                   />
                   <p className="text-xs text-muted-foreground">
                     Higher values require closer matches, reducing false
@@ -370,6 +396,7 @@ export function ProcessingSettings() {
                 max={5}
                 step={1}
                 className="w-full"
+                disabled={!canEdit}
               />
               <p className="text-xs text-muted-foreground">
                 Number of retry attempts for failed API calls
@@ -394,6 +421,7 @@ export function ProcessingSettings() {
                 max={180}
                 step={15}
                 className="w-full"
+                disabled={!canEdit}
               />
               <p className="text-xs text-muted-foreground">
                 Maximum time allowed for processing a single document
@@ -402,8 +430,8 @@ export function ProcessingSettings() {
           </CardContent>
         </Card>
 
-        {/* Action Buttons */}
-        {hasChanges && (
+        {/* Action Buttons — admin only (PX-099) */}
+        {canEdit && hasChanges && (
           <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <AlertCircle className="h-4 w-4" />

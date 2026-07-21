@@ -59,6 +59,22 @@ function trendLabel(trend: string): string {
   return "stable vs prior";
 }
 
+/** PX-097 — never show writer/verifier system prompts in the coaching UI */
+function stripCoachingPromptLeak(text: string): string {
+  if (!text) return text;
+  const leakPatterns = [
+    /you are a senior qa lead[\s\S]*?(?=\n\n|$)/i,
+    /you are an adversarial qa auditor[\s\S]*?(?=\n\n|$)/i,
+    /rules \(non-negotiable\):[\s\S]*?(?=\n\n|$)/i,
+    /return only valid json[\s\S]*?(?=\n\n|$)/i,
+  ];
+  let out = text;
+  for (const re of leakPatterns) {
+    out = out.replace(re, "").trim();
+  }
+  return out;
+}
+
 function CoachingPackView({
   pack,
   session,
@@ -74,7 +90,9 @@ function CoachingPackView({
   }) => void;
   markPending: boolean;
 }) {
-  const [opening, setOpening] = useState(pack.draftNarrative.opening);
+  const [opening, setOpening] = useState(() =>
+    stripCoachingPromptLeak(pack.draftNarrative.opening)
+  );
   const [strengthsText, setStrengthsText] = useState(
     pack.draftNarrative.strengths.join("\n\n")
   );
@@ -107,11 +125,20 @@ function CoachingPackView({
     return `${s} – ${e}`;
   }, [pack.period.start, pack.period.end]);
 
+  // PX-097 — naming hygiene + strip accidental system-prompt leaks from LLM drafts
+  const displayName = useMemo(() => {
+    const raw = (pack.engineerName || "").trim();
+    if (!raw || /^engineer\s*\d+$/i.test(raw) || /^user\s*\d+$/i.test(raw)) {
+      return `Technician ${pack.engineerId}`;
+    }
+    return raw;
+  }, [pack.engineerName, pack.engineerId]);
+
   const m = pack.summaryMetrics;
 
   return (
     <AnalyticsLayout
-      title={`Coaching pack — ${pack.engineerName}`}
+      title={`Coaching pack — ${displayName}`}
       description={`Analytical feedback for ${periodLabel}. Narrative first; numbers support the conversation.`}
     >
       <div className="space-y-8 coaching-pack-print">
@@ -167,7 +194,7 @@ function CoachingPackView({
               Page 1 · One-page summary
             </p>
             <h2 className="text-2xl font-heading font-semibold mt-1">
-              {pack.engineerName}
+              {displayName}
             </h2>
             <p className="text-sm text-muted-foreground">{periodLabel}</p>
           </div>

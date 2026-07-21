@@ -474,8 +474,15 @@ export default function AuditResults() {
   );
 
   const handleReject = usePersistFn((jobSheetId: number) => {
+    const reason = window.prompt(
+      "Rejection reason (required — at least 3 characters):"
+    );
+    if (!reason || reason.trim().length < 3) {
+      toast.error("A rejection reason is required");
+      return;
+    }
     updateStatus.mutate(
-      { id: jobSheetId, status: "failed" },
+      { id: jobSheetId, status: "failed", reason: reason.trim() },
       {
         onSuccess: () => {
           void invalidateAfterSheetAction();
@@ -483,6 +490,7 @@ export default function AuditResults() {
             goBackToList();
           }
           toast.success("Job sheet rejected", {
+            duration: 2500,
             action: {
               label: "Undo",
               onClick: () => {
@@ -585,6 +593,9 @@ export default function AuditResults() {
   }
 
   if (numericId > 0 && jobSheetError) {
+    const notFound =
+      jobSheetError.data?.code === "NOT_FOUND" ||
+      /not found/i.test(jobSheetError.message);
     return (
       <DashboardLayout>
         <div className="flex flex-col items-center justify-center h-[50vh] animate-in fade-in duration-[var(--duration-slow)]">
@@ -592,10 +603,34 @@ export default function AuditResults() {
             <AlertCircle className="h-10 w-10 text-[#BA3737]" />
           </div>
           <h2 className="text-xl font-semibold text-foreground mb-2">
-            Failed to load audit
+            {notFound ? "Audit not found" : "Failed to load audit"}
           </h2>
           <p className="text-muted-foreground mb-6 max-w-md text-center">
-            {jobSheetError.message}
+            {notFound
+              ? `No job sheet exists for id ${numericId}. It may have been deleted or the link is wrong.`
+              : jobSheetError.message}
+          </p>
+          <Button onClick={goBackToList} variant="outline">
+            Back to list
+          </Button>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // PX-079 — deep link id with empty payload (no error object)
+  if (numericId > 0 && !isLoading && !jobSheetData) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center h-[50vh] animate-in fade-in duration-[var(--duration-slow)]">
+          <div className="rounded-full bg-muted p-4 mb-4">
+            <AlertCircle className="h-10 w-10 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-semibold text-foreground mb-2">
+            Audit not found
+          </h2>
+          <p className="text-muted-foreground mb-6 max-w-md text-center">
+            No job sheet exists for id {numericId}.
           </p>
           <Button onClick={goBackToList} variant="outline">
             Back to list
@@ -909,7 +944,9 @@ export default function AuditResults() {
                             </div>
                           )}
                           <span className="text-[11px] text-muted-foreground tabular-nums hidden sm:inline">
-                            {new Date(sheet.createdAt).toLocaleDateString()}
+                            {new Date(sheet.createdAt).toLocaleDateString(
+                              "en-GB"
+                            )}
                           </span>
                           <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                         </div>
@@ -967,7 +1004,7 @@ export default function AuditResults() {
       (jobSheetData.status === "completed" && auditResult?.result === "pass"
         ? "100"
         : "-"),
-    date: new Date(jobSheetData.createdAt).toLocaleDateString(),
+    date: new Date(jobSheetData.createdAt).toLocaleDateString("en-GB"),
     technician:
       technicianNameById.get(jobSheetData.uploadedBy) ??
       `User ${jobSheetData.uploadedBy}`,

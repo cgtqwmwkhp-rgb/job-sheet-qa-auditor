@@ -26,7 +26,7 @@ import {
   normalizeTrainingReasonCode,
   withTrainingSignalDetails,
 } from "../trainingSignals";
-import { recordCorrectionEvent } from "../templateMemory";
+import { recordCorrectionEvent, softUndoCorrection } from "../templateMemory";
 
 export {
   deriveSheetResultFromFindings,
@@ -380,6 +380,19 @@ export async function undoFindingAction(
     resolvedAt: null,
     previousResolutionStatus: current,
   });
+
+  // PX-092 — soft-undo training samples written for the action being reversed
+  if (undoneAction) {
+    const memoryKey = `finding:${undoneAction}:${input.findingId}:${restoreTo}->${current}`;
+    try {
+      await softUndoCorrection(memoryKey, input.userId);
+    } catch (err) {
+      console.warn(
+        "[auditActions] softUndoCorrection failed (non-fatal):",
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
 
   const sideEffects = await recalculateSheetTruth(deps, finding.auditResultId);
 
