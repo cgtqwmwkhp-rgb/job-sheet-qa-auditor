@@ -69,14 +69,14 @@ const ABSTAIN_ALIAS_GROUPS: ReadonlyArray<ReadonlyArray<string>> = [
 
 function expandAbstainIds(ids: Iterable<string>): Set<string> {
   const out = new Set<string>();
-  for (const id of ids) {
+  Array.from(ids).forEach(id => {
     out.add(id);
-    for (const group of ABSTAIN_ALIAS_GROUPS) {
+    ABSTAIN_ALIAS_GROUPS.forEach(group => {
       if (group.includes(id)) {
-        for (const alias of group) out.add(alias);
+        group.forEach(alias => out.add(alias));
       }
-    }
-  }
+    });
+  });
   return out;
 }
 
@@ -100,9 +100,9 @@ export function buildFieldAuthority(
   const fields = aliasCanonicalExtractedFields(merged);
   const abstain = expandAbstainIds(input.textLayerAbstain ?? []);
   if (abstain.size > 0) {
-    for (const id of abstain) {
+    Array.from(abstain).forEach(id => {
       delete fields[id];
-    }
+    });
   }
   return { fields };
 }
