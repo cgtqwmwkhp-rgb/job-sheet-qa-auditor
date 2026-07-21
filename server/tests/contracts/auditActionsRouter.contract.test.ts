@@ -94,6 +94,17 @@ describe("Audit actions router error contracts", () => {
     });
   });
 
+  it("rejects forcePass input with a too-short reason before hitting the DB (PR-A)", async () => {
+    await expect(
+      createCaller().auditActions.approveJobSheet({
+        jobSheetId: 100,
+        forcePass: true,
+        reason: "short",
+      })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(db.getJobSheetById).not.toHaveBeenCalled();
+  });
+
   it("replays approve with an Idempotency-Key without repeating the mutation", async () => {
     vi.mocked(db.getAuditFindingById).mockResolvedValue({
       id: 10,

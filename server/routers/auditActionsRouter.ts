@@ -28,6 +28,7 @@ import {
 import {
   FINDING_ACTIONS,
   RESOLUTION_STATUSES,
+  FORCE_PASS_MIN_REASON_LENGTH,
 } from "../services/auditActions/types";
 import {
   TRAINING_REASON_CODES,
@@ -675,14 +676,34 @@ export const auditActionsRouter = router({
       }
     }),
 
-  /** Approve a job sheet out of the hold queue. */
+  /**
+   * Approve a job sheet out of the hold queue.
+   *
+   * PR-A (PX-109): `forcePass: true` auto-overrides open Major / photo
+   * cost-risk blockers and forces the sheet to pass — never silent, so a
+   * reason of at least FORCE_PASS_MIN_REASON_LENGTH chars is required.
+   */
   approveJobSheet: qaLeadProcedure
     .input(
-      z.object({
-        jobSheetId: z.number().int().positive(),
-        reason: z.string().min(1).max(2000).optional(),
-        claimToken: z.string().uuid().optional(),
-      })
+      z
+        .object({
+          jobSheetId: z.number().int().positive(),
+          reason: z.string().min(1).max(2000).optional(),
+          claimToken: z.string().uuid().optional(),
+          forcePass: z.boolean().optional(),
+        })
+        .superRefine((val, ctx) => {
+          if (
+            val.forcePass &&
+            (val.reason ?? "").trim().length < FORCE_PASS_MIN_REASON_LENGTH
+          ) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["reason"],
+              message: `forcePass requires a reason of at least ${FORCE_PASS_MIN_REASON_LENGTH} characters explaining the override`,
+            });
+          }
+        })
     )
     .mutation(async ({ ctx, input }) => {
       return runIdempotentAuditAction({
@@ -710,6 +731,7 @@ export const auditActionsRouter = router({
                 userId: ctx.user.id,
                 reason: input.reason,
                 previousStatus: sheet.status,
+                forcePass: input.forcePass,
               })
             );
           } catch (err) {
@@ -739,6 +761,16 @@ export const auditActionsRouter = router({
           .enum(["pass", "fail", "review_queue", "waived"])
           .optional(),
         claimToken: z.string().uuid().optional(),
+        // PR-A: reverse a forcePass auto-override back to each finding's
+        // resolution prior to the override.
+        restoreFindings: z
+          .array(
+            z.object({
+              id: z.number().int().positive(),
+              previousStatus: z.enum(RESOLUTION_STATUSES),
+            })
+          )
+          .optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -755,6 +787,7 @@ export const auditActionsRouter = router({
             restoreStatus: input.restoreStatus,
             auditResultId: input.auditResultId,
             restoreAuditResult: input.restoreAuditResult,
+            restoreFindings: input.restoreFindings,
           })
         );
       } catch (err) {
@@ -854,6 +887,7 @@ export const auditActionsRouter = router({
     reviewClaimSupported: true,
     expectedStatusSupported: true,
     fieldCorrectionSupported: true,
+    forcePassSupported: true,
     trainingReasonCodes: [...TRAINING_REASON_CODES],
     templateMemoryWrite: isTemplateMemoryCaptureEnabled(),
     templateMemoryApply: isTemplateMemoryApplyEnabled(),

@@ -355,6 +355,13 @@ export interface ReviewWorkstationPaneProps {
   ) => void;
   approvePending?: boolean;
   rejectPending?: boolean;
+  /**
+   * PR-A (PX-109): show "Override to pass" for sheets already in `failed`
+   * status — separate from the review_queue-focused Approve/Reject pair.
+   */
+  showForcePassAction?: boolean;
+  onForcePassJobSheet?: (reason: string) => void;
+  forcePassPending?: boolean;
   /** Ref for keyboard Enter → focus pane */
   paneRef?: RefObject<HTMLDivElement | null>;
   /** Optional back navigation (Audit Results list → detail). */
@@ -372,6 +379,9 @@ export function ReviewWorkstationPane({
   onReviewClaimChange,
   approvePending,
   rejectPending,
+  showForcePassAction = false,
+  onForcePassJobSheet,
+  forcePassPending,
   paneRef,
   onBack,
 }: ReviewWorkstationPaneProps) {
@@ -609,6 +619,9 @@ export function ReviewWorkstationPane({
         onReviewClaimChange={onReviewClaimChange}
         approvePending={approvePending}
         rejectPending={rejectPending}
+        showForcePassAction={showForcePassAction}
+        onForcePassJobSheet={onForcePassJobSheet}
+        forcePassPending={forcePassPending}
         paneRef={paneRef}
         onBack={onBack}
         commentQualityDerived={commentQualityDerived}
@@ -635,6 +648,9 @@ function ReviewWorkstationContent({
   onReviewClaimChange,
   approvePending,
   rejectPending,
+  showForcePassAction,
+  onForcePassJobSheet,
+  forcePassPending,
   paneRef,
   onBack,
   commentQualityDerived,
@@ -659,6 +675,9 @@ function ReviewWorkstationContent({
   ) => void;
   approvePending?: boolean;
   rejectPending?: boolean;
+  showForcePassAction?: boolean;
+  onForcePassJobSheet?: (reason: string) => void;
+  forcePassPending?: boolean;
   paneRef?: RefObject<HTMLDivElement | null>;
   onBack?: () => void;
   commentQualityDerived: {
@@ -686,6 +705,9 @@ function ReviewWorkstationContent({
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
   const [feedbackType, setFeedbackType] = useState("incorrect");
   const [feedbackComment, setFeedbackComment] = useState("");
+  const [forcePassOpen, setForcePassOpen] = useState(false);
+  const [forcePassReason, setForcePassReason] = useState("");
+  const FORCE_PASS_MIN_REASON_LENGTH = 10;
   const [actionDialog, setActionDialog] = useState<{
     finding: Finding;
     action: "override" | "waive";
@@ -1681,6 +1703,19 @@ function ReviewWorkstationContent({
     );
   };
 
+  const submitForcePass = () => {
+    const trimmed = forcePassReason.trim();
+    if (trimmed.length < FORCE_PASS_MIN_REASON_LENGTH) {
+      toast.error(
+        `Reason must be at least ${FORCE_PASS_MIN_REASON_LENGTH} characters`
+      );
+      return;
+    }
+    onForcePassJobSheet?.(trimmed);
+    setForcePassOpen(false);
+    setForcePassReason("");
+  };
+
   const passedFindings = displayFindings.filter(f => f.status === "passed");
   const failedFindings = displayFindings.filter(f => f.status !== "passed");
   const hasPartsFindings = failedFindings.some(isPartsFinding);
@@ -1854,6 +1889,23 @@ function ReviewWorkstationContent({
                 Reject
               </Button>
             </>
+          )}
+          {showForcePassAction && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 border-amber-300 text-amber-800 hover:bg-amber-50"
+              onClick={() => setForcePassOpen(true)}
+              disabled={forcePassPending}
+              title="Override open Major findings and force this sheet to pass"
+            >
+              {forcePassPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              <span className="ml-1.5 hidden xl:inline">Override to pass</span>
+            </Button>
           )}
           <Button
             variant="outline"
@@ -2364,6 +2416,53 @@ function ReviewWorkstationContent({
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               )}
               Submit Feedback
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={forcePassOpen}
+        onOpenChange={open => {
+          setForcePassOpen(open);
+          if (!open) setForcePassReason("");
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Override to pass</DialogTitle>
+            <DialogDescription>
+              This auto-overrides any open Major or photo cost-risk findings and
+              marks the job sheet as passed / completed. The action, your
+              reason, and every finding disposed are recorded on the audit trail
+              and can be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-4">
+            <Label>
+              Reason (required, min {FORCE_PASS_MIN_REASON_LENGTH} characters)
+            </Label>
+            <Textarea
+              placeholder="Explain why this job sheet should be forced to pass despite open Major findings..."
+              value={forcePassReason}
+              onChange={e => setForcePassReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setForcePassOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={submitForcePass}
+              disabled={
+                forcePassPending ||
+                forcePassReason.trim().length < FORCE_PASS_MIN_REASON_LENGTH
+              }
+            >
+              {forcePassPending && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Override to pass
             </Button>
           </DialogFooter>
         </DialogContent>

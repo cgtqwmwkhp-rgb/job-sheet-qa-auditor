@@ -375,6 +375,15 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           fieldAliases: ["Parts Used", "Parts Assessment"],
         },
         {
+          ruleId: "PARTS-C014",
+          label: "Parts Used (Repairs-Only, Unconfirmed)",
+          description:
+            "Repairs Required noted but Parts Used empty/None and Consumables Used not Yes — weak repairs-only implication, not a confirmed defect",
+          failClass: "informational",
+          enabled: true,
+          fieldAliases: ["Parts Used", "Parts Assessment"],
+        },
+        {
           ruleId: "ATTR-C010",
           label: "Engineer Attribution (Missing Name)",
           description: "No usable extracted engineer/technician name",

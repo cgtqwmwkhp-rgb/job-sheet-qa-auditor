@@ -556,6 +556,133 @@ describe("Audit Actions Contract (PR-10)", () => {
     });
   });
 
+  describe("forcePass (PR-A / PX-109)", () => {
+    it("rejects forcePass without a reason", async () => {
+      const mem = createMemoryDeps();
+      await expect(
+        approveJobSheet(mem.deps, {
+          jobSheetId: 100,
+          userId: 1,
+          forcePass: true,
+        })
+      ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    });
+
+    it("rejects forcePass with a too-short reason", async () => {
+      const mem = createMemoryDeps();
+      await expect(
+        approveJobSheet(mem.deps, {
+          jobSheetId: 100,
+          userId: 1,
+          forcePass: true,
+          reason: "short",
+        })
+      ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+      expect(mem.logs.some(log => log.action === "JOB_SHEET_FORCE_PASS")).toBe(
+        false
+      );
+    });
+
+    it("still hard-fails when audit findings are unavailable, even with forcePass", async () => {
+      const mem = createMemoryDeps();
+      await expect(
+        approveJobSheet(mem.deps, {
+          jobSheetId: 999,
+          userId: 1,
+          forcePass: true,
+          reason: "Business override, customer waiting on site",
+        })
+      ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    });
+
+    it("auto-overrides open Majors and photo cost risks, then passes", async () => {
+      const mem = createMemoryDeps();
+      mem.findings.set(3, {
+        id: 3,
+        auditResultId: 10,
+        resolutionStatus: "open",
+        severity: "S2",
+        ruleId: "PHOTO-C012",
+      });
+
+      const result = await approveJobSheet(mem.deps, {
+        jobSheetId: 100,
+        userId: 1,
+        previousStatus: "review_queue",
+        forcePass: true,
+        reason: "Business override, customer waiting on site",
+      });
+
+      expect(result.newStatus).toBe("completed");
+      expect(result.forcePass).toBe(true);
+      expect(result.overriddenFindings.map(f => f.id).sort()).toEqual([1, 3]);
+      expect(mem.findings.get(1)?.resolutionStatus).toBe("overridden");
+      expect(mem.findings.get(1)?.resolutionReason).toBe(
+        "Business override, customer waiting on site"
+      );
+      expect(mem.findings.get(3)?.resolutionStatus).toBe("overridden");
+      expect(mem.audits.get(10)?.result).toBe("pass");
+      expect(mem.jobSheetStatuses.get(100)).toBe("completed");
+
+      const log = mem.logs.find(l => l.action === "JOB_SHEET_FORCE_PASS");
+      expect(log).toBeTruthy();
+      const details = log!.details as Record<string, unknown>;
+      expect(details.forcePass).toBe(true);
+      expect(details.overriddenFindingIds).toEqual(
+        expect.arrayContaining([1, 3])
+      );
+      expect(details.reason).toBe(
+        "Business override, customer waiting on site"
+      );
+    });
+
+    it("undo restores every auto-overridden finding to its prior status", async () => {
+      const mem = createMemoryDeps();
+      const result = await approveJobSheet(mem.deps, {
+        jobSheetId: 100,
+        userId: 1,
+        previousStatus: "review_queue",
+        forcePass: true,
+        reason: "Business override, customer waiting on site",
+      });
+      expect(mem.findings.get(1)?.resolutionStatus).toBe("overridden");
+
+      const undone = await undoJobSheetApprove(mem.deps, {
+        jobSheetId: 100,
+        userId: 1,
+        restoreStatus: "review_queue",
+        auditResultId: result.auditResultId,
+        restoreAuditResult: result.previousAuditResult,
+        restoreFindings: result.overriddenFindings,
+      });
+
+      expect(undone.newStatus).toBe("review_queue");
+      expect(undone.restoredFindingIds).toEqual([1]);
+      // Finding 1 started "open" — undo must restore exactly that, not a
+      // hardcoded default.
+      expect(mem.findings.get(1)?.resolutionStatus).toBe("open");
+      expect(mem.audits.get(10)?.result).toBe("fail");
+    });
+
+    it("does not auto-override anything when no blockers are open", async () => {
+      const mem = createMemoryDeps();
+      mem.findings.set(1, {
+        ...mem.findings.get(1)!,
+        resolutionStatus: "overridden",
+      });
+
+      const result = await approveJobSheet(mem.deps, {
+        jobSheetId: 100,
+        userId: 1,
+        forcePass: true,
+        reason: "Business override, customer waiting on site",
+      });
+
+      expect(result.overriddenFindings).toHaveLength(0);
+      expect(result.forcePass).toBe(true);
+    });
+  });
+
   describe("captureFieldCorrection (PR-13)", () => {
     it("updates normalisedSnippet and logs FIELD_CORRECTION", async () => {
       const mem = createMemoryDeps();
