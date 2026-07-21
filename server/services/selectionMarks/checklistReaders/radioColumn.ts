@@ -23,7 +23,8 @@ type RadioChoice = Exclude<ChecklistChoice, "UNREADABLE">;
 const HEADER_TOKEN_RE =
   /^(ok|pass|adv\.?|advisory|fail|n\/?a|not\s*applicable)$/i;
 const GLYPH_MARK_RE = /^[xX✓✔√•●*]+$/;
-const SKIP_LABEL_RE = /^(result|results|item|description|check|task|page\s*\d+)/i;
+const SKIP_LABEL_RE =
+  /^(result|results|item|description|check|task|page\s*\d+)/i;
 
 function choiceForHeaderToken(text: string): RadioChoice | null {
   const t = text.trim().toLowerCase().replace(/\.$/, "");
@@ -218,8 +219,7 @@ export function readRadioColumnRows(options: {
     }
 
     for (const cluster of rowClusters) {
-      const rowY =
-        cluster.reduce((s, t) => s + t.yPercent, 0) / cluster.length;
+      const rowY = cluster.reduce((s, t) => s + t.yPercent, 0) / cluster.length;
       const hitBands = pageBands.filter(b =>
         cluster.some(t => t.xPercent >= b.xMin && t.xPercent <= b.xMax)
       );
