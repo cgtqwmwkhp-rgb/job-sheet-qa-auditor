@@ -81,6 +81,13 @@ vi.mock("./db", () => ({
       { id: 1, status: "open", reason: "Incorrect finding" },
     ]),
   createDispute: vi.fn().mockResolvedValue({ id: 2 }),
+  getDisputeById: vi.fn().mockResolvedValue({
+    id: 1,
+    // null finding → status update only (PX-064 overturn path covered elsewhere)
+    auditFindingId: null,
+    status: "open",
+    reason: "Incorrect finding",
+  }),
   updateDisputeStatus: vi.fn().mockResolvedValue(undefined),
   createWaiver: vi.fn().mockResolvedValue({ id: 1 }),
   getWaiverByFindingId: vi.fn().mockResolvedValue(null),
