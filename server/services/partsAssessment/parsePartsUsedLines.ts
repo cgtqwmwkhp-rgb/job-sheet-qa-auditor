@@ -10,7 +10,7 @@ const SKIP_LINE_RE = /^(?:none|n\/a|na|nil|-|—|\.|see\s+above|tbc|tba)$/i;
  * Consumables=Yes forms even when no real lines exist.
  */
 const PARTS_HEADER_CHROME_RE =
-  /^(?:part\s*(?:no\.?|number|#)|pn)(?:\s*[\/|\s]\s*(?:description|desc))?(?:\s*[\/|\s]\s*(?:qty|quantity))?$|^(?:description|desc)(?:\s*[\/|\s]\s*(?:qty|quantity))?$|^(?:qty|quantity)$/i;
+  /^(?:part\s*(?:no\.?|number|#)|pn)(?:\s*[/|\s]\s*(?:description|desc))?(?:\s*[/|\s]\s*(?:qty|quantity))?$|^(?:description|desc)(?:\s*[/|\s]\s*(?:qty|quantity))?$|^(?:qty|quantity)$/i;
 
 /** True when a line is only Parts Used column headers (no real part data). */
 export function isPartsUsedChromeLine(line: string): boolean {
