@@ -382,18 +382,28 @@ Customer Name: Acme Corp
       expect(dp).toContain('PIPELINE_VERSION = "2.1.0"');
     });
 
-    it("PR-A: deterministic validation merges Gemini ∪ ensemble ∪ text-layer (JSR-R001–3 honesty)", () => {
+    it("PR-A (PX-111): deterministic validation reuses the single ranked FieldAuthority map (JSR-R001–3 honesty)", () => {
+      const authorityBuildIdx = dp.indexOf("buildFieldAuthority({");
       const validationIdx = dp.indexOf("runDeterministicValidation({");
-      const stripCallsBeforeValidation =
-        dp.slice(0, validationIdx).split("stripEmptyExtractedFields(").length -
-        1;
-      // Three sources feed the merge: analysisResult, ensembleResult, textLayerResult.
-      expect(stripCallsBeforeValidation).toBeGreaterThanOrEqual(3);
-      expect(dp.slice(0, validationIdx)).toContain(
-        "ensembleResult?.ensembleExtractedFields"
+      expect(authorityBuildIdx).toBeGreaterThan(-1);
+      expect(authorityBuildIdx).toBeLessThan(validationIdx);
+      // Four ranked sources feed the one authority map: text-layer,
+      // roiSpatial/field-vote, ensemble, Gemini — PX-112 brings roiSpatial
+      // into validation's view for the first time (UI ≠ validate fracture).
+      const authorityCallSite = dp.slice(
+        authorityBuildIdx,
+        dp.indexOf("});", authorityBuildIdx)
       );
-      expect(dp.slice(0, validationIdx)).toContain(
-        "textLayerResult?.preExtracted"
+      expect(authorityCallSite).toContain("textLayer: textLayerPreExtracted");
+      expect(authorityCallSite).toContain("roiSpatial: roiSpatialFields");
+      expect(authorityCallSite).toContain(
+        "ensemble: ensembleResult?.ensembleExtractedFields"
+      );
+      expect(authorityCallSite).toContain(
+        "gemini: analysisResult.extractedFields"
+      );
+      expect(dp.slice(authorityBuildIdx, validationIdx)).toContain(
+        "const extractedForValidation = fieldAuthority.fields;"
       );
     });
 

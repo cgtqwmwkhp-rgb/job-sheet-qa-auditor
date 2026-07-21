@@ -34,10 +34,10 @@ import {
   synthesizeOcrResultFromTextLayer,
   toDbDocumentStrategy,
   formatGroundedFieldsForReport,
-  backfillAuthoritativeExtractedFields,
   type DocumentStrategyLogical,
   type TextLayerExtractionResult,
 } from "./textLayerExtraction";
+import { buildFieldAuthority, type FieldAuthority } from "./fieldAuthority";
 import {
   getTemplateVersion,
   getTemplate,
@@ -61,8 +61,6 @@ import { modelRegistryStamp } from "./modelRegistry";
 import {
   runEnsembleExtraction,
   buildEnsembleReviewFindings,
-  mergeExtractedFields,
-  stripEmptyExtractedFields,
   isEnsembleExtractionEnabled,
   formatPreExtractedHints,
   aliasCanonicalExtractedFields,
@@ -2540,12 +2538,48 @@ async function processJobSheetWithOptions(
     }
   }
 
+  // PR-A (PX-111, closes PX-106): built inside the hygiene block below (once
+  // the pre-hygiene signature honesty pass has landed) and reused everywhere
+  // downstream — deterministic validation, ATTR, persist. See assignment.
+  let fieldAuthority: FieldAuthority;
+
   // Finding hygiene: suppress garbage MISSING_FIELD / nonsense conflicts
   {
     const signatureLabelPresent = hasSignatureLabelEvidence(extractedText);
     const hasOcrSignature = hasOcrSignatureEvidence(ocrResult);
     const vlmSaysPresent = vlmInkResult?.preExtractedHint?.value === "Present";
     const vlmSaysAbsent = vlmInkResult?.preExtractedHint?.value === "Absent";
+
+    // PX-104 / VLM honesty: sanitize Gemini's own signature values BEFORE
+    // FieldAuthority is built, so the ranked map (feeding the hygiene
+    // evidence below, validation, ATTR, and persist) never carries a stale
+    // pre-sanitize "Absent" that ink evidence has already overridden.
+    const sanitizedFields = sanitizeExtractedFieldsForSignatures(
+      analysisResult.extractedFields,
+      {
+        signatureLabelPresent: signatureLabelPresent && !vlmSaysAbsent,
+        hasOcrSignature: hasOcrSignature || vlmSaysPresent,
+      }
+    );
+    const fieldsChanged =
+      JSON.stringify(sanitizedFields) !==
+      JSON.stringify(analysisResult.extractedFields);
+    if (fieldsChanged) {
+      analysisResult = { ...analysisResult, extractedFields: sanitizedFields };
+    }
+
+    // Ranked merge of nonempty text-layer > roiSpatial/field-vote > ensemble
+    // > Gemini — one field map, reused everywhere downstream instead of a
+    // slightly different ad hoc merge per stage. roiSpatialFields already
+    // carries the text-layer-preferring ROI-box + field-vote merge (PX-112:
+    // validation must see what the UI does).
+    fieldAuthority = buildFieldAuthority({
+      textLayer: textLayerPreExtracted,
+      roiSpatial: roiSpatialFields,
+      ensemble: ensembleResult?.ensembleExtractedFields,
+      gemini: analysisResult.extractedFields,
+    });
+
     const templateVersion = usedTemplateVersionId
       ? getTemplateVersion(usedTemplateVersionId)
       : null;
@@ -2579,10 +2613,9 @@ async function processJobSheetWithOptions(
     const beforeCount = analysisResult.findings.length;
     let cleaned = applyFindingHygiene(analysisResult.findings, {
       preExtractedFields: aliasCanonicalExtractedFields({
-        // PX-106: grounded text-layer headers must suppress MISSING_FIELD
-        // noise too — later high-confidence sources can still override.
-        ...textLayerPreExtracted,
-        ...(ensembleResult?.ensembleExtractedFields ?? {}),
+        // PX-111: FieldAuthority already ranks text-layer/roiSpatial above
+        // ensemble/Gemini — suppress MISSING_FIELD noise from that one map.
+        ...fieldAuthority.fields,
         ...(selectionMarksResult?.preExtractedFields ?? {}),
         ...(multimodalRoiResult?.preExtractedFields ?? {}),
         ...(vlmInkResult?.preExtractedHint
@@ -2628,18 +2661,8 @@ async function processJobSheetWithOptions(
     ) {
       cleaned = cleaned.filter(f => !isWastedJourneyExcludedField(f.fieldName));
     }
-    const sanitizedFields = sanitizeExtractedFieldsForSignatures(
-      analysisResult.extractedFields,
-      {
-        signatureLabelPresent: signatureLabelPresent && !vlmSaysAbsent,
-        hasOcrSignature: hasOcrSignature || vlmSaysPresent,
-      }
-    );
     const findingsChanged =
       JSON.stringify(cleaned) !== JSON.stringify(analysisResult.findings);
-    const fieldsChanged =
-      JSON.stringify(sanitizedFields) !==
-      JSON.stringify(analysisResult.extractedFields);
 
     if (findingsChanged || fieldsChanged) {
       // If we removed/converted signature Absents that caused FAIL, demote to
@@ -2658,7 +2681,6 @@ async function processJobSheetWithOptions(
       analysisResult = {
         ...analysisResult,
         overallResult,
-        extractedFields: sanitizedFields,
         findings: cleaned,
         summary:
           `${analysisResult.summary} ` +
@@ -3176,12 +3198,9 @@ async function processJobSheetWithOptions(
 
   // Engineer attribution gap (ATTR-C*) — name extraction + user match
   {
-    const attrExtractedFields = ensembleResult
-      ? mergeExtractedFields(
-          analysisResult.extractedFields,
-          ensembleResult.ensembleExtractedFields
-        )
-      : analysisResult.extractedFields;
+    // PX-111: attribute against the same ranked FieldAuthority map so ATTR
+    // sees text-layer/roiSpatial-grounded names, not just Gemini ∪ ensemble.
+    const attrExtractedFields = fieldAuthority.fields;
     const users = await db.getAllUsers();
     const attrResult = evaluateEngineerAttribution({
       report: {
@@ -3215,22 +3234,13 @@ async function processJobSheetWithOptions(
   {
     const validationStart = Date.now();
     try {
-      // PR-A (JSR honesty): validate against a merge of Gemini ∪ ensemble ∪
-      // text-layer extraction (+ canonical aliasing), not Gemini alone.
-      // Empty-string values are stripped before merging so JSR-R001–3
-      // (jobReference/assetId/date required) don't fire on headers that a
-      // non-Gemini source actually read correctly.
-      const extractedForValidation = aliasCanonicalExtractedFields(
-        mergeExtractedFields(
-          mergeExtractedFields(
-            stripEmptyExtractedFields(analysisResult.extractedFields ?? {}),
-            stripEmptyExtractedFields(
-              ensembleResult?.ensembleExtractedFields ?? {}
-            )
-          ),
-          stripEmptyExtractedFields(textLayerResult?.preExtracted ?? {})
-        )
-      );
+      // PR-A (PX-111 / JSR honesty): validate against the same ranked
+      // FieldAuthority map (text-layer > roiSpatial/field-vote > ensemble >
+      // Gemini) used everywhere else, not a bespoke merge. roiSpatialFields
+      // is now in scope too, so JSR-R001–3 (jobReference/assetId/date
+      // required) can't fire on headers the UI already shows correctly
+      // (validation ≠ UI fracture, PX-112).
+      const extractedForValidation = fieldAuthority.fields;
       const deterministic = runDeterministicValidation({
         spec,
         extractedFields: extractedForValidation,
@@ -3545,23 +3555,13 @@ async function processJobSheetWithOptions(
       score: analysisResult.score,
     });
 
-    // Attribute technician from OCR name when upload left technicianId unset
-    let finalExtractedFields = ensembleResult
-      ? mergeExtractedFields(
-          analysisResult.extractedFields,
-          ensembleResult.ensembleExtractedFields
-        )
-      : analysisResult.extractedFields;
-
-    // PX-106 Sprint1.5 PR-B: authoritative persist. Gemini can return `{}`
-    // for a Job Summary the text layer already grounded (Stage 1 extracts
-    // 6/6 locally); never let that grade the document 0/6. Backfill
-    // canonical headers from the text-layer / ROI spatial snapshot whenever
-    // the graded value is missing or empty — a nonempty graded value wins.
-    finalExtractedFields = backfillAuthoritativeExtractedFields(
-      finalExtractedFields,
-      { ...roiSpatialFields, ...textLayerPreExtracted }
-    );
+    // PR-A (PX-111, closes PX-106): persist the same ranked FieldAuthority
+    // map that fed hygiene/validation/ATTR above — text-layer/roiSpatial
+    // grounded evidence overrides Gemini/ensemble outright for any field
+    // they cover, not just a blank-fill backfill for canonical headers.
+    // This is what keeps the UI (this persisted map) and the validator
+    // looking at the exact same evidence for a given document.
+    let finalExtractedFields = fieldAuthority.fields;
 
     // Wave-7 H2/H4: apply template memory (value aliases + soft rule suppress)
     let memoryApplied: import("./templateMemory").MemoryAppliedEntry[] = [];

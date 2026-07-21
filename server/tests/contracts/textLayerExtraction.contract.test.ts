@@ -17,6 +17,7 @@ import {
   synthesizeOcrResultFromTextLayer,
   backfillAuthoritativeExtractedFields,
   isDateLabelBleedValue,
+  stripLabelBleedSuffix,
   CANONICAL_HEADER_FIELD_IDS,
   PAGE_DIGITAL_MIN_CHARS,
   type ExtractedFieldMap,
@@ -452,6 +453,87 @@ describe("LOLER jobRef date+label bleed rejection (PX-106)", () => {
     const fields = extractFieldsFromPlainText(LOLER_TEXT, 1);
     const jobRef = fields.find(f => f.fieldId === "jobReference");
     expect(jobRef?.value).toBe(LOLER_GT.headers.jobReference);
+  });
+});
+
+describe("Winch jobNumber/jobRef date+label bleed rejection (PX-112)", () => {
+  // "Make" bleed was not covered by the original PX-106 token list — widened
+  // by PX-112 alongside Site/Address, so this is a genuine regression case.
+  const bledWinchText = [
+    "Winch Job Summary",
+    "Job Ref: 21/07/2026Make",
+    "Asset No: WNCH-2201",
+    "Date: 21/07/2026",
+  ].join("\n");
+
+  it("flags the Make-label date bleed the same as the original AssetNo case", () => {
+    expect(isDateLabelBleedValue("21/07/2026Make")).toBe(true);
+  });
+
+  it("leaves jobReference AND its jobNumber alias unread rather than persisting date+label bleed", () => {
+    const fields = extractFieldsFromPlainText(bledWinchText, 1);
+    const byId = Object.fromEntries(fields.map(f => [f.fieldId, f]));
+    expect(byId.jobReference).toBeUndefined();
+    expect(byId.jobNumber).toBeUndefined();
+    // The real date field is unaffected by jobRef's bleed rejection.
+    expect(byId.date?.value).toBe("21/07/2026");
+  });
+});
+
+describe("next-field label-bleed suffix stripping (PX-112)", () => {
+  it("strips an underscore-glued next-field label from an ID-shaped value", () => {
+    expect(stripLabelBleedSuffix("3031532_MAKE")).toBe("3031532");
+    expect(stripLabelBleedSuffix("3031532_MODEL")).toBe("3031532");
+  });
+
+  it("strips a no-space-glued next-field label from an ID-shaped value", () => {
+    expect(stripLabelBleedSuffix("3031532MAKE")).toBe("3031532");
+  });
+
+  it("leaves ordinary values (non-digit-led, or no glued label) untouched", () => {
+    expect(stripLabelBleedSuffix("JT99XYZ")).toBe("JT99XYZ");
+    expect(stripLabelBleedSuffix("CANDIDATE")).toBe("CANDIDATE");
+    expect(stripLabelBleedSuffix("LOLER-8842")).toBe("LOLER-8842");
+  });
+
+  /** Synthetic geometry: a Jetter Asset No value glued to a MAKE label. */
+  function jetterBleedPageLayout(): EmbeddedPdfPageLayout {
+    const pageH = 842;
+    const mk = (
+      text: string,
+      x: number,
+      yFromTop: number,
+      w = 40,
+      h = 10
+    ): PdfTextWord => ({
+      text,
+      page: 1,
+      x,
+      y: pageH - yFromTop - h,
+      width: w,
+      height: h,
+    });
+    const words: PdfTextWord[] = [
+      mk("Asset", 40, 80, 35),
+      mk("No", 80, 80, 20),
+      // No-space PDF bleed: value + next field's label glued into one token.
+      mk("3031532_MAKE", 120, 80, 90),
+    ];
+    return { pageNumber: 1, text: "Asset No: 3031532_MAKE", words };
+  }
+
+  it("resolves the Jetter assetId as 3031532, not 3031532_MAKE", () => {
+    const embedded: EmbeddedPdfTextResult = {
+      success: true,
+      fullText: "Asset No: 3031532_MAKE",
+      pages: ["Asset No: 3031532_MAKE"],
+      pageCount: 1,
+      pageLayouts: [jetterBleedPageLayout()],
+      words: jetterBleedPageLayout().words,
+    };
+    const result = buildTextLayerResult(embedded);
+    expect(result.preExtracted.assetId?.value).toBe("3031532");
+    expect(result.preExtracted.assetId?.value).not.toBe("3031532_MAKE");
   });
 });
 

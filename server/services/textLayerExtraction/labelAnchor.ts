@@ -28,9 +28,13 @@ const ISO_DATE_RE = /^\d{4}[./-]\d{1,2}[./-]\d{1,2}$/;
 
 /** A date-shaped run anywhere inside the candidate value (not anchored). */
 const DATE_SHAPED_ANYWHERE_RE = /\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/;
-/** Another header's label text glued onto the value (no-space OCR bleed). */
+/**
+ * Another header's label text glued onto the value (no-space OCR bleed).
+ * PX-112: widened to cover Make/Model and Site Address bleed on top of the
+ * original Asset/Job/Serial/Customer/Technician set.
+ */
 const ADJACENT_LABEL_TOKEN_RE =
-  /assetno|assetnumber|assetid|serialno|serialnumber|jobno|jobid|customer|technician|makemodel/i;
+  /assetno|assetnumber|assetid|serialno|serialnumber|jobno|jobid|jobnumber|jobreference|customer|technician|engineer|makemodel|make|model|siteaddress|site/i;
 
 /**
  * LOLER-style jobRef hygiene (PX-106): reject values where a date run is
@@ -42,6 +46,60 @@ export function isDateLabelBleedValue(value: string): boolean {
   return (
     DATE_SHAPED_ANYWHERE_RE.test(value) && ADJACENT_LABEL_TOKEN_RE.test(value)
   );
+}
+
+/**
+ * Next-field label tokens that can bleed onto the END of a value when a PDF
+ * glues runs with no whitespace (or only `_`/`-`) between the value and the
+ * following header label — e.g. "3031532_MAKE", "3031532MAKE" (PX-112).
+ */
+const NEXT_FIELD_LABEL_TOKENS = [
+  "makemodel",
+  "make",
+  "model",
+  "assetno",
+  "assetnumber",
+  "assetid",
+  "serialno",
+  "serialnumber",
+  "jobno",
+  "jobid",
+  "jobnumber",
+  "jobreference",
+  "customer",
+  "technician",
+  "engineer",
+  "siteaddress",
+  "site",
+  "address",
+  "date",
+];
+
+/**
+ * Matches a numeric/alphanumeric id with a next-field label glued onto the
+ * end, optionally separated by `_`/`-`/`/`/whitespace. Requiring the head to
+ * start with a digit keeps this scoped to ID-shaped values (assetId,
+ * jobNumber, …) and away from ordinary words that happen to end the same way
+ * (e.g. "Candidate").
+ */
+const NEXT_LABEL_SUFFIX_RE = new RegExp(
+  `^([0-9][0-9A-Za-z]*?)[\\s_/-]*(${NEXT_FIELD_LABEL_TOKENS.join("|")})$`,
+  "i"
+);
+
+/**
+ * Strip a next-field label glued onto the end of an ID-shaped value with no
+ * (or minimal) separator — e.g. "3031532_MAKE" → "3031532" (PX-112). Never
+ * returns an empty string; falls back to the trimmed input when the whole
+ * value would otherwise be consumed.
+ */
+export function stripLabelBleedSuffix(value: string): string {
+  const trimmed = value.trim();
+  const m = trimmed.match(NEXT_LABEL_SUFFIX_RE);
+  if (m?.[1] && m[1].trim().length > 0) {
+    return m[1].trim();
+  }
+  return trimmed;
 }
 
 export const JOB_SUMMARY_LABEL_SPECS: LabelFieldSpec[] = [
@@ -287,6 +345,8 @@ export function extractFieldsFromPageLayout(
         .trim();
       // Strip leading colon leftovers
       value = value.replace(/^[:.-]\s*/, "").trim();
+      // PX-112: strip a next-field label glued onto the end (no-space bleed)
+      value = stripLabelBleedSuffix(value);
       if (!value) continue;
       if (spec.accept && !spec.accept(value)) continue;
 
@@ -451,7 +511,8 @@ export function extractFieldsFromPlainText(
     }
 
     if (!match?.[1]) continue;
-    const value = match[1].trim();
+    // PX-112: strip a next-field label glued onto the end (no-space bleed)
+    const value = stripLabelBleedSuffix(match[1].trim());
     if (p.accept && !p.accept(value)) continue;
     if (spec.accept && !spec.accept(value)) continue;
 
