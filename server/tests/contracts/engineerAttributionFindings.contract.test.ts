@@ -125,6 +125,41 @@ describe("evaluateEngineerAttribution", () => {
     expect(result.findings[0].ruleId).toBe("ATTR-C011");
   });
 
+  it("PX-067: skips ATTR-C011 when roster is phantom-only (synthetic OCR attribution accounts)", () => {
+    const result = evaluateEngineerAttribution({
+      report: REPORT_UNKNOWN_NAME,
+      candidates: [
+        {
+          id: 4,
+          name: "Some Prior Tech",
+          email: null,
+          role: "technician",
+          loginMethod: "attribution",
+        },
+      ],
+    });
+    expect(result.findings).toHaveLength(0);
+    expect(result.summary).toMatch(/ATTR-C011 skipped/i);
+  });
+
+  it("PX-067: still emits ATTR-C011 when roster has at least one real (non-phantom) candidate", () => {
+    const result = evaluateEngineerAttribution({
+      report: REPORT_UNKNOWN_NAME,
+      candidates: [
+        ...RICHARD_USER,
+        {
+          id: 4,
+          name: "Some Prior Tech",
+          email: null,
+          role: "technician",
+          loginMethod: "attribution",
+        },
+      ],
+    });
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0].ruleId).toBe("ATTR-C011");
+  });
+
   it("returns no findings when feature flag is off", () => {
     process.env[FEATURE_ENGINEER_ATTR_FINDING] = "false";
     const result = evaluateEngineerAttribution({

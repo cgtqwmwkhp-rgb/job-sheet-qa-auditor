@@ -6,6 +6,7 @@ import {
   extractTechnicianNameFromFields,
   extractTechnicianNameFromReport,
   extractTechnicianNameFromText,
+  isPhantomOnlyRoster,
   normalizePersonName,
   prettifyExtractedName,
   resolveTechnicianIdFromName,
@@ -120,6 +121,33 @@ describe("technicianAttribution", () => {
     expect(clusters[0]?.sheetCount).toBe(2);
     expect(clusters[0]?.match.technicianId).toBe(9);
     expect(clusters.some(c => c.match.technicianId == null)).toBe(true);
+  });
+
+  it("PX-067: isPhantomOnlyRoster is true for an empty roster", () => {
+    expect(isPhantomOnlyRoster([])).toBe(true);
+  });
+
+  it("PX-067: isPhantomOnlyRoster is true when every candidate is a synthetic attribution phantom", () => {
+    expect(
+      isPhantomOnlyRoster([
+        { id: 1, name: "OCR Ghost", email: null, loginMethod: "attribution" },
+        {
+          id: 2,
+          name: "Another Ghost",
+          email: null,
+          loginMethod: "attribution",
+        },
+      ])
+    ).toBe(true);
+  });
+
+  it("PX-067: isPhantomOnlyRoster is false when at least one real candidate exists", () => {
+    expect(
+      isPhantomOnlyRoster([
+        { id: 1, name: "OCR Ghost", email: null, loginMethod: "attribution" },
+        { id: 2, name: "Richard Newton", email: "r@x.com", loginMethod: "aad" },
+      ])
+    ).toBe(false);
   });
 
   it("builds stable attribution openIds", () => {

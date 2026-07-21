@@ -13,6 +13,13 @@ const SIGN_OFF_FIELD_RE =
 
 const MISSING_SNIPPET_RE = /^(absent|missing|no|unsigned|not\s*present|none)$/i;
 
+// PX-109 residual: the two canonical sign-off fields that DEF-C040 / WJ-C040
+// / LOLER-R004 / PTO-R004 (TE, PTO, default families) all key off of.
+// A GoldSpec/JSR re-emit for these exact fields can land at S2/LOW_CONFIDENCE
+// (not just S0/S1 MISSING_FIELD) — still a false MAJOR-in-waiting once
+// applyAuditPolicy's fieldName-alias match runs, so it must be demoted too.
+const EXACT_SIGN_OFF_FIELDS = new Set(["engineerSignOff", "customerSignature"]);
+
 export interface SignOffHonestyOptions {
   /** True only when Anthropic/mock VLM actually inspected ink. */
   vlmUsed: boolean;
@@ -20,17 +27,42 @@ export interface SignOffHonestyOptions {
   signatureLabelPresent?: boolean;
 }
 
-function isMajorSignOffMissing(finding: Finding): boolean {
-  if (!SIGN_OFF_FIELD_RE.test(finding.fieldName || "")) return false;
-  // S0/S1 are the product "MAJOR/Critical" band used for hold-queue routing
-  if (finding.severity !== "S0" && finding.severity !== "S1") return false;
-  if (finding.reasonCode === "MISSING_FIELD") return true;
+function isMissingLikeSnippet(finding: Finding): boolean {
   const snippet = (
     finding.normalisedSnippet ||
     finding.rawSnippet ||
     ""
   ).trim();
   return MISSING_SNIPPET_RE.test(snippet);
+}
+
+function isIssueBand(severity: Finding["severity"]): boolean {
+  return severity === "S0" || severity === "S1" || severity === "S2";
+}
+
+function isMajorSignOffMissing(finding: Finding): boolean {
+  if (!SIGN_OFF_FIELD_RE.test(finding.fieldName || "")) return false;
+
+  // S0/S1 are the product "MAJOR/Critical" band used for hold-queue routing —
+  // the original honesty case (any sign-off-shaped field name).
+  if (finding.severity === "S0" || finding.severity === "S1") {
+    if (finding.reasonCode === "MISSING_FIELD") return true;
+    if (isMissingLikeSnippet(finding)) return true;
+  }
+
+  // PX-109 residual: widen to S2/LOW_CONFIDENCE, but only for the exact
+  // engineerSignOff/customerSignature field names so we don't over-broaden
+  // the honesty exception to unrelated signature-shaped findings.
+  if (
+    EXACT_SIGN_OFF_FIELDS.has(finding.fieldName) &&
+    isIssueBand(finding.severity)
+  ) {
+    if (finding.reasonCode === "MISSING_FIELD") return true;
+    if (finding.reasonCode === "LOW_CONFIDENCE") return true;
+    if (isMissingLikeSnippet(finding)) return true;
+  }
+
+  return false;
 }
 
 /**

@@ -12,8 +12,18 @@ export type SummaryGateOutcome = "PASS" | "FAIL" | "REVIEW_QUEUE" | string;
 // all requirements") — reviewers phrase honesty violations many ways, and
 // any of these on a FAIL/REVIEW_QUEUE sheet contradicts the outcome exactly
 // like "passes" does.
-const PASS_CLAIM =
-  /\b(passes?|passed|passing|all\s+checks?\s+pass(?:ed)?|audit\s+pass(?:ed|es)?|fully\s+compliant|compliant|compliance|meets\s+(?:all\s+)?requirements?)\b/gi;
+//
+// PX-110: when the claim is preceded by a copula ("is/are/was/were compliant"),
+// the copula must be consumed by the same match — otherwise substituting just
+// the claim word leaves a dangling copula ("is does not pass with all
+// specified rules"). The copula+claim alternative is tried first so a single
+// pass replaces the whole phrase.
+const PASS_TERMS =
+  "passes?|passed|passing|all\\s+checks?\\s+pass(?:ed)?|audit\\s+pass(?:ed|es)?|fully\\s+compliant|compliant|compliance|meets\\s+(?:all\\s+)?requirements?";
+const PASS_CLAIM = new RegExp(
+  `\\b(?:is|are|was|were)\\s+(?:${PASS_TERMS})\\b|\\b(?:${PASS_TERMS})\\b`,
+  "gi"
+);
 
 function normalizeOutcome(outcome: SummaryGateOutcome): string {
   return String(outcome ?? "")
@@ -37,13 +47,7 @@ export function gateSummaryToResult(
     return text;
   }
 
-  const neutralized = text
-    ? text.replace(PASS_CLAIM, match => {
-        // Preserve length-ish readability; mark contradiction explicitly.
-        if (/^pass(?:es|ed|ing)?$/i.test(match)) return "does not pass";
-        return "does not pass";
-      })
-    : "";
+  const neutralized = text ? text.replace(PASS_CLAIM, "does not pass") : "";
 
   const prefix =
     outcome === "FAIL"

@@ -40,6 +40,7 @@
     "drift:check": "npx tsx scripts/drift/run-drift-check.ts",
     "drift:baseline": "npx tsx scripts/drift/run-drift-check.ts --create-baseline",
     "governance:check": "npx tsx scripts/governance/check-environment-contract.ts",
+    "seed:technicians": "node scripts/seed-technician-roster.mjs",
     "local-ci:governance": "pnpm governance:check"
   },
   "dependencies": {

@@ -408,6 +408,72 @@ describe("sign-off demote when vlmUsed:false", () => {
     expect(cleaned[0].severity).toBe("S1");
   });
 
+  it("PX-109 residual: demotes S2/LOW_CONFIDENCE engineerSignOff re-emit (LOLER-R004-shaped) when vlmUsed:false", () => {
+    // A re-emitted GoldSpec/JSR validation finding (e.g. LOLER-R004/PTO-R004)
+    // can land at S2/LOW_CONFIDENCE rather than S0/S1/MISSING_FIELD.
+    const goldSpecFinding = finding({
+      ruleId: "LOLER-R004",
+      fieldName: "engineerSignOff",
+      severity: "S2",
+      reasonCode: "LOW_CONFIDENCE",
+      normalisedSnippet: "",
+    });
+    const cleaned = demoteSignOffMissingWhenInkUnverified([goldSpecFinding], {
+      vlmUsed: false,
+    });
+    expect(cleaned[0].severity).toBe("S3");
+    expect(cleaned[0].honestyDemoted).toBe(true);
+  });
+
+  it("PX-109 residual: demotes S2/LOW_CONFIDENCE customerSignature re-emit (PTO-R004-shaped) when vlmUsed:false", () => {
+    const goldSpecFinding = finding({
+      ruleId: "PTO-R004",
+      fieldName: "customerSignature",
+      severity: "S2",
+      reasonCode: "LOW_CONFIDENCE",
+      normalisedSnippet: "",
+    });
+    const cleaned = demoteSignOffMissingWhenInkUnverified([goldSpecFinding], {
+      vlmUsed: false,
+    });
+    expect(cleaned[0].severity).toBe("S3");
+    expect(cleaned[0].honestyDemoted).toBe(true);
+  });
+
+  it("PX-109 residual: widened demote does not leak to unrelated S2/LOW_CONFIDENCE fields", () => {
+    const other = finding({
+      fieldName: "assetId",
+      severity: "S2",
+      reasonCode: "LOW_CONFIDENCE",
+    });
+    const cleaned = demoteSignOffMissingWhenInkUnverified([other], {
+      vlmUsed: false,
+    });
+    expect(cleaned[0].severity).toBe("S2");
+    expect(cleaned[0].honestyDemoted).toBeUndefined();
+  });
+
+  it("PX-109 residual: DEF-C040/WJ-C040 cannot rematerialize MAJOR for the widened S2 demote (default family)", () => {
+    const goldSpecFinding = finding({
+      ruleId: "LOLER-R004",
+      fieldName: "customerSignature",
+      severity: "S2",
+      reasonCode: "LOW_CONFIDENCE",
+    });
+    const cleaned = demoteSignOffMissingWhenInkUnverified([goldSpecFinding], {
+      vlmUsed: false,
+    });
+    const applied = applyAuditPolicy({
+      findings: cleaned,
+      formFamily: "default",
+      policy: DEFAULT_AUDIT_POLICY,
+      currentResult: "PASS",
+    });
+    expect(applied.hasMajorFails).toBe(false);
+    expect(applied.overallResult).toBe("PASS");
+    expect(applied.findings[0].failClass).toBe("informational");
+  });
+
   it("PR-A: demoted finding stays non-major after applyAuditPolicy (DEF-C040 undo guard)", () => {
     // finding()'s ruleId "G001" is not DEF-C040, but its fieldName
     // "engineerSignOff" matches DEF-C040's fieldAliases — this is exactly

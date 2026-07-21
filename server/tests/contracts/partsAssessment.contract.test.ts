@@ -67,6 +67,22 @@ see attached sheet
 Technician Signature
 `;
 
+const REPAIRS_ONLY_PARTS_NOT_REQUIRED = `
+Job Summary Report
+Repairs Required: Vacuum pump serviced and re-calibrated
+Parts Used
+Nil required
+Technician Signature
+`;
+
+const REPAIRS_ONLY_NO_PARTS_REQUIRED_PHRASE = `
+Job Summary Report
+Repairs Required: Flushed and inspected vacuum hose assembly
+Parts Used
+No parts required
+Technician Signature
+`;
+
 const NO_PARTS_CONTEXT = `
 Job Summary Report
 All Works Completed? Yes
@@ -170,6 +186,21 @@ describe("evaluatePartsUsed", () => {
     const result = evaluatePartsUsed(PARTS_USED_UNPARSEABLE);
     expect(result.findings.some(f => f.ruleId === "PARTS-C012")).toBe(true);
     expect(result.findings.some(f => f.ruleId === "PARTS-C014")).toBe(false);
+  });
+
+  it("PX-109 residual: 'Nil required' in Parts Used is treated like None, not MAJOR (Vacuum-class repairs-only)", () => {
+    const result = evaluatePartsUsed(REPAIRS_ONLY_PARTS_NOT_REQUIRED);
+    expect(result.findings.some(f => f.ruleId === "PARTS-C012")).toBe(false);
+    const c014 = result.findings.find(f => f.ruleId === "PARTS-C014");
+    expect(c014).toBeDefined();
+    expect(c014?.severity).toBe("S3");
+    expect(result.signals.completeCount).toBe(0);
+  });
+
+  it("PX-109 residual: 'No parts required' in Parts Used is treated like None, not MAJOR", () => {
+    const result = evaluatePartsUsed(REPAIRS_ONLY_NO_PARTS_REQUIRED_PHRASE);
+    expect(result.findings.some(f => f.ruleId === "PARTS-C012")).toBe(false);
+    expect(result.findings.some(f => f.ruleId === "PARTS-C014")).toBe(true);
   });
 
   it("skips when no parts context is implied", () => {
