@@ -131,7 +131,12 @@ describe("technicianAttribution", () => {
     expect(
       isPhantomOnlyRoster([
         { id: 1, name: "OCR Ghost", email: null, loginMethod: "attribution" },
-        { id: 2, name: "Another Ghost", email: null, loginMethod: "attribution" },
+        {
+          id: 2,
+          name: "Another Ghost",
+          email: null,
+          loginMethod: "attribution",
+        },
       ])
     ).toBe(true);
   });

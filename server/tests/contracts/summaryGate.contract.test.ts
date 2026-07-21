@@ -74,9 +74,9 @@ describe("gateSummaryToResult (PX-101)", () => {
     });
 
     it('handles "was/are/were + claim" the same way', () => {
-      expect(
-        gateSummaryToResult("The checklist was compliant.", "FAIL")
-      ).toBe("Outcome: FAIL. The checklist does not pass.");
+      expect(gateSummaryToResult("The checklist was compliant.", "FAIL")).toBe(
+        "Outcome: FAIL. The checklist does not pass."
+      );
       expect(
         gateSummaryToResult("These items are fully compliant.", "FAIL")
       ).toBe("Outcome: FAIL. These items does not pass.");

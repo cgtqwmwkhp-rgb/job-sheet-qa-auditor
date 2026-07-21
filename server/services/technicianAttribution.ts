@@ -23,7 +23,9 @@ export interface TechnicianCandidate {
 }
 
 /** True when every candidate is a synthetic OCR-attribution phantom (or the list is empty). */
-export function isPhantomOnlyRoster(candidates: TechnicianCandidate[]): boolean {
+export function isPhantomOnlyRoster(
+  candidates: TechnicianCandidate[]
+): boolean {
   if (candidates.length === 0) return true;
   return candidates.every(c => c.loginMethod === "attribution");
 }
