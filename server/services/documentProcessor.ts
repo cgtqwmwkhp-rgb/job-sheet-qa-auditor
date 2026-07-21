@@ -359,10 +359,12 @@ const PIPELINE_VERSION = "2.2.0-waveB";
 const WAVE_B_REVISION = "R1";
 
 function pipelineReportStamps(): {
+  pipelineVersion: string;
   gitSha: string;
   waveBRevision: string;
 } {
   return {
+    pipelineVersion: PIPELINE_VERSION,
     gitSha: process.env.GIT_SHA || "unknown",
     waveBRevision: WAVE_B_REVISION,
   };
