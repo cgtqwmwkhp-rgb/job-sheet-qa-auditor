@@ -857,7 +857,11 @@ describe("disputes", () => {
       reviewNotes: "Approved after review",
     });
 
-    expect(result).toEqual({ success: true });
+    expect(result).toEqual({
+      success: true,
+      findingOverturned: false,
+      auditResultStatus: undefined,
+    });
   });
 });
 
