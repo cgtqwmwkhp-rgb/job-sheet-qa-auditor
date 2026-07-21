@@ -4,6 +4,43 @@ const LINE_SEP = /\s*[—–\-/|]\s*/;
 const QTY_RE = /^\d+(?:\.\d+)?$/;
 const SKIP_LINE_RE = /^(?:none|n\/a|na|nil|-|—|\.|see\s+above|tbc|tba)$/i;
 
+/**
+ * Plantexpand Parts Used table header chrome (PX-116). These rows are not
+ * fitted parts — treating them as content forced MAJOR PARTS-C012 on
+ * Consumables=Yes forms even when no real lines exist.
+ */
+const PARTS_HEADER_CHROME_RE =
+  /^(?:part\s*(?:no\.?|number|#)|pn)(?:\s*[/|\s]\s*(?:description|desc))?(?:\s*[/|\s]\s*(?:qty|quantity))?$|^(?:description|desc)(?:\s*[/|\s]\s*(?:qty|quantity))?$|^(?:qty|quantity)$/i;
+
+/** True when a line is only Parts Used column headers (no real part data). */
+export function isPartsUsedChromeLine(line: string): boolean {
+  const normalized = line.replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+  if (PARTS_HEADER_CHROME_RE.test(normalized)) return true;
+  // Spaced form: "Part No Description Qty" (no separators)
+  return /^part\s*(?:no\.?|number|#)\s+description\s+(?:qty|quantity)$/i.test(
+    normalized
+  );
+}
+
+/**
+ * Drop header chrome and nil placeholders so presence/line parsing see an
+ * empty Parts Used body when the section is chrome-only.
+ */
+export function stripPartsUsedChrome(body: string): string {
+  if (!body.trim()) return "";
+  return body
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(
+      line =>
+        line.length > 0 &&
+        !isPartsUsedChromeLine(line) &&
+        !SKIP_LINE_RE.test(line)
+    )
+    .join("\n");
+}
+
 function looksLikePartNumber(token: string): boolean {
   const t = token.trim();
   if (!t) return false;
@@ -69,15 +106,17 @@ function isSkippableLine(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return true;
   if (SKIP_LINE_RE.test(trimmed)) return true;
+  if (isPartsUsedChromeLine(trimmed)) return true;
   if (!/[a-z0-9]/i.test(trimmed)) return true;
   return false;
 }
 
 /** Split Parts Used section body into parsed line items. */
 export function parsePartsUsedLines(sectionBody: string): PartsUsedLine[] {
-  if (!sectionBody.trim()) return [];
+  const cleaned = stripPartsUsedChrome(sectionBody);
+  if (!cleaned.trim()) return [];
 
-  return sectionBody
+  return cleaned
     .split(/\r?\n/)
     .map(line => line.trim())
     .filter(line => !isSkippableLine(line))

@@ -8,6 +8,8 @@ export {
   parsePartsUsedLine,
   parsePartsUsedLines,
   isCompletePartsLine,
+  isPartsUsedChromeLine,
+  stripPartsUsedChrome,
 } from "./parsePartsUsedLines";
 export type {
   PartsUsedLine,

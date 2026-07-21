@@ -69,6 +69,24 @@ None
 Technician Signature
 `;
 
+/** Real Plantexpand shape — table headers with no fitted lines (PX-116). */
+const CONSUMABLES_YES_HEADER_CHROME_ONLY = `
+Job Summary Report
+Repairs Required: Service completed
+Consumables Used? Yes
+Parts Used
+Part No Description Qty
+Technician Signature
+`;
+
+const CONSUMABLES_YES_HEADER_SLASH_CHROME = `
+Job Summary Report
+Consumables Used? Yes
+Parts Used
+Part No / Description / Qty
+Technician Signature
+`;
+
 const PARTS_USED_UNPARSEABLE = `
 Job Summary Report
 Repairs Required: Replace cracked hinge
@@ -201,6 +219,24 @@ describe("evaluatePartsUsed", () => {
     expect(c014?.severity).toBe("S3");
     expect(result.signals.consumablesYes).toBe(true);
     expect(result.signals.repairsPresent).toBe(false);
+  });
+
+  it("PX-116: Consumables=Yes + Parts Used header chrome only → C014, not C012", () => {
+    const result = evaluatePartsUsed(CONSUMABLES_YES_HEADER_CHROME_ONLY);
+    expect(result.findings.some(f => f.ruleId === "PARTS-C012")).toBe(false);
+    const c014 = result.findings.find(f => f.ruleId === "PARTS-C014");
+    expect(c014).toBeDefined();
+    expect(c014?.severity).toBe("S3");
+    expect(result.signals.partsUsedPresent).toBe(false);
+    expect(result.signals.lineCount).toBe(0);
+    expect(result.signals.consumablesYes).toBe(true);
+  });
+
+  it("PX-116: slash-separated Parts Used header chrome is also soft-pathed", () => {
+    const result = evaluatePartsUsed(CONSUMABLES_YES_HEADER_SLASH_CHROME);
+    expect(result.findings.some(f => f.ruleId === "PARTS-C012")).toBe(false);
+    expect(result.findings.some(f => f.ruleId === "PARTS-C014")).toBe(true);
+    expect(result.signals.lineCount).toBe(0);
   });
 
   it("PR-A: still emits MAJOR PARTS-C012 when Parts Used has real but unparseable content", () => {

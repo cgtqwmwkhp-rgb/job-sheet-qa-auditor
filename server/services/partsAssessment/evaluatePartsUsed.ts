@@ -7,6 +7,7 @@ import {
 import {
   isCompletePartsLine,
   parsePartsUsedLines,
+  stripPartsUsedChrome,
 } from "./parsePartsUsedLines";
 import type { PartsAssessmentResult, PartsAssessmentSignals } from "./types";
 
@@ -97,7 +98,10 @@ export function evaluatePartsUsed(text: string): PartsAssessmentResult {
     };
   }
 
-  const partsUsedBody = extractNamedSection(text, "Parts Used");
+  const partsUsedBodyRaw = extractNamedSection(text, "Parts Used");
+  // PX-116: strip table header chrome before presence / line parse so
+  // Consumables=Yes + header-only Parts Used takes the C014 soft path.
+  const partsUsedBody = stripPartsUsedChrome(partsUsedBodyRaw);
   const repairsBody = extractNamedSection(text, "Repairs Required");
   const partsNotRequired = isPartsNotRequiredNote(partsUsedBody);
   const partsUsedSection = partsNotRequired
