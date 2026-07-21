@@ -11,6 +11,7 @@ export type ChecklistRowSource =
   | "radio"
   | "result_column"
   | "obs_marks"
+  | "radio_column"
   | "merged";
 
 export interface ChecklistTextToken {

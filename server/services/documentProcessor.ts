@@ -34,6 +34,7 @@ import {
   synthesizeOcrResultFromTextLayer,
   toDbDocumentStrategy,
   formatGroundedFieldsForReport,
+  backfillAuthoritativeExtractedFields,
   type DocumentStrategyLogical,
   type TextLayerExtractionResult,
 } from "./textLayerExtraction";
@@ -2160,7 +2161,12 @@ async function processJobSheetWithOptions(
                   k === "jobReference" ||
                   k === "assetId" ||
                   k === "date" ||
-                  k === "expiryDate"
+                  k === "expiryDate" ||
+                  // PX-106: text-layer/ROI-grounded headers must win over
+                  // weaker analyzer-hint guesses for these too.
+                  k === "makeModel" ||
+                  k === "customerName" ||
+                  k === "technicianName"
               )
             ),
           });
@@ -2225,7 +2231,12 @@ async function processJobSheetWithOptions(
                     k === "jobReference" ||
                     k === "assetId" ||
                     k === "date" ||
-                    k === "expiryDate"
+                    k === "expiryDate" ||
+                    // PX-106: text-layer/ROI-grounded headers must win over
+                    // weaker analyzer-hint guesses for these too.
+                    k === "makeModel" ||
+                    k === "customerName" ||
+                    k === "technicianName"
                 )
               ),
             }
@@ -2568,6 +2579,9 @@ async function processJobSheetWithOptions(
     const beforeCount = analysisResult.findings.length;
     let cleaned = applyFindingHygiene(analysisResult.findings, {
       preExtractedFields: aliasCanonicalExtractedFields({
+        // PX-106: grounded text-layer headers must suppress MISSING_FIELD
+        // noise too — later high-confidence sources can still override.
+        ...textLayerPreExtracted,
         ...(ensembleResult?.ensembleExtractedFields ?? {}),
         ...(selectionMarksResult?.preExtractedFields ?? {}),
         ...(multimodalRoiResult?.preExtractedFields ?? {}),
@@ -3538,6 +3552,16 @@ async function processJobSheetWithOptions(
           ensembleResult.ensembleExtractedFields
         )
       : analysisResult.extractedFields;
+
+    // PX-106 Sprint1.5 PR-B: authoritative persist. Gemini can return `{}`
+    // for a Job Summary the text layer already grounded (Stage 1 extracts
+    // 6/6 locally); never let that grade the document 0/6. Backfill
+    // canonical headers from the text-layer / ROI spatial snapshot whenever
+    // the graded value is missing or empty — a nonempty graded value wins.
+    finalExtractedFields = backfillAuthoritativeExtractedFields(
+      finalExtractedFields,
+      { ...roiSpatialFields, ...textLayerPreExtracted }
+    );
 
     // Wave-7 H2/H4: apply template memory (value aliases + soft rule suppress)
     let memoryApplied: import("./templateMemory").MemoryAppliedEntry[] = [];

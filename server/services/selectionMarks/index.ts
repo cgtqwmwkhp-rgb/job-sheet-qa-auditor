@@ -30,6 +30,7 @@ import type { EmbeddedPdfPageLayout } from "../embeddedPdfText";
 import {
   readResultColumnRows,
   readObsMarkRows,
+  readRadioColumnRows,
   mergeChecklistRowSources,
 } from "./checklistReaders";
 
@@ -44,9 +45,11 @@ export const ENGINE_VERSION_WITH_TEXT_CHECKLIST =
 export {
   readResultColumnRows,
   readObsMarkRows,
+  readRadioColumnRows,
   mergeChecklistRowSources,
   detectResultColumnBands,
   detectObsColumnBands,
+  detectRadioColumnBands,
   normalizeResultChoice,
   normalizeObsGlyph,
   pageLayoutsToTokens,
@@ -735,7 +738,13 @@ export function enrichRowsWithTextChecklistReaders(
   textRowsAdded: number;
   resultRowCount: number;
   obsRowCount: number;
-  preferredSource: "layout" | "result_column" | "obs_marks" | "merged";
+  radioColumnRowCount: number;
+  preferredSource:
+    | "layout"
+    | "result_column"
+    | "obs_marks"
+    | "radio_column"
+    | "merged";
 } {
   const resultRows = readResultColumnRows({
     lines: options.lines,
@@ -745,16 +754,27 @@ export function enrichRowsWithTextChecklistReaders(
     lines: options.lines,
     pageLayouts: options.pageLayouts,
   });
+  // PX-106: Ok/Adv/Fail/N/A radio grid rendered as text glyphs, not Azure DI
+  // selectionMarks — only needed when the visual radio pass found nothing.
+  const radioColumnRows =
+    radioRows.filter(r => r.choice !== "UNREADABLE").length === 0
+      ? readRadioColumnRows({
+          lines: options.lines,
+          pageLayouts: options.pageLayouts,
+        })
+      : [];
   const merged = mergeChecklistRowSources({
     radioRows,
     resultRows,
     obsRows,
+    radioColumnRows,
   });
   return {
     rows: merged.rows,
     textRowsAdded: merged.textRowsAdded,
     resultRowCount: resultRows.length,
     obsRowCount: obsRows.length,
+    radioColumnRowCount: radioColumnRows.length,
     preferredSource: merged.preferredSource,
   };
 }

@@ -15,7 +15,11 @@ import {
   extractFieldsFromPlainText,
   toDbDocumentStrategy,
   synthesizeOcrResultFromTextLayer,
+  backfillAuthoritativeExtractedFields,
+  isDateLabelBleedValue,
+  CANONICAL_HEADER_FIELD_IDS,
   PAGE_DIGITAL_MIN_CHARS,
+  type ExtractedFieldMap,
 } from "../../services/textLayerExtraction";
 import {
   extractEmbeddedPdfText,
@@ -316,6 +320,138 @@ describe("label-anchor extract coverage (PX-106)", () => {
       LOLER_GT.headers.technicianName
     );
     expect(result.preExtracted.date?.value).toBe(LOLER_GT.headers.date);
+  });
+});
+
+describe("authoritative persist backfill (Sprint1.5 PR-B / PX-106)", () => {
+  /** Same synthetic geometry as the label-anchor coverage suite above. */
+  function jetterPageLayout(): EmbeddedPdfPageLayout {
+    const pageH = 842;
+    const mk = (
+      text: string,
+      x: number,
+      yFromTop: number,
+      w = 40,
+      h = 10
+    ): PdfTextWord => ({
+      text,
+      page: 1,
+      x,
+      y: pageH - yFromTop - h,
+      width: w,
+      height: h,
+    });
+    const words: PdfTextWord[] = [
+      mk("Asset", 40, 80, 35),
+      mk("No", 80, 80, 20),
+      mk("JT99XYZ", 120, 80, 55),
+      mk("Date", 40, 120, 30),
+      mk("22/07/2026", 90, 120, 70),
+      mk("Job", 40, 160, 25),
+      mk("ID :", 70, 160, 30),
+      mk("629", 105, 160, 30),
+      mk("Technician:", 40, 200, 65),
+      mk("John", 110, 200, 30),
+      mk("Smith", 145, 200, 35),
+      mk("Signature", 185, 200, 55),
+    ];
+    return { pageNumber: 1, text: JETTER_TEXT, words };
+  }
+
+  it("backfills graded {} with ≥5/6 canonical headers from the Jetter text-layer snapshot", () => {
+    const embedded: EmbeddedPdfTextResult = {
+      success: true,
+      fullText: JETTER_TEXT,
+      pages: [JETTER_TEXT],
+      pageCount: 1,
+      pageLayouts: [jetterPageLayout()],
+      words: jetterPageLayout().words,
+    };
+    const textLayer = buildTextLayerResult(embedded);
+
+    // Gemini returned {} — root cause of Run013 grading 0/6.
+    const graded: ExtractedFieldMap = {};
+    const backfilled = backfillAuthoritativeExtractedFields(
+      graded,
+      textLayer.preExtracted
+    );
+
+    const canonicalIds = [
+      "assetId",
+      "jobReference",
+      "date",
+      "makeModel",
+      "customerName",
+      "technicianName",
+    ];
+    const present = canonicalIds.filter(
+      id => backfilled[id] && backfilled[id].value.trim().length > 0
+    );
+    expect(present.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("never overwrites a nonempty graded value with an authoritative one", () => {
+    const graded: ExtractedFieldMap = {
+      assetId: { value: "GEMINI-VALUE", confidence: 40, pageNumber: 1 },
+    };
+    const backfilled = backfillAuthoritativeExtractedFields(graded, {
+      assetId: { value: "JT99XYZ", confidence: 98, pageNumber: 1 },
+    });
+    expect(backfilled.assetId.value).toBe("GEMINI-VALUE");
+  });
+
+  it("treats an empty-string graded value as absent and backfills it", () => {
+    const graded: ExtractedFieldMap = {
+      assetId: { value: "", confidence: 0, pageNumber: 1 },
+    };
+    const backfilled = backfillAuthoritativeExtractedFields(graded, {
+      assetId: { value: "JT99XYZ", confidence: 98, pageNumber: 1 },
+    });
+    expect(backfilled.assetId.value).toBe("JT99XYZ");
+  });
+
+  it("skips an authoritative value that is itself empty", () => {
+    const graded: ExtractedFieldMap = {};
+    const backfilled = backfillAuthoritativeExtractedFields(graded, {
+      assetId: { value: "   ", confidence: 98, pageNumber: 1 },
+    });
+    expect(backfilled.assetId).toBeUndefined();
+  });
+
+  it("only touches canonical header fields, not arbitrary keys", () => {
+    expect(CANONICAL_HEADER_FIELD_IDS).toContain("makeModel");
+    expect(CANONICAL_HEADER_FIELD_IDS).toContain("customerName");
+    expect(CANONICAL_HEADER_FIELD_IDS).toContain("technicianName");
+    const graded: ExtractedFieldMap = {};
+    const backfilled = backfillAuthoritativeExtractedFields(graded, {
+      engineerSignOff: { value: "Present", confidence: 90, pageNumber: 1 },
+    });
+    expect(backfilled.engineerSignOff).toBeUndefined();
+  });
+});
+
+describe("LOLER jobRef date+label bleed rejection (PX-106)", () => {
+  it("flags a jobRef value with a date glued to an Asset No label", () => {
+    expect(isDateLabelBleedValue("12/07/2026AssetNo")).toBe(true);
+    expect(isDateLabelBleedValue("LOLER-8842")).toBe(false);
+  });
+
+  it("leaves jobReference unread rather than persisting date+label bleed", () => {
+    const bledText = [
+      "LOLER Inspection Certificate",
+      "Job Reference: 12/07/2026AssetNo",
+      "Asset No: JCB-CRANE-04",
+      "Date of Examination: 12/07/2026",
+    ].join("\n");
+    const fields = extractFieldsFromPlainText(bledText, 1);
+    const jobRef = fields.find(f => f.fieldId === "jobReference");
+    expect(jobRef).toBeUndefined();
+  });
+
+  it("still extracts the real LOLER jobReference when unbled", () => {
+    const fields = extractFieldsFromPlainText(LOLER_TEXT, 1);
+    const jobRef = fields.find(f => f.fieldId === "jobReference");
+    expect(jobRef?.value).toBe(LOLER_GT.headers.jobReference);
   });
 });
 

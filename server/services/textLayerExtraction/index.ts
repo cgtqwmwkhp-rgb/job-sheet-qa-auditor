@@ -28,6 +28,7 @@ import type {
 export * from "./types";
 export * from "./classify";
 export * from "./labelAnchor";
+export * from "./authoritativeMerge";
 
 /** DB enum does not yet include text_layer — map for persistence. */
 export function toDbDocumentStrategy(
