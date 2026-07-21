@@ -102,9 +102,11 @@ export function buildTextLayerResult(
           words: [],
         }));
 
+  const abstainFieldIds = new Set<string>();
   const fields = extractLabelAnchoredFields(
     pageLayouts,
-    JOB_SUMMARY_LABEL_SPECS
+    JOB_SUMMARY_LABEL_SPECS,
+    { abstainFieldIds }
   );
 
   // Document-level plain-text backfill for any canonical header still
@@ -117,14 +119,19 @@ export function buildTextLayerResult(
   ]);
   const missingCanonical = Array.from(canonicalIds).some(id => !seen.has(id));
   if (missingCanonical && embedded.fullText) {
-    const fromFull = extractFieldsFromPlainText(embedded.fullText, 1);
+    const fromFull = extractFieldsFromPlainText(embedded.fullText, 1, undefined, {
+      abstainFieldIds,
+    });
     for (const f of fromFull) {
-      if (!seen.has(f.fieldId)) {
+      if (!seen.has(f.fieldId) && !abstainFieldIds.has(f.fieldId)) {
         seen.add(f.fieldId);
         fields.push(f);
       }
     }
   }
+
+  // Never persist a value for a field we explicitly rejected as bleed.
+  const kept = fields.filter(f => !abstainFieldIds.has(f.fieldId));
 
   const pageTexts =
     embedded.pages.length > 0 ? embedded.pages : [embedded.fullText];
@@ -136,8 +143,9 @@ export function buildTextLayerResult(
     classification,
     fullText,
     pageTexts,
-    fields,
-    preExtracted: groundedFieldsToPreExtracted(fields),
+    fields: kept,
+    preExtracted: groundedFieldsToPreExtracted(kept),
+    abstainFieldIds: Array.from(abstainFieldIds),
   };
 }
 
@@ -158,6 +166,7 @@ function emptyResult(reason: string): TextLayerExtractionResult {
     pageTexts: [],
     fields: [],
     preExtracted: {},
+    abstainFieldIds: [],
   };
 }
 

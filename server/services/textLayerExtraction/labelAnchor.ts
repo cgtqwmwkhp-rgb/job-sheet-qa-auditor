@@ -28,6 +28,8 @@ const ISO_DATE_RE = /^\d{4}[./-]\d{1,2}[./-]\d{1,2}$/;
 
 /** A date-shaped run anywhere inside the candidate value (not anchored). */
 const DATE_SHAPED_ANYWHERE_RE = /\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/;
+/** Spaced date run (Winch residual): "14 07 2026 Asset n". */
+const SPACED_DATE_SHAPED_RE = /\d{1,2}\s+\d{1,2}\s+\d{2,4}/;
 /**
  * Another header's label text glued onto the value (no-space OCR bleed).
  * PX-112: widened to cover Make/Model and Site Address bleed on top of the
@@ -37,15 +39,38 @@ const ADJACENT_LABEL_TOKEN_RE =
   /assetno|assetnumber|assetid|serialno|serialnumber|jobno|jobid|jobnumber|jobreference|customer|technician|engineer|makemodel|make|model|siteaddress|site/i;
 
 /**
- * LOLER-style jobRef hygiene (PX-106): reject values where a date run is
- * glued to an unrelated header label (e.g. "12072026AssetNo") — this is
- * date+label bleed from flattened/no-space text, never a real reference.
- * Leave the field unread rather than persist wrong adjacent text.
+ * LOLER-style jobRef hygiene (PX-106 / Wave B PX-112): reject values where a
+ * date run (slashed or spaced) sits next to an unrelated header label — e.g.
+ * "12072026AssetNo", "21/07/2026Make", "14 07 2026 Asset n". Leave unread
+ * rather than persist wrong adjacent text.
  */
 export function isDateLabelBleedValue(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  const compact = trimmed.replace(/\s+/g, "");
+  const hasDate =
+    DATE_SHAPED_ANYWHERE_RE.test(trimmed) ||
+    SPACED_DATE_SHAPED_RE.test(trimmed);
+  if (!hasDate) return false;
   return (
-    DATE_SHAPED_ANYWHERE_RE.test(value) && ADJACENT_LABEL_TOKEN_RE.test(value)
+    ADJACENT_LABEL_TOKEN_RE.test(compact) ||
+    /\b(asset|make|model|site|serial|customer|job)\b/i.test(trimmed)
   );
+}
+
+export interface LabelExtractOptions {
+  /** Field ids text-layer examined and rejected (bleed) — FieldAuthority abstain. */
+  abstainFieldIds?: Set<string>;
+}
+
+function noteAbstain(
+  abstain: Set<string> | undefined,
+  fieldId: string,
+  aliases?: string[]
+): void {
+  if (!abstain) return;
+  abstain.add(fieldId);
+  for (const alias of aliases ?? []) abstain.add(alias);
 }
 
 /**
@@ -247,10 +272,22 @@ function sameLine(a: PdfTextWord, b: PdfTextWord, tol: number): boolean {
   return Math.abs(a.y - b.y) <= tol;
 }
 
+function isHeaderStopToken(text: string, stopLabels: string[]): boolean {
+  const bare = text.replace(/\s*:\s*$/, "");
+  const token = normalizeLabel(bare);
+  if (stopLabels.some(l => token === l || token.startsWith(`${l} `))) {
+    return true;
+  }
+  // Bare next-field header words (Make / Customer / …) — not mid-value text.
+  return /^(asset|job|make|model|customer|technician|engineer|compliance|location|serial|site|miles|hours|signature)$/i.test(
+    bare
+  );
+}
+
 /**
  * Collect value tokens to the right of the label on the same line.
  */
-function collectValueWords(
+function collectSameLineValueWords(
   words: PdfTextWord[],
   labelEnd: number,
   opts: { maxGapX: number; lineTol: number; stopLabels: string[] }
@@ -268,17 +305,7 @@ function collectValueWords(
     if (out.length === 0 && gap > opts.maxGapX) break;
     if (out.length > 0 && gap > opts.maxGapX * 1.5) break;
 
-    const token = normalizeLabel(w.text.replace(/\s*:\s*$/, ""));
-    if (opts.stopLabels.some(l => token === l || token.startsWith(l + " "))) {
-      break;
-    }
-    // Stop at another known field label word, or a signature marker
-    // trailing the value (e.g. "Technician: John Smith Signature:").
-    if (
-      /^(asset|job|make|customer|technician|engineer|compliance|location|serial|site|miles|hours|signature)$/i.test(
-        w.text.replace(/\s*:\s*$/, "")
-      )
-    ) {
+    if (isHeaderStopToken(w.text, opts.stopLabels)) {
       break;
     }
 
@@ -288,6 +315,74 @@ function collectValueWords(
     if (out.length >= 8) break;
   }
   return out;
+}
+
+/**
+ * Wave B PX-115: when the same-line cell is empty because the next header
+ * (e.g. Make) sits on the label row, collect a value from the line below
+ * aligned to the label column — without discarding a real Asset No.
+ */
+function collectBelowLabelValueWords(
+  words: PdfTextWord[],
+  labelStart: number,
+  labelEnd: number,
+  opts: { maxGapX: number; lineTol: number; stopLabels: string[] }
+): PdfTextWord[] {
+  const labelWord = words[labelEnd];
+  const startWord = words[labelStart] ?? labelWord;
+  if (!labelWord || !startWord) return [];
+
+  const colLeft = startWord.x;
+  const colRight = labelWord.x + labelWord.width + opts.maxGapX * 0.4;
+  const candidates: PdfTextWord[] = [];
+
+  for (let i = 0; i < words.length; i++) {
+    if (i >= labelStart && i <= labelEnd) continue;
+    const w = words[i];
+    // PDF y increases upward; visually-below ⇒ smaller y than the label line.
+    const belowGap = labelWord.y - w.y;
+    if (belowGap < opts.lineTol * 0.5) continue;
+    if (belowGap > opts.lineTol * 8) continue;
+    if (w.x + w.width < colLeft - 8) continue;
+    if (w.x > colRight) continue;
+    if (isHeaderStopToken(w.text, opts.stopLabels)) continue;
+    candidates.push(w);
+  }
+
+  candidates.sort((a, b) => {
+    const lineDelta = b.y - a.y;
+    if (Math.abs(lineDelta) > Math.max(a.height, b.height) * 0.5) {
+      return lineDelta;
+    }
+    return a.x - b.x;
+  });
+
+  const out: PdfTextWord[] = [];
+  let prevRight = colLeft;
+  for (const w of candidates) {
+    const prev = out[out.length - 1];
+    if (prev && !sameLine(prev, w, opts.lineTol)) break;
+    if (out.length > 0 && w.x - prevRight > opts.maxGapX * 1.5) break;
+    if (isHeaderStopToken(w.text, opts.stopLabels)) break;
+    out.push(w);
+    prevRight = w.x + w.width;
+    if (out.length >= 4) break;
+  }
+  return out;
+}
+
+/**
+ * Same-line first; if empty (next-label on the row), bounded below-label wrap.
+ */
+function collectValueWords(
+  words: PdfTextWord[],
+  labelStart: number,
+  labelEnd: number,
+  opts: { maxGapX: number; lineTol: number; stopLabels: string[] }
+): PdfTextWord[] {
+  const sameLineWords = collectSameLineValueWords(words, labelEnd, opts);
+  if (sameLineWords.length > 0) return sameLineWords;
+  return collectBelowLabelValueWords(words, labelStart, labelEnd, opts);
 }
 
 function sortReadingOrder(words: PdfTextWord[]): PdfTextWord[] {
@@ -305,12 +400,18 @@ function sortReadingOrder(words: PdfTextWord[]): PdfTextWord[] {
  */
 export function extractFieldsFromPageLayout(
   layout: EmbeddedPdfPageLayout,
-  specs: LabelFieldSpec[] = JOB_SUMMARY_LABEL_SPECS
+  specs: LabelFieldSpec[] = JOB_SUMMARY_LABEL_SPECS,
+  options: LabelExtractOptions = {}
 ): GroundedTextLayerField[] {
   const words = sortReadingOrder(layout.words);
   if (words.length === 0) {
     // Fallback: regex on page text when boxes missing
-    return extractFieldsFromPlainText(layout.text, layout.pageNumber, specs);
+    return extractFieldsFromPlainText(
+      layout.text,
+      layout.pageNumber,
+      specs,
+      options
+    );
   }
 
   const stopLabels = specs.flatMap(s =>
@@ -331,7 +432,7 @@ export function extractFieldsFromPageLayout(
       const lineTol =
         (spec.lineTolFactor ?? 0.6) *
         Math.max(words[run.end].height, words[run.start].height, 8);
-      const valueWords = collectValueWords(words, run.end, {
+      const valueWords = collectValueWords(words, run.start, run.end, {
         maxGapX: spec.maxGapX ?? 180,
         lineTol,
         stopLabels,
@@ -345,10 +446,19 @@ export function extractFieldsFromPageLayout(
         .trim();
       // Strip leading colon leftovers
       value = value.replace(/^[:.-]\s*/, "").trim();
+      const rawBeforeStrip = value;
       // PX-112: strip a next-field label glued onto the end (no-space bleed)
       value = stripLabelBleedSuffix(value);
       if (!value) continue;
-      if (spec.accept && !spec.accept(value)) continue;
+      if (spec.accept && !spec.accept(value)) {
+        if (
+          isDateLabelBleedValue(value) ||
+          isDateLabelBleedValue(rawBeforeStrip)
+        ) {
+          noteAbstain(options.abstainFieldIds, spec.fieldId, spec.aliases);
+        }
+        continue;
+      }
 
       best = {
         fieldId: spec.fieldId,
@@ -378,7 +488,8 @@ export function extractFieldsFromPageLayout(
     const fromText = extractFieldsFromPlainText(
       layout.text,
       layout.pageNumber,
-      specs.filter(s => s.fieldId === "date")
+      specs.filter(s => s.fieldId === "date"),
+      options
     );
     for (const f of fromText) {
       if (!seen.has(f.fieldId)) {
@@ -398,7 +509,8 @@ export function extractFieldsFromPageLayout(
 export function extractFieldsFromPlainText(
   text: string,
   pageNumber: number,
-  specs: LabelFieldSpec[] = JOB_SUMMARY_LABEL_SPECS
+  specs: LabelFieldSpec[] = JOB_SUMMARY_LABEL_SPECS,
+  options: LabelExtractOptions = {}
 ): GroundedTextLayerField[] {
   const out: GroundedTextLayerField[] = [];
   const seen = new Set<string>();
@@ -421,7 +533,9 @@ export function extractFieldsFromPlainText(
     {
       fieldId: "jobReference",
       aliases: ["jobNumber"],
-      re: /(?:job\s*(?:id|no\.?|number|ref(?:erence)?))\s*[:.-]?\s*([A-Z0-9][A-Z0-9/_-]{1,24})/i,
+      // Capture through end-of-line so spaced date+label bleed is visible
+      // to the rejector (Wave B PX-112), not only tidy ID tokens.
+      re: /(?:job\s*(?:id|no\.?|number|ref(?:erence)?))\s*[:.-]?\s*([^\n]{1,48})/i,
       label: "Job ID",
     },
     {
@@ -511,10 +625,24 @@ export function extractFieldsFromPlainText(
     }
 
     if (!match?.[1]) continue;
+    const raw = match[1].trim().replace(/\s+/g, " ");
     // PX-112: strip a next-field label glued onto the end (no-space bleed)
-    const value = stripLabelBleedSuffix(match[1].trim());
-    if (p.accept && !p.accept(value)) continue;
-    if (spec.accept && !spec.accept(value)) continue;
+    const value = stripLabelBleedSuffix(raw);
+    const rejected =
+      (p.accept && !p.accept(value)) ||
+      (spec.accept && !spec.accept(value)) ||
+      isDateLabelBleedValue(raw) ||
+      isDateLabelBleedValue(value);
+    if (rejected) {
+      if (isDateLabelBleedValue(raw) || isDateLabelBleedValue(value)) {
+        noteAbstain(
+          options.abstainFieldIds,
+          spec.fieldId,
+          spec.aliases ?? p.aliases
+        );
+      }
+      continue;
+    }
 
     const field: GroundedTextLayerField = {
       fieldId: spec.fieldId,
@@ -542,12 +670,13 @@ export function extractFieldsFromPlainText(
  */
 export function extractLabelAnchoredFields(
   pageLayouts: EmbeddedPdfPageLayout[],
-  specs: LabelFieldSpec[] = JOB_SUMMARY_LABEL_SPECS
+  specs: LabelFieldSpec[] = JOB_SUMMARY_LABEL_SPECS,
+  options: LabelExtractOptions = {}
 ): GroundedTextLayerField[] {
   const out: GroundedTextLayerField[] = [];
   const seen = new Set<string>();
   for (const layout of pageLayouts) {
-    for (const field of extractFieldsFromPageLayout(layout, specs)) {
+    for (const field of extractFieldsFromPageLayout(layout, specs, options)) {
       if (seen.has(field.fieldId)) continue;
       seen.add(field.fieldId);
       out.push(field);
