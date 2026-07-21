@@ -81,9 +81,6 @@ export function wasVlmInkUsed(input: {
   vlmUsed?: boolean;
   imageQaVlmUsed?: boolean;
 }): boolean {
-  return (
-    input.vlmUsed === true ||
-    input.imageQaVlmUsed === true ||
-    (input.ran === true && input.vlmUsed === true)
-  );
+  // `ran` alone is insufficient — require an explicit VLM-used flag.
+  return input.vlmUsed === true || input.imageQaVlmUsed === true;
 }

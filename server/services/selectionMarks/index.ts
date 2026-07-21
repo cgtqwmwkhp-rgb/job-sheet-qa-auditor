@@ -247,7 +247,7 @@ export function computeAdaptiveYTolerance(
 
   const rowGaps: number[] = [];
   for (const ys of Array.from(byPage.values())) {
-    const uniq = [...new Set(ys.map(y => Math.round(y * 10) / 10))].sort(
+    const uniq = Array.from(new Set(ys.map(y => Math.round(y * 10) / 10))).sort(
       (a, b) => a - b
     );
     for (let i = 1; i < uniq.length; i++) {
