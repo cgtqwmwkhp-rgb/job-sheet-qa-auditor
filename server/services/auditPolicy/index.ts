@@ -157,12 +157,19 @@ export function mergeAuditPolicy(
  * Classify a single finding. Unmapped Issues default to Minor (score only).
  * Seeded policy rules win over LOW_CONFIDENCE soft-demote so honesty findings
  * (PHOTO-C014, PARTS-C022, …) stay Issues when failClass is minor/major.
+ *
+ * Exception: `honestyDemoted` findings (e.g. sign-off missing demoted
+ * because VLM ink verification did not run) must stay informational — a
+ * fieldName/alias rule match (DEF-C040, WJ-C040, …) must not remap the
+ * finding back to major/minor and undo the honesty demote (PR-A).
  */
 export function classifyFinding(
   finding: Finding,
   formFamily: string,
   policy: AuditPolicy
 ): FailClass {
+  if (finding.honestyDemoted) return "informational";
+
   const rule = findRule(policy, formFamily, finding);
   if (rule) {
     if (!rule.enabled) return "informational";

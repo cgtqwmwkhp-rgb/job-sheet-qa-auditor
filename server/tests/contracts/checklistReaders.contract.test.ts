@@ -28,6 +28,10 @@ import {
   type SelectionMarkRow,
 } from "../../services/selectionMarks";
 import type { AzureSelectionMark as Mark } from "../../services/ocrAdapter/parseAzureDiResponse";
+import {
+  applyAuditPolicy,
+  DEFAULT_AUDIT_POLICY,
+} from "../../services/auditPolicy";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -309,6 +313,25 @@ describe("sign-off demote when vlmUsed:false", () => {
       vlmUsed: false,
     });
     expect(cleaned[0].severity).toBe("S1");
+  });
+
+  it("PR-A: demoted finding stays non-major after applyAuditPolicy (DEF-C040 undo guard)", () => {
+    // finding()'s ruleId "G001" is not DEF-C040, but its fieldName
+    // "engineerSignOff" matches DEF-C040's fieldAliases — this is exactly
+    // the path that previously let applyAuditPolicy remap the honesty
+    // demote back to MAJOR.
+    const cleaned = demoteSignOffMissingWhenInkUnverified([finding()], {
+      vlmUsed: false,
+    });
+    const applied = applyAuditPolicy({
+      findings: cleaned,
+      formFamily: "default",
+      policy: DEFAULT_AUDIT_POLICY,
+      currentResult: "PASS",
+    });
+    expect(applied.hasMajorFails).toBe(false);
+    expect(applied.overallResult).toBe("PASS");
+    expect(applied.findings[0].failClass).toBe("informational");
   });
 });
 

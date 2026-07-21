@@ -3994,46 +3994,50 @@ function convertSpecJsonToGoldSpec(specJson: any): GoldSpec {
   return {
     name: specJson.name || "Template Spec",
     version: specJson.version || "1.0.0",
-    rules: (specJson.rules || []).map((rule: any) => {
-      const min =
-        rule.range?.min !== undefined && rule.range?.min !== ""
-          ? Number(rule.range.min)
-          : undefined;
-      const max =
-        rule.range?.max !== undefined && rule.range?.max !== ""
-          ? Number(rule.range.max)
-          : undefined;
-      const unitSuffix = rule.unit ? ` (${rule.unit})` : "";
-      const boundsNote =
-        rule.type === "range"
-          ? ` Threshold${unitSuffix}: ${
-              rule.boundsMode === "under"
-                ? `≤ ${max}`
-                : rule.boundsMode === "at_least"
-                  ? `≥ ${min}`
-                  : rule.boundsMode === "over"
-                    ? `> ${min}`
-                    : `${min ?? "…"}–${max ?? "…"}`
-            }.`
-          : "";
-      return {
-        id: rule.ruleId,
-        field: rule.field,
-        type:
-          rule.type === "required"
-            ? "presence"
-            : rule.type === "range"
-              ? "range"
-              : rule.type === "pattern"
-                ? "regex"
-                : "format",
-        required: rule.type === "required",
-        description: `${rule.description || ""}${boundsNote}`.trim(),
-        pattern: rule.pattern,
-        format: rule.pattern,
-        minValue: Number.isFinite(min) ? min : undefined,
-        maxValue: Number.isFinite(max) ? max : undefined,
-      };
-    }),
+    // PX-108: skip admin/import-pack disabled rules (enabled:false) —
+    // a disabled rule must never be re-required via the GoldSpec bridge.
+    rules: (specJson.rules || [])
+      .filter((rule: any) => rule.enabled !== false)
+      .map((rule: any) => {
+        const min =
+          rule.range?.min !== undefined && rule.range?.min !== ""
+            ? Number(rule.range.min)
+            : undefined;
+        const max =
+          rule.range?.max !== undefined && rule.range?.max !== ""
+            ? Number(rule.range.max)
+            : undefined;
+        const unitSuffix = rule.unit ? ` (${rule.unit})` : "";
+        const boundsNote =
+          rule.type === "range"
+            ? ` Threshold${unitSuffix}: ${
+                rule.boundsMode === "under"
+                  ? `≤ ${max}`
+                  : rule.boundsMode === "at_least"
+                    ? `≥ ${min}`
+                    : rule.boundsMode === "over"
+                      ? `> ${min}`
+                      : `${min ?? "…"}–${max ?? "…"}`
+              }.`
+            : "";
+        return {
+          id: rule.ruleId,
+          field: rule.field,
+          type:
+            rule.type === "required"
+              ? "presence"
+              : rule.type === "range"
+                ? "range"
+                : rule.type === "pattern"
+                  ? "regex"
+                  : "format",
+          required: rule.type === "required",
+          description: `${rule.description || ""}${boundsNote}`.trim(),
+          pattern: rule.pattern,
+          format: rule.pattern,
+          minValue: Number.isFinite(min) ? min : undefined,
+          maxValue: Number.isFinite(max) ? max : undefined,
+        };
+      }),
   };
 }
