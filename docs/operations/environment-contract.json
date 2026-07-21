@@ -104,6 +104,20 @@
           "default": "false",
           "value": "true"
         },
+        "VLM_PROVIDER": {
+          "type": "env",
+          "description": "Ink verifier provider (anthropic). Distinct from Gemini analyzer.",
+          "required": false,
+          "default": "mock",
+          "value": "anthropic"
+        },
+        "VLM_MAX_CROPS_PER_DOC": {
+          "type": "env",
+          "description": "Max signature crops sent to VLM per document (Wave B cost cap).",
+          "required": false,
+          "default": "5",
+          "value": "1"
+        },
         "FEATURE_IMAGE_QA_INTAKE": {
           "type": "env",
           "description": "Image QA intake pipeline stage.",

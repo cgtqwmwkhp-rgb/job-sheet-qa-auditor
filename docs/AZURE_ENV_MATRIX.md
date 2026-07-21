@@ -140,11 +140,13 @@ contract mirror. Effective values are whatever the running process sees in
 
 ### Critical — intentionally divergent (prod promotion)
 
-| Variable                    | Staging | Production | Notes                    |
-| --------------------------- | ------- | ---------- | ------------------------ |
-| `FEATURE_VLM_VERIFICATION`  | unset   | `true`     | Prod-only until promoted |
-| `FEATURE_IMAGE_QA_INTAKE`   | unset   | `true`     | Prod-only until promoted |
-| `FEATURE_GEMINI_MULTIMODAL` | unset   | `true`     | Prod-only until promoted |
+| Variable                    | Staging     | Production  | Notes                                                 |
+| --------------------------- | ----------- | ----------- | ----------------------------------------------------- |
+| `FEATURE_VLM_VERIFICATION`  | `true`      | `true`      | Anthropic ink path; honesty demote when vlmUsed=false |
+| `VLM_PROVIDER`              | `anthropic` | `anthropic` | Ink verifier (not Gemini analyzer)                    |
+| `VLM_MAX_CROPS_PER_DOC`     | `1`         | `1`         | Wave B Run017 cost cap (prefer crops over full PDF)   |
+| `FEATURE_IMAGE_QA_INTAKE`   | unset       | `true`      | Prod-only until promoted                              |
+| `FEATURE_GEMINI_MULTIMODAL` | unset       | `true`      | Prod-only until promoted                              |
 
 In-app view: **Feature Flags** (admin / qa_lead) → `/ops/feature-flags`.
 

@@ -284,6 +284,7 @@ jobs:
               FEATURE_IMAGE_QA_INTAKE=true \
               FEATURE_GEMINI_MULTIMODAL=true \
               VLM_PROVIDER=anthropic \
+              VLM_MAX_CROPS_PER_DOC=1 \
               FEATURE_OCR_CROSS_CHECK=true \
               OCR_CROSS_CHECK_PERCENT=15 \
               FEATURE_OCR_FAILOVER=true \
@@ -818,6 +819,7 @@ jobs:
               FEATURE_IMAGE_QA_INTAKE=true \
               FEATURE_GEMINI_MULTIMODAL=true \
               VLM_PROVIDER=anthropic \
+              VLM_MAX_CROPS_PER_DOC=1 \
               FEATURE_OCR_CROSS_CHECK=true \
               OCR_CROSS_CHECK_PERCENT=15 \
               FEATURE_OCR_FAILOVER=true \

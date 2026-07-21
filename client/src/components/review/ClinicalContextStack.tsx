@@ -41,6 +41,10 @@ import {
   type DeepNoteAnalysisData,
   type SheetSufficiencyAnalysisData,
 } from "@/components/DeepNoteAnalysis";
+import {
+  VlmInkStatusPanel,
+  type VlmInkStatus,
+} from "@/components/review/VlmInkStatusPanel";
 
 export interface ClinicalContextStackProps {
   selectionTrace: SelectionTrace | null;
@@ -57,6 +61,7 @@ export interface ClinicalContextStackProps {
   hasPartsFindings?: boolean;
   attribution?: AttributionStamp | null;
   hasAttrFindings?: boolean;
+  vlmInkStatus?: VlmInkStatus | null;
   photoPairCompare: PhotoPairCompareArtifact | null;
   deepNoteAnalysis: DeepNoteAnalysisData | null;
   sheetSufficiencyAnalysis?: SheetSufficiencyAnalysisData | null;
@@ -163,6 +168,7 @@ export function ClinicalContextStack(props: ClinicalContextStackProps) {
     commentOnFailurePath ||
     showPartsPanel ||
     showAttrPanel ||
+    props.vlmInkStatus ||
     (props.photoPairCompare &&
       Array.isArray(props.photoPairCompare.pairs) &&
       props.photoPairCompare.pairs.length > 0) ||
@@ -191,6 +197,10 @@ export function ClinicalContextStack(props: ClinicalContextStackProps) {
       <SelectionTracePanel
         trace={props.selectionTrace}
         defaultOpen={false}
+        className="shadow-none border-muted"
+      />
+      <VlmInkStatusPanel
+        status={props.vlmInkStatus}
         className="shadow-none border-muted"
       />
       <SelectionMarksPanel

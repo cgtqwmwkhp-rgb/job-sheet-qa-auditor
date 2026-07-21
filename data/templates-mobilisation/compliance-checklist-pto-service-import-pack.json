@@ -286,7 +286,11 @@
           "vacuum",
           "tanker",
           "110v",
-          "inspection"
+          "inspection",
+          "acumec",
+          "access",
+          "platform",
+          "mewp"
         ],
         "tokenWeights": {
           "pto": 20,
