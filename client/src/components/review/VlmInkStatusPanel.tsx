@@ -13,6 +13,10 @@ export interface VlmInkStatus {
   passed?: boolean | null;
   confidence?: number | null;
   mediaMode?: string | null;
+  /** Present when ink path did not run or VLM was fail-soft skipped (PX-116). */
+  skippedReason?: string | null;
+  ran?: boolean | null;
+  enabled?: boolean | null;
 }
 
 export function mapVlmInkFromReport(reportJson: unknown): VlmInkStatus | null {
@@ -25,6 +29,9 @@ export function mapVlmInkFromReport(reportJson: unknown): VlmInkStatus | null {
     passed: typeof v.passed === "boolean" ? v.passed : null,
     confidence: typeof v.confidence === "number" ? v.confidence : null,
     mediaMode: typeof v.mediaMode === "string" ? v.mediaMode : null,
+    skippedReason: typeof v.skippedReason === "string" ? v.skippedReason : null,
+    ran: typeof v.ran === "boolean" ? v.ran : null,
+    enabled: typeof v.enabled === "boolean" ? v.enabled : null,
   };
 }
 
@@ -45,7 +52,9 @@ export function VlmInkStatusPanel({
       : status.passed === false
         ? "Ink absent / fail"
         : "Ink checked"
-    : "Ink not verified (honesty demote)";
+    : status.skippedReason
+      ? `Ink skipped: ${status.skippedReason}`
+      : "Ink not verified (honesty demote)";
 
   const variant = status.vlmUsed
     ? status.passed === false
@@ -55,6 +64,9 @@ export function VlmInkStatusPanel({
 
   const detail = [
     status.vlmUsed ? "vlmUsed:true" : "vlmUsed:false",
+    status.skippedReason ? `skip:${status.skippedReason}` : null,
+    status.ran === false ? "ran:false" : null,
+    status.enabled === false ? "enabled:false" : null,
     status.confidence != null
       ? `conf ${(status.confidence * 100).toFixed(0)}%`
       : null,

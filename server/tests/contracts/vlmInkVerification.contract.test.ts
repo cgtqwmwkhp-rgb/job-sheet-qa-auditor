@@ -47,6 +47,10 @@ describe("vlmInkVerification", () => {
     });
     expect(result.ran).toBe(false);
     expect(result.skippedReason).toMatch(/off/i);
+    // PX-116: skippedReason must land on reportJson artifact (UI honesty).
+    expect(result.artifact.skippedReason).toMatch(/off/i);
+    expect(result.artifact.enabled).toBe(false);
+    expect(result.artifact.vlmUsed).toBe(false);
   });
 
   it("verifies ink from in-memory PDF buffer via mock VLM", async () => {

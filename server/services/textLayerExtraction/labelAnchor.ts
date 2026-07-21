@@ -526,7 +526,8 @@ export function extractFieldsFromPlainText(
     {
       fieldId: "assetId",
       aliases: ["serialNumber"],
-      re: /(?:asset\s*(?:no\.?|number|id|#))\s*[:.-]?\s*([A-Z0-9][A-Z0-9/_-]{1,24})/i,
+      // PX-116: allow value on the next line after the label (empty-words Jetter).
+      re: /(?:asset\s*(?:no\.?|number|id|#))\s*[:.-]?\s*(?:\r?\n\s*)?([A-Z0-9][A-Z0-9/_-]{1,24})/i,
       accept: v => /^[A-Z0-9]/i.test(v),
       label: "Asset No",
     },
@@ -535,7 +536,8 @@ export function extractFieldsFromPlainText(
       aliases: ["jobNumber"],
       // Capture through end-of-line so spaced date+label bleed is visible
       // to the rejector (Wave B PX-112), not only tidy ID tokens.
-      re: /(?:job\s*(?:id|no\.?|number|ref(?:erence)?))\s*[:.-]?\s*([^\n]{1,48})/i,
+      // PX-116: optional newline between label and value (text-only layouts).
+      re: /(?:job\s*(?:id|no\.?|number|ref(?:erence)?))\s*[:.-]?\s*(?:\r?\n\s*)?([^\n]{1,48})/i,
       label: "Job ID",
     },
     {
