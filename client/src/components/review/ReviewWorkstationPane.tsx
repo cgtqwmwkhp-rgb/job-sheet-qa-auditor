@@ -182,6 +182,7 @@ import {
   ClinicalContextStack,
   hasActionableClinicalContext,
 } from "@/components/review/ClinicalContextStack";
+import { mapVlmInkFromReport } from "@/components/review/VlmInkStatusPanel";
 
 export interface Finding {
   id: number | string;
@@ -2194,6 +2195,7 @@ function ReviewWorkstationContent({
                     hasPartsFindings={hasPartsFindings}
                     attribution={attributionStamp}
                     hasAttrFindings={hasAttrFindings}
+                    vlmInkStatus={mapVlmInkFromReport(auditReportJson)}
                     photoPairCompare={photoPairCompare}
                     pairResolvedDecisions={pairResolvedDecisions}
                     deepNoteAnalysis={deepNoteAnalysis}

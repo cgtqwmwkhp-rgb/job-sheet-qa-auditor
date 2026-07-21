@@ -703,19 +703,28 @@
         ]
       },
       "selectionConfigJson": {
-        "requiredTokensAll": ["loler"],
-        "requiredTokensAny": [
+        "requiredTokensAll": [],
+        "requiredTokensAny": ["loler", "thorough"],
+        "optionalTokens": [
           "examination",
-          "thorough",
           "lifting",
-          "equipment"
+          "equipment",
+          "winch",
+          "swl",
+          "competent",
+          "6 month",
+          "12 month"
         ],
-        "optionalTokens": ["6 month", "12 month", "swl", "competent"],
+        "negativeTokens": ["pto", "vacuum", "tanker", "110v", "pump"],
         "tokenWeights": {
           "loler": 18,
-          "thorough": 10,
-          "examination": 8,
-          "lifting": 8
+          "thorough": 16,
+          "examination": 12,
+          "lifting": 8,
+          "winch": 6,
+          "equipment": 4,
+          "swl": 4,
+          "competent": 4
         }
       },
       "roiJson": {

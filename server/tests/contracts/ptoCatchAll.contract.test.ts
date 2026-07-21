@@ -172,5 +172,32 @@ describe("PX-114: PTO catch-all hard-gate", () => {
       expect(selectedSlugOf(result)).toBe(LOLER_SLUG);
       expect(result.autoProcessingAllowed).toBe(true);
     });
+
+    it("Wave B: Winch thorough-exam without literal LOLER still selects loler-examination-v1", () => {
+      const winchText = [
+        "Thorough Examination Report",
+        "Winch Lifting Equipment",
+        "Asset ID: WNC-01",
+        "Examination Date: 14/07/2026",
+        "Competent Person Sign Off: Signed",
+        "Safe Working Load recorded",
+      ].join("\n");
+      const result = selectTemplateMultiSignal({ documentText: winchText });
+      expect(selectedSlugOf(result)).toBe(LOLER_SLUG);
+    });
+  });
+
+  describe("Wave B: AA / Acumec defence against PTO", () => {
+    it("hard-disqualifies PTO when Acumec/access platform tokens are present", () => {
+      const result = selectTemplateMultiSignal({
+        documentText:
+          "PTO Service Compliance Checklist Acumec Access Platform MEWP",
+      });
+      const ptoCandidate = result.multiSignalCandidates?.find(
+        c => c.templateSlug === PTO_SLUG
+      );
+      expect(ptoCandidate).toBeTruthy();
+      expect(ptoCandidate!.score).toBe(0);
+    });
   });
 });
