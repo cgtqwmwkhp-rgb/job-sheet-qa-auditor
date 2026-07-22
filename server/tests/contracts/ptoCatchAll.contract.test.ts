@@ -219,6 +219,31 @@ describe("PX-114: PTO catch-all hard-gate", () => {
       const result = selectTemplateMultiSignal({ documentText: winchText });
       expect(selectedSlugOf(result)).toBe(LOLER_SLUG);
     });
+
+    it("R4: OCR body without winch/thorough still wins via fileName + lifting tokens", () => {
+      // Mirrors staging form 45: OCR emits TE/lifting language but omits
+      // the filename words "Thorough Examination - Winch.pdf".
+      const ocrBody = [
+        "Examination of lifting equipment",
+        "Asset No: WNC-45",
+        "Date: 14/07/2026",
+        "Competent Person: Signed",
+        "Safe Working Load recorded",
+        "PlantExpand Job Summary Report",
+      ].join("\n");
+      const selectionText = `${ocrBody}\nThorough Examination - Winch.pdf`;
+      const result = selectTemplateMultiSignal({
+        documentText: selectionText,
+      });
+      expect(selectedSlugOf(result)).toBe(LOLER_SLUG);
+      const lolerCandidate = result.multiSignalCandidates?.find(
+        c => c.templateSlug === LOLER_SLUG
+      );
+      const standardCandidate = result.multiSignalCandidates?.find(
+        c => c.templateSlug === STANDARD_MAINTENANCE_SLUG
+      );
+      expect(lolerCandidate!.score).toBeGreaterThan(standardCandidate!.score);
+    });
   });
 
   describe("Wave B: AA / Acumec defence against PTO", () => {

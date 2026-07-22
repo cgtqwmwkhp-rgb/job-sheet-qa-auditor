@@ -200,8 +200,8 @@ const FORM_FAMILY_EXPECTED_VERSIONS: Record<
   "generator-service-v1": "1.0.0",
   "trailer-service-v1": "1.0.0",
   "ukpn-v1": "1.0.0",
-  // 1.2.0: winch in requiredTokensAny so Winch TE forms beat catch-all.
-  "loler-examination-v1": "1.2.0",
+  // 1.3.0: winch/lifting in requiredAny + fileName-augmented selection text.
+  "loler-examination-v1": "1.3.0",
 };
 
 /**

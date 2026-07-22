@@ -32,7 +32,7 @@ describe("Form-family selection catalogs (PR4)", () => {
       const active = getActiveVersion(t!.id);
       expect(active, slug).toBeTruthy();
       const expectedVersion =
-        slug === "loler-examination-v1" ? "1.2.0" : "1.0.0";
+        slug === "loler-examination-v1" ? "1.3.0" : "1.0.0";
       expect(active!.version).toBe(expectedVersion);
 
       const gates = checkActivationPreconditions(
@@ -59,18 +59,18 @@ describe("Form-family selection catalogs (PR4)", () => {
     expect(again.skipped.length).toBe(FORM_FAMILY_CATALOG_SLUGS.length);
   });
 
-  it("LOLER 1.2.0 selectionConfig has empty requiredTokensAll and winch in any-of", () => {
+  it("LOLER 1.3.0 selectionConfig has empty requiredTokensAll and winch/lifting in any-of", () => {
     initializeFormFamilySelectionCatalogs();
     const t = getTemplateBySlug("loler-examination-v1");
     const active = t ? getActiveVersion(t.id) : null;
-    expect(active?.version).toBe("1.2.0");
+    expect(active?.version).toBe("1.3.0");
     const sel = active?.selectionConfigJson as {
       requiredTokensAll?: string[];
       requiredTokensAny?: string[];
     };
     expect(sel.requiredTokensAll ?? []).toEqual([]);
     expect(sel.requiredTokensAny).toEqual(
-      expect.arrayContaining(["loler", "thorough", "winch"])
+      expect.arrayContaining(["loler", "thorough", "winch", "lifting"])
     );
   });
 

@@ -1304,9 +1304,21 @@ async function processJobSheetWithOptions(
       };
     }
   } else {
-    // Auto-select template via multi-signal recognition (tokens + layout + ROI + plausibility)
+    // Auto-select template via multi-signal recognition (tokens + layout + ROI + plausibility).
+    // Append fileName so distinctive titles (e.g. "Thorough Examination - Winch.pdf",
+    // "PTO Service.pdf") participate in token scoring when OCR omits the header words.
+    let selectionDocumentText = extractedText;
+    try {
+      const sheetForSelection = await db.getJobSheetById(jobSheetId);
+      const fileName = sheetForSelection?.fileName?.trim();
+      if (fileName) {
+        selectionDocumentText = `${extractedText}\n${fileName}`;
+      }
+    } catch {
+      // non-fatal — selection falls back to OCR text only
+    }
     selectionResult = selectTemplateMultiSignal({
-      documentText: extractedText,
+      documentText: selectionDocumentText,
       pageTexts: pageTextsForPipeline,
       metadata: { pageCount: ocrResult.totalPages },
     });
