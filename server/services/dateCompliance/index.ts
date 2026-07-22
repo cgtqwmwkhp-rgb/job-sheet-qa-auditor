@@ -68,11 +68,13 @@ function addMonths(d: Date, months: number): Date {
   return out;
 }
 
+type DateReasonCode = Finding["reasonCode"];
+
 function issue(
   ruleId: string,
   fieldName: string,
   severity: "S1" | "S2" | "S3",
-  reasonCode: string,
+  reasonCode: DateReasonCode,
   why: string,
   fix: string,
   snippet: string
