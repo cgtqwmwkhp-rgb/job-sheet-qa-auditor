@@ -299,10 +299,12 @@ export function toPresentSignatureFinding(finding: Finding): Finding {
   };
 }
 
-function buildPresentSignatureFinding(): Finding {
+function buildPresentSignatureFinding(
+  fieldName: "engineerSignOff" | "customerSignature"
+): Finding {
   return {
-    ruleId: "SYSTEM",
-    fieldName: "customerSignature",
+    ruleId: fieldName === "engineerSignOff" ? "JSR-R004" : "SYSTEM",
+    fieldName,
     severity: "S3",
     reasonCode: "INK_UNVERIFIED",
     rawSnippet: "Present",
@@ -643,22 +645,50 @@ export function applyFindingHygiene(
   });
 
   // Convert false Absent/MISSING signatures → recorded Present (S3 / Passed tab)
-  let convertedSignature = false;
   working = working.map(f => {
     if (isFalseAbsentSignature(f, signatureEvidence)) {
-      convertedSignature = true;
       return toPresentSignatureFinding(f);
     }
     return f;
   });
 
-  // If label/OCR evidence exists but Gemini omitted signature entirely, record Present
+  // Drop invented customerSignature Present/Absent theater when the sheet has
+  // no customer/client signature label (YN62EAW: lone technician Signature:).
+  // Empty documentText also means we lack customer-label proof.
+  if (!hasCustomerSignatureLabelEvidence(docText)) {
+    working = working.filter(f => {
+      if (!/customerSignature/i.test(f.fieldName || "")) return true;
+      const presentLike =
+        f.reasonCode === "INK_UNVERIFIED" ||
+        f.reasonCode === "MISSING_FIELD" ||
+        /^(present|absent|missing)$/i.test(
+          (f.normalisedSnippet || f.rawSnippet || "").trim()
+        );
+      return !presentLike;
+    });
+  }
+
+  // If label/OCR evidence exists but Gemini omitted signature entirely, record
+  // Present on the correct role — bare "Signature:" next to Technician Name is
+  // engineerSignOff, not customerSignature.
+  const wantCustomerSig = hasCustomerSignatureLabelEvidence(docText);
+  const wantEngineerSig =
+    hasTechnicianSignatureLabelEvidence(docText) ||
+    (signatureEvidence && !wantCustomerSig) ||
+    (hasSignatureLabelEvidence(docText) && !wantCustomerSig);
   if (
-    signatureEvidence &&
-    !convertedSignature &&
-    !working.some(f => SIGNATURE_FIELD_RE.test(f.fieldName))
+    wantEngineerSig &&
+    !working.some(f =>
+      /engineerSignOff|technicianSignature/i.test(f.fieldName || "")
+    )
   ) {
-    working = [...working, buildPresentSignatureFinding()];
+    working = [...working, buildPresentSignatureFinding("engineerSignOff")];
+  }
+  if (
+    wantCustomerSig &&
+    !working.some(f => /customerSignature/i.test(f.fieldName || ""))
+  ) {
+    working = [...working, buildPresentSignatureFinding("customerSignature")];
   }
 
   // Downgrade Present|assetId signature conflicts

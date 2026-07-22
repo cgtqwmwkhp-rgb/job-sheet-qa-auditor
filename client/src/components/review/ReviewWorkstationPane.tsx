@@ -279,11 +279,17 @@ export function mapFindingsFromApi(
         : failClass === "minor"
           ? "major"
           : "minor";
-    // EXTRACTED / INK_UNVERIFIED theater is captured evidence, not an Issue.
+    // EXTRACTED / INK_UNVERIFIED / successful ATTR match are captured evidence,
+    // not Issues. Soft PARTS-C014 stays visible as advisory but must not alone
+    // demote a Pass badge (see hasOpenNonMajorFindings = minors only).
     const reason = (f.reasonCode ?? "").toUpperCase();
+    const ruleId = (f.ruleId ?? "").toUpperCase();
+    const isSuccessfulAttrMatch = ruleId === "ATTR-C012";
     const isCapturedEvidenceTheater =
       failClass === "informational" &&
-      (reason === "EXTRACTED" || reason === "INK_UNVERIFIED");
+      (reason === "EXTRACTED" ||
+        reason === "INK_UNVERIFIED" ||
+        isSuccessfulAttrMatch);
     // Open S3 stays informational (not a Pass for the sheet); resolved → passed.
     const status = isResolved
       ? "passed"
@@ -1749,8 +1755,10 @@ function ReviewWorkstationContent({
     jobSheetStatus:
       auditData.status === "pending" ? "pending" : auditData.status,
     hasOpenMajorFindings: hasMajor,
+    // Only open Minors (S2) demote Pass → Needs review. Soft S3 advisories
+    // (PARTS-C014, photo hints, etc.) stay in Issues without flipping the badge.
     hasOpenNonMajorFindings: failedFindings.some(
-      f => f.failClass !== "major" && f.status !== "passed"
+      f => f.failClass === "minor" && f.status !== "passed"
     ),
   });
 
