@@ -172,6 +172,10 @@ import {
   type PhotoPairCompareArtifact,
 } from "@/components/review/BeforeAfterComparePane";
 import {
+  mapPhotoEvidenceFromReport,
+  type PhotoEvidenceView,
+} from "@/components/review/PhotoEvidenceContextPanel";
+import {
   mapDeepNoteFromReport,
   mapSheetSufficiencyFromReport,
   mapPersonaDecisionFromReport,
@@ -524,6 +528,9 @@ export function ReviewWorkstationPane({
   const photoPairCompare = mapPhotoPairCompareFromReport(
     auditResult?.reportJson
   );
+  const photoEvidenceDerived = mapPhotoEvidenceFromReport(
+    auditResult?.reportJson
+  );
   const deepNoteAnalysis = mapDeepNoteFromReport(auditResult?.reportJson);
   const sheetSufficiencyAnalysis = mapSheetSufficiencyFromReport(
     auditResult?.reportJson
@@ -642,6 +649,7 @@ export function ReviewWorkstationPane({
         partsContextDerived={partsContextDerived}
         attributionStamp={attributionStamp}
         makeModel={makeModel}
+        photoEvidence={photoEvidenceDerived.evidence}
         photoPairCompare={photoPairCompare}
         deepNoteAnalysis={deepNoteAnalysis}
         sheetSufficiencyAnalysis={sheetSufficiencyAnalysis}
@@ -671,6 +679,7 @@ function ReviewWorkstationContent({
   partsContextDerived,
   attributionStamp,
   makeModel,
+  photoEvidence,
   photoPairCompare,
   deepNoteAnalysis,
   sheetSufficiencyAnalysis,
@@ -706,6 +715,7 @@ function ReviewWorkstationContent({
   };
   attributionStamp: AttributionStamp | null;
   makeModel: string | null;
+  photoEvidence: PhotoEvidenceView | null;
   photoPairCompare: PhotoPairCompareArtifact | null;
   deepNoteAnalysis: DeepNoteAnalysisData | null;
   sheetSufficiencyAnalysis: SheetSufficiencyAnalysisData | null;
@@ -2125,6 +2135,7 @@ function ReviewWorkstationContent({
                       hasPartsFindings,
                       attribution: attributionStamp,
                       hasAttrFindings,
+                      photoEvidence,
                       photoPairCompare,
                     }) ? (
                       <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-destructive" />
@@ -2211,6 +2222,7 @@ function ReviewWorkstationContent({
                     attribution={attributionStamp}
                     hasAttrFindings={hasAttrFindings}
                     vlmInkStatus={mapVlmInkFromReport(auditReportJson)}
+                    photoEvidence={photoEvidence}
                     photoPairCompare={photoPairCompare}
                     pairResolvedDecisions={pairResolvedDecisions}
                     deepNoteAnalysis={deepNoteAnalysis}

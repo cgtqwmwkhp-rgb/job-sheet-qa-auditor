@@ -353,9 +353,21 @@ export function evaluateCommentQuality(
         )
       );
     }
+    // Still score coherence for Context coaching when a narrative exists.
+    signals.coherent =
+      analysis.present &&
+      analysis.hasWhat &&
+      (analysis.hasPartsStance || analysis.hasNextAction) &&
+      !analysis.isVagueOnly &&
+      !analysis.isTooThin &&
+      !placeholderFaultReason;
     const summary = findings.length
       ? `Fault/comment honesty: ${findings.length} finding(s) off failure path.`
-      : "No failure-path signals; comment quality check skipped.";
+      : analysis.present
+        ? signals.coherent
+          ? "Standard-path comments reviewed — narrative axes look solid."
+          : "Standard-path comments present — coach axes for completeness."
+        : "No failure-path signals; no engineer comments to review.";
     return { signals, findings, summary, scores };
   }
 
