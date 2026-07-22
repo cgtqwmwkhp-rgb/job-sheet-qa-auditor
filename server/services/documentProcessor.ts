@@ -3419,9 +3419,7 @@ async function processJobSheetWithOptions(
       const detPassed =
         deterministic.passed ||
         (detFindings.length < deterministic.findings.length &&
-          !detFindings.some(
-            f => f.severity === "S0" || f.severity === "S1"
-          ));
+          !detFindings.some(f => f.severity === "S0" || f.severity === "S1"));
       deterministicValidationPassed = detPassed;
       if (detFindings.length > 0) {
         analysisResult = {
@@ -3441,10 +3439,7 @@ async function processJobSheetWithOptions(
             overallResult: "REVIEW_QUEUE",
           };
         }
-      } else if (
-        deterministic.findings.length > 0 &&
-        !jobRefLabelPresent
-      ) {
+      } else if (deterministic.findings.length > 0 && !jobRefLabelPresent) {
         analysisResult = {
           ...analysisResult,
           summary:
