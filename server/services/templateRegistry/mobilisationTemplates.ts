@@ -14,6 +14,7 @@ import {
   getActiveVersion,
   getTemplateBySlug,
   getTemplateVersion,
+  listVersions,
 } from "./registryService";
 import { importBulkPack, type BulkImportPack } from "./importPack";
 import { createSafeLogger } from "../../utils/safeLogger";
@@ -88,14 +89,25 @@ function bootActivateTemplate(options: {
     const pack = loadPack(packRelative, label);
     const result = importBulkPack(pack, createdBy);
     if (!result.success || result.failureCount > 0) {
-      logger.warn(`${label} pack import failed`, {
+      logger.warn(`${label} pack import failed (will try activate existing)`, {
         errors: result.results.flatMap(r => r.errors ?? []),
       });
-      return null;
     }
 
     const created = result.results.find(r => r.templateId === slug);
-    const versionId = created?.created.versionDbId;
+    let versionId = created?.created.versionDbId ?? null;
+
+    // Import is often a no-op when the expected version content already exists
+    // ("identical content"). Still activate that version so MySQL hydrate cannot
+    // leave a stale older active (e.g. LOLER 1.0.0 vs expected 1.3.0).
+    if (!versionId && expectedVersion) {
+      const existing = getTemplateBySlug(slug);
+      const match = existing
+        ? listVersions(existing.id).find(v => v.version === expectedVersion)
+        : null;
+      versionId = match?.id ?? null;
+    }
+
     if (!versionId) {
       logger.warn(`${label} import produced no version id`);
       return null;
@@ -230,10 +242,12 @@ export function initializeFormFamilySelectionCatalogs(createdBy: number = 0): {
     const pack = loadPack(FORM_FAMILY_CATALOGS_PACK, "Form-family catalogs");
     const result = importBulkPack(pack, createdBy);
     if (!result.success || result.failureCount > 0) {
-      logger.warn("Form-family catalog pack import failed", {
-        errors: result.results.flatMap(r => r.errors ?? []),
-      });
-      return { seeded, skipped: [...FORM_FAMILY_CATALOG_SLUGS] };
+      logger.warn(
+        "Form-family catalog pack import failed (will try activate existing)",
+        {
+          errors: result.results.flatMap(r => r.errors ?? []),
+        }
+      );
     }
 
     for (const slug of FORM_FAMILY_CATALOG_SLUGS) {
@@ -254,10 +268,16 @@ export function initializeFormFamilySelectionCatalogs(createdBy: number = 0): {
       }
 
       const created = result.results.find(r => r.templateId === slug);
-      const versionId = created?.created.versionDbId;
+      let versionId = created?.created.versionDbId ?? null;
+      if (!versionId && existing) {
+        versionId =
+          listVersions(existing.id).find(v => v.version === expectedVersion)
+            ?.id ?? null;
+      }
       if (!versionId) {
         logger.warn("Form-family catalog missing version after import", {
           slug,
+          expectedVersion,
         });
         continue;
       }
