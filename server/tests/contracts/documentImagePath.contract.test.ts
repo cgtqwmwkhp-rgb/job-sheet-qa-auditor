@@ -75,10 +75,7 @@ describe("Pack v1 document-image honesty", () => {
     const fs = await import("node:fs/promises");
     const path = await import("node:path");
     const src = await fs.readFile(
-      path.resolve(
-        __dirname,
-        "../../services/documentProcessor.ts"
-      ),
+      path.resolve(__dirname, "../../services/documentProcessor.ts"),
       "utf8"
     );
     expect(src).toContain("buildDocumentImageBundle");

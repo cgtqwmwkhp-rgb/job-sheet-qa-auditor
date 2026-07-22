@@ -1,6 +1,6 @@
 /**
  * Critical Field Extraction Engine - PR-1
- * 
+ *
  * Per-field extraction strategies for the 6 critical fields:
  * - jobReference
  * - assetId
@@ -8,30 +8,30 @@
  * - expiryDate
  * - engineerSignOff
  * - complianceTickboxes
- * 
+ *
  * Each field has a dedicated extraction strategy with:
  * - Pattern matching
  * - Confidence scoring
  * - Candidate tracking for validation trace
  */
 
-import { createSafeLogger } from '../../utils/safeLogger';
+import { createSafeLogger } from "../../utils/safeLogger";
 
-const logger = createSafeLogger('criticalFieldExtractor');
+const logger = createSafeLogger("criticalFieldExtractor");
 
 /**
  * Critical field types
  */
 export const CRITICAL_FIELDS = [
-  'jobReference',
-  'assetId',
-  'date',
-  'expiryDate',
-  'engineerSignOff',
-  'complianceTickboxes',
+  "jobReference",
+  "assetId",
+  "date",
+  "expiryDate",
+  "engineerSignOff",
+  "complianceTickboxes",
 ] as const;
 
-export type CriticalFieldType = typeof CRITICAL_FIELDS[number];
+export type CriticalFieldType = (typeof CRITICAL_FIELDS)[number];
 
 /**
  * Extraction candidate - a potential value for a field
@@ -39,7 +39,7 @@ export type CriticalFieldType = typeof CRITICAL_FIELDS[number];
 export interface ExtractionCandidate {
   value: string;
   confidence: number;
-  source: 'pattern' | 'roi' | 'context' | 'llm_advisory';
+  source: "pattern" | "roi" | "context" | "llm_advisory";
   location?: {
     page: number;
     x: number;
@@ -53,13 +53,13 @@ export interface ExtractionCandidate {
 /**
  * Extraction status - PASS means successful extraction, no reason code needed
  */
-export type ExtractionStatus = 'PASS' | 'FAIL' | 'REVIEW_QUEUE';
+export type ExtractionStatus = "PASS" | "FAIL" | "REVIEW_QUEUE";
 
 /**
  * Failure reason codes - only present when status is not PASS
  * Note: VALID is NOT a reason code. Use status=PASS instead.
  */
-export type FailureReasonCode = 'MISSING_FIELD' | 'LOW_CONFIDENCE' | 'CONFLICT';
+export type FailureReasonCode = "MISSING_FIELD" | "LOW_CONFIDENCE" | "CONFLICT";
 
 /**
  * Field extraction result
@@ -112,10 +112,10 @@ const EXTRACTION_STRATEGIES: Record<CriticalFieldType, ExtractionStrategy> = {
       /WO\s*[:.\s]+([A-Z0-9]+(?:-[A-Z0-9]+)*)/i,
     ],
     validators: [
-      (v) => v.length >= 3 && v.length <= 30,
-      (v) => /[A-Z0-9]/i.test(v),
+      v => v.length >= 3 && v.length <= 30,
+      v => /[A-Z0-9]/i.test(v),
     ],
-    normalizer: (v) => v.toUpperCase().replace(/\s+/g, '-'),
+    normalizer: v => v.toUpperCase().replace(/\s+/g, "-"),
     minConfidence: 0.7,
   },
   assetId: {
@@ -129,10 +129,10 @@ const EXTRACTION_STRATEGIES: Record<CriticalFieldType, ExtractionStrategy> = {
       /serial\s*:\s*([A-Z0-9]+(?:-[A-Z0-9]+)*)/i,
     ],
     validators: [
-      (v) => v.length >= 2 && v.length <= 30,
-      (v) => /[A-Z0-9]/i.test(v),
+      v => v.length >= 2 && v.length <= 30,
+      v => /[A-Z0-9]/i.test(v),
     ],
-    normalizer: (v) => v.toUpperCase().replace(/\s+/g, '-'),
+    normalizer: v => v.toUpperCase().replace(/\s+/g, "-"),
     minConfidence: 0.7,
   },
   date: {
@@ -143,12 +143,12 @@ const EXTRACTION_STRATEGIES: Record<CriticalFieldType, ExtractionStrategy> = {
       /(\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{2,4})/i,
     ],
     validators: [
-      (v) => {
+      v => {
         const parsed = parseDate(v);
         return parsed !== null;
       },
     ],
-    normalizer: (v) => {
+    normalizer: v => {
       const parsed = parseDate(v);
       return parsed ? formatDateIso(parsed) : v;
     },
@@ -165,12 +165,12 @@ const EXTRACTION_STRATEGIES: Record<CriticalFieldType, ExtractionStrategy> = {
       /due\s*(?:date)?[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
     ],
     validators: [
-      (v) => {
+      v => {
         const parsed = parseDate(v);
         return parsed !== null;
       },
     ],
-    normalizer: (v) => {
+    normalizer: v => {
       const parsed = parseDate(v);
       return parsed ? formatDateIso(parsed) : v;
     },
@@ -184,19 +184,15 @@ const EXTRACTION_STRATEGIES: Record<CriticalFieldType, ExtractionStrategy> = {
     validators: [
       () => true, // Signature presence is validated by image QA
     ],
-    normalizer: (v) => v.trim(),
+    normalizer: v => v.trim(),
     minConfidence: 0.6,
   },
   complianceTickboxes: {
-    patterns: [
-      /(?:checked|completed|yes|no|n\/a)/i,
-      /\[[\sxX✓✔]\]/,
-      /☐|☑|☒/,
-    ],
+    patterns: [/(?:checked|completed|yes|no|n\/a)/i, /\[[\sxX✓✔]\]/, /☐|☑|☒/],
     validators: [
       () => true, // Tickbox validation done by image QA
     ],
-    normalizer: (v) => v.trim().toLowerCase(),
+    normalizer: v => v.trim().toLowerCase(),
     minConfidence: 0.6,
   },
 };
@@ -216,7 +212,7 @@ interface ParsedDate {
  */
 function parseDate(value: string): ParsedDate | null {
   const cleanValue = value.trim();
-  
+
   // Try ISO format first: YYYY-MM-DD
   const isoMatch = cleanValue.match(/^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})$/);
   if (isoMatch) {
@@ -227,7 +223,7 @@ function parseDate(value: string): ParsedDate | null {
       return { year, month, day };
     }
   }
-  
+
   // Try DD/MM/YYYY or DD-MM-YYYY (UK format)
   const ukMatch = cleanValue.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
   if (ukMatch) {
@@ -239,13 +235,25 @@ function parseDate(value: string): ParsedDate | null {
       return { year, month, day };
     }
   }
-  
+
   // Try month name format: 15 January 2024
-  const monthMatch = cleanValue.match(/^(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{2,4})$/i);
+  const monthMatch = cleanValue.match(
+    /^(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{2,4})$/i
+  );
   if (monthMatch) {
     const months: Record<string, number> = {
-      jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
-      jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+      jan: 1,
+      feb: 2,
+      mar: 3,
+      apr: 4,
+      may: 5,
+      jun: 6,
+      jul: 7,
+      aug: 8,
+      sep: 9,
+      oct: 10,
+      nov: 11,
+      dec: 12,
     };
     let year = parseInt(monthMatch[3]);
     if (year < 100) year += 2000;
@@ -255,7 +263,7 @@ function parseDate(value: string): ParsedDate | null {
       return { year, month, day };
     }
   }
-  
+
   return null;
 }
 
@@ -263,9 +271,9 @@ function parseDate(value: string): ParsedDate | null {
  * Format parsed date as ISO string (YYYY-MM-DD)
  */
 function formatDateIso(parsed: ParsedDate): string {
-  const year = parsed.year.toString().padStart(4, '0');
-  const month = parsed.month.toString().padStart(2, '0');
-  const day = parsed.day.toString().padStart(2, '0');
+  const year = parsed.year.toString().padStart(4, "0");
+  const month = parsed.month.toString().padStart(2, "0");
+  const day = parsed.day.toString().padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
@@ -279,63 +287,63 @@ function extractCandidates(
 ): ExtractionCandidate[] {
   const strategy = EXTRACTION_STRATEGIES[fieldId];
   const candidates: ExtractionCandidate[] = [];
-  
+
   // Extract from ROI first (higher confidence)
   if (roiText) {
     for (const pattern of strategy.patterns) {
-      const regex = new RegExp(pattern, 'gi');
+      const regex = new RegExp(pattern, "gi");
       let match: RegExpExecArray | null;
       while ((match = regex.exec(roiText)) !== null) {
         const value = match[1] || match[0];
         const normalized = strategy.normalizer(value);
-        
+
         // Validate
-        const isValid = strategy.validators.every((v) => v(normalized));
+        const isValid = strategy.validators.every(v => v(normalized));
         if (isValid) {
           candidates.push({
             value: normalized,
             confidence: 0.9, // High confidence for ROI extraction
-            source: 'roi',
+            source: "roi",
             matchedPattern: pattern.source,
           });
         }
       }
     }
   }
-  
+
   // Extract from full text (lower confidence)
   for (const pattern of strategy.patterns) {
-    const regex = new RegExp(pattern, 'gi');
+    const regex = new RegExp(pattern, "gi");
     let match: RegExpExecArray | null;
     while ((match = regex.exec(text)) !== null) {
       const value = match[1] || match[0];
       const normalized = strategy.normalizer(value);
-      
+
       // Validate
-      const isValid = strategy.validators.every((v) => v(normalized));
+      const isValid = strategy.validators.every(v => v(normalized));
       if (isValid) {
         // Check if already found in ROI
         const existsInRoi = candidates.some(
-          (c) => c.source === 'roi' && c.value === normalized
+          c => c.source === "roi" && c.value === normalized
         );
         if (!existsInRoi) {
           candidates.push({
             value: normalized,
             confidence: 0.7, // Lower confidence for full text
-            source: 'pattern',
+            source: "pattern",
             matchedPattern: pattern.source,
           });
         }
       }
     }
   }
-  
+
   // Sort by confidence descending, then by value for determinism
   candidates.sort((a, b) => {
     if (b.confidence !== a.confidence) return b.confidence - a.confidence;
     return a.value.localeCompare(b.value);
   });
-  
+
   return candidates;
 }
 
@@ -351,7 +359,7 @@ interface SelectionResult {
 
 /**
  * Select best candidate and determine status/reason code
- * 
+ *
  * IMPORTANT: When status is PASS, reasonCode MUST be null.
  * reasonCode is only set when status is FAIL or REVIEW_QUEUE.
  */
@@ -361,41 +369,66 @@ function selectCandidate(
 ): SelectionResult {
   const strategy = EXTRACTION_STRATEGIES[fieldId];
   const notes: string[] = [];
-  
+
   if (candidates.length === 0) {
-    notes.push('No candidates found');
-    return { selectedIndex: -1, status: 'FAIL', reasonCode: 'MISSING_FIELD', notes };
+    notes.push("No candidates found");
+    return {
+      selectedIndex: -1,
+      status: "FAIL",
+      reasonCode: "MISSING_FIELD",
+      notes,
+    };
   }
-  
+
   const topCandidate = candidates[0];
-  
+
   // Check confidence threshold first
   if (topCandidate.confidence < strategy.minConfidence) {
-    notes.push(`Confidence ${topCandidate.confidence.toFixed(2)} below threshold ${strategy.minConfidence}`);
-    return { selectedIndex: 0, status: 'REVIEW_QUEUE', reasonCode: 'LOW_CONFIDENCE', notes };
+    notes.push(
+      `Confidence ${topCandidate.confidence.toFixed(2)} below threshold ${strategy.minConfidence}`
+    );
+    return {
+      selectedIndex: 0,
+      status: "REVIEW_QUEUE",
+      reasonCode: "LOW_CONFIDENCE",
+      notes,
+    };
   }
-  
+
   // Check for conflicts: only consider it a conflict if there are multiple high-confidence
   // candidates with different values AND similar confidence levels (within 0.1)
-  const highConfCandidates = candidates.filter((c) => c.confidence >= strategy.minConfidence);
-  const uniqueValues = new Set(highConfCandidates.map((c) => c.value));
-  
+  const highConfCandidates = candidates.filter(
+    c => c.confidence >= strategy.minConfidence
+  );
+  const uniqueValues = new Set(highConfCandidates.map(c => c.value));
+
   if (uniqueValues.size > 1) {
     // Check if top candidate has a clear confidence advantage (>0.1 gap from runner-up)
-    const runnerUp = candidates.find((c) => c.value !== topCandidate.value);
-    const confidenceGap = runnerUp ? topCandidate.confidence - runnerUp.confidence : 1;
-    
+    const runnerUp = candidates.find(c => c.value !== topCandidate.value);
+    const confidenceGap = runnerUp
+      ? topCandidate.confidence - runnerUp.confidence
+      : 1;
+
     if (confidenceGap < 0.1) {
-      notes.push(`Conflict: ${uniqueValues.size} different values with similar confidence (gap: ${confidenceGap.toFixed(2)})`);
-      return { selectedIndex: 0, status: 'REVIEW_QUEUE', reasonCode: 'CONFLICT', notes };
+      notes.push(
+        `Conflict: ${uniqueValues.size} different values with similar confidence (gap: ${confidenceGap.toFixed(2)})`
+      );
+      return {
+        selectedIndex: 0,
+        status: "REVIEW_QUEUE",
+        reasonCode: "CONFLICT",
+        notes,
+      };
     } else {
-      notes.push(`Resolved conflict: top candidate has ${confidenceGap.toFixed(2)} confidence advantage`);
+      notes.push(
+        `Resolved conflict: top candidate has ${confidenceGap.toFixed(2)} confidence advantage`
+      );
     }
   }
-  
+
   notes.push(`Selected with confidence ${topCandidate.confidence.toFixed(2)}`);
   // PASS status - reasonCode must be null
-  return { selectedIndex: 0, status: 'PASS', reasonCode: null, notes };
+  return { selectedIndex: 0, status: "PASS", reasonCode: null, notes };
 }
 
 /**
@@ -407,11 +440,14 @@ export function extractField(
   roiText?: string
 ): FieldExtractionResult {
   const candidates = extractCandidates(fieldId, text, roiText);
-  const { selectedIndex, status, reasonCode, notes } = selectCandidate(fieldId, candidates);
-  
+  const { selectedIndex, status, reasonCode, notes } = selectCandidate(
+    fieldId,
+    candidates
+  );
+
   return {
     fieldId,
-    extracted: status === 'PASS',
+    extracted: status === "PASS",
     value: selectedIndex >= 0 ? candidates[selectedIndex].value : null,
     confidence: selectedIndex >= 0 ? candidates[selectedIndex].confidence : 0,
     candidates,
@@ -432,36 +468,37 @@ export function extractAllCriticalFields(
 ): ValidationTrace {
   const startTime = Date.now();
   const fields: FieldExtractionResult[] = [];
-  
+
   for (const fieldId of CRITICAL_FIELDS) {
     const roiText = roiTexts?.[fieldId];
     const result = extractField(fieldId, text, roiText);
     fields.push(result);
   }
-  
+
   // Calculate overall confidence (geometric mean of field confidences)
-  const validFields = fields.filter((f) => f.extracted);
-  const overallConfidence = validFields.length > 0
-    ? Math.pow(
-        validFields.reduce((acc, f) => acc * f.confidence, 1),
-        1 / validFields.length
-      )
-    : 0;
-  
+  const validFields = fields.filter(f => f.extracted);
+  const overallConfidence =
+    validFields.length > 0
+      ? Math.pow(
+          validFields.reduce((acc, f) => acc * f.confidence, 1),
+          1 / validFields.length
+        )
+      : 0;
+
   const processingTimeMs = Date.now() - startTime;
-  
-  logger.info('Critical field extraction complete', {
+
+  logger.info("Critical field extraction complete", {
     documentId,
     fieldsExtracted: validFields.length,
     totalFields: CRITICAL_FIELDS.length,
     overallConfidence: overallConfidence.toFixed(3),
     processingTimeMs,
   });
-  
+
   return {
     documentId,
     timestamp: new Date().toISOString(),
-    engineVersion: '1.0.0',
+    engineVersion: "1.0.0",
     fields,
     overallConfidence,
     processingTimeMs,

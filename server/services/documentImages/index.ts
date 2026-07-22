@@ -42,7 +42,11 @@ export async function buildDocumentImageBundle(options: {
   const pageImages: PageImageInput[] = [];
   const buffer = options.pdfBuffer;
   if (!buffer?.length) {
-    return { pageImages, cropImages, hasRaster: Object.keys(cropImages).length > 0 };
+    return {
+      pageImages,
+      cropImages,
+      hasRaster: Object.keys(cropImages).length > 0,
+    };
   }
 
   const maxPages = Math.max(1, options.maxPages ?? 1);
@@ -50,7 +54,9 @@ export async function buildDocumentImageBundle(options: {
   // Full-page raster(s) — Image QA / pair-compare fallback media.
   for (let page = 1; page <= maxPages; page++) {
     const pageRoi: RoiRegion = { ...FULL_PAGE, name: `page${page}`, page };
-    const rendered = await renderRoiCropFromPdf(buffer, pageRoi, { scale: 1.5 });
+    const rendered = await renderRoiCropFromPdf(buffer, pageRoi, {
+      scale: 1.5,
+    });
     if (rendered) {
       pageImages.push({
         page,
