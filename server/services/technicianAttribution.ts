@@ -138,17 +138,23 @@ export function extractTechnicianNameFromFields(
   return null;
 }
 
+// Allow QGP "Last, F" commas inside the capture (cleaned later).
+const NAME_CAPTURE = "([A-Za-z][A-Za-z0-9._' ,-]{1,80})";
+
 const TEXT_NAME_PATTERNS: RegExp[] = [
   // Prefer username.lastname immediately after Technican/Technician (flat OCR).
   /\btechni[cs]an\s+([A-Za-z][A-Za-z0-9]*\.[A-Za-z][A-Za-z0-9]*)\b/i,
   // Multiline: Technican\nName:\n brandon.Towse
-  /\btechni[cs]an\s*(?:\r?\n\s*)?name\s*[:-]?\s*(?:\r?\n\s*)*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
-  /techni[cs]an\s*name\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
-  /technician\s*name\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
-  /engineer\s*name\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
-  /\bengineer\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
-  /\btech(?:nician)?\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
-  /performed\s*by\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
+  new RegExp(
+    `\\btechni[cs]an\\s*(?:\\r?\\n\\s*)?name\\s*[:-]?\\s*(?:\\r?\\n\\s*)*${NAME_CAPTURE}`,
+    "i"
+  ),
+  new RegExp(`techni[cs]an\\s*name\\s*[:-]\\s*${NAME_CAPTURE}`, "i"),
+  new RegExp(`technician\\s*name\\s*[:-]\\s*${NAME_CAPTURE}`, "i"),
+  new RegExp(`engineer\\s*name\\s*[:-]\\s*${NAME_CAPTURE}`, "i"),
+  new RegExp(`\\bengineer\\s*[:-]\\s*${NAME_CAPTURE}`, "i"),
+  new RegExp(`\\btech(?:nician)?\\s*[:-]\\s*${NAME_CAPTURE}`, "i"),
+  new RegExp(`performed\\s*by\\s*[:-]\\s*${NAME_CAPTURE}`, "i"),
 ];
 
 const REJECT_NAME_TOKENS =
@@ -165,11 +171,17 @@ export function extractTechnicianNameFromText(
     const m = text.match(re);
     if (!m?.[1]) continue;
     const raw = m[1].trim().split(/\r?\n/)[0]!.trim();
-    // Drop trailing junk after common delimiters
-    const cleaned = raw
-      .replace(/\s{2,}.*$/, "")
-      .replace(/[,;|].*$/, "")
-      .trim();
+    // Drop trailing junk after common delimiters — but keep "Towse, B"
+    // (QGP roster Last, Initial) intact.
+    let cleaned = raw.replace(/\s{2,}.*$/, "").trim();
+    const lastInitialKeep = cleaned.match(
+      /^(.+?,\s*[A-Za-z]\.?)\s*(?:[;|].*)?$/
+    );
+    if (lastInitialKeep) {
+      cleaned = lastInitialKeep[1].trim();
+    } else {
+      cleaned = cleaned.replace(/[,;|].*$/, "").trim();
+    }
     if (cleaned.length >= 2 && /[A-Za-z]/.test(cleaned)) {
       if (REJECT_NAME_TOKENS.test(cleaned)) continue;
       // Flat OCR: "brandon.Towse Signature: Name:" — keep username only.
@@ -179,6 +191,13 @@ export function extractTechnicianNameFromText(
       const candidate =
         username || cleaned.replace(/\s+signature\b.*$/i, "").trim();
       if (REJECT_NAME_TOKENS.test(candidate)) continue;
+      // Preserve QGP "Last, F" — letterhead scrub collapses commas to spaces.
+      if (
+        /^[A-Za-z][A-Za-z0-9.' -]*,\s*[A-Za-z]\.?$/.test(candidate) &&
+        !isLetterheadNoise(candidate)
+      ) {
+        return candidate.replace(/\.$/, "");
+      }
       const scrubbed = stripLetterheadNoise(candidate);
       if (scrubbed && !isLetterheadNoise(scrubbed) && scrubbed.length >= 2) {
         return scrubbed;
@@ -212,38 +231,134 @@ export function extractTechnicianNameFromReport(
   return null;
 }
 
+export interface PersonNameParts {
+  tokens: string[];
+  surname: string | null;
+  given: string[];
+  /** Single-letter initial when roster/OCR only exposes a first initial. */
+  initial: string | null;
+}
+
+/**
+ * Parse QGP "Last, F" / OCR "first.last" / "First Last" / "F. Last" into parts.
+ */
+export function parsePersonNameParts(raw: string): PersonNameParts {
+  const trimmed = raw.trim();
+  const comma = trimmed.match(/^(.+?),\s*([A-Za-z][A-Za-z.'-]*)$/);
+  if (comma) {
+    const surnameCanon = canonicalizePersonName(comma[1]);
+    const givenCanon = canonicalizePersonName(comma[2].replace(/\.+$/g, ""));
+    const surnameToks = tokens(surnameCanon);
+    const given = tokens(givenCanon);
+    const surname = surnameToks[surnameToks.length - 1] ?? null;
+    const initial =
+      given[0] && given[0].length === 1 ? given[0] : (given[0]?.[0] ?? null);
+    return {
+      tokens: [...given, ...surnameToks],
+      surname,
+      given,
+      initial,
+    };
+  }
+
+  const canon = canonicalizePersonName(trimmed);
+  const toks = tokens(canon);
+  if (toks.length >= 2) {
+    const surname = toks[toks.length - 1]!;
+    const given = toks.slice(0, -1);
+    const initial =
+      given[0] && given[0].length === 1 ? given[0] : (given[0]?.[0] ?? null);
+    return { tokens: toks, surname, given, initial };
+  }
+  return {
+    tokens: toks,
+    surname: toks[0] ?? null,
+    given: [],
+    initial: null,
+  };
+}
+
+function givenInitialCompatible(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.length === 1 && b.startsWith(a)) return true;
+  if (b.length === 1 && a.startsWith(b)) return true;
+  return false;
+}
+
+/** True when surname matches and given name / initial is compatible. */
+export function isInitialSurnameCompatible(
+  extracted: PersonNameParts,
+  candidate: PersonNameParts
+): boolean {
+  if (!extracted.surname || !candidate.surname) return false;
+  if (extracted.surname.length < 3 || candidate.surname.length < 3) {
+    return false;
+  }
+  if (extracted.surname !== candidate.surname) return false;
+
+  if (extracted.given[0] && candidate.given[0]) {
+    if (givenInitialCompatible(extracted.given[0], candidate.given[0])) {
+      return true;
+    }
+  }
+  if (
+    extracted.initial &&
+    candidate.initial &&
+    extracted.initial === candidate.initial
+  ) {
+    return true;
+  }
+  if (extracted.initial && candidate.given[0]?.startsWith(extracted.initial)) {
+    return true;
+  }
+  if (candidate.initial && extracted.given[0]?.startsWith(candidate.initial)) {
+    return true;
+  }
+  return false;
+}
+
 function candidateKeys(c: TechnicianCandidate): string[] {
   const keys: string[] = [];
-  if (c.name?.trim()) keys.push(canonicalizePersonName(c.name));
+  if (c.name?.trim()) {
+    keys.push(canonicalizePersonName(c.name));
+    const parts = parsePersonNameParts(c.name);
+    if (parts.surname && parts.initial) {
+      keys.push(`${parts.initial} ${parts.surname}`);
+      keys.push(`${parts.surname} ${parts.initial}`);
+    }
+    if (parts.surname && parts.given[0] && parts.given[0].length > 1) {
+      keys.push(`${parts.given[0]} ${parts.surname}`);
+    }
+  }
   if (c.email?.trim()) {
     const local = c.email.split("@")[0] ?? "";
     if (local) keys.push(canonicalizePersonName(local));
   }
-  return keys.filter(Boolean);
+  return Array.from(new Set(keys.filter(Boolean)));
 }
 
-/**
- * Match an extracted name to a user with graduated confidence.
- * Prefers role=technician when multiple exact hits exist.
- */
-export function resolveTechnicianMatch(
-  extractedName: string | null | undefined,
+function isRealRosterCandidate(c: TechnicianCandidate): boolean {
+  return c.loginMethod !== "attribution";
+}
+
+function resolveTechnicianMatchAgainst(
+  extractedName: string,
   candidates: TechnicianCandidate[]
 ): NameMatchResult {
-  if (!extractedName?.trim() || candidates.length === 0) {
-    return { technicianId: null, confidence: "none", matchedOn: null };
-  }
   const target = canonicalizePersonName(extractedName);
-  if (target.length < 2) {
+  if (target.length < 2 || candidates.length === 0) {
     return { technicianId: null, confidence: "none", matchedOn: null };
   }
   const targetTokens = tokens(target);
+  const extractedParts = parsePersonNameParts(extractedName);
 
   type Hit = {
     id: number;
     confidence: MatchConfidence;
     matchedOn: string;
     role?: string;
+    real: boolean;
   };
   const hits: Hit[] = [];
 
@@ -256,6 +371,7 @@ export function resolveTechnicianMatch(
           confidence: "exact",
           matchedOn: key,
           role: c.role,
+          real: isRealRosterCandidate(c),
         });
         continue;
       }
@@ -265,6 +381,38 @@ export function resolveTechnicianMatch(
           confidence: "strong",
           matchedOn: key,
           role: c.role,
+          real: isRealRosterCandidate(c),
+        });
+      }
+    }
+  }
+
+  // Smart: unique surname + compatible given/initial (Towse, B ↔ brandon.Towse)
+  if (hits.length === 0 && extractedParts.surname) {
+    const initialHits = candidates.filter(c => {
+      if (!c.name?.trim()) return false;
+      return isInitialSurnameCompatible(
+        extractedParts,
+        parsePersonNameParts(c.name)
+      );
+    });
+    if (initialHits.length === 1) {
+      hits.push({
+        id: initialHits[0]!.id,
+        confidence: "strong",
+        matchedOn: `initial+surname:${extractedParts.initial ?? "?"} ${extractedParts.surname}`,
+        role: initialHits[0]!.role,
+        real: isRealRosterCandidate(initialHits[0]!),
+      });
+    } else if (initialHits.length > 1) {
+      const realOnly = initialHits.filter(isRealRosterCandidate);
+      if (realOnly.length === 1) {
+        hits.push({
+          id: realOnly[0]!.id,
+          confidence: "strong",
+          matchedOn: `initial+surname:${extractedParts.initial ?? "?"} ${extractedParts.surname}`,
+          role: realOnly[0]!.role,
+          real: true,
         });
       }
     }
@@ -281,12 +429,17 @@ export function resolveTechnicianMatch(
           return kt.length >= 1 && kt[kt.length - 1] === surname;
         });
       });
-      if (surnameHits.length === 1) {
+      const uniquePool =
+        surnameHits.length > 1
+          ? surnameHits.filter(isRealRosterCandidate)
+          : surnameHits;
+      if (uniquePool.length === 1) {
         hits.push({
-          id: surnameHits[0]!.id,
+          id: uniquePool[0]!.id,
           confidence: "probable",
           matchedOn: `surname:${surname}`,
-          role: surnameHits[0]!.role,
+          role: uniquePool[0]!.role,
+          real: isRealRosterCandidate(uniquePool[0]!),
         });
       }
     }
@@ -299,15 +452,29 @@ export function resolveTechnicianMatch(
     const pairHits = candidates.filter(c =>
       candidateKeys(c).some(k => {
         const kt = tokens(k);
-        return kt.includes(first) && kt.includes(last);
+        if (kt.includes(first) && kt.includes(last)) return true;
+        // Initial-compatible first token (b ↔ brandon)
+        if (kt.includes(last) && first.length === 1) {
+          return kt.some(t => t.startsWith(first) && t !== last);
+        }
+        if (
+          kt.includes(last) &&
+          kt.some(t => t.length === 1 && first.startsWith(t))
+        ) {
+          return true;
+        }
+        return false;
       })
     );
-    if (pairHits.length === 1) {
+    const uniquePool =
+      pairHits.length > 1 ? pairHits.filter(isRealRosterCandidate) : pairHits;
+    if (uniquePool.length === 1) {
       hits.push({
-        id: pairHits[0]!.id,
+        id: uniquePool[0]!.id,
         confidence: "strong",
         matchedOn: `${first} ${last}`,
-        role: pairHits[0]!.role,
+        role: uniquePool[0]!.role,
+        real: isRealRosterCandidate(uniquePool[0]!),
       });
     }
   }
@@ -322,9 +489,19 @@ export function resolveTechnicianMatch(
     probable: 1,
     none: 0,
   };
-  hits.sort((a, b) => rank[b.confidence] - rank[a.confidence]);
+  hits.sort((a, b) => {
+    const conf = rank[b.confidence] - rank[a.confidence];
+    if (conf !== 0) return conf;
+    if (a.real !== b.real) return a.real ? -1 : 1;
+    if ((a.role === "technician") !== (b.role === "technician")) {
+      return a.role === "technician" ? -1 : 1;
+    }
+    return 0;
+  });
   const bestRank = rank[hits[0]!.confidence];
-  const top = hits.filter(h => rank[h.confidence] === bestRank);
+  let top = hits.filter(h => rank[h.confidence] === bestRank);
+  const realTop = top.filter(h => h.real);
+  if (realTop.length > 0) top = realTop;
   const uniqueIds = Array.from(new Set(top.map(h => h.id)));
   if (uniqueIds.length === 1) {
     return {
@@ -343,6 +520,26 @@ export function resolveTechnicianMatch(
     };
   }
   return { technicianId: null, confidence: "none", matchedOn: null };
+}
+
+/**
+ * Match an extracted name to a user with graduated confidence.
+ * Prefers real roster (non-attribution) before phantoms, then role=technician.
+ * Smart-matches QGP "Last, F" ↔ OCR "first.last" / "First Last".
+ */
+export function resolveTechnicianMatch(
+  extractedName: string | null | undefined,
+  candidates: TechnicianCandidate[]
+): NameMatchResult {
+  if (!extractedName?.trim() || candidates.length === 0) {
+    return { technicianId: null, confidence: "none", matchedOn: null };
+  }
+  const real = candidates.filter(isRealRosterCandidate);
+  if (real.length > 0) {
+    const realMatch = resolveTechnicianMatchAgainst(extractedName, real);
+    if (realMatch.technicianId != null) return realMatch;
+  }
+  return resolveTechnicianMatchAgainst(extractedName, candidates);
 }
 
 /**
