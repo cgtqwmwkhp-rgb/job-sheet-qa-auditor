@@ -99,7 +99,7 @@ describe("evaluateCommentQuality", () => {
     );
   });
 
-  it("skips COMMENT rules when not on failure path (no Fault Reason)", () => {
+  it("skips COMMENT hard rules off failure path but still scores narrative", () => {
     const result = evaluateCommentQuality(`
 Job Summary Report
 Is the asset safe to use?: Yes
@@ -107,7 +107,9 @@ Were all works fully completed?: Yes
 Engineer Comments: Routine service completed, no defects found on inspection.
 `);
     expect(result.findings).toHaveLength(0);
-    expect(result.summary).toMatch(/skipped/i);
+    expect(result.signals.present).toBe(true);
+    expect(result.signals.onFailurePath).toBe(false);
+    expect(result.summary).toMatch(/Standard-path comments/i);
   });
 
   it("emits FAULT-C010 for placeholder Fault Reason even off failure path", () => {
