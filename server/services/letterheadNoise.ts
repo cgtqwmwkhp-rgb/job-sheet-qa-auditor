@@ -173,3 +173,57 @@ export function rejectLetterheadExtractedValue(
   const cleaned = stripLetterheadNoise(value);
   return cleaned;
 }
+
+/**
+ * True when `value` is a digit fragment of a UK contact phone printed on the
+ * sheet (e.g. jobReference "562102" from letterhead "Telephone: 01268 562102").
+ */
+export function isLetterheadPhoneFragment(
+  value: string | null | undefined,
+  documentText?: string | null
+): boolean {
+  if (value == null || !documentText) return false;
+  const digits = String(value).replace(/\D/g, "");
+  // Fragments only — full phones are already caught by looksLikeUkContactPhone.
+  if (digits.length < 5 || digits.length > 8) return false;
+  if (!/^\d+$/.test(digits)) return false;
+
+  const phones =
+    documentText.match(
+      /0\d{2,4}[\s-]?\d{3,4}[\s-]?\d{3,5}|0800[\s-]?\d{3}[\s-]?\d{3,5}/g
+    ) ?? [];
+  for (const phone of phones) {
+    const phoneDigits = phone.replace(/\D/g, "");
+    if (phoneDigits.length >= 10 && phoneDigits.endsWith(digits)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Job Summary sheets often omit Job ID entirely. Detect an actual job-ref
+ * label (not the "Job Summary Report" title).
+ */
+export function hasJobReferenceLabel(text: string | null | undefined): boolean {
+  if (!text) return false;
+  return (
+    /\bjob\s*(?:id|no\.?|number|ref(?:erence)?)\b\s*[:.#]?/i.test(text) ||
+    /\bwork\s*order\b\s*[:.#]?/i.test(text)
+  );
+}
+
+/**
+ * Sanitize a candidate job reference — null when letterhead / phone fragment.
+ */
+export function sanitizeJobReferenceValue(
+  value: string | null | undefined,
+  documentText?: string | null
+): string | null {
+  if (value == null) return null;
+  const cleaned = stripLetterheadNoise(String(value));
+  if (!cleaned) return null;
+  if (isLetterheadPhoneFragment(cleaned, documentText)) return null;
+  if (looksLikeUkContactPhone(cleaned)) return null;
+  return cleaned;
+}

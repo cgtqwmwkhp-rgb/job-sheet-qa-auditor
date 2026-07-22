@@ -13,7 +13,9 @@
 
 import type { Finding } from "../analyzer";
 import {
+  hasJobReferenceLabel,
   isLetterheadNoise,
+  isLetterheadPhoneFragment,
   scrubLetterheadConflictParts,
   scrubLetterheadFromSnippets,
   stripLetterheadNoise,
@@ -551,7 +553,9 @@ export function applyFindingHygiene(
 
   const threshold = options.confidenceThreshold ?? 70;
   const maxMissing = options.maxMissingField ?? MAX_MISSING_FIELD_FINDINGS;
-  const pre = options.preExtractedFields ?? {};
+  const pre: Record<string, PreExtractedField> = {
+    ...(options.preExtractedFields ?? {}),
+  };
   const optionalFields = normalizeOptionalSet(options.optionalTemplateFields);
   const optionalAliases =
     options.optionalFieldAliases ??
@@ -563,9 +567,35 @@ export function applyFindingHygiene(
     pre.technicianSignature?.value === "Present" ||
     pre.engineerSignOff?.value === "Present";
 
+  const docText = options.documentText ?? "";
+  // Drop phone-fragment job refs so MISSING_FIELD hygiene sees an empty field.
+  if (docText && pre.jobReference) {
+    if (isLetterheadPhoneFragment(pre.jobReference.value, docText)) {
+      delete pre.jobReference;
+    }
+  }
+  if (docText && pre.jobNumber) {
+    if (isLetterheadPhoneFragment(pre.jobNumber.value, docText)) {
+      delete pre.jobNumber;
+    }
+  }
+
   let working = findings.filter(f => {
     // Suppress MISSING_FIELD for optional template fields (e.g. Engineer Comments)
     if (isOptionalTemplateMissing(f, optionalFields, optionalAliases)) {
+      return false;
+    }
+    // Job Summary sheets without a Job ID/Ref label must not Issue JSR-R001
+    // when the only "candidate" was letterhead phone digits (YN62EAW).
+    if (
+      f.reasonCode === "MISSING_FIELD" &&
+      (/job\s*reference|job\s*number|jobreference|jobnumber/i.test(
+        f.fieldName || ""
+      ) ||
+        f.ruleId === "JSR-R001") &&
+      docText &&
+      !hasJobReferenceLabel(docText)
+    ) {
       return false;
     }
     // Suppress MISSING_FIELD when ensemble already has a confident value

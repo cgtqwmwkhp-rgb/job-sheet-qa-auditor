@@ -4,7 +4,10 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  hasJobReferenceLabel,
   isLetterheadNoise,
+  isLetterheadPhoneFragment,
+  sanitizeJobReferenceValue,
   scrubLetterheadConflictParts,
   scrubLetterheadFromSnippets,
   stripLetterheadNoise,
@@ -168,6 +171,62 @@ describe("scrubLetterheadFromSnippets", () => {
     });
     expect(scrubbed.rawSnippet).toBe("");
     expect(scrubbed.normalisedSnippet).toBe("");
+  });
+});
+
+describe("letterhead phone-fragment jobReference (YN62EAW)", () => {
+  const letterhead =
+    "UNIT 6 Telephone: 01268 562102 www.plantexpand.com Email: sales@plantexpand.com Job Summary Report Asset No: YN62EAW";
+
+  it("detects 562102 as a fragment of Telephone 01268 562102", () => {
+    expect(isLetterheadPhoneFragment("562102", letterhead)).toBe(true);
+    expect(sanitizeJobReferenceValue("562102", letterhead)).toBeNull();
+    // Real short job ids must survive when they are not phone tails.
+    expect(isLetterheadPhoneFragment("87", letterhead)).toBe(false);
+    expect(sanitizeJobReferenceValue("JOB-87", letterhead)).toBe("JOB-87");
+  });
+
+  it("hasJobReferenceLabel ignores Job Summary Report title", () => {
+    expect(hasJobReferenceLabel(letterhead)).toBe(false);
+    expect(hasJobReferenceLabel("Job ID: 87\nAsset No: YN62EAW")).toBe(true);
+    expect(hasJobReferenceLabel("Work Order: WO-1")).toBe(true);
+  });
+
+  it("hygiene drops JSR-R001 when sheet has no Job ID/Ref label", () => {
+    const cleaned = applyFindingHygiene(
+      [
+        {
+          ruleId: "JSR-R001",
+          fieldName: "jobReference",
+          severity: "S1",
+          reasonCode: "MISSING_FIELD",
+          rawSnippet: "562102",
+          normalisedSnippet: "562102",
+          confidence: 40,
+          pageNumber: 1,
+          whyItMatters: "Job reference required",
+          suggestedFix: "Enter Job ID",
+        },
+      ],
+      {
+        documentText: letterhead,
+        preExtractedFields: {
+          jobReference: {
+            value: "562102",
+            confidence: 80,
+            pageNumber: 1,
+          },
+        },
+      }
+    );
+    expect(cleaned.some(f => f.ruleId === "JSR-R001")).toBe(false);
+    expect(
+      cleaned.some(
+        f =>
+          f.reasonCode === "MISSING_FIELD" &&
+          /job\s*reference/i.test(f.fieldName || "")
+      )
+    ).toBe(false);
   });
 });
 
