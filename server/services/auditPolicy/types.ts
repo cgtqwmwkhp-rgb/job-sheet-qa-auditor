@@ -11,6 +11,7 @@ export type FailClass = "major" | "minor" | "informational";
 export type AuditFormFamily =
   | "wasted-journey-v1"
   | "job-summary-v1"
+  | "loler-examination-v1"
   | "default";
 
 export interface AuditPolicyRule {

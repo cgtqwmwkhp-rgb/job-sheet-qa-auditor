@@ -532,6 +532,55 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           enabled: true,
           fieldAliases: ["Tyre DOT Age", "Tyre Age", "DOT Age"],
         },
+        {
+          ruleId: "DATE-C010",
+          label: "Next Service Due (shadow)",
+          description:
+            "Next service / test / expiry date missing or past on inspection sheets (Pack v1 shadow — informational)",
+          failClass: "informational",
+          enabled: true,
+          fieldAliases: [
+            "Next Service Due",
+            "Next Service Date",
+            "expiryDate",
+            "Expiry Date",
+          ],
+        },
+      ],
+    },
+    /**
+     * LOLER thorough examination — statutory next-exam due (Pack v1 DATE-C020).
+     */
+    "loler-examination-v1": {
+      label: "LOLER Examination",
+      rules: [
+        {
+          ruleId: "DATE-C020",
+          label: "Next Examination Due",
+          description:
+            "LOLER Next Examination Due missing or overdue (statutory TE interval)",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: [
+            "Next Examination Due",
+            "expiryDate",
+            "Expiry Date",
+            "Next Exam Due",
+          ],
+        },
+        {
+          ruleId: "DEF-C040",
+          label: "Engineer Signature / Sign-off",
+          description: "Technician name or signature must be present",
+          failClass: "major",
+          enabled: true,
+          fieldAliases: [
+            "Engineer Signature / Sign-off",
+            "Technician Signature",
+            "engineerSignOff",
+            "customerSignature",
+          ],
+        },
       ],
     },
     /**

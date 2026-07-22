@@ -57,9 +57,13 @@ export {
 } from "./checklistReaders";
 export {
   demoteSignOffMissingWhenInkUnverified,
+  demoteSignatureSystemWhenImageQaUnavailable,
   wasVlmInkUsed,
 } from "./signOffHonesty";
-export type { SignOffHonestyOptions } from "./signOffHonesty";
+export type {
+  SignOffHonestyOptions,
+  ImageQaUnavailableDemoteOptions,
+} from "./signOffHonesty";
 export type { TextChecklistRow, ChecklistRowSource } from "./checklistReaders";
 
 /** Minimum confidence for a Fail mark to drive S1 findings / block auto-PASS. */

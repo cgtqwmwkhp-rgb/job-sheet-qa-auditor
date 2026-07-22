@@ -156,9 +156,12 @@ const EXTRACTION_STRATEGIES: Record<CriticalFieldType, ExtractionStrategy> = {
   },
   expiryDate: {
     patterns: [
+      /next\s*examination\s*due[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
+      /next\s*exam(?:ination)?\s*(?:due|date)?[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
+      /examination\s*due[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
       /expir(?:y|es|ation)\s*(?:date)?[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
       /valid\s*(?:until|to)[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
-      /next\s*(?:service|inspection)[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
+      /next\s*(?:service|inspection|test)\s*(?:date)?[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
       /due\s*(?:date)?[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
     ],
     validators: [

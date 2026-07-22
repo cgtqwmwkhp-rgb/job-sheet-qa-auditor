@@ -113,8 +113,48 @@ describe("auditPolicy", () => {
 
     expect(applied.hasMajorFails).toBe(false);
     expect(applied.minorCount).toBe(1);
-    expect(applied.overallResult).toBe("REVIEW_QUEUE");
+    // PX-117: minors are Doc Quality only — no sticky REVIEW from upstream FAIL.
+    expect(applied.overallResult).toBe("PASS");
     expect(applied.findings[0]?.severity).toBe("S2");
+  });
+
+  it("PX-117: identical maj=0 profiles yield PASS regardless of sticky REVIEW_QUEUE", () => {
+    const minor = finding({
+      ruleId: "ATTR-C011",
+      fieldName: "Engineer Name",
+      severity: "S2",
+    });
+    const fromReview = applyAuditPolicy({
+      findings: [minor],
+      formFamily: "job-summary-v1",
+      policy: DEFAULT_AUDIT_POLICY,
+      currentResult: "REVIEW_QUEUE",
+    });
+    const fromPass = applyAuditPolicy({
+      findings: [minor],
+      formFamily: "job-summary-v1",
+      policy: DEFAULT_AUDIT_POLICY,
+      currentResult: "PASS",
+    });
+    expect(fromReview.hasMajorFails).toBe(false);
+    expect(fromPass.hasMajorFails).toBe(false);
+    expect(fromReview.minorCount).toBe(fromPass.minorCount);
+    expect(fromReview.overallResult).toBe("PASS");
+    expect(fromPass.overallResult).toBe("PASS");
+  });
+
+  it("Pack v1: LOLER slug resolves to loler-examination-v1; DATE-C020 is major", () => {
+    expect(resolveAuditFormFamily("loler-examination-v1", false)).toBe(
+      "loler-examination-v1"
+    );
+    const f = finding({
+      ruleId: "DATE-C020",
+      fieldName: "Next Examination Due",
+      severity: "S1",
+    });
+    expect(
+      classifyFinding(f, "loler-examination-v1", DEFAULT_AUDIT_POLICY)
+    ).toBe("major");
   });
 
   it("disabled rule becomes informational (no hard-fail, no score hit)", () => {

@@ -135,6 +135,35 @@ Engineer Comments: Platform cracked; replace hinge assembly on return visit.
     ).toBe(true);
   });
 
+  /**
+   * Pack v1 / Run019: TEST-UAT-UNSAFE — dormant gate prove.
+   * Catalogue had 0 unsafe sheets; this fixture proves JSR-C020 fires when
+   * Safe to Use = No without a VOR banner.
+   * (Do not put the token "VOR" in the fixture body — \bVOR\b matches banners.)
+   */
+  it("Pack v1 TEST-UAT-UNSAFE: unsafe without VOR banner emits JSR-C020 S1", () => {
+    const text = `
+Job Summary Report
+TEST-UAT-UNSAFE
+Asset No: FIXTURE-UNSAFE-01
+Completion Details
+Were all works fully completed?: No
+Is a return visit required?: Yes
+Is the asset safe to use?: No
+Engineer Comments: Structural crack under load; isolate pending repair.
+Technician Signature
+`;
+    const result = evaluateJobSummaryConsistency(text);
+    expect(result.signals.unsafe).toBe(true);
+    expect(result.signals.vor).toBe(false);
+    expect(result.hasBlockingIssues).toBe(true);
+    const c020 = result.findings.find(f => f.ruleId === "JSR-C020");
+    expect(c020).toBeTruthy();
+    expect(c020!.severity).toBe("S1");
+    expect(c020!.reasonCode).toBe("INCOMPLETE_EVIDENCE");
+    expect(c020!.fieldName).toBe("Unsafe ↔ VOR");
+  });
+
   it("fails unsafe without return visit", () => {
     const text = `
 This Vehicle is marked as VOR

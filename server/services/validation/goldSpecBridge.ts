@@ -234,6 +234,8 @@ export const AUTO_PASS_BLOCKING_RULE_IDS = new Set([
   // COMMENT-C020 demoted (Option C) — present-but-thin must not block AUTO_PASS.
   "COMMENT-C040",
   "COMMENT-C042",
+  "DATE-C020",
+  "JSR-C020",
 ]);
 
 export function findingsBlockAutoPass(findings: Finding[]): boolean {

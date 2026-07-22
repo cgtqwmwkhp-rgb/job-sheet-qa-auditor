@@ -245,6 +245,28 @@ describe("evaluatePartsUsed", () => {
     expect(result.findings.some(f => f.ruleId === "PARTS-C014")).toBe(false);
   });
 
+  /**
+   * Pack v1 / Run019: catalogue never fired PARTS-C012 (partsUsed=0/56).
+   * Itemised-parts gap = repairs + non-empty but incomplete Parts Used lines.
+   */
+  it("Pack v1 TEST-UAT-PARTS-GAP: implied parts with incomplete lines emit PARTS-C012", () => {
+    const text = `
+Job Summary Report
+TEST-UAT-PARTS-GAP
+Repairs Required: Replace cracked hinge and refit platform
+Parts Used
+WT158
+hinge kit only
+Technician Signature
+`;
+    const result = evaluatePartsUsed(text);
+    expect(result.signals.partsImplied).toBe(true);
+    const c012 = result.findings.find(f => f.ruleId === "PARTS-C012");
+    expect(c012).toBeTruthy();
+    expect(c012!.severity).toBe("S1");
+    expect(result.findings.some(f => f.ruleId === "PARTS-C014")).toBe(false);
+  });
+
   it("PX-109 residual: 'Nil required' in Parts Used is treated like None, not MAJOR (Vacuum-class repairs-only)", () => {
     const result = evaluatePartsUsed(REPAIRS_ONLY_PARTS_NOT_REQUIRED);
     expect(result.findings.some(f => f.ruleId === "PARTS-C012")).toBe(false);
