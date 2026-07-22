@@ -18,7 +18,7 @@
           "selection-marks"
         ]
       },
-      "version": "1.1.0",
+      "version": "1.2.0",
       "specJson": {
         "name": "Compliance Checklist PTO Service Spec",
         "version": "1.0.0",
@@ -286,14 +286,13 @@
           "vacuum",
           "tanker",
           "110v",
-          "inspection",
           "acumec",
           "access",
           "platform",
           "mewp"
         ],
         "tokenWeights": {
-          "pto": 20,
+          "pto": 30,
           "service": 10,
           "compliance": 12,
           "checklist": 12,

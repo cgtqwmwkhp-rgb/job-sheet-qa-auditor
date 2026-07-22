@@ -181,9 +181,8 @@ export function initializePtoServiceTemplate(
     packRelative: PTO_SERVICE_PACK,
     label: "Compliance Checklist PTO Service",
     createdBy,
-    // Pack already carries Wave B negatives at 1.1.0; expectedVersion was
-    // stuck at 1.0.0 so MySQL-hydrated pods never re-imported (PX-116).
-    expectedVersion: "1.1.0",
+    // 1.2.0: P.T.O. tokenize + drop inspection negative + stronger pto weight.
+    expectedVersion: "1.2.0",
   });
 }
 
@@ -201,9 +200,8 @@ const FORM_FAMILY_EXPECTED_VERSIONS: Record<
   "generator-service-v1": "1.0.0",
   "trailer-service-v1": "1.0.0",
   "ukpn-v1": "1.0.0",
-  // Wave B LOLER thorough-exam tokens landed in JSON at 1.0.0 without a bump;
-  // 1.1.0 forces MySQL-hydrated pods to re-import selectionConfig (PX-116).
-  "loler-examination-v1": "1.1.0",
+  // 1.2.0: winch in requiredTokensAny so Winch TE forms beat catch-all.
+  "loler-examination-v1": "1.2.0",
 };
 
 /**

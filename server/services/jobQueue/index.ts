@@ -57,11 +57,11 @@ function toResponse(
   durable: boolean,
   payload: JobSheetProcessingPayload
 ): EnqueueJobSheetProcessingResponse {
-  if (!result.deduped) {
-    startJobSheetProcessingWorker();
-    if (durable) {
-      startJobSheetProcessingPoller();
-    }
+  // Always wake the worker — including deduped enqueues — so bulk reprocess
+  // cannot leave work stranded in `queued` when another instance held the key.
+  startJobSheetProcessingWorker();
+  if (durable) {
+    startJobSheetProcessingPoller();
   }
 
   return {
@@ -208,6 +208,15 @@ export function initJobSheetProcessingQueue(): Promise<void> {
     // either complete against an active/terminal sheet or re-enqueue once.
     const resumed = await resumeProcessOutboxAfterRestart();
     if (resumed > 0) {
+      startJobSheetProcessingWorker();
+      if (isDurableJobQueueEnabled()) {
+        startJobSheetProcessingPoller();
+      }
+    }
+    // Drain any pre-existing queued work after boot (crash / deploy residue).
+    const backend = getJobQueueBackend();
+    const hasQueued = await Promise.resolve(backend.hasQueued());
+    if (hasQueued) {
       startJobSheetProcessingWorker();
       if (isDurableJobQueueEnabled()) {
         startJobSheetProcessingPoller();

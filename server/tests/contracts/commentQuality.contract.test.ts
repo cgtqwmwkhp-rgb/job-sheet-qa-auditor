@@ -9,6 +9,7 @@ import {
 } from "../../services/commentQuality";
 import { evaluateJobSummaryConsistency } from "../../services/jobSummaryConsistency";
 import { DEFAULT_AUDIT_POLICY } from "../../services/auditPolicy/defaults";
+import { AUTO_PASS_BLOCKING_RULE_IDS } from "../../services/validation/goldSpecBridge";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
@@ -197,6 +198,10 @@ describe("COMMENT-C audit policy seeds", () => {
     expect(rules.find(r => r.ruleId === "COMMENT-C010")!.failClass).toBe(
       "major"
     );
+    // Option C: present-but-thin is minor; blank still C010 major.
+    expect(rules.find(r => r.ruleId === "COMMENT-C020")!.failClass).toBe(
+      "minor"
+    );
     expect(rules.find(r => r.ruleId === "COMMENT-C030")!.failClass).toBe(
       "minor"
     );
@@ -204,6 +209,16 @@ describe("COMMENT-C audit policy seeds", () => {
     expect(rules.find(r => r.ruleId === "COMMENT-C042")!.failClass).toBe(
       "minor"
     );
+    expect(AUTO_PASS_BLOCKING_RULE_IDS.has("COMMENT-C010")).toBe(true);
+    expect(AUTO_PASS_BLOCKING_RULE_IDS.has("COMMENT-C020")).toBe(false);
+  });
+
+  it("calibration: JSR-C040/C070 are minor; C050 stays major", () => {
+    const rules = DEFAULT_AUDIT_POLICY.forms["job-summary-v1"].rules;
+    expect(rules.find(r => r.ruleId === "JSR-C040")!.failClass).toBe("minor");
+    expect(rules.find(r => r.ruleId === "JSR-C070")!.failClass).toBe("minor");
+    expect(rules.find(r => r.ruleId === "JSR-C050")!.failClass).toBe("major");
+    expect(rules.find(r => r.ruleId === "TYRE-C020")!.failClass).toBe("major");
   });
 });
 

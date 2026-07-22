@@ -14,7 +14,7 @@
  * NON-NEGOTIABLES:
  * - Missing requiredTokensAll ("pto"+"service") already hard-disqualifies
  *   in multi-signal (PX-107); negativeTokens add defense-in-depth for
- *   vacuum/tanker/110v/inspection families that must never cross-select
+ *   vacuum/tanker/110v/acumec families that must never cross-select
  *   into the PTO template.
  * - No silent guess: LOLER family tokens must clearly outrank the
  *   ultra-permissive default catch-all template.
@@ -123,7 +123,7 @@ describe("PX-114: PTO catch-all hard-gate", () => {
   });
 
   describe("negativeTokens defense-in-depth", () => {
-    it("PTO negativeTokens now include vacuum/tanker/110v/inspection beyond pump", () => {
+    it("PTO negativeTokens include vacuum/tanker/110v beyond pump", () => {
       const result = selectTemplateMultiSignal({
         documentText:
           "PTO Service Compliance Checklist Vacuum Tanker 110V Inspection",
@@ -134,10 +134,27 @@ describe("PX-114: PTO catch-all hard-gate", () => {
       );
       expect(ptoCandidate).toBeTruthy();
       // Even though "pto"+"service"+"compliance"/"checklist" are present,
-      // the presence of vacuum/tanker/110v/inspection negative tokens
-      // must still hard-disqualify the PTO template.
+      // vacuum/tanker/110v negatives must still hard-disqualify PTO.
       expect(ptoCandidate!.score).toBe(0);
       expect(ptoCandidate!.confidence).toBe("LOW");
+    });
+  });
+
+  describe("Genuine PTO selects pto-service", () => {
+    it("selects PTO for dotted P.T.O. Service compliance checklist", () => {
+      const documentText = [
+        "Job Summary Report",
+        "PlantExpand",
+        "P.T.O. Service",
+        "Compliance Checklist",
+        "OVP Winton Gardener",
+        "Asset No: WX65VMH",
+        "Date: 14/07/2026",
+        "Job Reference: 750",
+        "Technician Signature: Signed",
+      ].join("\n");
+      const result = selectTemplateMultiSignal({ documentText });
+      expect(selectedSlugOf(result)).toBe(PTO_SLUG);
     });
   });
 
@@ -180,6 +197,23 @@ describe("PX-114: PTO catch-all hard-gate", () => {
         "Asset ID: WNC-01",
         "Examination Date: 14/07/2026",
         "Competent Person Sign Off: Signed",
+        "Safe Working Load recorded",
+      ].join("\n");
+      const result = selectTemplateMultiSignal({ documentText: winchText });
+      expect(selectedSlugOf(result)).toBe(LOLER_SLUG);
+    });
+
+    it("R4: Winch TE buried in Job Summary chrome still selects loler over catch-all/JSR", () => {
+      const winchText = [
+        "Job Summary Report",
+        "PlantExpand",
+        "Thorough Examination - Winch",
+        "Asset No: WNC-45",
+        "Make/Model: Hydraulic Winch",
+        "Date: 14/07/2026",
+        "Job Reference: 451",
+        "Technician Signature: Signed",
+        "Examination completed by competent person",
         "Safe Working Load recorded",
       ].join("\n");
       const result = selectTemplateMultiSignal({ documentText: winchText });

@@ -130,7 +130,8 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           ruleId: "JSR-C040",
           label: "Works Completion",
           description: "Failure/repairs signals but works marked complete",
-          failClass: "major",
+          // Calibration wave: noisy when works truly finished after repair — REVIEW not hard-FAIL.
+          failClass: "minor",
           enabled: true,
           fieldAliases: ["Works Completion"],
         },
@@ -162,7 +163,8 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           ruleId: "JSR-C070",
           label: "Repairs ↔ Return Visit",
           description: "Repairs path but return visit No",
-          failClass: "major",
+          // Calibration wave: overlaps C050/C090; demote to minor (REVIEW).
+          failClass: "minor",
           enabled: true,
           fieldAliases: ["Repairs ↔ Return Visit"],
         },
@@ -273,7 +275,8 @@ export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
           label: "Engineer Comments (Sufficiency)",
           description:
             "Narrative missing what-failed and next-action/parts stance",
-          failClass: "major",
+          // Option C: present-but-thin → minor (blank still COMMENT-C010 major).
+          failClass: "minor",
           enabled: true,
           fieldAliases: [
             "Engineer Comments (Sufficiency)",
