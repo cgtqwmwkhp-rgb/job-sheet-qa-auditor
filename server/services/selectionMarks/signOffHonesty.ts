@@ -27,30 +27,32 @@ export interface SignOffHonestyOptions {
   signatureLabelPresent?: boolean;
 }
 
-/** Pack v1 interim: LOLER / PTO families when ink skipped for missing raster. */
+/** Pack v1 interim: LOLER / PTO / Job Summary when ink skipped for missing raster. */
 export interface ImageQaUnavailableDemoteOptions {
   skippedReason?: string | null;
   templateSlug?: string | null;
 }
 
-function isLolerOrPtoSlug(slug: string | null | undefined): boolean {
+function isInkHonestySlug(slug: string | null | undefined): boolean {
   if (!slug) return false;
-  return /loler|pto-service|pto_service|\bpto\b/i.test(slug);
+  return /loler|pto-service|pto_service|\bpto\b|job-summary|standard-maintenance/i.test(
+    slug
+  );
 }
 
 /**
  * Pack v1 interim honesty: when VLM ink was skipped with
  * `skippedReason=image_qa_unavailable` (missing raster **or** VLM HTTP
- * fail-soft), lock signature-shaped findings as informational on LOLER + PTO
- * so DEF-C040 / family signature rules cannot re-major a Present/S3 theater
- * finding. Does not fake vlmUsed.
+ * fail-soft), lock signature-shaped findings as informational on LOLER, PTO,
+ * and Job Summary so DEF-C040 / family signature rules cannot re-major a
+ * Present/S3 theater finding. Does not fake vlmUsed.
  */
 export function demoteSignatureSystemWhenImageQaUnavailable(
   findings: Finding[],
   options: ImageQaUnavailableDemoteOptions
 ): Finding[] {
   if (options.skippedReason !== "image_qa_unavailable") return findings;
-  if (!isLolerOrPtoSlug(options.templateSlug)) return findings;
+  if (!isInkHonestySlug(options.templateSlug)) return findings;
   if (!findings.length) return findings;
 
   return findings.map(f => {
@@ -62,9 +64,14 @@ export function demoteSignatureSystemWhenImageQaUnavailable(
     return {
       ...f,
       severity: "S3" as const,
-      reasonCode: "LOW_CONFIDENCE" as const,
+      reasonCode: "INK_UNVERIFIED" as const,
+      normalisedSnippet: f.normalisedSnippet || "Present",
+      rawSnippet:
+        f.normalisedSnippet === "Present" || f.rawSnippet === "Present"
+          ? "Present"
+          : f.rawSnippet || "Present",
       whyItMatters:
-        "Signature could not be VLM-verified (image_qa_unavailable). Interim Pack v1: locked informational on LOLER/PTO — confirm ink on the PDF.",
+        "Signature could not be VLM-verified (image_qa_unavailable). Recorded as Present from label evidence — confirm ink on the PDF.",
       suggestedFix:
         "Confirm the handwritten signature on the document. Re-process when VLM ink verification succeeds.",
       honestyDemoted: true,
@@ -128,8 +135,9 @@ export function demoteSignOffMissingWhenInkUnverified(
       return {
         ...f,
         severity: "S3",
-        reasonCode: "LOW_CONFIDENCE",
+        reasonCode: "INK_UNVERIFIED",
         normalisedSnippet: "Present",
+        rawSnippet: "Present",
         confidence: Math.max(f.confidence || 0, 70),
         whyItMatters:
           "Signature/sign-off label detected but ink verification was skipped (vlmUsed:false). Recorded as Present — confirm handwritten ink on the document.",
@@ -144,7 +152,7 @@ export function demoteSignOffMissingWhenInkUnverified(
     return {
       ...f,
       severity: "S3",
-      reasonCode: "LOW_CONFIDENCE",
+      reasonCode: "INK_UNVERIFIED",
       whyItMatters:
         "Sign-off ink was not verified because the VLM ink stage did not run (vlmUsed:false). Do not treat this as a confirmed MAJOR missing sign-off — confirm on the document.",
       suggestedFix:

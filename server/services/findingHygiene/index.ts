@@ -285,14 +285,15 @@ export function toPresentSignatureFinding(finding: Finding): Finding {
   return {
     ...finding,
     severity: "S3",
-    reasonCode: "LOW_CONFIDENCE",
+    reasonCode: "INK_UNVERIFIED",
     normalisedSnippet: "Present",
-    rawSnippet: finding.rawSnippet || "Technician Signature",
+    rawSnippet: "Present",
     confidence: Math.max(finding.confidence || 0, 70),
     whyItMatters:
       "Signature label/box detected. Handwritten ink is usually invisible to OCR; recorded as Present — confirm ink on the document (scroll to the signature box).",
     suggestedFix:
       "Scroll to the signature section on the PDF and confirm the handwritten signature is present.",
+    honestyDemoted: true,
   };
 }
 
@@ -301,8 +302,8 @@ function buildPresentSignatureFinding(): Finding {
     ruleId: "SYSTEM",
     fieldName: "customerSignature",
     severity: "S3",
-    reasonCode: "LOW_CONFIDENCE",
-    rawSnippet: "Technician Signature",
+    reasonCode: "INK_UNVERIFIED",
+    rawSnippet: "Present",
     normalisedSnippet: "Present",
     confidence: 75,
     pageNumber: 1,
@@ -316,6 +317,7 @@ function buildPresentSignatureFinding(): Finding {
       "Signature label/box detected. Handwritten ink is usually invisible to OCR; recorded as Present — confirm ink on the document (scroll to the signature box).",
     suggestedFix:
       "Scroll to the signature section on the PDF and confirm the handwritten signature is present.",
+    honestyDemoted: true,
   };
 }
 
@@ -435,12 +437,13 @@ function buildPresentFieldFinding(
   value: string,
   confidence: number
 ): Finding {
+  // raw === normalised kills false CORRECTED; EXTRACTED leaves Issues panel.
   return {
     ruleId: "SYSTEM",
     fieldName,
     severity: "S3",
-    reasonCode: "LOW_CONFIDENCE",
-    rawSnippet: `${label}: ${value}`,
+    reasonCode: "EXTRACTED",
+    rawSnippet: value,
     normalisedSnippet: value,
     confidence,
     pageNumber: 1,

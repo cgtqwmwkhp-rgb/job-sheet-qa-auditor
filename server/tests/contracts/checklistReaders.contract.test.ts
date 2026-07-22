@@ -375,7 +375,7 @@ describe("sign-off demote when vlmUsed:false", () => {
     });
     expect(cleaned).toHaveLength(1);
     expect(cleaned[0].severity).toBe("S3");
-    expect(cleaned[0].reasonCode).toBe("LOW_CONFIDENCE");
+    expect(cleaned[0].reasonCode).toBe("INK_UNVERIFIED");
     expect(cleaned[0].whyItMatters).toMatch(/vlmUsed:false/i);
   });
 

@@ -97,10 +97,10 @@ export function hasSubstantiveEngineerComments(text: string): {
   // like "VOR see above" to swallow "Technician Signature".
   const section =
     text.match(
-      /(?:engineer\s*comments?|work\s*notes?)\s*[:-]?\s*([\s\S]{0,800}?)(?=\n(?:technician\s*signature|customer\s*signature|completion\s*details)\b|$)/i
+      /(?:engineer\s*comments?|work\s*notes?)\s*[:-]?\s*([\s\S]{0,4000}?)(?=(?:\n|\s{2,})(?:parts\s+used\b(?!\s*still)|techni[cs]an|technician\s+signature|customer\s+signature|completion\s+details|fault\s+reason)\b|$)/i
     )?.[1] ||
     text.match(
-      /(?:repairs?\s*(?:needed|details?)|action\s*required|defect(?:s)?\s*(?:found|notes?))\s*[:-]?\s*([\s\S]{0,800}?)(?=\n(?:technician\s*signature|customer\s*signature)\b|$)/i
+      /(?:repairs?\s*(?:needed|details?)|action\s*required|defect(?:s)?\s*(?:found|notes?))\s*[:-]?\s*([\s\S]{0,4000}?)(?=(?:\n|\s{2,})(?:parts\s+used\b(?!\s*still)|techni[cs]an|technician\s+signature|customer\s+signature)\b|$)/i
     )?.[1] ||
     "";
 
@@ -137,15 +137,57 @@ const PARTS_SECTION_HEADERS = [
   "Parts Used",
   "Parts Still Required",
   "Technician Name",
+  "Technican Name",
   "Technician Signature",
   "Customer Signature",
   "Engineer Comments",
   "Work Notes",
 ] as const;
 
+/**
+ * Headers used to re-introduce line breaks into born-digital / text-layer
+ * streams that flatten an entire Job Summary page into one line.
+ * Longer names first so "Parts Still Required" wins over "Parts Used".
+ */
+const JSR_SECTION_BREAK_HEADERS = [
+  "Parts Still Required",
+  "Technician Signature",
+  "Customer Signature",
+  "Technician Name",
+  "Technican Name",
+  "Engineer Comments",
+  "Work Notes",
+  "Repairs Required",
+  "Breakdown/Repair",
+  "Fault Reason",
+  "Parts Used",
+  "Completion Details",
+  "Asset Details",
+  "Technican",
+] as const;
+
 /** Convert a header name's literal spaces to `\s+` for OCR spacing tolerance. */
 function flexPattern(name: string): string {
-  return name.replace(/\s+/g, "\\s+");
+  return name.replace(/\s+/g, "\\s+").replace(/\//g, "\\/");
+}
+
+/**
+ * Insert newlines before known Job Summary section headers so line-oriented
+ * extractors work on flattened text-layer OCR (e.g. YN62EAW repair sheets).
+ */
+export function normalizeJobSummarySectionText(text: string): string {
+  if (!text || typeof text !== "string") return text ?? "";
+  let out = text.replace(/\r\n/g, "\n");
+  const headers = [...JSR_SECTION_BREAK_HEADERS].sort(
+    (a, b) => b.length - a.length
+  );
+  for (const h of headers) {
+    const flex = flexPattern(h);
+    // Insert newline before a mid-stream header (not already at line start).
+    const re = new RegExp(`([^\\n])(\\s*)(?=${flex}\\b)`, "gi");
+    out = out.replace(re, "$1\n");
+  }
+  return out.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 const PAGE_PHOTO_RE = /^(?:Photo|Page)\s+\d/i;

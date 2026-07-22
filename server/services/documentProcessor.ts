@@ -84,6 +84,7 @@ import {
 import {
   evaluateJobSummaryConsistency,
   extractNamedSection,
+  normalizeJobSummarySectionText,
   type FailurePathSignals,
 } from "./jobSummaryConsistency";
 import { evaluateImpliesRules } from "./impliesRules";
@@ -2868,7 +2869,10 @@ async function processJobSheetWithOptions(
       );
       // Prefer Azure DI layout text for completion-block evaluation when
       // available — it preserves grid structure that Mistral OCR flattens.
-      const jsrText = selectionMarksResult?.layoutText || extractedText;
+      // Re-introduce section newlines for born-digital text-layer flatten.
+      const jsrText = normalizeJobSummarySectionText(
+        selectionMarksResult?.layoutText || extractedText
+      );
       const consistency = evaluateJobSummaryConsistency(jsrText, {
         failMarkCount,
         skipEngineerCommentRules: true,

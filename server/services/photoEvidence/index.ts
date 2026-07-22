@@ -105,7 +105,18 @@ function hasUsefulPhotoHints(hints: PhotoEvidenceHints): boolean {
   if (hints.photoNumberCount >= 1) return true;
   if (hints.totalPagesHint != null && hints.totalPagesHint >= 3) return true;
   if (hints.pageMarkers >= 2) return true;
+  // Repair packs often append a single "Images" page (2 pages total).
+  if (hints.totalPagesHint != null && hints.totalPagesHint >= 2) return true;
   return false;
+}
+
+/** Repair Job Summary cues when Parts/Repairs sections fail to parse. */
+function isRepairPhotoPath(text: string): boolean {
+  return (
+    /\bconsumables\s+used\??\s*yes\b/i.test(text) ||
+    /\brepair\s+issue\b/i.test(text) ||
+    /\bbreakdown\s*\/\s*repair\b/i.test(text)
+  );
 }
 
 /**
@@ -128,12 +139,13 @@ export function evaluatePhotoEvidenceConsistency(
 
   const partsUsed = sectionHasContent(partsUsedBody);
   const repairs = sectionHasContent(repairsBody);
-  const hasPartsOrRepairs = partsUsed.present || repairs.present;
-
   const hints = extractPhotoEvidenceHints(text, {
     totalPages: options.totalPages,
   });
   const photoHints = hasUsefulPhotoHints(hints);
+  const repairPath = isRepairPhotoPath(text);
+  const hasPartsOrRepairs =
+    partsUsed.present || repairs.present || (repairPath && photoHints);
 
   const duplicateFileHash = Boolean(
     options.fileHash &&
@@ -158,6 +170,9 @@ export function evaluatePhotoEvidenceConsistency(
   const triggers: string[] = [];
   if (partsUsed.present) triggers.push(`Parts Used: ${partsUsed.snippet}`);
   if (repairs.present) triggers.push(`Repairs Required: ${repairs.snippet}`);
+  if (!triggers.length && repairPath) {
+    triggers.push("Repair Job Summary (consumables/repair cues)");
+  }
   const raw = triggers.join(" | ");
 
   if (!photoHints) {
@@ -182,9 +197,9 @@ export function evaluatePhotoEvidenceConsistency(
       ruleId: `${PHOTO_EVIDENCE_RULE_PREFIX}011`,
       fieldName: "Photo Evidence Hints",
       severity: "S3",
-      reasonCode: "LOW_CONFIDENCE",
+      reasonCode: "EXTRACTED",
       rawSnippet: hints.hintSummary.join(", ").slice(0, 300),
-      normalisedSnippet: `Photo evidence hints detected: ${hints.hintSummary.join(", ")}.`,
+      normalisedSnippet: hints.hintSummary.join(", ").slice(0, 300),
       confidence: 75,
       pageNumber: 1,
       whyItMatters:

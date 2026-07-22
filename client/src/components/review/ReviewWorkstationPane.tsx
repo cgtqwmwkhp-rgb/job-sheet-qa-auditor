@@ -279,14 +279,21 @@ export function mapFindingsFromApi(
         : failClass === "minor"
           ? "major"
           : "minor";
+    // EXTRACTED / INK_UNVERIFIED theater is captured evidence, not an Issue.
+    const reason = (f.reasonCode ?? "").toUpperCase();
+    const isCapturedEvidenceTheater =
+      failClass === "informational" &&
+      (reason === "EXTRACTED" || reason === "INK_UNVERIFIED");
     // Open S3 stays informational (not a Pass for the sheet); resolved → passed.
     const status = isResolved
       ? "passed"
-      : failClass === "major"
-        ? "missing"
-        : failClass === "minor"
-          ? "warning"
-          : "warning";
+      : isCapturedEvidenceTheater
+        ? "passed"
+        : failClass === "major"
+          ? "missing"
+          : failClass === "minor"
+            ? "warning"
+            : "warning";
     const bb = f.boundingBox as
       | {
           x?: number;

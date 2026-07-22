@@ -139,12 +139,20 @@ export function extractTechnicianNameFromFields(
 }
 
 const TEXT_NAME_PATTERNS: RegExp[] = [
+  // Prefer username.lastname immediately after Technican/Technician (flat OCR).
+  /\btechni[cs]an\s+([A-Za-z][A-Za-z0-9]*\.[A-Za-z][A-Za-z0-9]*)\b/i,
+  // Multiline: Technican\nName:\n brandon.Towse
+  /\btechni[cs]an\s*(?:\r?\n\s*)?name\s*[:-]?\s*(?:\r?\n\s*)*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
+  /techni[cs]an\s*name\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
   /technician\s*name\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
   /engineer\s*name\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
   /\bengineer\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
   /\btech(?:nician)?\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
   /performed\s*by\s*[:-]\s*([A-Za-z][A-Za-z0-9._ -]{1,80})/i,
 ];
+
+const REJECT_NAME_TOKENS =
+  /^(present|absent|signed|yes|no|name|signature|sign|off|technician|technican|engineer)$/i;
 
 /**
  * Fallback: scrape technician/engineer name from raw OCR / extracted text.
@@ -163,8 +171,15 @@ export function extractTechnicianNameFromText(
       .replace(/[,;|].*$/, "")
       .trim();
     if (cleaned.length >= 2 && /[A-Za-z]/.test(cleaned)) {
-      if (/^(present|absent|signed|yes|no)$/i.test(cleaned)) continue;
-      const scrubbed = stripLetterheadNoise(cleaned);
+      if (REJECT_NAME_TOKENS.test(cleaned)) continue;
+      // Flat OCR: "brandon.Towse Signature: Name:" — keep username only.
+      const username = cleaned.match(
+        /^([A-Za-z][A-Za-z0-9]*\.[A-Za-z][A-Za-z0-9]*)\b/
+      )?.[1];
+      const candidate =
+        username || cleaned.replace(/\s+signature\b.*$/i, "").trim();
+      if (REJECT_NAME_TOKENS.test(candidate)) continue;
+      const scrubbed = stripLetterheadNoise(candidate);
       if (scrubbed && !isLetterheadNoise(scrubbed) && scrubbed.length >= 2) {
         return scrubbed;
       }
