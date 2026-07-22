@@ -82,6 +82,25 @@ describe("evaluateEngineerAttribution", () => {
     expect(result.attribution.technicianId).toBeNull();
   });
 
+  it("stampAutoProvisionedTechnician replaces ATTR-C011 with ATTR-C012", async () => {
+    const { stampAutoProvisionedTechnician } = await import(
+      "../../services/engineerAttributionFindings"
+    );
+    const prior = evaluateEngineerAttribution({
+      report: REPORT_UNKNOWN_NAME,
+      candidates: RICHARD_USER,
+    });
+    expect(prior.findings[0]?.ruleId).toBe("ATTR-C011");
+    const stamped = stampAutoProvisionedTechnician(prior, 42, {
+      created: true,
+    });
+    expect(stamped.findings.every(f => f.ruleId !== "ATTR-C011")).toBe(true);
+    expect(stamped.findings[0]?.ruleId).toBe("ATTR-C012");
+    expect(stamped.findings[0]?.severity).toBe("S3");
+    expect(stamped.attribution.technicianId).toBe(42);
+    expect(stamped.attribution.matchedOn).toBe("auto_provisioned");
+  });
+
   it("emits ATTR-C012 when structured technicianName matches a user", () => {
     const result = evaluateEngineerAttribution({
       report: REPORT_WITH_STRUCTURED_NAME,

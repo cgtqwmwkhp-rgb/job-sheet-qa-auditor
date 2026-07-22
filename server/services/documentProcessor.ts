@@ -139,7 +139,10 @@ import {
 } from "./aiPersona";
 import { evaluatePartsUsed } from "./partsAssessment";
 import { parsePartsUsedLines } from "./partsAssessment/parsePartsUsedLines";
-import { evaluateEngineerAttribution } from "./engineerAttributionFindings";
+import {
+  evaluateEngineerAttribution,
+  stampAutoProvisionedTechnician,
+} from "./engineerAttributionFindings";
 import {
   isPartsWebVerifyEnabled,
   toPersistedPartsCatalogLineResults,
@@ -223,7 +226,9 @@ import {
 } from "./multimodalRoiExtract";
 import * as db from "../db";
 import {
+  attributionOpenIdForName,
   extractTechnicianNameFromReport,
+  prettifyExtractedName,
   resolveTechnicianMatch,
 } from "./technicianAttribution";
 import { webhookEvents } from "./webhooks";
@@ -3340,7 +3345,7 @@ async function processJobSheetWithOptions(
     // sees text-layer/roiSpatial-grounded names, not just Gemini ∪ ensemble.
     const attrExtractedFields = fieldAuthority.fields;
     const users = await db.getAllUsers();
-    const attrResult = evaluateEngineerAttribution({
+    let attrResult = evaluateEngineerAttribution({
       report: {
         extractedFields: attrExtractedFields,
         extractedText,
@@ -3350,8 +3355,40 @@ async function processJobSheetWithOptions(
         name: u.name,
         email: u.email,
         role: u.role,
+        loginMethod: u.loginMethod,
       })),
     });
+    // Hybrid roster policy: prefer real AAD/seed match; when a clear OCR
+    // name is unmatched against a real roster, auto-provision an attribution
+    // stub so the sheet is attributed and ATTR-C011 does not clutter Issues.
+    if (
+      attrResult.attribution.extractedName &&
+      attrResult.attribution.technicianId == null &&
+      attrResult.findings.some(f => f.ruleId === "ATTR-C011")
+    ) {
+      try {
+        const extracted = attrResult.attribution.extractedName;
+        const pretty = prettifyExtractedName(extracted);
+        const ensured = await db.ensureAttributionTechnicianUser({
+          openId: attributionOpenIdForName(extracted),
+          name: pretty,
+        });
+        attrResult = stampAutoProvisionedTechnician(attrResult, ensured.id, {
+          created: ensured.created,
+        });
+        console.log(`[DocumentProcessor] Auto-provisioned technician`, {
+          jobSheetId,
+          technicianId: ensured.id,
+          created: ensured.created,
+          extractedName: extracted,
+        });
+      } catch (ensureErr) {
+        console.warn(
+          "[DocumentProcessor] Auto-provision technician failed; keeping ATTR-C011",
+          ensureErr
+        );
+      }
+    }
     engineerAttributionStamp = attrResult.attribution;
     if (attrResult.findings.length > 0) {
       analysisResult = {
@@ -3850,22 +3887,32 @@ async function processJobSheetWithOptions(
           extractedText,
         });
         const users = await db.getAllUsers();
-        const match = resolveTechnicianMatch(
-          name,
-          users.map(u => ({
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            role: u.role,
-          }))
-        );
-        if (match.technicianId != null) {
-          await db.updateJobSheetTechnicianId(jobSheetId, match.technicianId);
+        let technicianId =
+          resolveTechnicianMatch(
+            name,
+            users.map(u => ({
+              id: u.id,
+              name: u.name,
+              email: u.email,
+              role: u.role,
+              loginMethod: u.loginMethod,
+            }))
+          ).technicianId ??
+          engineerAttributionStamp?.technicianId ??
+          null;
+        if (technicianId == null && name) {
+          const ensured = await db.ensureAttributionTechnicianUser({
+            openId: attributionOpenIdForName(name),
+            name: prettifyExtractedName(name),
+          });
+          technicianId = ensured.id;
+        }
+        if (technicianId != null) {
+          await db.updateJobSheetTechnicianId(jobSheetId, technicianId);
           console.log(`[DocumentProcessor] Attributed technician`, {
             jobSheetId,
-            technicianId: match.technicianId,
+            technicianId,
             extractedName: name,
-            confidence: match.confidence,
           });
         } else if (name) {
           console.log(

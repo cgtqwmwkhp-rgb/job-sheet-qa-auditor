@@ -157,6 +157,43 @@ describe("pairCompare", () => {
     expect(result.findings.some(f => f.ruleId === "PHOTO-C012")).toBe(false);
   });
 
+  it("empty pairs + page-count-only hints do not emit PHOTO-C014", () => {
+    const imagesOnly =
+      "Parts Used\nFilter\nRepairs Required\nReplace filter\nImages\n";
+    const result = evaluatePhotoEvidenceConsistency(imagesOnly, {
+      totalPages: 2,
+      pairCompare: {
+        enabled: true,
+        provider: "heuristic",
+        model: "none",
+        pairs: [],
+        pageRoles: [],
+        summary: "No before/after pairs could be formed from the pack.",
+        processingTimeMs: 0,
+      },
+    });
+    expect(result.findings.some(f => f.ruleId === "PHOTO-C011")).toBe(true);
+    expect(result.findings.some(f => f.ruleId === "PHOTO-C014")).toBe(false);
+  });
+
+  it("empty pairs + before/after labels still emit PHOTO-C014", () => {
+    const labelled =
+      "Parts Used\nFilter\nRepairs Required\nReplace filter\nBefore photo\nAfter photo\n";
+    const result = evaluatePhotoEvidenceConsistency(labelled, {
+      totalPages: 3,
+      pairCompare: {
+        enabled: true,
+        provider: "heuristic",
+        model: "none",
+        pairs: [],
+        pageRoles: [],
+        summary: "No before/after pairs could be formed from the pack.",
+        processingTimeMs: 0,
+      },
+    });
+    expect(result.findings.some(f => f.ruleId === "PHOTO-C014")).toBe(true);
+  });
+
   it("runPhotoPairCompare returns null when flag off", async () => {
     delete process.env[FEATURE_PHOTO_PAIR_COMPARE];
     const art = await runPhotoPairCompare({ text: WITH_HINTS, totalPages: 3 });

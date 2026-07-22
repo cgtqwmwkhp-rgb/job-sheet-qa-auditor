@@ -14,7 +14,10 @@ import {
   sectionHasContent,
 } from "../../services/jobSummaryConsistency";
 import { extractTechnicianNameFromText } from "../../services/technicianAttribution";
-import { evaluateEngineerAttribution } from "../../services/engineerAttributionFindings";
+import {
+  evaluateEngineerAttribution,
+  stampAutoProvisionedTechnician,
+} from "../../services/engineerAttributionFindings";
 import { evaluatePhotoEvidenceConsistency } from "../../services/photoEvidence";
 import {
   applyFindingHygiene,
@@ -90,6 +93,44 @@ describe("YN62EAW repair fix pack (text-layer flatten)", () => {
     });
     expect(photo.hasPartsOrRepairs).toBe(true);
     expect(photo.summary).not.toMatch(/skipped/i);
+  });
+
+  it("Images page without Before/After labels does not Issue PHOTO-C014", () => {
+    const photo = evaluatePhotoEvidenceConsistency(normalized, {
+      totalPages: 2,
+      pairCompare: {
+        enabled: true,
+        provider: "heuristic",
+        model: "none",
+        pairs: [],
+        pageRoles: [],
+        summary: "No before/after pairs could be formed from the pack.",
+        processingTimeMs: 0,
+      },
+    });
+    expect(photo.findings.some(f => f.ruleId === "PHOTO-C011")).toBe(true);
+    expect(photo.findings.some(f => f.ruleId === "PHOTO-C014")).toBe(false);
+  });
+
+  it("auto-provision stamp clears ATTR-C011 for brandon.Towse", () => {
+    const unmatched = evaluateEngineerAttribution({
+      report: { extractedFields: {}, extractedText: normalized },
+      candidates: [
+        {
+          id: 1,
+          name: "Richard Newton",
+          email: "richard@example.com",
+          role: "technician",
+          loginMethod: "seed",
+        },
+      ],
+    });
+    expect(unmatched.findings.some(f => f.ruleId === "ATTR-C011")).toBe(true);
+    const stamped = stampAutoProvisionedTechnician(unmatched, 99, {
+      created: true,
+    });
+    expect(stamped.findings.some(f => f.ruleId === "ATTR-C011")).toBe(false);
+    expect(stamped.attribution.technicianId).toBe(99);
   });
 
   it("Parts Still Required does not swallow Technican/Images bleed", () => {

@@ -1,5 +1,6 @@
 export {
   evaluateEngineerAttribution,
+  stampAutoProvisionedTechnician,
   isEngineerAttrFindingEnabled,
   ENGINEER_ATTR_RULE_PREFIX,
   FEATURE_ENGINEER_ATTR_FINDING,
