@@ -3881,23 +3881,21 @@ async function processJobSheetWithOptions(
 
     try {
       const sheetRow = await db.getJobSheetById(jobSheetId);
-      if (sheetRow && sheetRow.technicianId == null) {
+      if (sheetRow) {
         const name = extractTechnicianNameFromReport({
           extractedFields: finalExtractedFields,
           extractedText,
         });
         const users = await db.getAllUsers();
+        const candidates = users.map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          loginMethod: u.loginMethod,
+        }));
         let technicianId =
-          resolveTechnicianMatch(
-            name,
-            users.map(u => ({
-              id: u.id,
-              name: u.name,
-              email: u.email,
-              role: u.role,
-              loginMethod: u.loginMethod,
-            }))
-          ).technicianId ??
+          resolveTechnicianMatch(name, candidates).technicianId ??
           engineerAttributionStamp?.technicianId ??
           null;
         if (technicianId == null && name) {
@@ -3907,14 +3905,27 @@ async function processJobSheetWithOptions(
           });
           technicianId = ensured.id;
         }
-        if (technicianId != null) {
+        const current = users.find(u => u.id === sheetRow.technicianId);
+        const currentIsPhantom = current?.loginMethod === "attribution";
+        const nextIsReal =
+          technicianId != null &&
+          users.find(u => u.id === technicianId)?.loginMethod !== "attribution";
+        // Never downgrade a real roster match to an attribution phantom.
+        const shouldUpdate =
+          technicianId != null &&
+          sheetRow.technicianId !== technicianId &&
+          (sheetRow.technicianId == null ||
+            (currentIsPhantom && nextIsReal) ||
+            (nextIsReal && !currentIsPhantom));
+        if (shouldUpdate && technicianId != null) {
           await db.updateJobSheetTechnicianId(jobSheetId, technicianId);
           console.log(`[DocumentProcessor] Attributed technician`, {
             jobSheetId,
             technicianId,
             extractedName: name,
+            previousTechnicianId: sheetRow.technicianId,
           });
-        } else if (name) {
+        } else if (name && technicianId == null) {
           console.log(
             `[DocumentProcessor] Could not resolve technician name to user`,
             { jobSheetId, extractedName: name }
