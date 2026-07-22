@@ -17,10 +17,16 @@ import { extractTechnicianNameFromText } from "../../services/technicianAttribut
 import { evaluateEngineerAttribution } from "../../services/engineerAttributionFindings";
 import { evaluatePhotoEvidenceConsistency } from "../../services/photoEvidence";
 import {
+  applyFindingHygiene,
   injectPresentFieldFindings,
   toPresentSignatureFinding,
 } from "../../services/findingHygiene";
 import { demoteSignatureSystemWhenImageQaUnavailable } from "../../services/selectionMarks/signOffHonesty";
+import {
+  hasJobReferenceLabel,
+  isLetterheadPhoneFragment,
+  sanitizeJobReferenceValue,
+} from "../../services/letterheadNoise";
 import type { Finding } from "../../services/analyzer";
 
 const FLAT = readFileSync(
@@ -99,6 +105,36 @@ describe("YN62EAW repair fix pack (text-layer flatten)", () => {
     expect(asset?.reasonCode).toBe("EXTRACTED");
     expect(asset?.rawSnippet).toBe(asset?.normalisedSnippet);
     expect(asset?.normalisedSnippet).toMatch(/YN62EAW/i);
+  });
+
+  it("rejects letterhead phone-fragment as jobReference (JSR-R001)", () => {
+    expect(hasJobReferenceLabel(FLAT)).toBe(false);
+    expect(isLetterheadPhoneFragment("562102", FLAT)).toBe(true);
+    expect(sanitizeJobReferenceValue("562102", FLAT)).toBeNull();
+
+    const cleaned = applyFindingHygiene(
+      [
+        {
+          ruleId: "JSR-R001",
+          fieldName: "jobReference",
+          severity: "S1",
+          reasonCode: "MISSING_FIELD",
+          rawSnippet: "562102",
+          normalisedSnippet: "562102",
+          confidence: 40,
+          pageNumber: 1,
+          whyItMatters: "Job reference required",
+          suggestedFix: "Enter Job ID",
+        },
+      ],
+      {
+        documentText: FLAT,
+        preExtractedFields: {
+          jobReference: { value: "562102", confidence: 85, pageNumber: 1 },
+        },
+      }
+    );
+    expect(cleaned.some(f => f.ruleId === "JSR-R001")).toBe(false);
   });
 
   it("job-summary image_qa_unavailable signatures use INK_UNVERIFIED", () => {

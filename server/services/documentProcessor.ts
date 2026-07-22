@@ -82,6 +82,11 @@ import {
   sanitizeExtractedFieldsForSignatures,
 } from "./findingHygiene";
 import {
+  hasJobReferenceLabel,
+  isLetterheadPhoneFragment,
+  sanitizeJobReferenceValue,
+} from "./letterheadNoise";
+import {
   evaluateJobSummaryConsistency,
   extractNamedSection,
   normalizeJobSummarySectionText,
@@ -3373,35 +3378,81 @@ async function processJobSheetWithOptions(
       // is now in scope too, so JSR-R001–3 (jobReference/assetId/date
       // required) can't fire on headers the UI already shows correctly
       // (validation ≠ UI fracture, PX-112).
-      const extractedForValidation = fieldAuthority.fields;
+      //
+      // YN62EAW: letterhead "Telephone: 01268 562102" must not become
+      // jobReference "562102". Scrub before validation; when the sheet has
+      // no Job ID/Ref label, soft-drop JSR-R001 (deterministic runs after
+      // the first hygiene pass, so findings would otherwise stick).
+      const extractedForValidation: typeof fieldAuthority.fields = {
+        ...fieldAuthority.fields,
+      };
+      for (const key of ["jobReference", "jobNumber"] as const) {
+        const field = extractedForValidation[key];
+        if (!field?.value) continue;
+        const sanitized = sanitizeJobReferenceValue(field.value, extractedText);
+        if (!sanitized) {
+          delete extractedForValidation[key];
+        } else if (sanitized !== field.value) {
+          extractedForValidation[key] = { ...field, value: sanitized };
+        } else if (isLetterheadPhoneFragment(field.value, extractedText)) {
+          delete extractedForValidation[key];
+        }
+      }
       const deterministic = runDeterministicValidation({
         spec,
         extractedFields: extractedForValidation,
       });
-      deterministicValidationPassed = deterministic.passed;
-      if (deterministic.findings.length > 0) {
+      const jobRefLabelPresent = hasJobReferenceLabel(extractedText);
+      const detFindings = deterministic.findings.filter(f => {
+        if (jobRefLabelPresent) return true;
+        if (f.ruleId === "JSR-R001") return false;
+        if (
+          f.reasonCode === "MISSING_FIELD" &&
+          /job\s*reference|job\s*number|jobreference|jobnumber/i.test(
+            f.fieldName || ""
+          )
+        ) {
+          return false;
+        }
+        return true;
+      });
+      const detPassed =
+        deterministic.passed ||
+        (detFindings.length < deterministic.findings.length &&
+          !detFindings.some(f => f.severity === "S0" || f.severity === "S1"));
+      deterministicValidationPassed = detPassed;
+      if (detFindings.length > 0) {
         analysisResult = {
           ...analysisResult,
-          findings: [...analysisResult.findings, ...deterministic.findings],
+          findings: [...analysisResult.findings, ...detFindings],
           summary:
             `${analysisResult.summary} ` +
-            `[DETERMINISTIC_VALIDATION] passed=${deterministic.passed} ` +
-            `failures=${deterministic.result.summary.failedRules} ` +
+            `[DETERMINISTIC_VALIDATION] passed=${detPassed} ` +
+            `failures=${detFindings.length} ` +
             `(critical=${deterministic.result.summary.criticalFailures} ` +
-            `major=${deterministic.result.summary.majorFailures}).`,
+            `major=${deterministic.result.summary.majorFailures}` +
+            `${jobRefLabelPresent ? "" : "; JSR-R001 soft-dropped: no Job ID/Ref label"}).`,
         };
-        if (!deterministic.passed && analysisResult.overallResult === "PASS") {
+        if (!detPassed && analysisResult.overallResult === "PASS") {
           analysisResult = {
             ...analysisResult,
             overallResult: "REVIEW_QUEUE",
           };
         }
+      } else if (deterministic.findings.length > 0 && !jobRefLabelPresent) {
+        analysisResult = {
+          ...analysisResult,
+          summary:
+            `${analysisResult.summary} ` +
+            `[DETERMINISTIC_VALIDATION] passed=true failures=0 ` +
+            `(JSR-R001 soft-dropped: no Job ID/Ref label).`,
+        };
       }
       recordStage({
         stage: "Deterministic Validation",
-        status: deterministic.passed ? "success" : "failed",
+        status: detPassed ? "success" : "failed",
         durationMs: Date.now() - validationStart,
-        error: deterministic.passed
+        error: detPassed
           ? undefined
           : `${deterministic.result.summary.criticalFailures} critical / ${deterministic.result.summary.majorFailures} major rule failure(s)`,
       });
