@@ -214,3 +214,43 @@ export function evaluateEngineerAttribution(
     attribution: stamp,
   };
 }
+
+/**
+ * After pipeline auto-provisions a technician stub for an unmatched OCR name,
+ * replace ATTR-C011 with informational ATTR-C012 and stamp technicianId.
+ * Real roster matches still win first — this only runs on C011 paths.
+ */
+export function stampAutoProvisionedTechnician(
+  prior: EngineerAttributionResult,
+  technicianId: number,
+  options: { created?: boolean } = {}
+): EngineerAttributionResult {
+  const name = prior.attribution.extractedName;
+  if (!name || technicianId <= 0) return prior;
+
+  const display = prior.attribution.displayName ?? prettifyExtractedName(name);
+  const stamp: ReportAttributionStamp = {
+    extractedName: name,
+    displayName: display,
+    technicianId,
+    confidence: "probable",
+    matchedOn: options.created ? "auto_provisioned" : "attribution_stub",
+  };
+
+  return {
+    signals: buildSignals(stamp),
+    findings: [
+      passed(
+        "ATTR-C012",
+        "Engineer Attribution (Provisioned)",
+        `Engineer name "${display}" attributed via ${
+          options.created ? "auto-created" : "existing"
+        } technician account for analytics.`,
+        "Clear OCR names should attribute the sheet even when the engineer is not yet on the AAD/seed roster. Prefer seeding real engineers so coaching joins a durable identity.",
+        name
+      ),
+    ],
+    summary: `Engineer name "${display}" auto-provisioned to user ${technicianId}; ATTR-C011 suppressed.`,
+    attribution: stamp,
+  };
+}

@@ -110,6 +110,17 @@ function hasUsefulPhotoHints(hints: PhotoEvidenceHints): boolean {
   return false;
 }
 
+/**
+ * Hints that can actually form a Before/After pair — not just an Images
+ * page count. Used to avoid PHOTO-C014 on repair packs that have photos
+ * but no pair labels (YN62EAW).
+ */
+export function hasPairFormingHints(hints: PhotoEvidenceHints): boolean {
+  return (
+    hints.hasBeforeLabel || hints.hasAfterLabel || hints.photoNumberCount >= 1
+  );
+}
+
 /** Repair Job Summary cues when Parts/Repairs sections fail to parse. */
 function isRepairPhotoPath(text: string): boolean {
   return (
@@ -305,20 +316,25 @@ export function evaluatePhotoEvidenceConsistency(
       }
     }
   } else if (pair && pair.pairs.length === 0 && photoHints) {
-    findings.push({
-      ruleId: `${PHOTO_EVIDENCE_RULE_PREFIX}014`,
-      fieldName: "Before/After Pair Compare",
-      severity: "S2",
-      reasonCode: "INCOMPLETE_EVIDENCE",
-      rawSnippet: pair.summary.slice(0, 300),
-      normalisedSnippet: "No before/after pairs could be formed from the pack.",
-      confidence: 60,
-      pageNumber: 1,
-      whyItMatters:
-        "Without paired pages, multimodal repair verification cannot run.",
-      suggestedFix:
-        "Include at least one Before and one After page of the same repair area.",
-    });
+    // Images-only / page-count hints prove photos exist but cannot form a
+    // Before/After pair — keep PHOTO-C011, do not Issue C014 (YN62EAW).
+    if (hasPairFormingHints(hints)) {
+      findings.push({
+        ruleId: `${PHOTO_EVIDENCE_RULE_PREFIX}014`,
+        fieldName: "Before/After Pair Compare",
+        severity: "S2",
+        reasonCode: "INCOMPLETE_EVIDENCE",
+        rawSnippet: pair.summary.slice(0, 300),
+        normalisedSnippet:
+          "No before/after pairs could be formed from the pack.",
+        confidence: 60,
+        pageNumber: 1,
+        whyItMatters:
+          "Without paired pages, multimodal repair verification cannot run.",
+        suggestedFix:
+          "Include at least one Before and one After page of the same repair area.",
+      });
+    }
   }
 
   const major = findings.filter(f => f.severity === "S1").length;
