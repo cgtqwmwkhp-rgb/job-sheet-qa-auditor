@@ -3910,11 +3910,13 @@ async function processJobSheetWithOptions(
         const nextIsReal =
           technicianId != null &&
           users.find(u => u.id === technicianId)?.loginMethod !== "attribution";
+        // Never downgrade a real roster match to an attribution phantom.
         const shouldUpdate =
           technicianId != null &&
+          sheetRow.technicianId !== technicianId &&
           (sheetRow.technicianId == null ||
             (currentIsPhantom && nextIsReal) ||
-            sheetRow.technicianId !== technicianId);
+            (nextIsReal && !currentIsPhantom));
         if (shouldUpdate && technicianId != null) {
           await db.updateJobSheetTechnicianId(jobSheetId, technicianId);
           console.log(`[DocumentProcessor] Attributed technician`, {
