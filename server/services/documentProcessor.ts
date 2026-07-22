@@ -103,6 +103,8 @@ import {
   isCropHtrField,
   isRoiCropReocrEnabled,
 } from "./ocrAdapter/cropOcrAdapter";
+import { buildDocumentImageBundle } from "./documentImages";
+import { evaluateDateCompliance } from "./dateCompliance";
 import {
   reconcileFields,
   type ExtractedField as ReconcileExtractedField,
@@ -156,6 +158,7 @@ import {
   hasBlockingFailMarks,
   countHighConfidenceFailMarks,
   demoteSignOffMissingWhenInkUnverified,
+  demoteSignatureSystemWhenImageQaUnavailable,
   type SelectionMarksResult,
 } from "./selectionMarks";
 import {
@@ -1932,10 +1935,21 @@ async function processJobSheetWithOptions(
   }
 
   // Stage 1.95: Anthropic VLM signature ink verification on cropped ROIs (fail-soft)
+  // Pack v1: always try to materialize page/signature rasters before ink verify
+  // so Image QA is not skipped with image_qa_unavailable when a PDF exists.
   let vlmInkResult: SignatureInkVerificationResult | null = null;
+  let documentImageBundle: Awaited<
+    ReturnType<typeof buildDocumentImageBundle>
+  > | null = null;
   const vlmStart = Date.now();
   if (isVlmVerificationEnabled()) {
     try {
+      documentImageBundle = await buildDocumentImageBundle({
+        pdfBuffer: sharedPdfBuffer,
+        roiConfig: pinnedRoiConfig,
+        existingCrops: multimodalCropImages,
+        maxPages: 1,
+      });
       vlmInkResult = await verifySignatureInk({
         documentUrl,
         pdfBuffer: sharedPdfBuffer,
@@ -1944,6 +1958,14 @@ async function processJobSheetWithOptions(
           "OCR cannot see handwritten ink; verify cropped Technician/Customer Signature ROI",
         extractionConfidence: 0.4,
         roiConfig: pinnedRoiConfig,
+        cropImages:
+          Object.keys(documentImageBundle.cropImages).length > 0
+            ? documentImageBundle.cropImages
+            : undefined,
+        pageImages:
+          documentImageBundle.pageImages.length > 0
+            ? documentImageBundle.pageImages
+            : undefined,
       });
       recordStage({
         stage: "VLM Ink Verification",
@@ -1982,9 +2004,15 @@ async function processJobSheetWithOptions(
         documentPdf: sharedPdfBuffer
           ? pdfBufferToVlmDocument(sharedPdfBuffer)
           : null,
-        // Prefer pixel crops from stage 1.92 when available (fail-soft → PDF+bounds)
-        ...(Object.keys(multimodalCropImages).length > 0
-          ? { cropImages: multimodalCropImages }
+        // Prefer pixel crops / page rasters from Pack v1 document-image path
+        ...(documentImageBundle &&
+        Object.keys(documentImageBundle.cropImages).length > 0
+          ? { cropImages: documentImageBundle.cropImages }
+          : Object.keys(multimodalCropImages).length > 0
+            ? { cropImages: multimodalCropImages }
+            : {}),
+        ...(documentImageBundle?.pageImages?.length
+          ? { pageImages: documentImageBundle.pageImages }
           : {}),
       });
       recordStage({
@@ -3240,6 +3268,46 @@ async function processJobSheetWithOptions(
     }
   }
 
+  // Pack v1 date compliance — DATE-C020 (LOLER major) / DATE-C010 (inspection shadow)
+  if (!isWastedJourneyDocument(extractedText)) {
+    const dateSlug =
+      buildSelectionCohortMeta(selectionResult, usedTemplateVersionId)
+        ?.templateSlug ?? null;
+    const expiryField =
+      analysisResult.extractedFields?.expiryDate ??
+      fieldAuthority?.fields?.expiryDate;
+    const examField =
+      analysisResult.extractedFields?.date ?? fieldAuthority?.fields?.date;
+    const dateResult = evaluateDateCompliance({
+      text: extractedText,
+      templateSlug: dateSlug,
+      expiryDate:
+        typeof expiryField === "object" && expiryField && "value" in expiryField
+          ? String((expiryField as { value?: unknown }).value ?? "")
+          : typeof expiryField === "string"
+            ? expiryField
+            : null,
+      examinationDate:
+        typeof examField === "object" && examField && "value" in examField
+          ? String((examField as { value?: unknown }).value ?? "")
+          : typeof examField === "string"
+            ? examField
+            : null,
+    });
+    if (dateResult.findings.length > 0) {
+      analysisResult = {
+        ...analysisResult,
+        findings: [...analysisResult.findings, ...dateResult.findings],
+        summary: `${analysisResult.summary} [DATE_COMPLIANCE] ${dateResult.summary}`,
+      };
+      recordStage({
+        stage: "Date Compliance",
+        status: "success",
+        durationMs: 0,
+      });
+    }
+  }
+
   // Checklist completeness: "Please select" placeholder → Minor/S2
   if (!isWastedJourneyDocument(extractedText)) {
     const checklistResult = evaluateChecklistCompleteness(extractedText);
@@ -3357,15 +3425,33 @@ async function processJobSheetWithOptions(
   // re-emit a MAJOR "engineerSignOff missing" finding here even when VLM
   // ink verification never ran — without this second pass, the re-emitted
   // finding would reach applyAuditPolicy undemoted and undo the earlier fix.
-  analysisResult = {
-    ...analysisResult,
-    findings: demoteSignOffMissingWhenInkUnverified(analysisResult.findings, {
-      vlmUsed: vlmInkResult?.imageQa?.vlmUsed === true,
-      signatureLabelPresent:
-        hasSignatureLabelEvidence(extractedText) &&
-        vlmInkResult?.preExtractedHint?.value !== "Absent",
-    }),
-  };
+  {
+    const honestySlug =
+      buildSelectionCohortMeta(selectionResult, usedTemplateVersionId)
+        ?.templateSlug ?? null;
+    let honestyFindings = demoteSignOffMissingWhenInkUnverified(
+      analysisResult.findings,
+      {
+        vlmUsed: vlmInkResult?.imageQa?.vlmUsed === true,
+        signatureLabelPresent:
+          hasSignatureLabelEvidence(extractedText) &&
+          vlmInkResult?.preExtractedHint?.value !== "Absent",
+      }
+    );
+    // Pack v1 interim: LOLER/PTO must not sole-fail on SYSTEM when ink skipped
+    // only because the document raster was unavailable.
+    honestyFindings = demoteSignatureSystemWhenImageQaUnavailable(
+      honestyFindings,
+      {
+        skippedReason: vlmInkResult?.skippedReason,
+        templateSlug: honestySlug,
+      }
+    );
+    analysisResult = {
+      ...analysisResult,
+      findings: honestyFindings,
+    };
+  }
 
   // Promote REVIEW_QUEUE → PASS only when findings are S3-only, deterministic
   // validation passed, score is strong, and no blocking fail marks.

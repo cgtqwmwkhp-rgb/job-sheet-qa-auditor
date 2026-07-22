@@ -85,6 +85,9 @@ export function resolveAuditFormFamily(
   if (isWastedJourney || templateSlug === "wasted-journey-v1") {
     return "wasted-journey-v1";
   }
+  if (templateSlug && /loler/i.test(templateSlug)) {
+    return "loler-examination-v1";
+  }
   if (
     templateSlug === "job-summary-v1" ||
     templateSlug === "job-summary" ||
@@ -234,9 +237,13 @@ export function hasMajorFails(findings: PolicyFinding[]): boolean {
 }
 
 /**
- * Decide overall result from policy:
+ * Decide overall result from policy (PX-117 — deterministic):
  * - Any Major → FAIL
- * - Else do not FAIL from Minor alone (demote Gemini FAIL → REVIEW_QUEUE if minors remain, else PASS)
+ * - Else → PASS (minors are Doc Quality % only; never sticky REVIEW from upstream)
+ *
+ * Previously `return input.current` preserved analyzer/ensemble REVIEW_QUEUE vs
+ * PASS for identical maj=0 profiles (forms 42 vs 64). Verdict is now a pure
+ * function of classified findings, not sticky upstream state.
  */
 export function decideOverallResult(input: {
   current: "PASS" | "FAIL" | "REVIEW_QUEUE";
@@ -245,15 +252,9 @@ export function decideOverallResult(input: {
   if (hasMajorFails(input.findings)) {
     return "FAIL";
   }
-
-  const hasMinors = input.findings.some(f => f.failClass === "minor");
-
-  if (input.current === "FAIL") {
-    // No majors — hard-fail not allowed from minors / LLM alone
-    return hasMinors ? "REVIEW_QUEUE" : "PASS";
-  }
-
-  return input.current;
+  // Minors / informational never hard-fail and must not fork pass vs review.
+  void input.current;
+  return "PASS";
 }
 
 /**
