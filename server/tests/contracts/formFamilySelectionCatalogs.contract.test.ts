@@ -10,6 +10,8 @@ import {
   getTemplateBySlug,
   getTemplate,
   getActiveVersion,
+  activateVersion,
+  uploadTemplateVersion,
   checkActivationPreconditions,
   initializeFormFamilySelectionCatalogs,
   FORM_FAMILY_CATALOG_SLUGS,
@@ -57,6 +59,41 @@ describe("Form-family selection catalogs (PR4)", () => {
     const again = initializeFormFamilySelectionCatalogs();
     expect(again.seeded).toEqual([]);
     expect(again.skipped.length).toBe(FORM_FAMILY_CATALOG_SLUGS.length);
+  });
+
+  it("reactivates expected LOLER version when a stale older version is active", () => {
+    initializeFormFamilySelectionCatalogs();
+    const t = getTemplateBySlug("loler-examination-v1");
+    expect(t).toBeTruthy();
+    const active = getActiveVersion(t!.id);
+    expect(active?.version).toBe("1.3.0");
+
+    // Simulate MySQL hydrate leaving a stale active by writing a 1.0.0-shaped
+    // version and activating it (fresh pack only ships 1.3.0).
+    const stale = uploadTemplateVersion({
+      templateId: t!.id,
+      version: "1.0.0-stale",
+      specJson: active!.specJson,
+      selectionConfigJson: {
+        requiredTokensAll: ["loler"],
+        requiredTokensAny: ["examination", "thorough"],
+        optionalTokens: [],
+        tokenWeights: { loler: 18 },
+      },
+      roiJson: active!.roiJson,
+      createdBy: 0,
+      changeNotes: "stale active for reseed contract",
+    });
+    activateVersion(stale.id, {
+      skipPreconditions: true,
+      skipFixtures: true,
+      skipCollisionCheck: true,
+    });
+    expect(getActiveVersion(t!.id)?.version).toBe("1.0.0-stale");
+
+    const result = initializeFormFamilySelectionCatalogs();
+    expect(result.seeded).toContain("loler-examination-v1");
+    expect(getActiveVersion(t!.id)?.version).toBe("1.3.0");
   });
 
   it("LOLER 1.3.0 selectionConfig has empty requiredTokensAll and winch/lifting in any-of", () => {
