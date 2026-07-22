@@ -691,6 +691,20 @@ export function applyFindingHygiene(
     working = [...working, buildPresentSignatureFinding("customerSignature")];
   }
 
+  // One Present theater row per signature field (avoid convert+inject doubles).
+  const seenSigFields = new Set<string>();
+  working = working.filter(f => {
+    if (!SIGNATURE_FIELD_RE.test(f.fieldName || "")) return true;
+    const presentLike =
+      f.reasonCode === "INK_UNVERIFIED" ||
+      /^present$/i.test((f.normalisedSnippet || "").trim());
+    if (!presentLike) return true;
+    const key = (f.fieldName || "").toLowerCase();
+    if (seenSigFields.has(key)) return false;
+    seenSigFields.add(key);
+    return true;
+  });
+
   // Downgrade Present|assetId signature conflicts
   working = working.map(f => {
     if (isNonsenseSignatureConflict(f)) {
