@@ -402,9 +402,11 @@ Customer Name: Acme Corp
       expect(authorityCallSite).toContain(
         "gemini: analysisResult.extractedFields"
       );
-      expect(dp.slice(authorityBuildIdx, validationIdx)).toContain(
-        "const extractedForValidation = fieldAuthority.fields;"
-      );
+      const extractedSlice = dp.slice(authorityBuildIdx, validationIdx + 800);
+      expect(extractedSlice).toContain("const extractedForValidation");
+      expect(extractedSlice).toContain("...fieldAuthority.fields");
+      expect(extractedSlice).toContain("sanitizeJobReferenceValue");
+      expect(extractedSlice).toContain("hasJobReferenceLabel");
     });
 
     it("PR-A (LOLER-R004): re-runs the sign-off honesty demote after deterministic validation and before applyAuditPolicy", () => {

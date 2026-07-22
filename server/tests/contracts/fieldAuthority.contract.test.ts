@@ -193,8 +193,13 @@ describe("documentProcessor wiring (source contract)", () => {
     const attrIdx = dp.indexOf(
       "const attrExtractedFields = fieldAuthority.fields;"
     );
-    const validationIdx = dp.indexOf(
-      "const extractedForValidation = fieldAuthority.fields;"
+    // Clone + letterhead scrub before validation; still rooted in FieldAuthority.
+    const validationIdx = dp.indexOf("const extractedForValidation");
+    expect(dp.slice(validationIdx, validationIdx + 200)).toContain(
+      "...fieldAuthority.fields"
+    );
+    expect(dp.slice(validationIdx, validationIdx + 1200)).toContain(
+      "sanitizeJobReferenceValue"
     );
     const persistIdx = dp.indexOf(
       "let finalExtractedFields = fieldAuthority.fields;"
