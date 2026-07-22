@@ -67,7 +67,8 @@ export function CommentQualityPanel({
 }: CommentQualityPanelProps) {
   const [open, setOpen] = useState(defaultOpen);
 
-  if (!signals || !signals.onFailurePath) return null;
+  // Show whenever a substantive narrative exists (standard + failure path).
+  if (!signals || (!signals.present && !signals.onFailurePath)) return null;
 
   const missingAxes = Array.isArray(signals.missingAxes)
     ? signals.missingAxes

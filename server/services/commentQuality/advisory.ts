@@ -56,7 +56,8 @@ export function buildDeterministicDeepNote(
       }
     : undefined;
 
-  if (!s.onFailurePath) {
+  // No narrative and not on failure path → nothing useful to coach.
+  if (!s.present && !s.onFailurePath) {
     return {
       enabled: false,
       provider: "deterministic",
@@ -68,15 +69,23 @@ export function buildDeterministicDeepNote(
       flags: [
         {
           type: "success",
-          message: "Not on failure path — clinical Deep Note skipped.",
+          message: "No engineer comments — Deep Note skipped.",
         },
       ],
-      summary: "Standard path; clinical comment advisory not required.",
+      summary: "No comment narrative to assess.",
       coachRewrite: "",
       gaps: [],
       recommendEscalate: false,
       persona: personaMeta,
     };
+  }
+
+  if (!s.onFailurePath && s.present) {
+    flags.push({
+      type: "success",
+      message:
+        "Standard path — coaching engineer overview for completeness (not a hard fail).",
+    });
   }
 
   if (!s.present) {
@@ -97,6 +106,18 @@ export function buildDeterministicDeepNote(
         message: "Missing clear 'what failed' statement.",
       });
       gaps.push("Name the defect (e.g. cracked coupling, worn tread).");
+    }
+    if (s.hasImpact) {
+      flags.push({
+        type: "success",
+        message: "Impact / safety stance language present.",
+      });
+    } else if (s.onFailurePath) {
+      flags.push({
+        type: "warning",
+        message: "Impact / unsafe-VOR stance not explicit.",
+      });
+      gaps.push("State impact (unsafe / VOR / downtime) where relevant.");
     }
     if (s.hasNextAction || s.hasPartsStance) {
       flags.push({

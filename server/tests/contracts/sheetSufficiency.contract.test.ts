@@ -62,6 +62,37 @@ describe("Deep Note honesty", () => {
     expect(note.provider).toBe("deterministic");
   });
 
+  it("enables Deep Note coaching for present standard-path comments", () => {
+    const note = buildDeterministicDeepNote(
+      sampleResult({
+        onFailurePath: false,
+        present: true,
+        hasWhat: true,
+        hasPartsStance: true,
+        hasNextAction: false,
+        snippet:
+          "fuel pipe from the second filter to the injectors had popped off",
+        wordCount: 40,
+      })
+    );
+    expect(note.enabled).toBe(true);
+    expect(note.usedLlm).toBe(false);
+    expect(note.gaps.some(g => /next action|parts/i.test(g))).toBe(false);
+    expect(note.flags.some(f => /Standard path/i.test(f.message))).toBe(true);
+  });
+
+  it("skips Deep Note when standard path has no comments", () => {
+    const note = buildDeterministicDeepNote(
+      sampleResult({
+        onFailurePath: false,
+        present: false,
+        snippet: "",
+        wordCount: 0,
+      })
+    );
+    expect(note.enabled).toBe(false);
+  });
+
   it("restores deterministic advisory when the live Gemini call fails", async () => {
     process.env[FEATURE_COMMENT_LLM_ADVISORY] = "true";
     process.env.GEMINI_API_KEY = "test-key-not-used";

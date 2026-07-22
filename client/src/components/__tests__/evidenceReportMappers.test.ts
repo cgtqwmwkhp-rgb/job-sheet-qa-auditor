@@ -10,6 +10,10 @@ import {
 } from "../review/BeforeAfterComparePane";
 import { mapCommentQualityFromReport } from "../review/CommentQualityPanel";
 import {
+  mapPhotoEvidenceFromReport,
+  photoEvidenceNeedsCoach,
+} from "../review/PhotoEvidenceContextPanel";
+import {
   mapPartsContextFromReport,
   partsCatalogNeedsRecheck,
 } from "../review/PartsContextPanel";
@@ -71,6 +75,38 @@ describe("Evidence AI reportJson mapper crash guards", () => {
     expect(note).not.toBeNull();
     expect(Array.isArray(note!.flags)).toBe(true);
     expect(note!.flags).toEqual([]);
+  });
+
+  it("mapPhotoEvidenceFromReport maps Images-pack hints without pairs", () => {
+    const { evidence } = mapPhotoEvidenceFromReport({
+      photoEvidence: {
+        hasPhotoHints: true,
+        hasPartsOrRepairs: true,
+        duplicateFileHash: false,
+        summary: "Page-markers×2, pages=2",
+        hints: {
+          hasBeforeLabel: false,
+          hasAfterLabel: false,
+          photoNumberCount: 0,
+          pageMarkers: 2,
+          totalPagesHint: 2,
+          hintSummary: ["Page-markers×2", "pages=2"],
+        },
+      },
+    });
+    expect(evidence).not.toBeNull();
+    expect(evidence!.hints.totalPagesHint).toBe(2);
+    expect(
+      photoEvidenceNeedsCoach(evidence, {
+        enabled: true,
+        provider: "heuristic",
+        model: "v1",
+        pairs: [],
+        pageRoles: [{ page: 2, role: "form" }],
+        summary: "no pairs",
+        processingTimeMs: 1,
+      })
+    ).toBe(true);
   });
 
   it("mapPartsContextFromReport coerces missing signal fields", () => {

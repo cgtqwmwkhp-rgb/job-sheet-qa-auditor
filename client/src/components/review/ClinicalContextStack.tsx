@@ -36,6 +36,12 @@ import {
   type PhotoPairCompareArtifact,
 } from "@/components/review/BeforeAfterComparePane";
 import {
+  PhotoEvidenceContextPanel,
+  photoEvidenceContextIsVisible,
+  photoEvidenceNeedsCoach,
+  type PhotoEvidenceView,
+} from "@/components/review/PhotoEvidenceContextPanel";
+import {
   DeepNoteAnalysis,
   SheetSufficiencyAdvisoryPanel,
   type DeepNoteAnalysisData,
@@ -62,6 +68,7 @@ export interface ClinicalContextStackProps {
   attribution?: AttributionStamp | null;
   hasAttrFindings?: boolean;
   vlmInkStatus?: VlmInkStatus | null;
+  photoEvidence?: PhotoEvidenceView | null;
   photoPairCompare: PhotoPairCompareArtifact | null;
   deepNoteAnalysis: DeepNoteAnalysisData | null;
   sheetSufficiencyAnalysis?: SheetSufficiencyAnalysisData | null;
@@ -84,18 +91,17 @@ export function buildClinicalContextSummary(
     | "hasPartsFindings"
     | "attribution"
     | "hasAttrFindings"
+    | "photoEvidence"
     | "photoPairCompare"
     | "deepNoteAnalysis"
   >
 ): string {
   const parts: string[] = [];
   if (props.failurePathSignals?.onFailurePath) parts.push("Failure path");
-  if (
-    props.commentSignals?.onFailurePath &&
-    props.commentSignals &&
-    !props.commentSignals.coherent
-  ) {
+  if (props.commentSignals?.present && !props.commentSignals.coherent) {
     parts.push("comments need coach");
+  } else if (props.commentSignals?.present) {
+    parts.push("comment overview");
   }
   if (
     partsContextIsActionable(
@@ -116,6 +122,12 @@ export function buildClinicalContextSummary(
     );
   } else if (pairCount > 0) {
     parts.push(`${pairCount} photo pair${pairCount === 1 ? "" : "s"}`);
+  } else if (
+    photoEvidenceNeedsCoach(props.photoEvidence, props.photoPairCompare)
+  ) {
+    parts.push("photos need Before/After labels");
+  } else if (props.photoEvidence?.hasPhotoHints) {
+    parts.push("photo hints");
   }
   if (props.deepNoteAnalysis) parts.push("Deep Note");
   if (parts.length === 0) return "Signals & evidence";
@@ -131,11 +143,12 @@ export function hasActionableClinicalContext(
     | "hasPartsFindings"
     | "attribution"
     | "hasAttrFindings"
+    | "photoEvidence"
     | "photoPairCompare"
   >
 ): boolean {
   const commentsNeedCoach = Boolean(
-    props.commentSignals?.onFailurePath && !props.commentSignals?.coherent
+    props.commentSignals?.present && !props.commentSignals?.coherent
   );
   return (
     commentsNeedCoach ||
@@ -145,12 +158,14 @@ export function hasActionableClinicalContext(
       props.hasPartsFindings
     ) ||
     attrContextIsActionable(props.attribution, props.hasAttrFindings) ||
-    photoPairHasActionableFail(props.photoPairCompare)
+    photoPairHasActionableFail(props.photoPairCompare) ||
+    photoEvidenceNeedsCoach(props.photoEvidence, props.photoPairCompare)
   );
 }
 
 export function ClinicalContextStack(props: ClinicalContextStackProps) {
   const commentOnFailurePath = Boolean(props.commentSignals?.onFailurePath);
+  const commentPresent = Boolean(props.commentSignals?.present);
   const actionable = hasActionableClinicalContext(props);
   const summary = buildClinicalContextSummary(props);
 
@@ -160,15 +175,21 @@ export function ClinicalContextStack(props: ClinicalContextStackProps) {
       props.partsCatalogSignals
   );
   const showAttrPanel = Boolean(props.hasAttrFindings || props.attribution);
+  const showPhotoEvidencePanel = photoEvidenceContextIsVisible(
+    props.photoEvidence,
+    props.photoPairCompare
+  );
 
   const hasAny =
     props.selectionTrace ||
     props.selectionMarks ||
     props.failurePathSignals ||
     commentOnFailurePath ||
+    commentPresent ||
     showPartsPanel ||
     showAttrPanel ||
     props.vlmInkStatus ||
+    showPhotoEvidencePanel ||
     (props.photoPairCompare &&
       Array.isArray(props.photoPairCompare.pairs) &&
       props.photoPairCompare.pairs.length > 0) ||
@@ -220,7 +241,7 @@ export function ClinicalContextStack(props: ClinicalContextStackProps) {
         signals={props.commentSignals}
         summary={props.commentSummary}
         defaultOpen={Boolean(
-          props.commentSignals?.onFailurePath && !props.commentSignals?.coherent
+          props.commentSignals?.present && !props.commentSignals?.coherent
         )}
         className="shadow-none border-muted"
       />
@@ -251,6 +272,17 @@ export function ClinicalContextStack(props: ClinicalContextStackProps) {
           className="shadow-none border-muted"
         />
       ) : null}
+      {showPhotoEvidencePanel ? (
+        <PhotoEvidenceContextPanel
+          evidence={props.photoEvidence}
+          pairCompare={props.photoPairCompare}
+          defaultOpen={photoEvidenceNeedsCoach(
+            props.photoEvidence,
+            props.photoPairCompare
+          )}
+          className="shadow-none border-muted"
+        />
+      ) : null}
       <BeforeAfterComparePane
         artifact={props.photoPairCompare}
         documentUrl={props.documentUrl}
@@ -264,7 +296,9 @@ export function ClinicalContextStack(props: ClinicalContextStackProps) {
       {props.deepNoteAnalysis ? (
         <DeepNoteAnalysis
           analysis={props.deepNoteAnalysis}
-          defaultOpen={false}
+          defaultOpen={Boolean(
+            props.commentSignals?.present && !props.commentSignals?.coherent
+          )}
           className="shadow-none border-muted"
         />
       ) : null}
