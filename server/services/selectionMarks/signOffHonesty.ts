@@ -39,9 +39,11 @@ function isLolerOrPtoSlug(slug: string | null | undefined): boolean {
 }
 
 /**
- * Pack v1 interim honesty: when VLM ink was skipped solely because Image QA
- * had no document raster (`image_qa_unavailable`), demote signature-shaped
- * SYSTEM / DEF majors → minor on LOLER + PTO only. Does not fake vlmUsed.
+ * Pack v1 interim honesty: when VLM ink was skipped with
+ * `skippedReason=image_qa_unavailable` (missing raster **or** VLM HTTP
+ * fail-soft), lock signature-shaped findings as informational on LOLER + PTO
+ * so DEF-C040 / family signature rules cannot re-major a Present/S3 theater
+ * finding. Does not fake vlmUsed.
  */
 export function demoteSignatureSystemWhenImageQaUnavailable(
   findings: Finding[],
@@ -54,16 +56,17 @@ export function demoteSignatureSystemWhenImageQaUnavailable(
   return findings.map(f => {
     if (f.honestyDemoted) return f;
     if (!SIGN_OFF_FIELD_RE.test(f.fieldName || "")) return f;
-    if (f.severity !== "S0" && f.severity !== "S1") return f;
 
+    // Include S3 Present / SYSTEM label theater — applyAuditPolicy DEF-C040
+    // otherwise remaps customerSignature → major and sole-fails clean sheets.
     return {
       ...f,
-      severity: "S2" as const,
+      severity: "S3" as const,
       reasonCode: "LOW_CONFIDENCE" as const,
       whyItMatters:
-        "Signature could not be VLM-verified because no document image was available (image_qa_unavailable). Interim Pack v1: demoted from major on LOLER/PTO — confirm ink on the PDF.",
+        "Signature could not be VLM-verified (image_qa_unavailable). Interim Pack v1: locked informational on LOLER/PTO — confirm ink on the PDF.",
       suggestedFix:
-        "Confirm the handwritten signature on the document. Re-process once page rasters are available for VLM ink.",
+        "Confirm the handwritten signature on the document. Re-process when VLM ink verification succeeds.",
       honestyDemoted: true,
     };
   });
