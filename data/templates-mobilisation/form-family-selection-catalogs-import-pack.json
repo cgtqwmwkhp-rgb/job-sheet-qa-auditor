@@ -622,7 +622,7 @@
         "category": "loler",
         "tags": ["loler", "lifting", "examination", "selection-catalog"]
       },
-      "version": "1.2.0",
+      "version": "1.3.0",
       "specJson": {
         "name": "LOLER Examination Spec",
         "version": "1.0.0",
@@ -704,10 +704,9 @@
       },
       "selectionConfigJson": {
         "requiredTokensAll": [],
-        "requiredTokensAny": ["loler", "thorough", "winch"],
+        "requiredTokensAny": ["loler", "thorough", "winch", "lifting"],
         "optionalTokens": [
           "examination",
-          "lifting",
           "equipment",
           "swl",
           "competent",
@@ -719,8 +718,8 @@
           "loler": 18,
           "thorough": 16,
           "winch": 18,
+          "lifting": 16,
           "examination": 12,
-          "lifting": 8,
           "equipment": 4,
           "swl": 4,
           "competent": 4

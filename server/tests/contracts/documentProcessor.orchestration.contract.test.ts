@@ -38,6 +38,17 @@ describe("documentProcessor orchestration contract", () => {
     expect(documentProcessor).toContain("fileKey");
   });
 
+  it("augments template selection text with job sheet fileName", () => {
+    const documentProcessor = readRepoFile(
+      "server/services/documentProcessor.ts"
+    );
+    expect(documentProcessor).toContain("selectionDocumentText");
+    expect(documentProcessor).toContain("fileName");
+    expect(documentProcessor).toMatch(
+      /selectionDocumentText\s*=\s*`\$\{extractedText\}\\n\$\{fileName\}`/
+    );
+  });
+
   it("keeps pipeline integration behind documentProcessor", () => {
     const documentProcessor = readRepoFile(
       "server/services/documentProcessor.ts"
