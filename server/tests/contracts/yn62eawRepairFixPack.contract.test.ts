@@ -86,6 +86,13 @@ describe("YN62EAW repair fix pack (text-layer flatten)", () => {
     expect(photo.summary).not.toMatch(/skipped/i);
   });
 
+  it("Parts Still Required does not swallow Technican/Images bleed", () => {
+    const body = extractNamedSection(normalized, "Parts Still Required");
+    const content = sectionHasContent(body);
+    expect(content.present).toBe(false);
+    expect(body.toLowerCase()).not.toContain("images");
+  });
+
   it("present field theater uses EXTRACTED without CORRECTED mismatch", () => {
     const injected = injectPresentFieldFindings([], normalized);
     const asset = injected.find(f => f.fieldName === "assetId");
