@@ -56,4 +56,25 @@ describe("auditOutcome mapping (PX-061)", () => {
     });
     expect(badge.label).not.toBe("Pass");
   });
+
+  it("keeps Pass when only soft S3 advisories remain (no open minors)", () => {
+    const badge = deriveWorkstationOutcome({
+      auditResult: "pass",
+      jobSheetStatus: "completed",
+      hasOpenMajorFindings: false,
+      hasOpenNonMajorFindings: false,
+    });
+    expect(badge.label).toBe("Pass");
+    expect(badge.status).toBe("passed");
+  });
+
+  it("demotes Pass to Needs review when an open Minor remains", () => {
+    const badge = deriveWorkstationOutcome({
+      auditResult: "pass",
+      jobSheetStatus: "completed",
+      hasOpenMajorFindings: false,
+      hasOpenNonMajorFindings: true,
+    });
+    expect(badge.label).toBe("Needs review");
+  });
 });

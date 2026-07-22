@@ -117,7 +117,7 @@ describe("findingHygiene", () => {
     expect(cleaned[0].normalisedSnippet).toBe("2024-09-02");
   });
 
-  it("records Present instead of dropping false Absent signature", () => {
+  it("records engineerSignOff Present instead of false customer Absent", () => {
     const findings = [
       finding({
         fieldName: "customerSignature",
@@ -131,12 +131,13 @@ describe("findingHygiene", () => {
       signatureLabelPresent: true,
     });
     expect(cleaned).toHaveLength(1);
+    expect(cleaned[0].fieldName).toBe("engineerSignOff");
     expect(cleaned[0].normalisedSnippet).toBe("Present");
     expect(cleaned[0].severity).toBe("S3");
     expect(cleaned[0].reasonCode).toBe("INK_UNVERIFIED");
   });
 
-  it("injects Present signature finding when label evidence and Gemini omitted it", () => {
+  it("injects engineerSignOff Present when bare Signature label (not customer)", () => {
     const findings = [
       finding({
         fieldName: "jobNumber",
@@ -148,11 +149,42 @@ describe("findingHygiene", () => {
     ];
     const cleaned = applyFindingHygiene(findings, {
       signatureLabelPresent: true,
+      documentText:
+        "Technician Name: brandon.Towse\nSignature:\nEngineer Comments: done",
     });
-    expect(cleaned.some(f => f.fieldName === "customerSignature")).toBe(true);
-    const sig = cleaned.find(f => f.fieldName === "customerSignature")!;
+    expect(cleaned.some(f => f.fieldName === "engineerSignOff")).toBe(true);
+    expect(cleaned.some(f => f.fieldName === "customerSignature")).toBe(false);
+    const sig = cleaned.find(f => f.fieldName === "engineerSignOff")!;
     expect(sig.normalisedSnippet).toBe("Present");
     expect(sig.severity).toBe("S3");
+    expect(sig.reasonCode).toBe("INK_UNVERIFIED");
+  });
+
+  it("only injects customerSignature when a customer/client label exists", () => {
+    const cleaned = applyFindingHygiene([], {
+      signatureLabelPresent: true,
+      documentText: "Customer Signature:\nTechnician Signature:\n",
+    });
+    expect(cleaned.some(f => f.fieldName === "customerSignature")).toBe(true);
+    expect(cleaned.some(f => f.fieldName === "engineerSignOff")).toBe(true);
+  });
+
+  it("drops invented customerSignature Present without customer label", () => {
+    const cleaned = applyFindingHygiene(
+      [
+        finding({
+          fieldName: "customerSignature",
+          reasonCode: "INK_UNVERIFIED",
+          normalisedSnippet: "Present",
+          rawSnippet: "Present",
+          severity: "S3",
+        }),
+      ],
+      {
+        documentText: "Technician Name: brandon.Towse\nSignature:\n",
+      }
+    );
+    expect(cleaned.some(f => f.fieldName === "customerSignature")).toBe(false);
   });
 
   it("detects signature labels in document text", () => {
@@ -299,7 +331,8 @@ Technician Signature
       signatureLabelPresent: true,
       optionalTemplateFields: ["workDescription"],
     });
-    expect(cleaned.some(f => /signature/i.test(f.fieldName))).toBe(true);
+    expect(cleaned.some(f => f.fieldName === "engineerSignOff")).toBe(true);
+    expect(cleaned.some(f => f.fieldName === "customerSignature")).toBe(false);
     expect(cleaned.some(f => f.fieldName === "vorStatus")).toBe(true);
     expect(cleaned.some(f => f.fieldName === "assetId")).toBe(true);
     expect(hasOnlyInformationalFindings(cleaned)).toBe(true);
