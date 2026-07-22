@@ -1,0 +1,599 @@
+{
+  "source": "production engineers table (app-qgp-prod / psql-qgp-prod)",
+  "exportedAt": "2026-07-22T19:20:00Z",
+  "note": "Active engineers only. UAT/MISC/Workshop/CEO/External placeholders excluded from seed.",
+  "engineers": [
+    {
+      "name": "Adams, D",
+      "employeeNo": "101",
+      "qgpId": 76,
+      "pamsTechId": "101",
+      "jobTitle": "Technician",
+      "site": "ME3 9QP"
+    },
+    {
+      "name": "Alexander-Forde, C",
+      "employeeNo": "183",
+      "qgpId": 158,
+      "pamsTechId": "183",
+      "jobTitle": "Technician",
+      "site": "IG7 4EY"
+    },
+    {
+      "name": "Allott, S",
+      "employeeNo": "174",
+      "qgpId": 149,
+      "pamsTechId": "174",
+      "jobTitle": "Technician",
+      "site": null
+    },
+    {
+      "name": "Bailey, B",
+      "employeeNo": "193",
+      "qgpId": 168,
+      "pamsTechId": "193",
+      "jobTitle": "Technician",
+      "site": "KT11 1AX"
+    },
+    {
+      "name": "Bailey, K",
+      "employeeNo": "228",
+      "qgpId": 202,
+      "pamsTechId": "228",
+      "jobTitle": "Technician",
+      "site": "B31 1SJ"
+    },
+    {
+      "name": "Balogh, A",
+      "employeeNo": "236",
+      "qgpId": 209,
+      "pamsTechId": "236",
+      "jobTitle": "Technician",
+      "site": "SL6 3ND"
+    },
+    {
+      "name": "Barrett, H",
+      "employeeNo": "130",
+      "qgpId": 105,
+      "pamsTechId": "130",
+      "jobTitle": "Technician",
+      "site": "UB8 3EG"
+    },
+    {
+      "name": "Barry, C",
+      "employeeNo": "232",
+      "qgpId": 205,
+      "pamsTechId": "232",
+      "jobTitle": "Technician",
+      "site": "CO12 4NE"
+    },
+    {
+      "name": "Beauchamp, S",
+      "employeeNo": "239",
+      "qgpId": 212,
+      "pamsTechId": "239",
+      "jobTitle": "Technician",
+      "site": "SL9 9AH"
+    },
+    {
+      "name": "Bell, K",
+      "employeeNo": "194",
+      "qgpId": 169,
+      "pamsTechId": "194",
+      "jobTitle": "Technician",
+      "site": "SS13 1FN"
+    },
+    {
+      "name": "Binley, A",
+      "employeeNo": "207",
+      "qgpId": 182,
+      "pamsTechId": "207",
+      "jobTitle": "Technician",
+      "site": "NN17 1EJ"
+    },
+    {
+      "name": "Brookes, J",
+      "employeeNo": "127",
+      "qgpId": 102,
+      "pamsTechId": "127",
+      "jobTitle": "Technician",
+      "site": "CT1 3BW"
+    },
+    {
+      "name": "Burrell, G",
+      "employeeNo": "115",
+      "qgpId": 90,
+      "pamsTechId": "115",
+      "jobTitle": "Technician",
+      "site": null
+    },
+    {
+      "name": "Butcher, T",
+      "employeeNo": "142",
+      "qgpId": 117,
+      "pamsTechId": "142",
+      "jobTitle": "Technician",
+      "site": "NR12 8LR"
+    },
+    {
+      "name": "Butler, J",
+      "employeeNo": "99",
+      "qgpId": 74,
+      "pamsTechId": "99",
+      "jobTitle": "Technician",
+      "site": null
+    },
+    {
+      "name": "Carinus, A",
+      "employeeNo": "82",
+      "qgpId": 57,
+      "pamsTechId": "82",
+      "jobTitle": "Technician",
+      "site": "HP1 3NX"
+    },
+    {
+      "name": "Chapman, J",
+      "employeeNo": "50",
+      "qgpId": 25,
+      "pamsTechId": "50",
+      "jobTitle": "Technician",
+      "site": "OX12 0NT"
+    },
+    {
+      "name": "Cownden, B",
+      "employeeNo": "223",
+      "qgpId": 198,
+      "pamsTechId": "223",
+      "jobTitle": "Technician",
+      "site": "NN5 6LU"
+    },
+    {
+      "name": "Daniels, W",
+      "employeeNo": "168",
+      "qgpId": 143,
+      "pamsTechId": "168",
+      "jobTitle": "Technician",
+      "site": "NR27 0LW"
+    },
+    {
+      "name": "Davey, M",
+      "employeeNo": "107",
+      "qgpId": 82,
+      "pamsTechId": "107",
+      "jobTitle": "Technician",
+      "site": "TN13 2UG"
+    },
+    {
+      "name": "England, M",
+      "employeeNo": "173",
+      "qgpId": 148,
+      "pamsTechId": "173",
+      "jobTitle": "Technician",
+      "site": null
+    },
+    {
+      "name": "Frank, T",
+      "employeeNo": "11",
+      "qgpId": 5,
+      "pamsTechId": "11",
+      "jobTitle": "Technician",
+      "site": "IP4 2BZ"
+    },
+    {
+      "name": "Frazer, R",
+      "employeeNo": "219",
+      "qgpId": 194,
+      "pamsTechId": "219",
+      "jobTitle": "Technician",
+      "site": "FK2 7QJ"
+    },
+    {
+      "name": "Fry, R",
+      "employeeNo": "128",
+      "qgpId": 103,
+      "pamsTechId": "128",
+      "jobTitle": "Technician",
+      "site": "IP24 2JE"
+    },
+    {
+      "name": "Gerothanasis, N",
+      "employeeNo": "242",
+      "qgpId": 215,
+      "pamsTechId": "242",
+      "jobTitle": "Technician",
+      "site": "L7 2GB"
+    },
+    {
+      "name": "Gibbons, M",
+      "employeeNo": "136",
+      "qgpId": 111,
+      "pamsTechId": "136",
+      "jobTitle": "Technician",
+      "site": "TF2 7RJ"
+    },
+    {
+      "name": "Goodson, D",
+      "employeeNo": "45",
+      "qgpId": 20,
+      "pamsTechId": "45",
+      "jobTitle": "Technician",
+      "site": "NR13 6NX"
+    },
+    {
+      "name": "Gulliver, M",
+      "employeeNo": "243",
+      "qgpId": 216,
+      "pamsTechId": "243",
+      "jobTitle": "Technician",
+      "site": null
+    },
+    {
+      "name": "Hedger, D",
+      "employeeNo": "48",
+      "qgpId": 23,
+      "pamsTechId": "48",
+      "jobTitle": "Technician",
+      "site": "PE16 6HA"
+    },
+    {
+      "name": "Hepburn, G",
+      "employeeNo": "63",
+      "qgpId": 38,
+      "pamsTechId": "63",
+      "jobTitle": "Technician",
+      "site": null
+    },
+    {
+      "name": "Hermitage, M",
+      "employeeNo": "102",
+      "qgpId": 77,
+      "pamsTechId": "102",
+      "jobTitle": "Technician",
+      "site": "CM22 6TG"
+    },
+    {
+      "name": "Hunter, D",
+      "employeeNo": "204",
+      "qgpId": 179,
+      "pamsTechId": "204",
+      "jobTitle": "Technician",
+      "site": "SS11 8YQ"
+    },
+    {
+      "name": "Jack, G",
+      "employeeNo": "86",
+      "qgpId": 61,
+      "pamsTechId": "86",
+      "jobTitle": "Technician",
+      "site": "KA3 3FE"
+    },
+    {
+      "name": "Jefferies, M",
+      "employeeNo": "195",
+      "qgpId": 170,
+      "pamsTechId": "195",
+      "jobTitle": "Technician",
+      "site": "DY10 4PY"
+    },
+    {
+      "name": "Kibble, A",
+      "employeeNo": "213",
+      "qgpId": 188,
+      "pamsTechId": "213",
+      "jobTitle": "Technician",
+      "site": "TF2 8EN"
+    },
+    {
+      "name": "Knight, M",
+      "employeeNo": "49",
+      "qgpId": 24,
+      "pamsTechId": "49",
+      "jobTitle": "Technician",
+      "site": null
+    },
+    {
+      "name": "Lawrence, N",
+      "employeeNo": "210",
+      "qgpId": 185,
+      "pamsTechId": "210",
+      "jobTitle": "Technician",
+      "site": "IP14 5GH"
+    },
+    {
+      "name": "Leggett, S",
+      "employeeNo": "100",
+      "qgpId": 75,
+      "pamsTechId": "100",
+      "jobTitle": "Technician",
+      "site": "SN16 0DN"
+    },
+    {
+      "name": "Long, O",
+      "employeeNo": "245",
+      "qgpId": 218,
+      "pamsTechId": "245",
+      "jobTitle": "Technician",
+      "site": "RG5 4XL"
+    },
+    {
+      "name": "Mansbridge, J",
+      "employeeNo": "244",
+      "qgpId": 217,
+      "pamsTechId": "244",
+      "jobTitle": "Technician",
+      "site": "CO2 9DB"
+    },
+    {
+      "name": "McAllister, L",
+      "employeeNo": "135",
+      "qgpId": 110,
+      "pamsTechId": "135",
+      "jobTitle": "Technician",
+      "site": "BH12 1EJ"
+    },
+    {
+      "name": "Mclean, D",
+      "employeeNo": "162",
+      "qgpId": 137,
+      "pamsTechId": "162",
+      "jobTitle": "Technician",
+      "site": "KA20 3NW"
+    },
+    {
+      "name": "Merry, D",
+      "employeeNo": "77",
+      "qgpId": 52,
+      "pamsTechId": "77",
+      "jobTitle": "Technician",
+      "site": "HA4 8TU"
+    },
+    {
+      "name": "Mettem, R",
+      "employeeNo": "231",
+      "qgpId": 204,
+      "pamsTechId": "231",
+      "jobTitle": "Technician",
+      "site": "TA20 1GW"
+    },
+    {
+      "name": "Morgan, D",
+      "employeeNo": "7",
+      "qgpId": 4,
+      "pamsTechId": "7",
+      "jobTitle": "Technician",
+      "site": "CM3 5ZX"
+    },
+    {
+      "name": "Mustoe, G",
+      "employeeNo": "149",
+      "qgpId": 124,
+      "pamsTechId": "149",
+      "jobTitle": "Technician",
+      "site": "MK12 5FT"
+    },
+    {
+      "name": "Newton, A",
+      "employeeNo": "241",
+      "qgpId": 214,
+      "pamsTechId": "241",
+      "jobTitle": "Technician",
+      "site": null
+    },
+    {
+      "name": "Newton, R",
+      "employeeNo": "238",
+      "qgpId": 211,
+      "pamsTechId": "238",
+      "jobTitle": "Technician",
+      "site": "NR5 9LG"
+    },
+    {
+      "name": "North, R",
+      "employeeNo": "216",
+      "qgpId": 191,
+      "pamsTechId": "216",
+      "jobTitle": "Technician",
+      "site": "NG17 8AU"
+    },
+    {
+      "name": "Nye, G",
+      "employeeNo": "192",
+      "qgpId": 167,
+      "pamsTechId": "192",
+      "jobTitle": "Technician",
+      "site": "ME2 2JB"
+    },
+    {
+      "name": "OLoughlin, J",
+      "employeeNo": "189",
+      "qgpId": 164,
+      "pamsTechId": "189",
+      "jobTitle": "Technician",
+      "site": "TN30 7NX"
+    },
+    {
+      "name": "OSullivan, B",
+      "employeeNo": "150",
+      "qgpId": 125,
+      "pamsTechId": "150",
+      "jobTitle": "Technician",
+      "site": "NP19 4NJ"
+    },
+    {
+      "name": "Page, T",
+      "employeeNo": "179",
+      "qgpId": 154,
+      "pamsTechId": "179",
+      "jobTitle": "Technician",
+      "site": "BN8 6JD"
+    },
+    {
+      "name": "Palmer, C",
+      "employeeNo": "171",
+      "qgpId": 146,
+      "pamsTechId": "171",
+      "jobTitle": "Technician",
+      "site": null
+    },
+    {
+      "name": "Parker, J",
+      "employeeNo": "215",
+      "qgpId": 190,
+      "pamsTechId": "215",
+      "jobTitle": "Technician",
+      "site": "CM8 1TE"
+    },
+    {
+      "name": "Perfitt, J",
+      "employeeNo": "217",
+      "qgpId": 192,
+      "pamsTechId": "217",
+      "jobTitle": "Technician",
+      "site": "TN9 2QH"
+    },
+    {
+      "name": "Powell, C",
+      "employeeNo": "227",
+      "qgpId": 201,
+      "pamsTechId": "227",
+      "jobTitle": "Technician",
+      "site": "GU35 9BP"
+    },
+    {
+      "name": "Richard, D",
+      "employeeNo": "234",
+      "qgpId": 207,
+      "pamsTechId": "234",
+      "jobTitle": "Technician",
+      "site": "CO11 2FZ"
+    },
+    {
+      "name": "Singh, A",
+      "employeeNo": "114",
+      "qgpId": 89,
+      "pamsTechId": "114",
+      "jobTitle": "Technician",
+      "site": "B43 6EP"
+    },
+    {
+      "name": "Smart, R",
+      "employeeNo": "152",
+      "qgpId": 127,
+      "pamsTechId": "152",
+      "jobTitle": "Technician",
+      "site": null
+    },
+    {
+      "name": "Smith, A",
+      "employeeNo": "22",
+      "qgpId": 11,
+      "pamsTechId": "22",
+      "jobTitle": "Technician",
+      "site": "CO7 9JA"
+    },
+    {
+      "name": "Smith, N",
+      "employeeNo": "180",
+      "qgpId": 155,
+      "pamsTechId": "180",
+      "jobTitle": "Technician",
+      "site": "SY15 6LQ"
+    },
+    {
+      "name": "Smith, P",
+      "employeeNo": "158",
+      "qgpId": 133,
+      "pamsTechId": "158",
+      "jobTitle": "Technician",
+      "site": "ME3 7AE"
+    },
+    {
+      "name": "Smith, T",
+      "employeeNo": "123",
+      "qgpId": 98,
+      "pamsTechId": "123",
+      "jobTitle": "Technician",
+      "site": "IP33 3HQ"
+    },
+    {
+      "name": "Southgate, H",
+      "employeeNo": "178",
+      "qgpId": 153,
+      "pamsTechId": "178",
+      "jobTitle": "Technician",
+      "site": "IP28 7QA"
+    },
+    {
+      "name": "Tapper, E",
+      "employeeNo": "230",
+      "qgpId": 203,
+      "pamsTechId": "230",
+      "jobTitle": "Technician",
+      "site": "ME1 2DS"
+    },
+    {
+      "name": "Thompson, L",
+      "employeeNo": "246",
+      "qgpId": 219,
+      "pamsTechId": "246",
+      "jobTitle": "Technician",
+      "site": null
+    },
+    {
+      "name": "Thorpe-Biggs, N",
+      "employeeNo": "212",
+      "qgpId": 187,
+      "pamsTechId": "212",
+      "jobTitle": "Technician",
+      "site": null
+    },
+    {
+      "name": "Towse, B",
+      "employeeNo": "235",
+      "qgpId": 208,
+      "pamsTechId": "235",
+      "jobTitle": "Technician",
+      "site": "RG4 5LT"
+    },
+    {
+      "name": "Turner, K",
+      "employeeNo": "5",
+      "qgpId": 2,
+      "pamsTechId": "5",
+      "jobTitle": "Technician",
+      "site": "OX5 1TS"
+    },
+    {
+      "name": "Wallace, M",
+      "employeeNo": "169",
+      "qgpId": 144,
+      "pamsTechId": "169",
+      "jobTitle": "Technician",
+      "site": null
+    },
+    {
+      "name": "Warwick, C",
+      "employeeNo": "164",
+      "qgpId": 139,
+      "pamsTechId": "164",
+      "jobTitle": "Technician",
+      "site": "MK7 8LP"
+    },
+    {
+      "name": "Webb, L",
+      "employeeNo": "151",
+      "qgpId": 126,
+      "pamsTechId": "151",
+      "jobTitle": "Technician",
+      "site": null
+    },
+    {
+      "name": "Wright, S",
+      "employeeNo": "154",
+      "qgpId": 129,
+      "pamsTechId": "154",
+      "jobTitle": "Technician",
+      "site": "CT14 9AN"
+    }
+  ]
+}

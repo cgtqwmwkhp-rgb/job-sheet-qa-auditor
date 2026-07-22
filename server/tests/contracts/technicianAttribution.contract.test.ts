@@ -76,6 +76,74 @@ describe("technicianAttribution", () => {
     expect(match.confidence).toBe("exact");
   });
 
+  it("smart-matches QGP Last, Initial roster to PlantExpand first.last OCR", () => {
+    const roster = [
+      {
+        id: 235,
+        name: "Towse, B",
+        email: "b.towse@plantexpand.roster",
+        role: "technician",
+        loginMethod: "seed",
+      },
+      {
+        id: 238,
+        name: "Newton, R",
+        email: "r.newton@plantexpand.roster",
+        role: "technician",
+        loginMethod: "seed",
+      },
+      {
+        id: 241,
+        name: "Newton, A",
+        email: "a.newton@plantexpand.roster",
+        role: "technician",
+        loginMethod: "seed",
+      },
+    ];
+    expect(resolveTechnicianMatch("brandon.Towse", roster).technicianId).toBe(
+      235
+    );
+    expect(resolveTechnicianMatch("Brandon Towse", roster).technicianId).toBe(
+      235
+    );
+    expect(resolveTechnicianMatch("B. Towse", roster).technicianId).toBe(235);
+    expect(resolveTechnicianMatch("Towse, B", roster).technicianId).toBe(235);
+    expect(resolveTechnicianMatch("Richard.Newton", roster).technicianId).toBe(
+      238
+    );
+    expect(resolveTechnicianMatch("richard.newton", roster).technicianId).toBe(
+      238
+    );
+    // Ambiguous surname alone still refuses when initials differ.
+    expect(resolveTechnicianMatch("Newton", roster).technicianId).toBeNull();
+  });
+
+  it("prefers real seed roster over attribution phantom on smart match", () => {
+    const match = resolveTechnicianMatch("brandon.Towse", [
+      {
+        id: 99,
+        name: "Brandon Towse",
+        email: null,
+        role: "technician",
+        loginMethod: "attribution",
+      },
+      {
+        id: 235,
+        name: "Towse, B",
+        email: "b.towse@plantexpand.roster",
+        role: "technician",
+        loginMethod: "seed",
+      },
+    ]);
+    expect(match.technicianId).toBe(235);
+  });
+
+  it("keeps Last, Initial intact when scraping technician text", () => {
+    expect(
+      extractTechnicianNameFromText("Technician Name: Towse, B\nJob ID: 1")
+    ).toBe("Towse, B");
+  });
+
   it("matches via email local-part", () => {
     expect(
       resolveTechnicianIdFromName("Richard.Newton", [
