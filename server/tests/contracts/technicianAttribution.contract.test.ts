@@ -49,6 +49,20 @@ describe("technicianAttribution", () => {
     ).toBe("Richard.Newton");
   });
 
+  it("scrapes Technican OCR typo and broken signature-adjacent layout", () => {
+    expect(extractTechnicianNameFromText("Technican Name: brandon.Towse")).toBe(
+      "brandon.Towse"
+    );
+    expect(
+      extractTechnicianNameFromText(
+        "Technican\nName: \n brandon.Towse Signature: "
+      )
+    ).toBe("brandon.Towse");
+    expect(
+      extractTechnicianNameFromText("Technican brandon.Towse Signature: Name:")
+    ).toBe("brandon.Towse");
+  });
+
   it("matches Richard.Newton to Richard Newton user", () => {
     const match = resolveTechnicianMatch("Richard.Newton", [
       {

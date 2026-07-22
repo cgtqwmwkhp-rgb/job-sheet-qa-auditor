@@ -67,7 +67,7 @@ describe("Pack v1 document-image honesty", () => {
     expect(cleaned[0]?.honestyDemoted).toBe(true);
   });
 
-  it("does not demote job-summary on image_qa_unavailable", () => {
+  it("demotes job-summary on image_qa_unavailable to INK_UNVERIFIED", () => {
     const cleaned = demoteSignatureSystemWhenImageQaUnavailable(
       [sigFinding()],
       {
@@ -75,8 +75,9 @@ describe("Pack v1 document-image honesty", () => {
         templateSlug: "job-summary-v1",
       }
     );
-    expect(cleaned[0]?.severity).toBe("S1");
-    expect(cleaned[0]?.honestyDemoted).toBeUndefined();
+    expect(cleaned[0]?.severity).toBe("S3");
+    expect(cleaned[0]?.honestyDemoted).toBe(true);
+    expect(cleaned[0]?.reasonCode).toBe("INK_UNVERIFIED");
   });
 
   it("does not demote when skip reason is unrelated", () => {

@@ -269,6 +269,8 @@ export const auditFindings = mysqlTable("audit_findings", {
     "PIPELINE_ERROR",
     "SPEC_GAP",
     "SECURITY_RISK",
+    "EXTRACTED",
+    "INK_UNVERIFIED",
   ]).notNull(),
   fieldName: varchar("fieldName", { length: 128 }).notNull(),
   /** Page number where issue was found */

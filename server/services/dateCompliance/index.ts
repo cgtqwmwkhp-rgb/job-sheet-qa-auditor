@@ -32,6 +32,7 @@ export interface DateComplianceResult {
     nextServiceDue: string | null;
     lolerScope: boolean;
     inspectionScope: boolean;
+    repairScope: boolean;
   };
 }
 
@@ -107,6 +108,26 @@ function isInspectionJobSummary(slug: string | null | undefined): boolean {
   );
 }
 
+/**
+ * Repair Job Summaries do not record Next Service Due — DATE-C010 must not
+ * shadow-advise on that family (YN62EAW / breakdown-repair path).
+ */
+export function isRepairJobSummaryText(text: string): boolean {
+  if (!text) return false;
+  if (
+    /\b(?:loler|thorough\s+examination|next\s+examination\s+due)\b/i.test(text)
+  ) {
+    return false;
+  }
+  return (
+    /\brepair\s+issue\b/i.test(text) ||
+    /\bbreakdown\s*\/\s*repair\b/i.test(text) ||
+    /\bconsumables\s+used\??\s*yes\b/i.test(text) ||
+    (/\brepairs?\s+required\b/i.test(text) &&
+      /\b(?:engineer\s+comments?|fault\s+reason)\b/i.test(text))
+  );
+}
+
 function extractNextExamFromText(text: string): string | null {
   const patterns = [
     /next\s*examination\s*due[:.\s]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/i,
@@ -129,8 +150,9 @@ export function evaluateDateCompliance(
   const now = input.now ?? new Date();
   const findings: Finding[] = [];
   const lolerScope = isLolerSlug(input.templateSlug);
+  const repairScope = !lolerScope && isRepairJobSummaryText(input.text);
   const inspectionScope =
-    !lolerScope && isInspectionJobSummary(input.templateSlug);
+    !lolerScope && !repairScope && isInspectionJobSummary(input.templateSlug);
 
   const examRaw =
     input.examinationDate?.trim() ||
@@ -157,6 +179,7 @@ export function evaluateDateCompliance(
     nextServiceDue: nextServiceRaw,
     lolerScope,
     inspectionScope,
+    repairScope,
   };
 
   if (lolerScope) {

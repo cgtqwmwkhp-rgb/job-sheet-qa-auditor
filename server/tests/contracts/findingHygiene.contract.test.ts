@@ -133,7 +133,7 @@ describe("findingHygiene", () => {
     expect(cleaned).toHaveLength(1);
     expect(cleaned[0].normalisedSnippet).toBe("Present");
     expect(cleaned[0].severity).toBe("S3");
-    expect(cleaned[0].reasonCode).toBe("LOW_CONFIDENCE");
+    expect(cleaned[0].reasonCode).toBe("INK_UNVERIFIED");
   });
 
   it("injects Present signature finding when label evidence and Gemini omitted it", () => {
@@ -239,9 +239,10 @@ Technician Signature
     const injected = injectPresentFieldFindings([], text);
     expect(injected.some(f => f.fieldName === "vorStatus")).toBe(true);
     expect(injected.some(f => f.fieldName === "assetId")).toBe(true);
-    expect(
-      injected.find(f => f.fieldName === "assetId")?.normalisedSnippet
-    ).toBe("BN21ACO_TL");
+    const asset = injected.find(f => f.fieldName === "assetId");
+    expect(asset?.normalisedSnippet).toBe("BN21ACO_TL");
+    expect(asset?.reasonCode).toBe("EXTRACTED");
+    expect(asset?.rawSnippet).toBe(asset?.normalisedSnippet);
     expect(injected.some(f => f.fieldName === "makeModel")).toBe(true);
     expect(
       injected.find(f => f.fieldName === "makeModel")?.normalisedSnippet

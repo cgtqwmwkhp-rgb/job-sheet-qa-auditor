@@ -100,4 +100,21 @@ describe("dateCompliance Pack v1", () => {
     });
     expect(result.findings.some(f => f.ruleId === "DATE-C010")).toBe(false);
   });
+
+  it("DATE-C010 does not emit on repair Job Summary (no next-service field)", () => {
+    const result = evaluateDateCompliance({
+      text: `
+        Job Summary Report
+        Repair Issue: fuel leak
+        Breakdown/Repair
+        Consumables Used? Yes
+        Engineer Comments: replaced fuel pipe
+        Next Service Date:
+      `,
+      templateSlug: "job-summary-v1",
+      now,
+    });
+    expect(result.signals.repairScope).toBe(true);
+    expect(result.findings.some(f => f.ruleId === "DATE-C010")).toBe(false);
+  });
 });

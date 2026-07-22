@@ -106,22 +106,25 @@ const WORK_DONE_ONLY_RE =
   /\b(fitted|replaced|installed|refitted|tightened|adjusted|cleaned|lubricat(?:ed|e)|completed|carried\s+out|parts?\s+used)\b/i;
 
 function extractCommentBody(text: string): string {
-  // Bound by signature headers — NOT by "Parts Still Required", because Job-87
-  // style narratives write "Parts still required: ..." as prose inside comments.
+  // Bound by signature / parts / Technican headers — NOT by "Parts Still
+  // Required" alone as prose inside comments (Job-87). Cap 4000 for thorough
+  // repair narratives; stop on whitespace OR newline (flattened text-layer).
+  // Do NOT stop on "Parts Still Required" — Job-87 narratives use that as prose.
+  // Do stop on "Parts Used" / Technican / signatures (YN62EAW flatten).
   const section =
     text.match(
-      /(?:engineer\s*comments?|work\s*notes?)\s*[:-]?\s*([\s\S]{0,800}?)(?=\n(?:technician\s*signature|customer\s*signature|completion\s*details)\b|$)/i
+      /(?:engineer\s*comments?|work\s*notes?)\s*[:-]?\s*([\s\S]{0,4000}?)(?=(?:\n|\s{2,})(?:parts\s+used\b(?!\s*still)|techni[cs]an|technician\s+signature|customer\s+signature|completion\s+details|fault\s+reason|breakdown\s*\/\s*repair)\b|$)/i
     )?.[1] ||
     extractNamedSection(text, "Engineer Comments") ||
     extractNamedSection(text, "Work Notes") ||
     text.match(
-      /(?:repairs?\s*(?:needed|details?)|action\s*required|defect(?:s)?\s*(?:found|notes?))\s*[:-]?\s*([\s\S]{0,800}?)(?=\n(?:technician\s*signature|customer\s*signature)\b|$)/i
+      /(?:repairs?\s*(?:needed|details?)|action\s*required|defect(?:s)?\s*(?:found|notes?))\s*[:-]?\s*([\s\S]{0,4000}?)(?=(?:\n|\s{2,})(?:parts\s+used\b(?!\s*still)|techni[cs]an|technician\s+signature|customer\s+signature)\b|$)/i
     )?.[1] ||
     "";
 
   return section
     .replace(/\s+/g, " ")
-    .replace(/\b(?:technician|customer)\s+signature\b.*$/i, "")
+    .replace(/\b(?:technician|customer|technican)\s+signature\b.*$/i, "")
     .trim();
 }
 

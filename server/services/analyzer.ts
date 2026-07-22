@@ -53,7 +53,11 @@ export interface Finding {
     | "OCR_FAILURE"
     | "PIPELINE_ERROR"
     | "SPEC_GAP"
-    | "SECURITY_RISK";
+    | "SECURITY_RISK"
+    /** Successful field extraction theater — not an Issue. */
+    | "EXTRACTED"
+    /** Signature Present from label; VLM ink not verified — not an Issue. */
+    | "INK_UNVERIFIED";
   rawSnippet: string;
   normalisedSnippet: string;
   confidence: number;
