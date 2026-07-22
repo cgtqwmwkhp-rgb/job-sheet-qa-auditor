@@ -138,6 +138,7 @@ const PARTS_SECTION_HEADERS = [
   "Parts Still Required",
   "Technician Name",
   "Technican Name",
+  "Technican",
   "Technician Signature",
   "Customer Signature",
   "Engineer Comments",
@@ -300,6 +301,15 @@ export function sectionHasContent(body: string): {
   }
   if (/^(?:see\s+above|tbc|tba|\.+)$/i.test(cleaned)) {
     return { present: false, snippet: cleaned };
+  }
+  // YN62EAW flatten bleed: empty Parts Still Required swallowed Technican/Images.
+  if (
+    /^(?:techni[cs]an(?:\s+name)?|signature|name|images|page\s+\d+)(?:\b|[\s:])/i.test(
+      cleaned
+    ) &&
+    !/\b(?:part|pn[- ]?\d|filter|hose|bearing|seal|gasket|kit)\b/i.test(cleaned)
+  ) {
+    return { present: false, snippet: "" };
   }
   return { present: true, snippet: cleaned.slice(0, 160) };
 }
