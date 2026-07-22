@@ -48,6 +48,10 @@ describe("Template Selector - PR-B Contract Tests", () => {
   describe("Tokenization", () => {
     it("should tokenize text to lowercase words", () => {
       const tokens = tokenizeText("Hello World! This is a TEST.");
+      expect(tokenizeText("P.T.O. Service Compliance")).toEqual(
+        expect.arrayContaining(["pto", "service", "compliance"])
+      );
+      expect(tokenizeText("P.T.O. Service Compliance")).not.toContain("t");
 
       expect(tokens).toEqual(["hello", "world", "this", "is", "a", "test"]);
     });

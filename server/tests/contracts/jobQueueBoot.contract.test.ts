@@ -22,4 +22,21 @@ describe("durable job queue boot recovery contract", () => {
       /try\s*\{\s*await initJobSheetProcessingQueue\(\);\s*\}\s*catch\s*\(error\)\s*\{\s*console\.warn\("\[JobQueue\] Boot recovery skipped:", error\);/s
     );
   });
+
+  it("always wakes worker/poller on enqueue and drains queued work at boot", () => {
+    const queueSrc = readFileSync(
+      path.join(repoRoot, "server/services/jobQueue/index.ts"),
+      "utf8"
+    );
+    // Must not gate wake on !deduped — that stranded bulk reprocess jobs.
+    expect(queueSrc).toContain("startJobSheetProcessingWorker()");
+    expect(queueSrc).toContain("startJobSheetProcessingPoller()");
+    expect(queueSrc).toMatch(
+      /function toResponse[\s\S]*?startJobSheetProcessingWorker\(\);\s*if \(durable\) \{\s*startJobSheetProcessingPoller\(\);/
+    );
+    expect(queueSrc).not.toMatch(
+      /if\s*\(\s*!result\.deduped\s*\)\s*\{\s*startJobSheetProcessingWorker/
+    );
+    expect(queueSrc).toContain("hasQueued()");
+  });
 });

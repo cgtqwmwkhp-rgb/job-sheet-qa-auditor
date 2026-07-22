@@ -99,15 +99,18 @@ const CONFIDENCE_THRESHOLDS = {
 } as const;
 
 /**
- * Tokenize text for matching
- * Normalizes to lowercase, removes punctuation, splits on whitespace
+ * Tokenize text for matching.
+ * Normalizes to lowercase, collapses P.T.O. / P T O → pto (PTO selection),
+ * removes other punctuation, splits on whitespace.
  */
 export function tokenizeText(text: string): string[] {
-  return text
+  const normalized = text
     .toLowerCase()
-    .replace(/[^\w\s]/g, " ")
-    .split(/\s+/)
-    .filter(t => t.length > 0);
+    // Preserve "pto" before punctuation strip turns "p.t.o" into p/t/o.
+    .replace(/\bp\s*\.\s*t\s*\.\s*o\b/g, "pto")
+    .replace(/\bp\s+t\s+o\b/g, "pto")
+    .replace(/[^\w\s]/g, " ");
+  return normalized.split(/\s+/).filter(t => t.length > 0);
 }
 
 /**
