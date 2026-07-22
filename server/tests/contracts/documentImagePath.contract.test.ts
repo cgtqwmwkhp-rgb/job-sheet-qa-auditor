@@ -31,9 +31,28 @@ describe("Pack v1 document-image honesty", () => {
         templateSlug: "loler-examination-v1",
       }
     );
-    expect(cleaned[0]?.severity).toBe("S2");
+    expect(cleaned[0]?.severity).toBe("S3");
     expect(cleaned[0]?.honestyDemoted).toBe(true);
     expect(cleaned[0]?.whyItMatters).toMatch(/image_qa_unavailable/i);
+  });
+
+  it("locks LOLER Present/S3 customerSignature so DEF-C040 cannot re-major", () => {
+    const cleaned = demoteSignatureSystemWhenImageQaUnavailable(
+      [
+        sigFinding({
+          fieldName: "customerSignature",
+          severity: "S3",
+          reasonCode: "LOW_CONFIDENCE",
+          normalisedSnippet: "Present",
+        }),
+      ],
+      {
+        skippedReason: "image_qa_unavailable",
+        templateSlug: "loler-examination-v1",
+      }
+    );
+    expect(cleaned[0]?.honestyDemoted).toBe(true);
+    expect(cleaned[0]?.severity).toBe("S3");
   });
 
   it("demotes PTO signature SYSTEM major on image_qa_unavailable", () => {
@@ -44,7 +63,7 @@ describe("Pack v1 document-image honesty", () => {
         templateSlug: "pto-service-v1",
       }
     );
-    expect(cleaned[0]?.severity).toBe("S2");
+    expect(cleaned[0]?.severity).toBe("S3");
     expect(cleaned[0]?.honestyDemoted).toBe(true);
   });
 
