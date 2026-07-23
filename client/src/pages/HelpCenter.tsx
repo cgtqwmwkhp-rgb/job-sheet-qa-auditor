@@ -822,8 +822,8 @@ export default function HelpCenter() {
                         of the entire job card, regardless of the Doc Quality
                         score. Default deduction:{" "}
                         <strong className="text-foreground">−25</strong> from
-                        Doc Quality. Safety-critical rules cannot be
-                        downgraded by non-admin users.
+                        Doc Quality. Safety-critical rules cannot be downgraded
+                        by non-admin users.
                       </p>
                     </div>
                     <div className="rounded-lg border border-orange-200 bg-orange-50/50 dark:bg-orange-950/20 p-4 space-y-2">
@@ -838,7 +838,9 @@ export default function HelpCenter() {
                         . If Doc Quality falls below the pass mark (default{" "}
                         <strong className="text-foreground">85</strong>), the
                         sheet goes to{" "}
-                        <strong className="text-foreground">Needs review</strong>{" "}
+                        <strong className="text-foreground">
+                          Needs review
+                        </strong>{" "}
                         instead of PASS.
                       </p>
                     </div>

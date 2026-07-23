@@ -264,9 +264,7 @@ export function AuditPolicySettings() {
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label>Doc Quality pass mark</Label>
-              <span className="font-mono text-sm">
-                {policy.passMark ?? 85}
-              </span>
+              <span className="font-mono text-sm">{policy.passMark ?? 85}</span>
             </div>
             <Slider
               value={[policy.passMark ?? 85]}
