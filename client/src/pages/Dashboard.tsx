@@ -19,6 +19,7 @@ import {
   Loader2,
   Upload,
   ArrowRight,
+  X,
 } from "lucide-react";
 import { SmartTip } from "@/components/SmartTip";
 import { AuditTimeline } from "@/components/AuditTimeline";
@@ -28,17 +29,41 @@ import { Link, useLocation } from "wouter";
 import { perfMark, perfClear, PERF_MARKS } from "@/lib/perf";
 import { cn } from "@/lib/utils";
 import { formatDateUk } from "@/lib/formatDateUk";
+import { labelForReasonCode } from "@/components/review/holdQueueReasons";
 import { useMemo, useState } from "react";
 import type { Activity } from "@/lib/api";
 import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+
+type DefectReasonRow = {
+  ruleKey: string;
+  name: string;
+  reasonCode: string;
+  ruleId: string | null;
+  severity: string;
+  count: number;
+  overturned: number;
+  overturnRate: number | null;
+  sampleFindingIds: number[];
+};
+
+function buildAuditsFilterHref(input: {
+  reasonCode: string;
+  ruleId: string | null;
+}): string {
+  const params = new URLSearchParams();
+  params.set("reasonCode", input.reasonCode);
+  if (input.ruleId) params.set("ruleId", input.ruleId);
+  return `/audits?${params.toString()}`;
+}
 
 function KpiSkeleton() {
   return (
@@ -89,6 +114,7 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const period = useMemo(() => dashboardPeriod(), []);
+  const [selectedRuleKey, setSelectedRuleKey] = useState<string | null>(null);
 
   const navigateToAudit = (id: number) => {
     perfClear();
@@ -102,8 +128,6 @@ export default function Dashboard() {
     isError: statsError,
     refetch: refetchStats,
   } = trpc.stats.dashboard.useQuery(undefined, { enabled: !!user });
-  const { data: recentJobSheets, isLoading: jobSheetsLoading } =
-    trpc.jobSheets.list.useQuery({ limit: 5 }, { enabled: !!user });
   const { data: holdQueueSheets, isLoading: holdLoading } =
     trpc.jobSheets.list.useQuery(
       { status: "review_queue", limit: 5 },
@@ -122,6 +146,49 @@ export default function Dashboard() {
   );
 
   const systemHealthy = health?.ok === true;
+
+  const defectReasons: DefectReasonRow[] = useMemo(() => {
+    const rules = exceptionSummary?.overturns.worstRules ?? [];
+    return rules.slice(0, 6).map(rule => ({
+      ruleKey: rule.ruleKey,
+      name: labelForReasonCode(rule.reasonCode),
+      reasonCode: rule.reasonCode,
+      ruleId: rule.ruleId,
+      severity: rule.severity,
+      count: rule.totalFindings,
+      overturned: rule.overturnedCount,
+      overturnRate: rule.overturnRate,
+      sampleFindingIds: rule.sampleFindingIds ?? [],
+    }));
+  }, [exceptionSummary]);
+
+  const selectedDefect = useMemo(
+    () => defectReasons.find(r => r.ruleKey === selectedRuleKey) ?? null,
+    [defectReasons, selectedRuleKey]
+  );
+
+  const { data: recentJobSheets, isLoading: jobSheetsLoading } =
+    trpc.jobSheets.list.useQuery(
+      {
+        limit: 5,
+        ...(selectedDefect
+          ? {
+              reasonCode: selectedDefect.reasonCode,
+              ...(selectedDefect.ruleId
+                ? { ruleId: selectedDefect.ruleId }
+                : {}),
+            }
+          : {}),
+      },
+      { enabled: !!user }
+    );
+
+  const sampleFindingIds = selectedDefect?.sampleFindingIds ?? [];
+  const { data: sampleAudits, isLoading: samplesLoading } =
+    trpc.auditActions.resolveSampleAudits.useQuery(
+      { findingIds: sampleFindingIds },
+      { enabled: !!user && sampleFindingIds.length > 0 }
+    );
 
   const activityChart = useMemo(() => {
     const series = driftSummary?.series ?? [];
@@ -145,15 +212,6 @@ export default function Dashboard() {
         defects: v.defects,
       }));
   }, [driftSummary]);
-
-  const defectReasons = useMemo(() => {
-    const rules = exceptionSummary?.overturns.worstRules ?? [];
-    return rules.slice(0, 6).map(rule => ({
-      name: rule.reasonCode || rule.ruleId || "Unknown",
-      count: rule.totalFindings,
-      overturned: rule.overturnedCount,
-    }));
-  }, [exceptionSummary]);
 
   const recentActivity: Activity[] = useMemo(() => {
     return (recentJobSheets?.items ?? []).slice(0, 8).map(sheet => ({
@@ -414,14 +472,37 @@ export default function Dashboard() {
           </Card>
 
           <Card className="col-span-3">
-            <CardHeader>
-              <CardTitle>Top Defect Reasons</CardTitle>
-              <CardDescription>
-                Highest-volume rules by findings (last 14 days).
-              </CardDescription>
+            <CardHeader className="space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <CardTitle>Top Defect Reasons</CardTitle>
+                  <CardDescription>
+                    Highest-impact rules by findings (last 14 days). Click a bar
+                    to drill down.
+                  </CardDescription>
+                </div>
+                {selectedDefect ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 shrink-0 gap-1 px-2 text-xs"
+                    onClick={() => setSelectedRuleKey(null)}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Clear
+                  </Button>
+                ) : null}
+              </div>
+              {selectedDefect ? (
+                <Badge variant="secondary" className="w-fit gap-1 font-normal">
+                  Filter: {selectedDefect.name}
+                  {selectedDefect.ruleId ? ` · ${selectedDefect.ruleId}` : ""}
+                </Badge>
+              ) : null}
             </CardHeader>
-            <CardContent>
-              <div className="h-[280px]">
+            <CardContent className="space-y-3">
+              <div className="h-[220px]">
                 {chartsLoading ? (
                   <ChartSkeleton />
                 ) : defectReasons.length > 0 ? (
@@ -439,16 +520,54 @@ export default function Dashboard() {
                       <YAxis
                         type="category"
                         dataKey="name"
-                        width={96}
+                        width={148}
                         tick={{ fontSize: 10 }}
                       />
-                      <Tooltip contentStyle={CHART_TOOLTIP} />
+                      <Tooltip
+                        contentStyle={CHART_TOOLTIP}
+                        formatter={(value: number, _name, item) => {
+                          const row = item?.payload as
+                            | DefectReasonRow
+                            | undefined;
+                          const overturned = row?.overturned ?? 0;
+                          return [
+                            `${value} findings · ${overturned} overturned`,
+                            "Findings",
+                          ];
+                        }}
+                        labelFormatter={(label, payload) => {
+                          const row = payload?.[0]?.payload as
+                            | DefectReasonRow
+                            | undefined;
+                          if (!row) return String(label);
+                          const ruleBit = row.ruleId ?? "no-rule";
+                          return `${row.name} · ${ruleBit} · ${row.severity}`;
+                        }}
+                      />
                       <Bar
                         dataKey="count"
-                        fill="#2868CE"
                         name="Findings"
                         radius={[0, 4, 4, 0]}
-                      />
+                        cursor="pointer"
+                        onClick={(data: { payload?: DefectReasonRow }) => {
+                          const key = data?.payload?.ruleKey;
+                          if (!key) return;
+                          setSelectedRuleKey(prev =>
+                            prev === key ? null : key
+                          );
+                        }}
+                      >
+                        {defectReasons.map(row => (
+                          <Cell
+                            key={row.ruleKey}
+                            fill={
+                              selectedRuleKey === row.ruleKey
+                                ? "#1d4f9c"
+                                : "#2868CE"
+                            }
+                          />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -473,6 +592,71 @@ export default function Dashboard() {
                   />
                 )}
               </div>
+
+              {selectedDefect ? (
+                <div className="rounded-lg border bg-[#F9F9F9] p-3 space-y-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge variant="outline" className="text-[10px]">
+                      {selectedDefect.severity}
+                    </Badge>
+                    {selectedDefect.ruleId ? (
+                      <Badge
+                        variant="outline"
+                        className="font-mono text-[10px]"
+                      >
+                        {selectedDefect.ruleId}
+                      </Badge>
+                    ) : null}
+                    <Badge variant="secondary" className="text-[10px]">
+                      {selectedDefect.count} findings
+                    </Badge>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {selectedDefect.overturned} overturned
+                    </Badge>
+                    {selectedDefect.overturnRate != null ? (
+                      <Badge variant="outline" className="text-[10px]">
+                        {(selectedDefect.overturnRate * 100).toFixed(0)}%
+                        overturn rate
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {samplesLoading ? (
+                      <span className="text-xs text-muted-foreground">
+                        Resolving sample audits…
+                      </span>
+                    ) : (sampleAudits?.jobSheetIds ?? []).length > 0 ? (
+                      sampleAudits!.jobSheetIds.slice(0, 5).map(jobSheetId => (
+                        <Button
+                          key={jobSheetId}
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => navigateToAudit(jobSheetId)}
+                        >
+                          <FileText className="h-3 w-3 mr-1" />
+                          JS-{jobSheetId}
+                        </Button>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        No sample audits for this rule.
+                      </span>
+                    )}
+                  </div>
+                  <Button asChild size="sm" className="h-8 w-full text-xs">
+                    <Link
+                      href={buildAuditsFilterHref({
+                        reasonCode: selectedDefect.reasonCode,
+                        ruleId: selectedDefect.ruleId,
+                      })}
+                    >
+                      View all matching audits
+                      <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </div>
@@ -506,14 +690,31 @@ export default function Dashboard() {
                     <div>
                       <CardTitle>Recent Audits</CardTitle>
                       <CardDescription>
-                        Latest job sheets processed by the system.
+                        {selectedDefect
+                          ? `Filtered by ${selectedDefect.name}${
+                              selectedDefect.ruleId
+                                ? ` · ${selectedDefect.ruleId}`
+                                : ""
+                            }.`
+                          : "Latest job sheets processed by the system."}
                       </CardDescription>
                     </div>
                     {!jobSheetsLoading &&
                     recentJobSheets &&
                     recentJobSheets.items.length > 0 ? (
                       <Button asChild variant="ghost" size="sm">
-                        <Link href="/audits">View all</Link>
+                        <Link
+                          href={
+                            selectedDefect
+                              ? buildAuditsFilterHref({
+                                  reasonCode: selectedDefect.reasonCode,
+                                  ruleId: selectedDefect.ruleId,
+                                })
+                              : "/audits"
+                          }
+                        >
+                          View all
+                        </Link>
                       </Button>
                     ) : null}
                   </CardHeader>
@@ -597,6 +798,21 @@ export default function Dashboard() {
                           </div>
                         ))}
                       </div>
+                    ) : selectedDefect ? (
+                      <EmptyState
+                        compact
+                        icon={AlertTriangle}
+                        title="No matching audits"
+                        description={`No recent job sheets with ${selectedDefect.name}${
+                          selectedDefect.ruleId
+                            ? ` (${selectedDefect.ruleId})`
+                            : ""
+                        }.`}
+                        action={{
+                          label: "Clear filter",
+                          onClick: () => setSelectedRuleKey(null),
+                        }}
+                      />
                     ) : (
                       <EmptyState
                         icon={FileText}

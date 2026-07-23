@@ -58,7 +58,53 @@ const REASON_META: Record<
     variant: "warning",
     className: "bg-amber-100 text-amber-800 border-amber-200",
   },
+  INCOMPLETE_EVIDENCE: {
+    label: "Incomplete Evidence",
+    variant: "warning",
+    className: "bg-amber-100 text-amber-800 border-amber-200",
+  },
+  PIPELINE_ERROR: {
+    label: "Pipeline Error",
+    variant: "destructive",
+    className: "bg-red-100 text-red-800 border-red-200",
+  },
+  SPEC_GAP: {
+    label: "Spec Gap",
+    variant: "secondary",
+    className: "bg-slate-100 text-slate-700 border-slate-200",
+  },
+  SECURITY_RISK: {
+    label: "Security Risk",
+    variant: "destructive",
+    className: "bg-red-100 text-red-800 border-red-200",
+  },
+  EXTRACTED: {
+    label: "Extracted",
+    variant: "outline",
+    className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+  INK_UNVERIFIED: {
+    label: "Ink Unverified",
+    variant: "outline",
+    className: "bg-slate-50 text-slate-600 border-slate-200",
+  },
 };
+
+/** Human-readable label for a finding reason code (Dashboard / Audit Results). */
+export function labelForReasonCode(
+  reasonCode: string | null | undefined
+): string {
+  const code = (reasonCode ?? "").trim().toUpperCase();
+  if (!code) return "Unknown";
+  const meta = REASON_META[code];
+  if (meta) return meta.label;
+  return code
+    .toLowerCase()
+    .split("_")
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 const REASON_PRIORITY = [
   "CONFLICT",
