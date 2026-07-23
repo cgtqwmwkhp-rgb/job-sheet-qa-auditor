@@ -1860,6 +1860,7 @@ export const appRouter = router({
             minor: z.number().min(0).max(100),
             informational: z.number().min(0).max(100),
           }),
+          passMark: z.number().min(0).max(100),
           forms: z.record(
             z.string(),
             z.object({

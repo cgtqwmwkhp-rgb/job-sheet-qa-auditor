@@ -159,7 +159,11 @@ import {
   canPromoteAutoPass,
   runDeterministicValidation,
 } from "./validation/goldSpecBridge";
-import { applyAuditPolicy, resolveAuditFormFamily } from "./auditPolicy";
+import {
+  applyAuditPolicy,
+  finalizeDocQualityVerdict,
+  resolveAuditFormFamily,
+} from "./auditPolicy";
 import {
   runSelectionMarkDetection,
   isSelectionMarksEnabled,
@@ -3575,13 +3579,16 @@ async function processJobSheetWithOptions(
     });
   }
 
-  // Admin Audit Policy: Major → hard FAIL; Minor → Doc Quality only.
+  // Admin Audit Policy: Major → hard FAIL; Minor → Doc Quality deduction;
+  // PASS requires no majors AND Doc Quality ≥ passMark (else REVIEW_QUEUE).
   let auditPolicyDecision: {
     formFamily: string;
     hasMajorFails: boolean;
     majorCount: number;
     minorCount: number;
     weights: { major: number; minor: number; informational: number };
+    passMark: number;
+    documentationQualityScore?: number;
     policyVersion: string;
     ruleSnapshotHash: string;
   } | null = null;
@@ -3599,6 +3606,7 @@ async function processJobSheetWithOptions(
       majorCount: applied.majorCount,
       minorCount: applied.minorCount,
       weights: auditPolicy.weights,
+      passMark: auditPolicy.passMark,
       policyVersion: applied.policyVersion,
       ruleSnapshotHash: applied.ruleSnapshotHash,
     };
@@ -3608,7 +3616,7 @@ async function processJobSheetWithOptions(
       findings: applied.findings,
       summary:
         `${analysisResult.summary} ` +
-        `[AUDIT_POLICY] form=${auditFormFamily} majors=${applied.majorCount} minors=${applied.minorCount} → ${applied.overallResult}.`,
+        `[AUDIT_POLICY] form=${auditFormFamily} majors=${applied.majorCount} minors=${applied.minorCount} passMark=${auditPolicy.passMark} → ${applied.overallResult}.`,
     };
     recordStage({
       stage: "Audit Policy (Major/Minor)",
@@ -3633,17 +3641,34 @@ async function processJobSheetWithOptions(
       weights: auditPolicy.weights,
     });
     documentationQualityPenalties = quality.penalties;
+    const verdict = finalizeDocQualityVerdict({
+      hasMajorFails: Boolean(auditPolicyDecision?.hasMajorFails),
+      documentationQualityScore: quality.score,
+      passMark: auditPolicy.passMark,
+    });
+    if (auditPolicyDecision) {
+      auditPolicyDecision = {
+        ...auditPolicyDecision,
+        documentationQualityScore: quality.score,
+      };
+    }
     analysisResult = {
       ...analysisResult,
       score: quality.score,
+      overallResult: verdict,
       summary:
         `${analysisResult.summary} ` +
-        `[DOC_QUALITY] ${quality.summary} (LLM confidence was ${llmConfidenceForReport}).`,
+        `[DOC_QUALITY] ${quality.summary} (LLM confidence was ${llmConfidenceForReport}). ` +
+        `[PASS_MARK] score=${quality.score} mark=${auditPolicy.passMark} → ${verdict}.`,
     };
     recordStage({
       stage: "Documentation Quality Score",
       status: "success",
       durationMs: 0,
+      error:
+        verdict === "REVIEW_QUEUE"
+          ? `Doc Quality ${quality.score} < pass mark ${auditPolicy.passMark}`
+          : undefined,
     });
   }
 

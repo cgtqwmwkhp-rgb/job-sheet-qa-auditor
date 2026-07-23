@@ -651,13 +651,17 @@ export default function HelpCenter() {
                       <p>
                         Starts at <strong>100 %</strong> and drops when the
                         auditor finds documentation problems — missing fields,
-                        inconsistent values, or incomplete notes. Each rule
-                        violation deducts points based on its fail class (Major
-                        penalties are heavier than Minor).
+                        inconsistent values, or incomplete notes. Defaults:{" "}
+                        <strong>Major −25</strong>, <strong>Minor −10</strong>.
+                        A sheet only <strong>PASS</strong>es when there are no
+                        majors <em>and</em> Doc Quality is at least{" "}
+                        <strong>85</strong> (configurable pass mark).
                       </p>
                       <p>
                         Think of it as a <em>paperwork score</em>: "How complete
-                        and correct is this job sheet?"
+                        and correct is this job sheet?" An engineer's period
+                        Quality Score is the <strong>average</strong> of their
+                        sheet Doc Quality marks (target 95).
                       </p>
                     </div>
                     <div className="rounded-lg border p-4 space-y-2">
@@ -813,24 +817,31 @@ export default function HelpCenter() {
                       <p>
                         A single Major finding causes an{" "}
                         <strong className="text-foreground">
-                          immediate fail
+                          immediate FAIL
                         </strong>{" "}
                         of the entire job card, regardless of the Doc Quality
-                        score. Safety-critical rules (e.g. missing safety
-                        signature, unsafe tread depth) are always Major and
-                        cannot be downgraded by non-admin users.
+                        score. Default deduction:{" "}
+                        <strong className="text-foreground">−25</strong> from
+                        Doc Quality. Safety-critical rules cannot be downgraded
+                        by non-admin users.
                       </p>
                     </div>
                     <div className="rounded-lg border border-orange-200 bg-orange-50/50 dark:bg-orange-950/20 p-4 space-y-2">
                       <Badge variant="secondary">Minor</Badge>
                       <p>
-                        Minor findings deduct points from Doc Quality but{" "}
+                        Minor findings deduct{" "}
+                        <strong className="text-foreground">−10</strong> from
+                        Doc Quality and{" "}
                         <strong className="text-foreground">
-                          never force a fail on their own
+                          never hard-fail alone
                         </strong>
-                        . They are used for coaching — for example, a missing
-                        secondary note or an incomplete reading that doesn't
-                        affect safety.
+                        . If Doc Quality falls below the pass mark (default{" "}
+                        <strong className="text-foreground">85</strong>), the
+                        sheet goes to{" "}
+                        <strong className="text-foreground">
+                          Needs review
+                        </strong>{" "}
+                        instead of PASS.
                       </p>
                     </div>
                     <div className="rounded-lg border p-4 space-y-2">

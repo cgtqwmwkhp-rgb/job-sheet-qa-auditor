@@ -110,10 +110,24 @@ export function mergeAuditPolicy(
   }
 
   const base = structuredClone(DEFAULT_AUDIT_POLICY);
+  const legacyPrePassMark = typeof stored.passMark !== "number";
   const weights = {
     ...base.weights,
     ...(stored.weights ?? {}),
   };
+  // First load of v2 best-in-class model: lock score weights + pass mark while
+  // preserving admin rule classifications from the stored forms.
+  if (legacyPrePassMark) {
+    weights.major = base.weights.major;
+    weights.minor = base.weights.minor;
+    weights.informational = base.weights.informational;
+  }
+
+  const passMarkRaw =
+    typeof stored.passMark === "number" && Number.isFinite(stored.passMark)
+      ? stored.passMark
+      : base.passMark;
+  const passMark = Math.max(0, Math.min(100, Math.round(passMarkRaw)));
 
   const forms = { ...base.forms };
   if (stored.forms) {
@@ -152,6 +166,7 @@ export function mergeAuditPolicy(
   return {
     version: stored.version ?? base.version,
     weights,
+    passMark,
     forms,
   };
 }
@@ -237,9 +252,9 @@ export function hasMajorFails(findings: PolicyFinding[]): boolean {
 }
 
 /**
- * Decide overall result from policy (PX-117 — deterministic):
+ * Decide preliminary overall result from policy (PX-117 — deterministic):
  * - Any Major → FAIL
- * - Else → PASS (minors are Doc Quality % only; never sticky REVIEW from upstream)
+ * - Else → PASS (score gate applied later via finalizeDocQualityVerdict)
  *
  * Previously `return input.current` preserved analyzer/ensemble REVIEW_QUEUE vs
  * PASS for identical maj=0 profiles (forms 42 vs 64). Verdict is now a pure
@@ -252,8 +267,31 @@ export function decideOverallResult(input: {
   if (hasMajorFails(input.findings)) {
     return "FAIL";
   }
-  // Minors / informational never hard-fail and must not fork pass vs review.
+  // Minors / informational never hard-fail at this stage.
   void input.current;
+  return "PASS";
+}
+
+/**
+ * Best-in-class sheet verdict after Doc Quality is scored:
+ * - Any Major → FAIL
+ * - No majors but Doc Quality < passMark → REVIEW_QUEUE (Needs review)
+ * - Else → PASS
+ */
+export function finalizeDocQualityVerdict(input: {
+  hasMajorFails: boolean;
+  documentationQualityScore: number;
+  passMark: number;
+}): "PASS" | "FAIL" | "REVIEW_QUEUE" {
+  if (input.hasMajorFails) return "FAIL";
+  const score = Number.isFinite(input.documentationQualityScore)
+    ? input.documentationQualityScore
+    : 0;
+  const mark =
+    Number.isFinite(input.passMark) && input.passMark >= 0
+      ? input.passMark
+      : DEFAULT_AUDIT_POLICY.passMark;
+  if (score < mark) return "REVIEW_QUEUE";
   return "PASS";
 }
 
@@ -264,6 +302,7 @@ export function decideOverallResult(input: {
 export function computeRuleSnapshotHash(policy: AuditPolicy): string {
   const canonical = JSON.stringify({
     weights: policy.weights,
+    passMark: policy.passMark,
     forms: policy.forms,
   });
   return createHash("sha256").update(canonical).digest("hex");

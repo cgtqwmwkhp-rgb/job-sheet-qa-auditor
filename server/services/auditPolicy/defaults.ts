@@ -5,12 +5,14 @@ import type { AuditPolicy } from "./types";
  * Admins override via Settings → Audit Policy; pipeline uses DB ?? these defaults.
  */
 export const DEFAULT_AUDIT_POLICY: AuditPolicy = {
-  version: "1.0.0",
+  version: "2.0.0",
   weights: {
     major: 25,
-    minor: 15,
+    minor: 10,
     informational: 0,
   },
+  /** Sheet PASS requires Doc Quality ≥ this when there are no majors. */
+  passMark: 85,
   forms: {
     "wasted-journey-v1": {
       label: "Wasted Journey",
