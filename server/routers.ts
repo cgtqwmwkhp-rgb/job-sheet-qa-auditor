@@ -177,6 +177,8 @@ export const appRouter = router({
           .object({
             status: z.string().optional(),
             technicianId: z.number().optional(),
+            reasonCode: z.string().min(1).max(64).optional(),
+            ruleId: z.string().min(1).max(64).optional(),
             limit: z.number().min(1).max(100).default(50),
             offset: z.number().min(0).default(0),
           })

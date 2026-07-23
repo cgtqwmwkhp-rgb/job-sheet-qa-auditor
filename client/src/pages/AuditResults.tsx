@@ -19,14 +19,16 @@ import {
   Keyboard,
   Loader2,
   Search,
+  X,
   XCircle,
 } from "lucide-react";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { labelForReasonCode } from "@/components/review/holdQueueReasons";
 import { ProcessingProgressPanel } from "@/components/ProcessingProgressPanel";
 import { useJobSheetProcessStatus } from "@/hooks/useProcessingWatch";
 import {
@@ -167,6 +169,7 @@ function AuditListSkeleton() {
 
 export default function AuditResults() {
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const [listSearch, setListSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [jobSheetOffset, setJobSheetOffset] = useState(0);
@@ -194,6 +197,13 @@ export default function AuditResults() {
   const undoApprove = trpc.auditActions.undoJobSheetApprove.useMutation();
   const updateStatus = trpc.jobSheets.updateStatus.useMutation();
 
+  const urlFilters = useMemo(() => {
+    const params = new URLSearchParams(searchString);
+    const reasonCode = params.get("reasonCode")?.trim() || null;
+    const ruleId = params.get("ruleId")?.trim() || null;
+    return { reasonCode, ruleId };
+  }, [searchString]);
+
   const [selectedAuditId, setSelectedAuditId] = useState<number | null>(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -213,16 +223,41 @@ export default function AuditResults() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  // Reset accumulated pages when defect filter changes.
+  useEffect(() => {
+    setJobSheetOffset(0);
+    setAllJobSheets([]);
+  }, [urlFilters.reasonCode, urlFilters.ruleId]);
+
+  const buildAuditsListHref = useCallback(
+    (opts?: { id?: number; clearDefectFilter?: boolean }) => {
+      const params = new URLSearchParams();
+      if (opts?.id != null) params.set("id", String(opts.id));
+      if (!opts?.clearDefectFilter) {
+        if (urlFilters.reasonCode)
+          params.set("reasonCode", urlFilters.reasonCode);
+        if (urlFilters.ruleId) params.set("ruleId", urlFilters.ruleId);
+      }
+      const qs = params.toString();
+      return qs ? `/audits?${qs}` : "/audits";
+    },
+    [urlFilters.reasonCode, urlFilters.ruleId]
+  );
+
+  const clearDefectFilter = () => {
+    setLocation(buildAuditsListHref({ clearDefectFilter: true }));
+  };
+
   const goBackToList = () => {
     setSelectedAuditId(null);
-    setLocation("/audits");
+    setLocation(buildAuditsListHref());
   };
 
   const navigateToAudit = (id: number) => {
     perfClear();
     perfMark(PERF_MARKS.AUDIT_DETAIL_CLICK);
     setSelectedAuditId(id);
-    setLocation(`/audits?id=${id}`);
+    setLocation(buildAuditsListHref({ id }));
   };
 
   const numericId = selectedAuditId ?? 0;
@@ -254,7 +289,12 @@ export default function AuditResults() {
     isLoading: listLoading,
     isFetching: jobSheetsFetching,
   } = trpc.jobSheets.list.useQuery(
-    { limit: JOB_SHEET_PAGE_SIZE, offset: jobSheetOffset },
+    {
+      limit: JOB_SHEET_PAGE_SIZE,
+      offset: jobSheetOffset,
+      ...(urlFilters.reasonCode ? { reasonCode: urlFilters.reasonCode } : {}),
+      ...(urlFilters.ruleId ? { ruleId: urlFilters.ruleId } : {}),
+    },
     {
       refetchInterval: query => {
         const rows = query.state.data?.items;
@@ -818,6 +858,26 @@ export default function AuditResults() {
                 aria-label="Search audits"
               />
             </div>
+            {urlFilters.reasonCode || urlFilters.ruleId ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="gap-1.5 font-normal pr-1">
+                  <span>
+                    {urlFilters.reasonCode
+                      ? labelForReasonCode(urlFilters.reasonCode)
+                      : "Rule filter"}
+                    {urlFilters.ruleId ? ` · ${urlFilters.ruleId}` : ""}
+                  </span>
+                  <button
+                    type="button"
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full hover:bg-black/10"
+                    aria-label="Clear defect filter"
+                    onClick={clearDefectFilter}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-center gap-2">
               {filterChips.map(chip => (
                 <button

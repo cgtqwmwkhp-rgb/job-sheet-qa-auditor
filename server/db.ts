@@ -358,14 +358,95 @@ export async function getJobSheetById(id: number) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+/**
+ * Distinct job sheet IDs that have at least one finding matching reason/rule.
+ * Ordered by most recent matching audit result.
+ */
+export async function getJobSheetIdsByFindingFilter(options: {
+  reasonCode?: string;
+  ruleId?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<number[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const reasonCode = options.reasonCode?.trim();
+  const ruleId = options.ruleId?.trim();
+  if (!reasonCode && !ruleId) return [];
+
+  const findingConds = [];
+  if (reasonCode) {
+    findingConds.push(eq(auditFindings.reasonCode, reasonCode as any));
+  }
+  if (ruleId) {
+    findingConds.push(eq(auditFindings.ruleId, ruleId));
+  }
+
+  const limit = options.limit ?? 50;
+  const offset = options.offset ?? 0;
+
+  const rows = await db
+    .select({
+      jobSheetId: auditResults.jobSheetId,
+      latestAt: sql<Date>`max(${auditResults.createdAt})`.as("latestAt"),
+    })
+    .from(auditFindings)
+    .innerJoin(auditResults, eq(auditFindings.auditResultId, auditResults.id))
+    .where(and(...findingConds))
+    .groupBy(auditResults.jobSheetId)
+    .orderBy(desc(sql`max(${auditResults.createdAt})`))
+    .limit(limit)
+    .offset(offset);
+
+  return rows.map(r => r.jobSheetId);
+}
+
 export async function getJobSheets(options?: {
   status?: string;
   limit?: number;
   offset?: number;
   technicianId?: number;
+  /** Filter to sheets that have a finding with this reason code. */
+  reasonCode?: string;
+  /** Filter to sheets that have a finding with this rule id. */
+  ruleId?: string;
 }) {
   const db = await getDb();
   if (!db) return [];
+
+  const limit = options?.limit ?? 50;
+  const offset = options?.offset ?? 0;
+  const hasFindingFilter = Boolean(
+    options?.reasonCode?.trim() || options?.ruleId?.trim()
+  );
+
+  if (hasFindingFilter) {
+    // Over-fetch IDs so status/technician filters can still fill the page.
+    const matchedIds = await getJobSheetIdsByFindingFilter({
+      reasonCode: options?.reasonCode,
+      ruleId: options?.ruleId,
+      limit: Math.min(500, Math.max(limit + offset, limit) * 4),
+      offset: 0,
+    });
+    if (matchedIds.length === 0) return [];
+
+    const conditions = [inArray(jobSheets.id, matchedIds)];
+    if (options?.status) {
+      conditions.push(eq(jobSheets.status, options.status as any));
+    }
+    if (options?.technicianId) {
+      conditions.push(eq(jobSheets.technicianId, options.technicianId));
+    }
+
+    return db
+      .select()
+      .from(jobSheets)
+      .where(and(...conditions))
+      .orderBy(desc(jobSheets.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
 
   let query = db.select().from(jobSheets);
 
@@ -381,10 +462,7 @@ export async function getJobSheets(options?: {
     query = query.where(and(...conditions)) as any;
   }
 
-  return query
-    .orderBy(desc(jobSheets.createdAt))
-    .limit(options?.limit ?? 50)
-    .offset(options?.offset ?? 0);
+  return query.orderBy(desc(jobSheets.createdAt)).limit(limit).offset(offset);
 }
 
 export async function updateJobSheetStatus(
