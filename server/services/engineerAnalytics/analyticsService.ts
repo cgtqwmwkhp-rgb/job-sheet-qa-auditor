@@ -25,6 +25,21 @@ import type {
 import { getDefaultTrainingModules } from './types';
 
 /**
+ * Average of per-sheet Doc Quality scores (best-in-class engineer mark).
+ * Empty list → 100 (no paperwork audited in period).
+ */
+export function averageSheetDocQuality(
+  sheetDocQualityScores: Array<number | null | undefined>
+): number {
+  const scores = sheetDocQualityScores.filter(
+    (s): s is number => typeof s === "number" && Number.isFinite(s)
+  );
+  if (scores.length === 0) return 100;
+  const avg = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+  return Math.max(0, Math.min(100, Math.round(avg)));
+}
+
+/**
  * Calculate engineer score card
  */
 export function calculateScoreCard(
@@ -33,7 +48,9 @@ export function calculateScoreCard(
   totalDocuments: number,
   periodStart: string,
   periodEnd: string,
-  peerScores?: { teamAvgScore: number; regionAvgScore: number; percentile: number }
+  peerScores?: { teamAvgScore: number; regionAvgScore: number; percentile: number },
+  /** Per-sheet Doc Quality % in the period — engineer score is the average. */
+  sheetDocQualityScores?: Array<number | null | undefined>
 ): EngineerScoreCard {
   // Filter issues for this engineer in the period
   const engineerIssues = issues.filter(
@@ -46,13 +63,20 @@ export function calculateScoreCard(
   const documentsWithIssues = new Set(engineerIssues.map(i => i.documentId)).size;
   const issueRate = totalDocuments > 0 ? documentsWithIssues / totalDocuments : 0;
   
-  // Calculate overall score (100 - penalty for issues)
-  const severityWeights = { S0: 10, S1: 5, S2: 2, S3: 1 };
-  let penalty = 0;
-  for (const issue of engineerIssues) {
-    penalty += severityWeights[issue.severity];
+  // Best-in-class: overall score = average of sheet Doc Quality marks.
+  // When sheet scores are omitted (legacy unit fixtures), fall back to a
+  // severity-penalty estimate so older tests still exercise the card shape.
+  let overallScore: number;
+  if (sheetDocQualityScores !== undefined) {
+    overallScore = averageSheetDocQuality(sheetDocQualityScores);
+  } else {
+    const severityWeights = { S0: 10, S1: 5, S2: 2, S3: 1 };
+    let penalty = 0;
+    for (const issue of engineerIssues) {
+      penalty += severityWeights[issue.severity];
+    }
+    overallScore = Math.max(0, Math.min(100, 100 - penalty));
   }
-  const overallScore = Math.max(0, Math.min(100, 100 - penalty));
   
   // Count issues by severity
   const issuesBySeverity = {

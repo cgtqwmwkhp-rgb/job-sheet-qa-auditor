@@ -4,6 +4,7 @@ import {
   classifyFinding,
   computeRuleSnapshotHash,
   decideOverallResult,
+  finalizeDocQualityVerdict,
   DEFAULT_AUDIT_POLICY,
   mergeAuditPolicy,
   resolveAuditFormFamily,
@@ -224,6 +225,81 @@ describe("auditPolicy", () => {
     });
     // 2 majors × 25 = 50
     expect(quality.score).toBe(50);
+  });
+
+  it("locks best-in-class defaults: minor −10, passMark 85", () => {
+    expect(DEFAULT_AUDIT_POLICY.weights.minor).toBe(10);
+    expect(DEFAULT_AUDIT_POLICY.weights.major).toBe(25);
+    expect(DEFAULT_AUDIT_POLICY.passMark).toBe(85);
+    expect(DEFAULT_AUDIT_POLICY.version).toBe("2.0.0");
+  });
+
+  it("finalizeDocQualityVerdict: PASS only when score ≥ passMark", () => {
+    expect(
+      finalizeDocQualityVerdict({
+        hasMajorFails: false,
+        documentationQualityScore: 85,
+        passMark: 85,
+      })
+    ).toBe("PASS");
+    expect(
+      finalizeDocQualityVerdict({
+        hasMajorFails: false,
+        documentationQualityScore: 84,
+        passMark: 85,
+      })
+    ).toBe("REVIEW_QUEUE");
+    expect(
+      finalizeDocQualityVerdict({
+        hasMajorFails: true,
+        documentationQualityScore: 100,
+        passMark: 85,
+      })
+    ).toBe("FAIL");
+  });
+
+  it("merge upgrades pre-passMark policies to locked weights + passMark", () => {
+    const merged = mergeAuditPolicy({
+      version: "1.0.0",
+      weights: { major: 25, minor: 15, informational: 0 },
+      forms: {},
+    });
+    expect(merged.passMark).toBe(85);
+    expect(merged.weights.minor).toBe(10);
+    expect(merged.weights.major).toBe(25);
+    expect(merged.version).toBe("1.0.0");
+  });
+
+  it("one minor (−10) stays PASS under pass mark; two minors need review", () => {
+    const applied = applyAuditPolicy({
+      findings: [
+        finding({
+          ruleId: "WJ-R007",
+          fieldName: "assetId pattern",
+          severity: "S2",
+        }),
+        finding({
+          ruleId: "ATTR-C011",
+          fieldName: "Engineer Name",
+          severity: "S2",
+        }),
+      ],
+      formFamily: "wasted-journey-v1",
+      policy: DEFAULT_AUDIT_POLICY,
+      currentResult: "PASS",
+    });
+    const quality = computeDocumentationQualityScore(applied.findings, {
+      weights: DEFAULT_AUDIT_POLICY.weights,
+    });
+    // 2 minors × 10 = 80 → below pass mark 85
+    expect(quality.score).toBe(80);
+    expect(
+      finalizeDocQualityVerdict({
+        hasMajorFails: false,
+        documentationQualityScore: quality.score,
+        passMark: DEFAULT_AUDIT_POLICY.passMark,
+      })
+    ).toBe("REVIEW_QUEUE");
   });
 
   it("JSR engineer comments are major by default", () => {

@@ -36,7 +36,7 @@ describe("documentationQuality", () => {
     expect(result.llmConfidence).toBe(100);
   });
 
-  it("deducts 15 for a single S1 engineer-comments Issue (QOGRX3-like)", () => {
+  it("deducts 10 for a single S1 engineer-comments Issue (legacy path)", () => {
     const result = computeDocumentationQualityScore(
       [
         finding({ fieldName: "Works Completion", severity: "S3" }),
@@ -48,7 +48,7 @@ describe("documentationQuality", () => {
       ],
       { llmConfidence: 100, overallResult: "FAIL" }
     );
-    expect(result.score).toBe(85);
+    expect(result.score).toBe(90);
     expect(result.penalties).toHaveLength(1);
   });
 
@@ -58,6 +58,7 @@ describe("documentationQuality", () => {
       finding({ fieldName: "Return Visit Required", severity: "S1" }),
       finding({ fieldName: "Critical safety", severity: "S0" }),
     ]);
-    expect(result.score).toBe(100 - 15 - 15 - 25);
+    // Legacy: S1=10, S1=10, S0=25
+    expect(result.score).toBe(100 - 10 - 10 - 25);
   });
 });

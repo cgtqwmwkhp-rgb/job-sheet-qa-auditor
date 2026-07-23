@@ -58,6 +58,8 @@ interface AuditPolicy {
     minor: number;
     informational: number;
   };
+  /** Minimum Doc Quality % to PASS when there are no majors. */
+  passMark: number;
   forms: Record<string, AuditPolicyForm>;
 }
 
@@ -204,12 +206,17 @@ export function AuditPolicySettings() {
           </CardTitle>
           <CardDescription className="text-sm space-y-1">
             <span className="block">
-              <strong>Major</strong> = immediate job-card fail (supersedes pass
-              / fail). Doc Quality % still shows for coaching.
+              <strong>Major</strong> = immediate job-card FAIL. Doc Quality %
+              still shows for coaching.
             </span>
             <span className="block">
-              <strong>Minor</strong> = documentation score only — never forces
-              FAIL alone.
+              <strong>Minor</strong> = Doc Quality deduction only — never hard
+              fails alone. If Doc Quality falls below the pass mark, the sheet
+              goes to <strong>Needs review</strong>.
+            </span>
+            <span className="block">
+              <strong>PASS</strong> = no majors <em>and</em> Doc Quality ≥ pass
+              mark (default 85).
             </span>
             <span className="block">
               Changes apply to new / reprocessed audits. Existing results keep
@@ -221,10 +228,10 @@ export function AuditPolicySettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Score weights</CardTitle>
+          <CardTitle>Score weights &amp; pass mark</CardTitle>
           <CardDescription>
-            Points deducted from Doc Quality (start at 100). Major coaching
-            penalty does not change hard-fail logic.
+            Points deducted from Doc Quality (start at 100). Pass mark is the
+            minimum Doc Quality for a clean PASS when there are no majors.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -252,6 +259,24 @@ export function AuditPolicySettings() {
               max={50}
               step={1}
               onValueChange={([v]) => updateWeights("minor", v)}
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <Label>Doc Quality pass mark</Label>
+              <span className="font-mono text-sm">
+                {policy.passMark ?? 85}
+              </span>
+            </div>
+            <Slider
+              value={[policy.passMark ?? 85]}
+              min={50}
+              max={100}
+              step={1}
+              onValueChange={([v]) => {
+                setPolicy(prev => (prev ? { ...prev, passMark: v } : prev));
+                setHasChanges(true);
+              }}
             />
           </div>
         </CardContent>

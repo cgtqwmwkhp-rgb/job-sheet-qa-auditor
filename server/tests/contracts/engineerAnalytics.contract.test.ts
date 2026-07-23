@@ -7,6 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  averageSheetDocQuality,
   calculateScoreCard,
   generateFixPack,
   calculateTrendAnalytics,
@@ -107,6 +108,21 @@ describe('Engineer Analytics Contract Tests', () => {
   });
   
   describe('Score Card Calculation', () => {
+    it('averages sheet Doc Quality for overall engineer score', () => {
+      expect(averageSheetDocQuality([100, 90, 80])).toBe(90);
+      expect(averageSheetDocQuality([])).toBe(100);
+      const scoreCard = calculateScoreCard(
+        sampleEngineer,
+        sampleIssues,
+        3,
+        '2024-01-01',
+        '2024-01-31',
+        undefined,
+        [100, 90, 80]
+      );
+      expect(scoreCard.overallScore).toBe(90);
+    });
+
     it('should calculate score card for engineer', () => {
       const scoreCard = calculateScoreCard(
         sampleEngineer,

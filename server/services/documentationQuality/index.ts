@@ -12,7 +12,7 @@ import { DEFAULT_AUDIT_POLICY } from "../auditPolicy/defaults";
 
 const LEGACY_PENALTY = {
   S0: 25,
-  S1: 15,
+  S1: 10,
   S2: 5,
   S3: 0,
 } as const;

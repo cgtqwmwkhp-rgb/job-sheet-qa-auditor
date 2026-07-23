@@ -211,12 +211,17 @@ export function buildEngineerScoreCards(input: {
       prev.end
     );
     const prevIssues = prevFindings.map(toIssueOccurrence);
+    const prevScores = prevDocs.map(d => d.confidenceScore);
+    const periodScores = periodDocs.map(d => d.confidenceScore);
+
     const prevCard = calculateScoreCard(
       profile,
       prevIssues,
       prevDocs.length,
       prev.start,
-      prev.end
+      prev.end,
+      undefined,
+      prevScores
     );
 
     const card = calculateScoreCard(
@@ -224,7 +229,9 @@ export function buildEngineerScoreCards(input: {
       issues,
       periodDocs.length,
       periodStart,
-      periodEnd
+      periodEnd,
+      undefined,
+      periodScores
     );
 
     // Replace hardcoded previous-score assumption with real prior period.
