@@ -223,11 +223,15 @@ export default function AuditResults() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // Reset accumulated pages when defect filter changes.
-  useEffect(() => {
+  // Reset accumulated pages when defect filter changes (render-time sync).
+  const defectFilterKey = `${urlFilters.reasonCode ?? ""}|${urlFilters.ruleId ?? ""}`;
+  const [appliedDefectFilterKey, setAppliedDefectFilterKey] =
+    useState(defectFilterKey);
+  if (appliedDefectFilterKey !== defectFilterKey) {
+    setAppliedDefectFilterKey(defectFilterKey);
     setJobSheetOffset(0);
     setAllJobSheets([]);
-  }, [urlFilters.reasonCode, urlFilters.ruleId]);
+  }
 
   const buildAuditsListHref = useCallback(
     (opts?: { id?: number; clearDefectFilter?: boolean }) => {
