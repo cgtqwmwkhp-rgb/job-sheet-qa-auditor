@@ -10,6 +10,8 @@
 
 import type { Request, Response } from 'express';
 import { formatPrometheusMetrics } from '../services/metrics/parityMetrics';
+import { formatPipelinePrometheusMetrics } from '../services/metrics/pipelineMetrics';
+import { getDeadLetterQueueStatus } from '../utils/deadLetterQueue';
 import { getPdfProxyMetrics } from './pdfProxy';
 
 // Track server start time for uptime metric
@@ -136,8 +138,10 @@ export function handleMetrics(_req: Request, res: Response): void {
     // Combine app metrics with parity metrics
     const appMetrics = formatAppMetrics();
     const parityMetrics = formatPrometheusMetrics();
-    
-    const allMetrics = appMetrics + '\n' + parityMetrics;
+    const dlqDepth = getDeadLetterQueueStatus().totalFailed;
+    const pipelineMetrics = formatPipelinePrometheusMetrics(dlqDepth);
+
+    const allMetrics = appMetrics + '\n' + parityMetrics + '\n' + pipelineMetrics;
     
     // Prometheus exposition format requires text/plain
     res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
